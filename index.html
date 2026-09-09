@@ -219,6 +219,7 @@ body::before{
   animation:halo 5s ease-in-out infinite;
 }
 @keyframes halo{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.09);opacity:1}}
+.pet-stage.has-sprite .pet-shadow{opacity:0}
 .pet-shadow{
   position:absolute;bottom:14px;width:120px;height:16px;border-radius:50%;
   background:radial-gradient(ellipse, rgba(0,0,0,.55), transparent 70%);
@@ -717,14 +718,18 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
 .mt{margin-top:12px}.mt2{margin-top:20px}
 .hide{display:none!important}
 
-/* sprite-sheet driven pet (user supplied art) */
-.sprite{
-  image-rendering:pixelated;background-repeat:no-repeat;
-  background-size:auto 100%;
-  width:100%;height:100%;
+/* Sprite-sheet driven pets.
+   The strip is `frames` viewports wide and slides by exactly one viewport per
+   step. Do NOT switch this to animating background-position in %: percentage
+   background positions resolve against (container - image), so they never land
+   on frame boundaries. transform:translateX(-100%) of the strip is exact. */
+.sprite-view{position:relative;width:100%;aspect-ratio:var(--saspect,1);overflow:hidden;transform:scale(var(--sscale,1))}
+.sprite-strip{
+  position:absolute;left:0;top:0;height:100%;
+  background-repeat:no-repeat;image-rendering:pixelated;
 }
-.sprite.playing{animation:spriteRun steps(var(--frames)) var(--dur) infinite}
-@keyframes spriteRun{from{background-position-x:0}to{background-position-x:calc(var(--frames) * -100%)}}
+.sprite-strip.playing{animation:spriteRun steps(var(--frames)) var(--dur) infinite}
+@keyframes spriteRun{from{transform:translateX(0)}to{transform:translateX(-100%)}}
 
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.08s!important}
@@ -2037,21 +2042,58 @@ PET_ART.nimbus = [
    ------------------------------------------------------------------------- */
 function spriteKey(species, stage){ return species + ":" + stage; }
 
+/* Art that ships with the app. A key present in save.sprites wins; an explicit
+   null there means "use the vector pet instead of this default". */
+const DEFAULT_SPRITES = {
+  "ember:1": {
+    src:"art/ember-baby.png",
+    frames:4, rows:6, fps:3.5, aspect:1.587, scale:1.28,
+    moods:{ elated:0, happy:1, okay:2, bored:3, sad:4, asleep:5 },
+    moodFps:{ elated:6, happy:4, okay:3, bored:2.4, sad:2.4, asleep:1.1 }
+  }
+};
+function spriteConfig(species, stage){
+  const key = spriteKey(species, stage);
+  const own = save.sprites[key];
+  return own !== undefined ? own : (DEFAULT_SPRITES[key] || null);
+}
+
+/* If a sheet cannot be fetched (offline, moved, typo) fall back to the vector
+   pet rather than showing an empty box. */
+const spriteBroken = Object.create(null);
+function probeSprite(src){
+  if (src in spriteBroken) return;
+  spriteBroken[src] = false;
+  const img = new Image();
+  img.onerror = () => { spriteBroken[src] = true; if (save.species) renderAll(); };
+  img.src = src;
+}
+
 function spriteMarkup(species, stage, mood){
-  const cfg = save.sprites[spriteKey(species, stage)];
+  const cfg = spriteConfig(species, stage);
   if (!cfg || !cfg.src) return null;
+  if (spriteBroken[cfg.src]) return null;
+  probeSprite(cfg.src);
+  return spriteHTML(cfg, mood);
+}
+
+function spriteHTML(cfg, mood){
   const frames = Math.max(1, cfg.frames || 1);
-  const fps    = Math.max(1, cfg.fps || 8);
   const rows   = cfg.rows || (cfg.moods ? Math.max(...Object.values(cfg.moods)) + 1 : 1);
   const row    = (cfg.moods && cfg.moods[mood] != null) ? cfg.moods[mood] : 0;
+  const fps    = Math.max(.1, (cfg.moodFps && cfg.moodFps[mood]) || cfg.fps || 8);
+  // percentage background-position resolves against (container - image), which
+  // is exactly what makes k/(rows-1) the right figure for picking row k
   const posY   = rows > 1 ? (row / (rows - 1)) * 100 : 0;
   const dur    = (frames / fps).toFixed(3) + "s";
-  const esc    = String(cfg.src).replace(/"/g, "&quot;");
-  return `<div class="sprite playing" style="
-      background-image:url(&quot;${esc}&quot;);
-      background-size:${frames * 100}% ${rows * 100}%;
-      background-position-y:${posY}%;
-      --frames:${frames}; --dur:${dur};"></div>`;
+  const esc    = String(cfg.src).replace(/'/g, "%27").replace(/"/g, "%22");
+  return `<div class="sprite-view" style="--sscale:${cfg.scale || 1};--saspect:${cfg.aspect || 1}">
+    <div class="sprite-strip playing" style="
+      width:${frames * 100}%;
+      background-image:url('${esc}');
+      background-size:100% ${rows * 100}%;
+      background-position:0 ${posY}%;
+      --frames:${frames}; --dur:${dur};"></div></div>`;
 }
 
 /** Full pet markup for a species + stage, honouring any registered sprite. */
@@ -2195,6 +2237,7 @@ function drawRoute(canvas, path, opts){
 function renderHome(){
   const d = derived, sp = d.species;
   paintPet($("#home-pet"), sp.id, d.stage, d.mood.key);
+  $("#pet-stage").classList.toggle("has-sprite", !!$("#home-pet .sprite-view"));
   $("#pet-name-txt").textContent = save.petName || sp.name;
   $("#pet-species-txt").textContent = `${sp.stages[d.stage].name} · Stage ${d.stage + 1} of 5`;
   $("#pet-speech").innerHTML = speechFor();
@@ -2961,10 +3004,10 @@ function renderSettings(){
   $("#set-weight-u").textContent = "kg";
   $("#tg-sim").classList.toggle("on", !!save.settings.simulate);
   $("#tg-wake").classList.toggle("on", !!save.settings.wakeLock);
-  const n = Object.keys(save.sprites).length;
+  const n = Object.values(save.sprites).filter(Boolean).length;
   $("#sprite-summary").textContent = n
     ? `${n} custom sprite${n === 1 ? "" : "s"} registered — tap to manage`
-    : "Using the built-in vector pets — tap to add your own sheets";
+    : "Built-in art — tap to add your own sheets";
   $("#storage-note").textContent = storageOK ? "" : "⚠️ localStorage is unavailable — progress will not survive a reload.";
 }
 
@@ -2973,13 +3016,23 @@ function openSpriteSheetManager(){
   for (const id of SPECIES_ORDER){
     for (let k = 0; k < 5; k++){
       const key = spriteKey(id, k);
-      const has = !!save.sprites[key];
+      const own = save.sprites[key];              // object = custom, null = forced vector
+      const def = DEFAULT_SPRITES[key];
+      const cfg = spriteConfig(id, k);
+      const label = own ? `custom · ${own.frames || 1} frames`
+                  : own === null ? "vector — built-in art switched off"
+                  : def ? `built-in pixel art · ${def.frames} frames`
+                  : "built-in vector";
+      const alt = own !== undefined
+        ? `<button class="btn ghost" style="width:auto;padding:8px 10px;font-size:12px" data-sprite-default="${key}" title="Back to the shipped art">↺</button>`
+        : def ? `<button class="btn ghost" style="width:auto;padding:8px 10px;font-size:12px;color:var(--danger)" data-sprite-vector="${key}" title="Use the vector pet instead">✕</button>`
+        : "";
       rows.push(`<div class="row" style="margin-bottom:7px;padding:10px 12px">
         <div class="pet-holder tiny" data-sprite-prev="${key}"></div>
         <div class="t"><div class="n" style="font-size:13px">${SPECIES[id].name} · ${SPECIES[id].stages[k].name}</div>
-          <div class="h">${has ? `custom · ${save.sprites[key].frames || 1} frames` : "built-in vector"}</div></div>
-        <button class="btn ghost" style="width:auto;padding:8px 12px;font-size:12px" data-sprite-set="${key}">${has ? "Replace" : "Add"}</button>
-        ${has ? `<button class="btn ghost" style="width:auto;padding:8px 10px;font-size:12px;color:var(--danger)" data-sprite-clear="${key}">✕</button>` : ""}
+          <div class="h">${label}</div></div>
+        <button class="btn ghost" style="width:auto;padding:8px 12px;font-size:12px" data-sprite-set="${key}">${cfg ? "Replace" : "Add"}</button>
+        ${alt}
       </div>`);
     }
   }
@@ -3000,7 +3053,7 @@ function openSpriteSheetManager(){
 function openSpriteEditor(key){
   const [species, stageStr] = key.split(":");
   const stage = +stageStr;
-  const cur = save.sprites[key] || { src:"", frames:4, fps:8 };
+  const cur = save.sprites[key] || DEFAULT_SPRITES[key] || { src:"", frames:4, fps:8 };
   openSheet({
     title:`${SPECIES[species].name} · ${SPECIES[species].stages[stage].name}`,
     desc:"Pick a PNG or GIF sprite sheet from this device, or paste a URL. The image is stored with your save file.",
@@ -3013,6 +3066,8 @@ function openSpriteEditor(key){
           <input class="inp" id="sprite-frames" type="number" min="1" max="60" value="${cur.frames || 4}"></div>
         <div style="flex:1"><label class="fl" for="sprite-fps">FPS</label>
           <input class="inp" id="sprite-fps" type="number" min="1" max="60" value="${cur.fps || 8}"></div>
+        <div style="flex:1"><label class="fl" for="sprite-scale">Scale</label>
+          <input class="inp" id="sprite-scale" type="number" min="0.4" max="3" step="0.02" value="${cur.scale || 1}"></div>
       </div>
       <label class="fl" style="margin-top:11px" for="sprite-moods">Mood rows (optional JSON)</label>
       <textarea class="inp" id="sprite-moods" placeholder='{"happy":0,"sad":1,"asleep":2}'>${cur.moods ? JSON.stringify(cur.moods) : ""}</textarea>
@@ -3030,9 +3085,12 @@ function openSpriteEditor(key){
           if (raw){ try { moods = JSON.parse(raw); } catch(e){ toast("Mood rows must be valid JSON", "bad", "⚠️"); return; } }
           save.sprites[key] = {
             src, frames: Math.max(1, +$("#sprite-frames").value || 1),
-            fps: Math.max(1, +$("#sprite-fps").value || 8)
+            fps: Math.max(1, +$("#sprite-fps").value || 8),
+            scale: Math.max(.4, Math.min(3, +$("#sprite-scale").value || 1))
           };
           if (moods) save.sprites[key].moods = moods;
+          if (cur.moodFps && src === cur.src) save.sprites[key].moodFps = cur.moodFps;
+          if (cur.aspect  && src === cur.src) save.sprites[key].aspect  = cur.aspect;
           pendingSpriteData = null;
           persist(); renderAll();
           toast("Sprite saved", "good", "🎨");
@@ -3043,14 +3101,18 @@ function openSpriteEditor(key){
       const preview = () => {
         const src = ($("#sprite-src").value || "").trim() || pendingSpriteData;
         if (!src){ paintPet($("#sprite-preview"), species, stage, "okay"); return; }
-        const frames = Math.max(1, +$("#sprite-frames").value || 1);
-        const fps = Math.max(1, +$("#sprite-fps").value || 8);
-        $("#sprite-preview").innerHTML =
-          `<div class="sprite playing" style="background-image:url(&quot;${src.replace(/"/g,"&quot;")}&quot;);
-            background-size:${frames*100}% 100%;--frames:${frames};--dur:${(frames/fps).toFixed(3)}s"></div>`;
+        let moods = null;
+        try { moods = JSON.parse(($("#sprite-moods").value || "").trim() || "null"); } catch(e){}
+        $("#sprite-preview").innerHTML = spriteHTML({
+          src,
+          frames: Math.max(1, +$("#sprite-frames").value || 1),
+          fps: Math.max(1, +$("#sprite-fps").value || 8),
+          scale: Math.max(.4, Math.min(3, +$("#sprite-scale").value || 1)),
+          aspect: cur.aspect, moods: moods || undefined
+        }, "okay");
       };
       preview();
-      ["sprite-src","sprite-frames","sprite-fps"].forEach(id => $("#"+id, root).addEventListener("input", preview));
+      ["sprite-src","sprite-frames","sprite-fps","sprite-scale","sprite-moods"].forEach(id => $("#"+id, root).addEventListener("input", preview));
       $("#sprite-file", root).addEventListener("click", () => {
         pendingPreviewFn = preview;
         $("#file-sprite").click();
@@ -3174,8 +3236,10 @@ function wire(){
 
     const sSet = e.target.closest("[data-sprite-set]");
     if (sSet){ pendingSpriteData = null; openSpriteEditor(sSet.dataset.spriteSet); return; }
-    const sClr = e.target.closest("[data-sprite-clear]");
-    if (sClr){ delete save.sprites[sClr.dataset.spriteClear]; persist(); renderAll(); openSpriteSheetManager(); toast("Sprite removed", "", "🧹"); return; }
+    const sVec = e.target.closest("[data-sprite-vector]");
+    if (sVec){ save.sprites[sVec.dataset.spriteVector] = null; persist(); renderAll(); openSpriteSheetManager(); toast("Using the vector pet", "", "🧹"); return; }
+    const sDef = e.target.closest("[data-sprite-default]");
+    if (sDef){ delete save.sprites[sDef.dataset.spriteDefault]; persist(); renderAll(); openSpriteSheetManager(); toast("Back to the shipped art", "", "↺"); return; }
 
     if (e.target === $("#sheet-wrap")) closeSheet();
   });
@@ -3339,8 +3403,11 @@ window.RunPet = {
     persist(); renderAll();
     return save.sprites[spriteKey(species, stage)];
   },
-  clearSprite(species, stage){
-    delete save.sprites[spriteKey(species, stage)];
+  /** Drop a custom sheet. Pass useVector:true to also switch off shipped art. */
+  clearSprite(species, stage, useVector){
+    const key = spriteKey(species, stage);
+    if (useVector && DEFAULT_SPRITES[key]) save.sprites[key] = null;
+    else delete save.sprites[key];
     persist(); renderAll();
   },
   listSprites(){ return structuredCloneSafe(save.sprites); },

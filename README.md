@@ -45,11 +45,15 @@ Your choice sets the app's accent colour. The pet's expression and idle
 animation follow how recently you ran: elated the day you run, happy the day
 after, restless at two days, sad at three, and asleep from five.
 
+The Cinderling (Ember, stage 2) ships as pixel art in
+[`art/ember-baby.png`](art/ember-baby.png); the rest are inline SVG. Both are
+placeholders — see below.
+
 ### Swapping in your own art
 
-The built-in vector pets are placeholders. Any species and stage can be
-replaced with a horizontal sprite sheet, from **Settings → Sprite packs** (pick
-a file, set frames and FPS, watch the live preview) or from the console:
+Any species and stage can be replaced with a horizontal sprite sheet, from
+**Settings → Sprite packs** (pick a file, set frames, FPS and scale, watch the
+live preview) or from the console:
 
 ```js
 RunPet.setSprite("ember", 2, {
@@ -63,9 +67,29 @@ RunPet.clearSprite("ember", 2); // back to the vector art
 RunPet.listSprites();
 ```
 
-A registered sheet replaces the vector pet everywhere — home, evolution tree,
+A registered sheet replaces the built-in pet everywhere — home, evolution tree,
 summary, species picker — and is saved with the rest of your game. Nothing else
-needs changing.
+needs changing. If the image cannot be fetched, the pet quietly falls back to
+vector art rather than showing an empty box.
+
+**Sheet layout.** Frames run left to right. Add `moods` and the sheet becomes a
+grid: one row per mood, `frames` columns wide. `art/ember-baby.png` is the
+worked example — 4 columns x 6 rows, rows ordered
+`elated, happy, okay, bored, sad, asleep`:
+
+| key | what it does |
+| --- | --- |
+| `frames` | columns in the sheet; each is one animation frame |
+| `rows` | rows in the sheet (defaults to what `moods` implies) |
+| `moods` | mood name to row index |
+| `fps` | playback speed |
+| `moodFps` | per-mood speed override, e.g. slow breathing while asleep |
+| `aspect` | frame width / height, if the frames are not square |
+| `scale` | grow or shrink the pet within its slot |
+
+Frames must be evenly sized with no gutters between them. There is a script-free
+way to check yours: register it, then watch the live preview in the editor — if
+you see two half-pets, the frame width is off.
 
 ## How XP works
 
