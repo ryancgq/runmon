@@ -7,7 +7,7 @@ five forms — and visibly sulks if you stop running.
 The entire app is one file: **[`index.html`](index.html)**. No frameworks, no
 build step, no server, no account. Open it and it works.
 
-**[Play it →](https://ryancgq.github.io/coursera-test/)**
+**[Play it →](https://ryancgq.github.io/runmon/)**
 
 ---
 

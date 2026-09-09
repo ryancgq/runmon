@@ -452,6 +452,14 @@ body::before{
 .banner.warn{background:rgba(251,191,36,.1);border-color:rgba(251,191,36,.3);color:#fde3a7}
 .banner svg{width:17px;height:17px;flex:0 0 17px;margin-top:1px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 .banner .x{margin-left:auto;opacity:.6;flex:0 0 auto}
+.banner-btn{
+  display:inline-block;margin-top:10px;padding:8px 14px;border-radius:10px;
+  font-size:12.5px;font-weight:800;letter-spacing:.2px;
+  color:inherit;background:rgba(255,255,255,.08);
+  border:1px solid currentColor;transition:.16s var(--ease);
+}
+.banner-btn:hover{background:rgba(255,255,255,.16)}
+.banner-btn:active{transform:scale(.97)}
 .banner[hidden]{display:none}
 
 /* ============================================================
@@ -2469,12 +2477,34 @@ function setGps(quality, text){
   pill.dataset.q = quality;
   $("#gps-txt").textContent = text;
 }
-function banner(msg, kind){
+let bannerAction = null;
+function banner(msg, kind, action){
   const b = $("#track-banner");
+  bannerAction = action || null;
   if (!msg){ b.hidden = true; return; }
   b.hidden = false;
   b.className = "banner" + (kind === "warn" ? " warn" : "");
-  $("#track-banner-txt").innerHTML = msg;
+  $("#track-banner-txt").innerHTML = msg +
+    (action ? `<button class="banner-btn" id="banner-act">${action.label}</button>` : "");
+}
+
+/** Is this most likely a device with a real GPS chip? */
+function looksLikeMobile(){
+  return matchMedia("(pointer:coarse)").matches || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+}
+/** Some browsers can never resolve a position — say so instead of "step outside". */
+function isNoLocationProvider(err){
+  return /api key|network location|provider|403|not available|failed to (query|determine)/i.test(String(err && err.message || ""));
+}
+/** Drop straight into the simulator, mid-run if need be. */
+function switchToSim(){
+  save.settings.simulate = true;
+  persist(); renderSettings();
+  stopGeo();
+  banner(null);
+  if (tracker.active && !tracker.simId) startSim();
+  else setGps("good", "Simulated GPS ready");
+  toast("Simulated GPS on", "good", "\u{1F9EA}");
 }
 
 /* --- position handling --------------------------------------------------- */
@@ -2598,12 +2628,23 @@ function startGeo(){
     p => acceptPosition(p.coords.latitude, p.coords.longitude, p.coords.accuracy || 999, p.timestamp),
     err => {
       if (err.code === 1){
-        banner("Location permission was denied. Allow location for this site in your browser settings, then start the run again — or switch on <b>Simulated GPS</b> in Settings to try the app.");
+        banner("Location permission was denied. Allow location for this site in your browser settings, then start the run again.",
+               null, { label:"Use Simulated GPS instead", fn: switchToSim });
         setGps("off", "Permission denied");
         if (tracker.active) abortRun();
       } else if (err.code === 2){
-        banner("Your device cannot get a position right now. If you are indoors, step outside — the timer keeps running.", "warn");
-        setGps("bad", "Position unavailable");
+        // A desktop browser has no GPS chip: it asks a network location service
+        // instead, and Chromium builds without a Google API key get a 403 back.
+        // That is not something the user can fix by walking outside.
+        if (isNoLocationProvider(err) || !looksLikeMobile()){
+          banner("This browser cannot work out where you are. Desktop browsers have no GPS chip and fall back to a network location service — which some builds (Chromium, Brave, several Linux packages) ship without the key that service needs. <b>Open this page on a phone</b> for real tracking, or try the app right here with a fake route.",
+                 "warn", { label:"Use Simulated GPS", fn: switchToSim });
+          setGps("off", "No location provider");
+          if (tracker.active) abortRun();
+        } else {
+          banner("Your device cannot get a position right now. If you are indoors, step outside — the timer keeps running.", "warn");
+          setGps("bad", "Position unavailable");
+        }
       } else {
         setGps("bad", "GPS timed out — still trying");
       }
@@ -3157,6 +3198,9 @@ function wire(){
     if (mapReady && tracker.last) map.panTo([tracker.last.lat, tracker.last.lng]);
   });
   $("#track-banner-x").addEventListener("click", () => banner(null));
+  $("#track-banner").addEventListener("click", e => {
+    if (e.target.closest("#banner-act") && bannerAction) bannerAction.fn();
+  });
   $("#btn-start").addEventListener("click", startRun);
 
   $("#sum-close").addEventListener("click", e => go(e.currentTarget.dataset.back || "home"));
