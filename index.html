@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
 <meta name="theme-color" content="#0b0d14">
-<meta name="description" content="RunPet — log real runs, level up a virtual pet, watch it evolve.">
+<meta name="description" content="Runmon — log real runs, level up a virtual pet, watch it evolve.">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230a0c13'/%3E%3Cpath d='M50 20 C64 38 64 52 50 62 C36 52 36 38 50 20 Z' fill='%23ff6b35'/%3E%3Cpath d='M50 34 C57 44 57 52 50 58 C43 52 43 44 50 34 Z' fill='%23ffd23f'/%3E%3Ccircle cx='34' cy='76' r='7' fill='%234ade80'/%3E%3Ccircle cx='66' cy='76' r='7' fill='%237cd4fd'/%3E%3C/svg%3E">
-<title>RunPet — Run. Level up. Evolve.</title>
+<title>Runmon — Run. Level up. Evolve.</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -19,7 +19,7 @@
 
 <style>
 /* ============================================================
-   RunPet — design tokens
+   Runmon — design tokens
    ============================================================ */
 :root{
   --bg:#0a0c13;
@@ -650,7 +650,11 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
 .ob-step.on{display:flex}
 @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
 .ob-logo{text-align:center;margin-bottom:6px}
-.ob-logo h1{font-size:38px;letter-spacing:.5px;background:linear-gradient(120deg,#ff6b35,#ffd23f 30%,#4ade80 62%,#7cd4fd);-webkit-background-clip:text;background-clip:text;color:transparent}
+/* one stop per species; kept near-horizontal so a short wordmark still shows
+   all four colours rather than just the middle of the ramp */
+/* inline-block so the gradient box is the wordmark itself; as a full-width
+   block the text would only ever sample the middle of the ramp */
+.ob-logo h1{display:inline-block;font-size:40px;letter-spacing:.5px;background:linear-gradient(96deg,#ff6b35 3%,#ffd23f 33%,#4ade80 65%,#7cd4fd 97%);-webkit-background-clip:text;background-clip:text;color:transparent}
 .ob-logo p{font-size:13px;color:var(--muted);font-weight:700;margin:9px 0 0;line-height:1.55}
 .pick-grid{display:flex;flex-direction:column;gap:11px;margin:18px 0}
 .pick{
@@ -990,7 +994,7 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
       </button>
 
       <p class="muted center" style="font-size:11px;font-weight:700;line-height:1.7;margin-top:22px">
-        RunPet stores everything on this device in <span class="mono">localStorage</span>.<br>
+        Runmon stores everything on this device in <span class="mono">localStorage</span>.<br>
         No account, no server, no tracking.<br>
         <span id="storage-note" class="mono"></span>
       </p>
@@ -1023,7 +1027,7 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
   <div class="overlay" id="onboard">
     <div class="ob-step on" id="ob-1">
       <div class="ob-logo" style="margin-top:22px">
-        <h1>RunPet</h1>
+        <h1>Runmon</h1>
         <p>Every kilometre you run feeds a little creature.<br>Keep running and it will grow up.</p>
       </div>
       <div class="pet-stage" style="min-height:200px">
@@ -1081,7 +1085,7 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
 <script>
 "use strict";
 /* ============================================================================
-   RunPet — a single-file running tracker with a virtual pet.
+   Runmon — a single-file running tracker with a virtual pet.
    Sections:  1 config   2 maths   3 state   4 art   5 render
               6 tracking 7 screens 8 settings 9 boot
    ========================================================================== */
@@ -1089,7 +1093,11 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
 /* ---------------------------------------------------------------------------
    1. CONFIG
    ------------------------------------------------------------------------- */
-const SAVE_KEY = "runpet.save.v1";
+const SAVE_KEY = "runmon.save.v1";
+/* Saves written before the app was renamed. Read once, copied to SAVE_KEY, and
+   deliberately left in place as a backup — but cleared on reset, or a "new game"
+   would come back from the dead on the next load. */
+const LEGACY_SAVE_KEYS = ["runpet.save.v1"];
 
 /* XP curve ------------------------------------------------------------------
    Base rate is 100 XP per km. On top of that every extra kilometre inside a
@@ -1346,7 +1354,15 @@ function structuredCloneSafe(o){ return JSON.parse(JSON.stringify(o)); }
 let storageOK = true;
 function loadSave(){
   let raw = null;
-  try { raw = localStorage.getItem(SAVE_KEY); }
+  try {
+    raw = localStorage.getItem(SAVE_KEY);
+    if (!raw){
+      for (const k of LEGACY_SAVE_KEYS){
+        const old = localStorage.getItem(k);
+        if (old){ raw = old; localStorage.setItem(SAVE_KEY, old); break; }
+      }
+    }
+  }
   catch(e){ storageOK = false; }
   if (!raw) return false;
   try {
@@ -2027,7 +2043,7 @@ PET_ART.nimbus = [
    Register a horizontal sprite sheet for any species/stage and it is used in
    place of the vector pet everywhere (home, evolution tree, summary, picker).
 
-     RunPet.setSprite("ember", 2, {
+     Runmon.setSprite("ember", 2, {
        src: "art/blazewyrm.png",  // URL, relative path or data: URI
        frames: 6,                 // frames laid out left to right
        fps: 8,                    // playback speed
@@ -2036,8 +2052,8 @@ PET_ART.nimbus = [
 
    Rows are optional. With `moods`, the sheet is a grid: every row is one mood
    and `frames` columns wide. Without it a single row is used for every mood.
-   RunPet.clearSprite(species, stage) puts the vector art back, and
-   RunPet.listSprites() shows what is registered. Everything is saved to
+   Runmon.clearSprite(species, stage) puts the vector art back, and
+   Runmon.listSprites() shows what is registered. Everything is saved to
    localStorage with the rest of the game.
    ------------------------------------------------------------------------- */
 function spriteKey(species, stage){ return species + ":" + stage; }
@@ -3038,7 +3054,7 @@ function openSpriteSheetManager(){
   }
   openSheet({
     title:"Sprite packs",
-    desc:`Replace any pet with your own horizontal sprite sheet. Frames run left to right; add a <span class="mono">moods</span> map if your sheet has one row per mood. Everything else in the app keeps working — the sheet simply takes the place of the vector art.<br><br>You can also do this from the console: <span class="mono">RunPet.setSprite("ember", 2, {src, frames, fps})</span>`,
+    desc:`Replace any pet with your own horizontal sprite sheet. Frames run left to right; add a <span class="mono">moods</span> map if your sheet has one row per mood. Everything else in the app keeps working — the sheet simply takes the place of the vector art.<br><br>You can also do this from the console: <span class="mono">Runmon.setSprite("ember", 2, {src, frames, fps})</span>`,
     body: rows.join(""),
     actions:[{ label:"Done", cls:"primary", fn: closeSheet }],
     onOpen: root => {
@@ -3181,7 +3197,7 @@ function exportSave(){
   const blob = new Blob([JSON.stringify(save, null, 2)], { type:"application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `runpet-${dayKey(Date.now())}.json`;
+  a.download = `runmon-${dayKey(Date.now())}.json`;
   document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
   toast("Save file downloaded", "good", "💾");
@@ -3189,7 +3205,7 @@ function exportSave(){
 function importSave(text){
   let data;
   try { data = JSON.parse(text); } catch(e){ toast("That file is not valid JSON", "bad", "⚠️"); return; }
-  if (!data || !data.species || !Array.isArray(data.runs)){ toast("That does not look like a RunPet save", "bad", "⚠️"); return; }
+  if (!data || !data.species || !Array.isArray(data.runs)){ toast("That does not look like a Runmon save", "bad", "⚠️"); return; }
   save = Object.assign(structuredCloneSafe(DEFAULT_SAVE), data);
   save.settings = Object.assign({}, DEFAULT_SAVE.settings, data.settings || {});
   persist(); renderAll();
@@ -3354,7 +3370,10 @@ function wire(){
       actions:[
         { label:"Cancel", cls:"ghost", fn: closeSheet },
         { label:"Erase everything", cls:"danger", fn: () => {
-            try { localStorage.removeItem(SAVE_KEY); } catch(e){}
+            try {
+              localStorage.removeItem(SAVE_KEY);
+              LEGACY_SAVE_KEYS.forEach(k => localStorage.removeItem(k));
+            } catch(e){}
             save = structuredCloneSafe(DEFAULT_SAVE);
             obSpecies = null;
             closeSheet();
@@ -3390,7 +3409,7 @@ function wire(){
 }
 
 /* --- public hooks (console-friendly) ------------------------------------- */
-window.RunPet = {
+window.Runmon = {
   get state(){ return { save, derived }; },
   setSprite(species, stage, cfg){
     if (!SPECIES[species]) throw new Error("Unknown species: " + species);
@@ -3434,6 +3453,9 @@ window.RunPet = {
     return rows;
   }
 };
+/* The app used to be called RunPet. Console snippets and notes written against
+   the old name keep working. */
+window.RunPet = window.Runmon;
 
 /* --- boot ---------------------------------------------------------------- */
 function boot(){

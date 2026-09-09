@@ -1,4 +1,4 @@
-# RunPet
+# Runmon
 
 A mobile running tracker where real runs level up a virtual pet. GPS tracks
 your route, distance becomes XP, and XP grows a creature that evolves through
@@ -56,15 +56,15 @@ Any species and stage can be replaced with a horizontal sprite sheet, from
 live preview) or from the console:
 
 ```js
-RunPet.setSprite("ember", 2, {
+Runmon.setSprite("ember", 2, {
   src: "art/blazewyrm.png",     // URL, relative path or data: URI
   frames: 6,                    // frames laid out left to right
   fps: 8,
   moods: { sad: 1, asleep: 2 }  // optional: one sheet row per mood
 });
 
-RunPet.clearSprite("ember", 2); // back to the vector art
-RunPet.listSprites();
+Runmon.clearSprite("ember", 2); // back to the vector art
+Runmon.listSprites();
 ```
 
 A registered sheet replaces the built-in pet everywhere — home, evolution tree,
@@ -114,7 +114,7 @@ The curve as tuned:
 | Final | 50 | 175,228 | ~1,500 km |
 
 `LEVEL_BASE` and `LEVEL_DECAY` near the top of the file control this, and
-`RunPet.xpTable()` prints the whole curve in the console.
+`Runmon.xpTable()` prints the whole curve in the console.
 
 ## How tracking works
 
@@ -148,9 +148,9 @@ There is nothing to install or build. Edit `index.html` and reload.
 Useful console helpers for previewing later stages without running 1,500 km:
 
 ```js
-RunPet.addRun(9.5, 52, 0);  // km, minutes, days ago
-RunPet.state;               // { save, derived }
-RunPet.xpTable();
+Runmon.addRun(9.5, 52, 0);  // km, minutes, days ago
+Runmon.state;               // { save, derived }
+Runmon.xpTable();
 ```
 
 ## Licence
