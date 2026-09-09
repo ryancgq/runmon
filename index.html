@@ -2085,10 +2085,9 @@ function spriteKey(species, stage){ return species + ":" + stage; }
    null there means "use the vector pet instead of this default". */
 const DEFAULT_SPRITES = {
   "ember:1": {
-    src:"art/ember-baby.png",
-    frames:4, rows:6, fps:3.5, aspect:1.587, scale:1.28,
-    moods:{ elated:0, happy:1, okay:2, bored:3, sad:4, asleep:5 },
-    moodFps:{ elated:6, happy:4, okay:3, bored:2.4, sad:2.4, asleep:1.1 }
+    src:"art/ember-cinderling.png",
+    // one continuous 12-frame loop at the source animation's own 2 fps
+    frames:12, rows:1, fps:2, aspect:1.447, scale:1.2
   }
 };
 /* The question this demo exists to answer: what does it feel like if the pixel
