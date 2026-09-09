@@ -11,6 +11,17 @@ build step, no server, no account. Open it and it works.
 
 ---
 
+## Demo build
+
+[`demo.html`](demo.html) launches the same app with the egg stage skipped, so
+Ember's pixel art is on screen from level 1 instead of level 5. It runs on its
+own save slot (`runmon.demo.v1`), so nothing you do there touches a real pet.
+A **DEMO** badge sits above the tab bar with shortcuts: log a 5 km run, skip a
+day (which walks the pet down through all six moods), or reset.
+
+The demo is `index.html?demo=1` — the same file, one flag, no second copy to
+keep in sync.
+
 ## Trying it out
 
 Open the page on a phone and allow location access when it asks. If you are on

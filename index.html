@@ -715,6 +715,21 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
 @keyframes toastIn{from{opacity:0;transform:translateY(-18px) scale(.94)}to{opacity:1;transform:none}}
 @keyframes toastOut{to{opacity:0;transform:translateY(-14px) scale(.96)}}
 
+/* demo-mode badge; sits clear of the FAB and rides with the tab bar */
+.demo-badge{
+  position:absolute;z-index:46;left:12px;bottom:calc(96px + var(--safe-b));
+  display:inline-flex;align-items:center;gap:7px;
+  padding:8px 13px;border-radius:999px;
+  background:rgba(22,27,40,.94);border:1px solid rgba(var(--glow),.45);
+  color:var(--accent);font-size:10.5px;font-weight:800;letter-spacing:.9px;
+  backdrop-filter:blur(12px);box-shadow:0 8px 24px rgba(0,0,0,.5);
+  transition:transform .3s var(--ease), opacity .25s var(--ease);
+}
+.demo-badge .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px currentColor;animation:blinkDot 1.8s ease-in-out infinite}
+.demo-badge:active{transform:scale(.94)}
+.demo-badge.hidden{transform:translateY(140%);opacity:0;pointer-events:none}
+.demo-badge[hidden]{display:none}
+
 .linkish{color:var(--accent);font-weight:800;text-decoration:none;border-bottom:1px dashed rgba(var(--glow),.5)}
 .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px}
 .muted{color:var(--muted)}
@@ -1023,6 +1038,10 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
     <svg viewBox="0 0 24 24"><path d="M13 3l-1.5 5.5L15 10l2 4"/><circle cx="16.5" cy="4.5" r="1.6" fill="currentColor" stroke="none"/><path d="M11.5 8.5L8 11l1 4-3 5"/><path d="M8 11l-3.5 1"/></svg>
   </button>
 
+  <button class="demo-badge" id="demo-badge" hidden>
+    <span class="dot"></span> DEMO · egg skipped
+  </button>
+
   <!-- ===================== ONBOARDING ===================== -->
   <div class="overlay" id="onboard">
     <div class="ob-step on" id="ob-1">
@@ -1093,11 +1112,15 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
 /* ---------------------------------------------------------------------------
    1. CONFIG
    ------------------------------------------------------------------------- */
-const SAVE_KEY = "runmon.save.v1";
+/* Demo mode (?demo in the URL) is a sandbox for trying out artwork and pacing.
+   It keeps its own save slot, so playing with it can never touch a real pet. */
+const DEMO = /[?&]demo(=|&|$)/.test(location.search);
+
+const SAVE_KEY = DEMO ? "runmon.demo.v1" : "runmon.save.v1";
 /* Saves written before the app was renamed. Read once, copied to SAVE_KEY, and
    deliberately left in place as a backup — but cleared on reset, or a "new game"
-   would come back from the dead on the next load. */
-const LEGACY_SAVE_KEYS = ["runpet.save.v1"];
+   would come back from the dead on the next load. Never migrated into the demo. */
+const LEGACY_SAVE_KEYS = DEMO ? [] : ["runpet.save.v1"];
 
 /* XP curve ------------------------------------------------------------------
    Base rate is 100 XP per km. On top of that every extra kilometre inside a
@@ -2068,6 +2091,16 @@ const DEFAULT_SPRITES = {
     moodFps:{ elated:6, happy:4, okay:3, bored:2.4, sad:2.4, asleep:1.1 }
   }
 };
+/* The question this demo exists to answer: what does it feel like if the pixel
+   pet is there from level 1 and the egg stage is skipped entirely? */
+if (DEMO){
+  DEFAULT_SPRITES["ember:0"] = Object.assign({}, DEFAULT_SPRITES["ember:1"]);
+  SPECIES.ember.stages[0] = {
+    name: "Cinderling",
+    desc: "Hatched from the off. This demo skips the egg so the pixel art is there from level 1."
+  };
+}
+
 function spriteConfig(species, stage){
   const key = spriteKey(species, stage);
   const own = save.sprites[key];
@@ -2445,6 +2478,7 @@ function go(name){
   const chromeless = name === "track" || name === "summary";
   $("#tabbar").classList.toggle("hidden", chromeless);
   $("#fab").classList.toggle("hidden", chromeless);
+  $("#demo-badge").classList.toggle("hidden", chromeless);
 
   if (name === "history") { renderHistory(); }
   if (name === "evolve")  { renderEvolve(); }
@@ -3150,7 +3184,12 @@ function showOnboarding(){
   $("#onboard").classList.add("show");
   $("#tabbar").classList.add("hidden");
   $("#fab").classList.add("hidden");
-  const hero = SPECIES_ORDER[(Math.random() * 3) | 0];
+  const hero = DEMO ? "ember" : SPECIES_ORDER[(Math.random() * 3) | 0];
+  if (DEMO){
+    $("#ob-hero").classList.remove("egg-crack");
+    $(".ob-logo p", $("#ob-1")).innerHTML =
+      "Demo build — the egg stage is skipped, so Ember's pixel art is on screen<br>from level 1. Its own save slot; your real pet is untouched.";
+  }
   applyTheme(hero);
   paintPet($("#ob-hero"), hero, 0, "okay");
   renderSpeciesPicks();
@@ -3190,6 +3229,45 @@ function hatch(){
     toast(`${name} hatched! Go for a run to feed it.`, "good", "🥚");
     confetti(50);
   }, 420);
+}
+
+/* --- demo controls -------------------------------------------------------
+   Reaching the later moods honestly takes days of not running, and the later
+   forms take hundreds of kilometres. These shortcuts exist so the artwork and
+   pacing can be judged in a couple of minutes.
+   ------------------------------------------------------------------------- */
+function openDemoPanel(){
+  const d = derived;
+  openSheet({
+    title:"Demo mode",
+    desc:`The egg stage is skipped here, so the pixel Cinderling is on screen from level 1. This runs on its own save slot — nothing you do in the demo touches a real pet.<br><br>
+      Right now: <b>level ${d.level}</b>, ${d.species.stages[d.stage].name}, mood <b>${d.mood.label.toLowerCase()}</b>${d.gapDays === Infinity ? "" : ` (${d.gapDays === 0 ? "ran today" : d.gapDays + " day" + (d.gapDays === 1 ? "" : "s") + " idle"})`}.
+      ${d.runs.length ? "Skip a day to walk it down through all six moods." : "Log a run first — mood is measured from your last run, so it needs one to move."}`,
+    actions:[
+      { label:"Log a 5 km run", cls:"primary", fn: () => {
+          closeSheet();
+          Runmon.addRun(5, 28, 0);
+          const r = save.runs[save.runs.length - 1];
+          showSummary(r, { celebrate:true });
+        } },
+      { label:"Skip a day", cls:"ghost", fn: () => {
+          if (!save.runs.length){
+            // nothing to shift: mood is driven by the gap since the last run
+            toast("Log a run first — mood follows your last run", "", "🗓️");
+            return;
+          }
+          // push every run back a day, so the pet slides down through its moods
+          save.runs.forEach(r => { r.t -= 86400000; });
+          persist(); renderAll(); closeSheet();
+          toast(`A day passes — ${derived.mood.label.toLowerCase()}`, "", derived.mood.emoji);
+        } },
+      { label:"Reset demo", cls:"danger", fn: () => {
+          try { localStorage.removeItem(SAVE_KEY); } catch(e){}
+          save = structuredCloneSafe(DEFAULT_SAVE);
+          obSpecies = null; closeSheet(); recompute(); showOnboarding();
+        } }
+    ]
+  });
 }
 
 /* --- import / export ----------------------------------------------------- */
@@ -3261,6 +3339,10 @@ function wire(){
   });
 
   $("#fab").addEventListener("click", () => go("track"));
+  if (DEMO){
+    $("#demo-badge").hidden = false;
+    $("#demo-badge").addEventListener("click", openDemoPanel);
+  }
   $("#track-back").addEventListener("click", () => {
     if (tracker.active){
       openSheet({
