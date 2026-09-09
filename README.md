@@ -57,8 +57,13 @@ animation follow how recently you ran: elated the day you run, happy the day
 after, restless at two days, sad at three, and asleep from five.
 
 The Cinderling (Ember, stage 2) ships as pixel art in
-[`art/ember-baby.png`](art/ember-baby.png); the rest are inline SVG. Both are
-placeholders — see below.
+[`art/ember-cinderling.png`](art/ember-cinderling.png) — a single 12-frame loop
+at 2 fps. The rest are inline SVG. Both are placeholders — see below.
+
+Note that this pet plays one continuous loop rather than a per-mood animation,
+so its face cycles through every expression regardless of how recently you ran.
+The engine still supports mood rows (`moods` below); this sheet just does not
+use them.
 
 ### Swapping in your own art
 
@@ -84,9 +89,9 @@ needs changing. If the image cannot be fetched, the pet quietly falls back to
 vector art rather than showing an empty box.
 
 **Sheet layout.** Frames run left to right. Add `moods` and the sheet becomes a
-grid: one row per mood, `frames` columns wide. `art/ember-baby.png` is the
-worked example — 4 columns x 6 rows, rows ordered
-`elated, happy, okay, bored, sad, asleep`:
+grid: one row per mood, `frames` columns wide. A 6-row sheet ordered
+`elated, happy, okay, bored, sad, asleep` gives the pet a distinct animation per
+mood:
 
 | key | what it does |
 | --- | --- |
