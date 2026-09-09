@@ -154,16 +154,13 @@ Real problems from the first two rounds, worth avoiding:
 | Uneven frame widths, or gutters | Frames land half-and-half; you see two half-pets at once |
 | Soft or anti-aliased edges | Fringing once the app renders it pixelated |
 
-## 10. A prompt that works
+## 10. Generation prompts
 
-For image tools, adapt this — it is close to what produced the Cinderling:
+[`art/PROMPTS.md`](art/PROMPTS.md) holds ready-to-paste prompt text: a fixed
+sheet block covering everything on this page that an image model can actually
+act on, plus a subject line for each of the fourteen pets still to draw.
 
-> Pixel art sprite sheet of a *[species description]*, 12 frames arranged in a
-> 3x4 grid, each frame the same size with the creature in the same position and
-> its feet on the same line. Fully transparent background, no scenery, no
-> ground, no borders between frames. Expressions in order: delighted (x2),
-> happy (x2), neutral curious (x2), bored half-lidded (x2), sad (x2), asleep
-> eyes-closed (x2). Limited palette, hard pixel edges, no anti-aliasing.
-
-Then export as a transparent animated GIF at 500 ms per frame, or hand over the
-grid as a PNG. Both convert.
+The two files split on purpose. This one is the engineering contract — canvas
+pixels, baseline coordinates, colour counts, file sizes. None of that belongs
+in a prompt, because a model cannot act on `y = 264` and asking dilutes the
+constraints it can act on. Conversion enforces those instead.
