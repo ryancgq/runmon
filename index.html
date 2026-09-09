@@ -1,0 +1,3356 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0b0d14">
+<meta name="description" content="RunPet — log real runs, level up a virtual pet, watch it evolve.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230a0c13'/%3E%3Cpath d='M50 20 C64 38 64 52 50 62 C36 52 36 38 50 20 Z' fill='%23ff6b35'/%3E%3Cpath d='M50 34 C57 44 57 52 50 58 C43 52 43 44 50 34 Z' fill='%23ffd23f'/%3E%3Ccircle cx='34' cy='76' r='7' fill='%234ade80'/%3E%3Ccircle cx='66' cy='76' r='7' fill='%237cd4fd'/%3E%3C/svg%3E">
+<title>RunPet — Run. Level up. Evolve.</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+
+<style>
+/* ============================================================
+   RunPet — design tokens
+   ============================================================ */
+:root{
+  --bg:#0a0c13;
+  --bg-2:#101420;
+  --card:#161b28;
+  --card-2:#1d2333;
+  --line:#262d40;
+  --text:#eef1f8;
+  --muted:#8791a8;
+  --muted-2:#5d6478;
+  --danger:#ff5c7a;
+  --good:#4ade80;
+
+  /* species theme (overwritten by JS) */
+  --accent:#ff6b35;
+  --accent-2:#ffd23f;
+  --accent-ink:#1a0d05;
+  --glow:255,107,53;
+
+  --r-lg:22px;
+  --r-md:16px;
+  --r-sm:11px;
+  --ease:cubic-bezier(.22,.9,.24,1);
+  --safe-b:env(safe-area-inset-bottom, 0px);
+  --safe-t:env(safe-area-inset-top, 0px);
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:"Nunito",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  font-weight:600;
+  -webkit-font-smoothing:antialiased;
+  overscroll-behavior:none;
+  -webkit-tap-highlight-color:transparent;
+}
+h1,h2,h3,h4,.font-display{
+  font-family:"Fredoka One","Fredoka",system-ui,sans-serif;
+  font-weight:400;
+  letter-spacing:.2px;
+  margin:0;
+}
+button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer}
+input,select{font-family:inherit}
+::-webkit-scrollbar{width:0;height:0}
+
+/* ambient backdrop that tints to the pet's element */
+body::before{
+  content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(120% 70% at 50% -8%, rgba(var(--glow),.20), transparent 62%),
+    radial-gradient(90% 55% at 92% 8%, rgba(var(--glow),.10), transparent 60%),
+    linear-gradient(180deg,#0a0c13 0%,#080a10 100%);
+  transition:background 700ms var(--ease);
+}
+
+/* ============================================================
+   App shell
+   ============================================================ */
+.app{
+  position:relative;z-index:1;
+  width:100%;max-width:430px;min-width:320px;
+  margin:0 auto;min-height:100svh;height:100svh;
+  display:flex;flex-direction:column;
+  overflow:hidden;
+}
+@media (min-width:520px){
+  .app{
+    height:min(100svh, 920px);margin-top:max(0px, calc((100svh - 920px)/2));
+    border:1px solid var(--line);border-radius:34px;
+    box-shadow:0 40px 90px rgba(0,0,0,.6), 0 0 0 10px #05060a;
+  }
+}
+.stage{position:relative;flex:1;overflow:hidden}
+
+.screen{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;
+  padding:calc(14px + var(--safe-t)) 16px 0;
+  overflow-y:auto;overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+  opacity:0;visibility:hidden;
+  transform:translate3d(0,14px,0) scale(.985);
+  transition:opacity .28s var(--ease), transform .34s var(--ease), visibility 0s linear .34s;
+}
+.screen.active{opacity:1;visibility:visible;transform:none;transition-delay:0s}
+/* screens are scrolling flex columns — nothing in them may shrink to fit, or
+   cards collapse the moment the content is taller than the viewport */
+.screen>*{flex:0 0 auto}
+.screen>.track-wrap{flex:1 1 auto}
+.screen.flush{padding:0}
+.screen-pad{height:calc(112px + var(--safe-b))}
+.screen.no-nav .screen-pad{height:calc(24px + var(--safe-b))}
+
+/* header */
+.hdr{display:flex;align-items:center;gap:12px;margin-bottom:14px;min-height:38px}
+.hdr h2{font-size:22px}
+.hdr .sub{font-size:12px;color:var(--muted);font-weight:700;margin-top:2px}
+.hdr-spacer{flex:1}
+.iconbtn{
+  width:38px;height:38px;flex:0 0 38px;display:grid;place-items:center;
+  border-radius:12px;background:var(--card);border:1px solid var(--line);
+  color:var(--muted);transition:.18s var(--ease);
+}
+.iconbtn:hover{color:var(--text);border-color:var(--accent)}
+.iconbtn:active{transform:scale(.92)}
+.iconbtn svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round}
+
+/* ============================================================
+   Bits
+   ============================================================ */
+.card{
+  background:linear-gradient(180deg,var(--card),var(--card-2));
+  border:1px solid var(--line);border-radius:var(--r-lg);
+  padding:16px;
+}
+.chip{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:5px 11px;border-radius:999px;font-size:11.5px;font-weight:800;
+  background:rgba(var(--glow),.13);color:var(--accent);
+  border:1px solid rgba(var(--glow),.28);letter-spacing:.3px;
+}
+.chip.grey{background:var(--card-2);color:var(--muted);border-color:var(--line)}
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:9px;
+  width:100%;padding:15px 18px;border-radius:16px;
+  font-weight:800;font-size:15.5px;letter-spacing:.2px;
+  background:var(--card-2);border:1px solid var(--line);
+  transition:.16s var(--ease);
+}
+.btn:active{transform:scale(.975)}
+.btn.primary{
+  background:linear-gradient(135deg,var(--accent),var(--accent-2));
+  color:var(--accent-ink);border-color:transparent;
+  box-shadow:0 10px 28px -8px rgba(var(--glow),.75);
+}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--danger);border-color:rgba(255,92,122,.32);background:rgba(255,92,122,.08)}
+.btn svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round}
+.btn[disabled]{opacity:.4;pointer-events:none}
+
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.stat{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);
+  padding:12px 10px;text-align:center;
+}
+.stat .v{font-family:"Fredoka One","Fredoka",sans-serif;font-size:19px;line-height:1.15;letter-spacing:.3px}
+.stat .k{font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:1.1px;font-weight:800;margin-top:5px}
+.stat .v small{font-size:11px;color:var(--muted);font-family:"Nunito";font-weight:800;margin-left:2px}
+
+.section-title{
+  font-size:11px;text-transform:uppercase;letter-spacing:1.4px;
+  color:var(--muted);font-weight:800;margin:22px 0 10px;display:flex;align-items:center;gap:8px;
+}
+.section-title::after{content:"";flex:1;height:1px;background:var(--line)}
+
+/* ============================================================
+   XP bar
+   ============================================================ */
+.xpbar{
+  position:relative;height:13px;border-radius:999px;
+  background:#0c0f18;border:1px solid var(--line);overflow:hidden;
+}
+.xpbar .fill{
+  position:absolute;inset:1px auto 1px 1px;width:0;
+  border-radius:999px;overflow:hidden;
+  background:linear-gradient(90deg,var(--accent),var(--accent-2));
+  box-shadow:0 0 16px rgba(var(--glow),.85);
+  transition:width 1.1s var(--ease);
+}
+.xpbar .fill::after{
+  content:"";position:absolute;inset:0;border-radius:999px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);
+  transform:translateX(-100%);
+  animation:sheen 2.6s var(--ease) infinite;
+}
+@keyframes sheen{0%{transform:translateX(-100%)}55%,100%{transform:translateX(220%)}}
+.xpbar.lg{height:17px}
+.xp-meta{display:flex;justify-content:space-between;font-size:11.5px;font-weight:800;color:var(--muted);margin-top:8px}
+.xp-meta b{color:var(--text)}
+
+/* ============================================================
+   Pet stage (home)
+   ============================================================ */
+.pet-stage{
+  position:relative;
+  display:grid;place-items:center;
+  padding:6px 0 2px;
+  min-height:236px;
+}
+.pet-halo{
+  position:absolute;width:250px;height:250px;border-radius:50%;
+  background:radial-gradient(circle, rgba(var(--glow),.30), rgba(var(--glow),.06) 46%, transparent 68%);
+  filter:blur(2px);
+  animation:halo 5s ease-in-out infinite;
+}
+@keyframes halo{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.09);opacity:1}}
+.pet-shadow{
+  position:absolute;bottom:14px;width:120px;height:16px;border-radius:50%;
+  background:radial-gradient(ellipse, rgba(0,0,0,.55), transparent 70%);
+  animation:shadowPulse 2.6s ease-in-out infinite;
+}
+@keyframes shadowPulse{0%,100%{transform:scale(1);opacity:.6}50%{transform:scale(.86);opacity:.4}}
+
+.pet-holder{position:relative;width:210px;height:210px;display:grid;place-items:center}
+.pet-holder svg{width:100%;height:100%;overflow:visible}
+.pet-holder.mini{width:88px;height:88px}
+.pet-holder.tiny{width:52px;height:52px}
+
+/* idle motion — mood driven */
+.pet-anim{transform-origin:50% 92%;animation:bob 2.6s ease-in-out infinite}
+.mood-elated .pet-anim{animation:hop 1.05s cubic-bezier(.3,1.5,.5,1) infinite}
+.mood-happy  .pet-anim{animation:bob 2.2s ease-in-out infinite}
+.mood-okay   .pet-anim{animation:bob 3.1s ease-in-out infinite}
+.mood-bored  .pet-anim{animation:sway 4.2s ease-in-out infinite}
+.mood-sad    .pet-anim{animation:droop 5s ease-in-out infinite}
+.mood-asleep .pet-anim{animation:snooze 5.6s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-9px) scale(1.015)}}
+@keyframes hop{0%{transform:translateY(0) scaleY(1)}18%{transform:translateY(2px) scaleY(.9) scaleX(1.07)}45%{transform:translateY(-28px) scaleY(1.08) scaleX(.95)}72%{transform:translateY(0) scaleY(.95) scaleX(1.04)}100%{transform:translateY(0) scaleY(1)}}
+@keyframes sway{0%,100%{transform:rotate(-2.5deg) translateY(0)}50%{transform:rotate(2.5deg) translateY(-3px)}}
+@keyframes droop{0%,100%{transform:translateY(3px) rotate(-1.4deg) scaleY(.975)}50%{transform:translateY(7px) rotate(1.4deg) scaleY(.955)}}
+@keyframes snooze{0%,100%{transform:translateY(6px) scaleY(.94) scaleX(1.03)}50%{transform:translateY(9px) scaleY(.90) scaleX(1.06)}}
+
+/* shared pet part animations */
+.p-flick{animation:flick 1.15s ease-in-out infinite;transform-origin:50% 100%}
+@keyframes flick{0%,100%{transform:scaleY(1) scaleX(1) rotate(0)}30%{transform:scaleY(1.14) scaleX(.92) rotate(-4deg)}65%{transform:scaleY(.92) scaleX(1.08) rotate(4deg)}}
+.p-wag{animation:wag 1.7s ease-in-out infinite;transform-origin:22% 60%}
+@keyframes wag{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(9deg)}}
+.p-flap{animation:flap 1.5s ease-in-out infinite;transform-origin:50% 55%}
+@keyframes flap{0%,100%{transform:rotate(-9deg) scaleX(1)}50%{transform:rotate(11deg) scaleX(.88)}}
+.p-sway{animation:leafsway 3.4s ease-in-out infinite;transform-origin:50% 100%}
+@keyframes leafsway{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(5deg)}}
+.p-spark{animation:sparkle 1.9s ease-in-out infinite}
+@keyframes sparkle{0%,100%{opacity:.15;transform:scale(.7)}45%{opacity:1;transform:scale(1.15)}}
+.p-pulse{animation:corePulse 2.1s ease-in-out infinite;transform-origin:center}
+@keyframes corePulse{0%,100%{opacity:.55;transform:scale(.94)}50%{opacity:1;transform:scale(1.08)}}
+.p-orbit{animation:orbit 7s linear infinite;transform-origin:100px 105px}
+@keyframes orbit{to{transform:rotate(360deg)}}
+.p-orbit-r{animation:orbitR 9s linear infinite;transform-origin:100px 105px}
+@keyframes orbitR{to{transform:rotate(-360deg)}}
+.p-float{animation:floaty 3.8s ease-in-out infinite}
+@keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.p-crack{animation:crackGlow 2.4s ease-in-out infinite}
+@keyframes crackGlow{0%,100%{opacity:.35}50%{opacity:1}}
+.p-wiggle{animation:wiggle 3.6s ease-in-out infinite;transform-origin:50% 100%}
+@keyframes wiggle{0%,88%,100%{transform:rotate(0)}91%{transform:rotate(-5deg)}95%{transform:rotate(5deg)}}
+.p-blink{animation:blink 4.4s ease-in-out infinite;transform-origin:center}
+@keyframes blink{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.08)}}
+.p-zzz{animation:zzz 3.4s ease-out infinite;opacity:0}
+@keyframes zzz{0%{opacity:0;transform:translate(0,0) scale(.6)}25%{opacity:1}100%{opacity:0;transform:translate(16px,-30px) scale(1.15)}}
+
+/* pet name plate */
+.pet-name{display:flex;align-items:center;justify-content:center;gap:9px;margin-top:2px}
+.pet-name h1{font-size:27px;line-height:1.1}
+.pet-name .edit{opacity:.45;transition:.2s}
+.pet-name .edit:hover{opacity:1}
+.pet-name .edit svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.pet-species{text-align:center;font-size:11.5px;color:var(--muted);font-weight:800;letter-spacing:1.3px;text-transform:uppercase;margin-top:4px}
+
+.speech{
+  position:relative;margin:14px auto 0;max-width:302px;
+  background:var(--card);border:1px solid var(--line);
+  border-radius:16px;padding:11px 15px;text-align:center;
+  font-size:13.5px;font-weight:700;color:#dbe1ef;line-height:1.45;
+}
+.speech::before{
+  content:"";position:absolute;top:-7px;left:50%;margin-left:-7px;
+  width:12px;height:12px;background:var(--card);
+  border-left:1px solid var(--line);border-top:1px solid var(--line);
+  transform:rotate(45deg);
+}
+.speech .mood-tag{color:var(--accent);font-weight:800}
+
+/* level ring */
+.lvl-badge{
+  display:inline-flex;align-items:center;gap:7px;
+  background:linear-gradient(135deg,var(--accent),var(--accent-2));
+  color:var(--accent-ink);font-family:"Fredoka One","Fredoka",sans-serif;
+  font-size:13px;padding:5px 13px;border-radius:999px;
+  box-shadow:0 6px 20px -6px rgba(var(--glow),.9);
+}
+
+/* ============================================================
+   Tab bar + FAB
+   ============================================================ */
+.tabbar{
+  position:absolute;left:0;right:0;bottom:0;z-index:40;
+  display:grid;grid-template-columns:repeat(5,1fr);
+  padding:9px 6px calc(9px + var(--safe-b));
+  background:linear-gradient(180deg, rgba(10,12,19,.6), rgba(10,12,19,.96) 42%);
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  border-top:1px solid var(--line);
+  transition:transform .34s var(--ease), opacity .28s var(--ease);
+}
+.tabbar.hidden{transform:translateY(115%);opacity:0;pointer-events:none}
+.tab{
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  padding:5px 0;color:var(--muted);transition:.2s var(--ease);border-radius:12px;
+}
+.tab svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.95;stroke-linecap:round;stroke-linejoin:round;transition:.2s var(--ease)}
+.tab span{font-size:9.5px;font-weight:800;letter-spacing:.4px}
+.tab.on{color:var(--accent)}
+.tab.on svg{transform:translateY(-1px) scale(1.08);filter:drop-shadow(0 0 8px rgba(var(--glow),.85))}
+.tab.spacer{pointer-events:none;opacity:0}
+.tab:active{transform:scale(.9)}
+
+.fab{
+  position:absolute;z-index:45;left:50%;bottom:calc(34px + var(--safe-b));
+  transform:translateX(-50%);
+  width:62px;height:62px;border-radius:50%;
+  display:grid;place-items:center;
+  background:linear-gradient(140deg,var(--accent),var(--accent-2));
+  color:var(--accent-ink);
+  box-shadow:0 12px 30px -6px rgba(var(--glow),.85), 0 0 0 5px var(--bg);
+  transition:transform .3s var(--ease), opacity .25s var(--ease);
+}
+.fab svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.fab::after{
+  content:"";position:absolute;inset:-5px;border-radius:50%;
+  border:2px solid rgba(var(--glow),.55);
+  animation:fabRing 2.4s var(--ease) infinite;
+}
+@keyframes fabRing{0%{transform:scale(.92);opacity:.9}70%,100%{transform:scale(1.42);opacity:0}}
+.fab:active{transform:translateX(-50%) scale(.9)}
+.fab.hidden{transform:translateX(-50%) scale(0) translateY(40px);opacity:0;pointer-events:none}
+
+/* ============================================================
+   Run tracking screen
+   ============================================================ */
+#screen-track{background:#0a0c13}
+.track-wrap{position:relative;flex:1;display:flex;flex-direction:column;min-height:0}
+#map{
+  position:absolute;inset:0;z-index:0;background:#11141d;
+}
+.leaflet-container{background:#11141d;font-family:"Nunito",sans-serif}
+.leaflet-control-attribution{
+  background:rgba(10,12,19,.72)!important;color:#6b7488!important;
+  font-size:9px!important;padding:1px 6px!important;
+}
+.leaflet-control-attribution a{color:#8791a8!important}
+.pulse-dot{position:relative}
+.pulse-dot i{
+  position:absolute;left:50%;top:50%;width:16px;height:16px;margin:-8px 0 0 -8px;
+  border-radius:50%;background:var(--accent);border:2.5px solid #fff;
+  box-shadow:0 0 14px rgba(var(--glow),1);display:block;
+}
+.pulse-dot i::after{
+  content:"";position:absolute;inset:-4px;border-radius:50%;
+  border:2px solid var(--accent);animation:fabRing 2s var(--ease) infinite;
+}
+.map-fallback{
+  position:absolute;inset:0;display:grid;place-items:center;z-index:1;
+  background:repeating-linear-gradient(45deg,#0f131d,#0f131d 12px,#111621 12px,#111621 24px);
+  text-align:center;padding:30px;
+}
+.map-fallback canvas{width:100%;max-width:300px;height:200px;display:block;margin:0 auto 14px}
+
+.track-top{
+  position:relative;z-index:10;
+  padding:calc(12px + var(--safe-t)) 14px 12px;
+  display:flex;align-items:center;gap:10px;
+  background:linear-gradient(180deg,rgba(10,12,19,.94),rgba(10,12,19,0));
+}
+.gps-pill{
+  display:inline-flex;align-items:center;gap:7px;
+  background:rgba(10,12,19,.82);border:1px solid var(--line);
+  padding:7px 12px;border-radius:999px;font-size:11px;font-weight:800;
+  backdrop-filter:blur(10px);
+}
+.gps-pill .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);box-shadow:0 0 8px currentColor}
+.gps-pill[data-q="good"] .dot{background:#4ade80}
+.gps-pill[data-q="ok"] .dot{background:#fbbf24}
+.gps-pill[data-q="bad"] .dot{background:#ff5c7a;animation:blinkDot 1s steps(2) infinite}
+.gps-pill[data-q="off"] .dot{background:#5d6478}
+@keyframes blinkDot{50%{opacity:.25}}
+
+.recenter{
+  position:absolute;right:14px;z-index:10;bottom:8px;
+  width:40px;height:40px;border-radius:13px;display:grid;place-items:center;
+  background:rgba(10,12,19,.86);border:1px solid var(--line);color:var(--accent);
+  backdrop-filter:blur(10px);opacity:0;pointer-events:none;transition:.22s var(--ease);
+}
+.recenter.show{opacity:1;pointer-events:auto}
+.recenter svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+
+.track-panel{
+  position:relative;z-index:10;margin-top:auto;
+  background:linear-gradient(180deg, rgba(14,17,26,.86), rgba(10,12,19,.98) 32%);
+  backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);
+  border-top:1px solid var(--line);
+  border-radius:26px 26px 0 0;
+  padding:16px 16px calc(18px + var(--safe-b));
+  box-shadow:0 -22px 50px rgba(0,0,0,.55);
+}
+.grab{width:38px;height:4px;border-radius:999px;background:var(--line);margin:0 auto 14px}
+.big-metric{text-align:center;margin-bottom:14px}
+.big-metric .n{
+  font-family:"Fredoka One","Fredoka",sans-serif;
+  font-size:63px;line-height:.95;letter-spacing:-1px;
+  background:linear-gradient(180deg,#fff,rgba(var(--glow),1));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  font-variant-numeric:tabular-nums;
+}
+.big-metric .u{font-size:11px;letter-spacing:2.4px;color:var(--muted);font-weight:800;text-transform:uppercase;margin-top:5px}
+.track-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px}
+.track-row .v{font-family:"Fredoka One","Fredoka",sans-serif;font-size:21px;font-variant-numeric:tabular-nums}
+.run-ctl{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.run-ctl.single{grid-template-columns:1fr}
+.ctl{
+  height:60px;border-radius:19px;display:flex;align-items:center;justify-content:center;gap:9px;
+  font-weight:800;font-size:15px;border:1px solid var(--line);background:var(--card);
+  transition:.16s var(--ease);
+}
+.ctl:active{transform:scale(.965)}
+.ctl svg{width:20px;height:20px;fill:currentColor}
+.ctl.go{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:var(--accent-ink);border-color:transparent;box-shadow:0 10px 26px -8px rgba(var(--glow),.8)}
+.ctl.stop{background:rgba(255,92,122,.13);color:#ff8098;border-color:rgba(255,92,122,.35)}
+.hold-hint{font-size:10px;color:var(--muted);text-align:center;margin-top:9px;font-weight:700;letter-spacing:.4px}
+.ctl.stop{position:relative;overflow:hidden}
+.ctl.stop .holdfill{position:absolute;inset:0;background:rgba(255,92,122,.3);width:0;transition:width .05s linear}
+
+.banner{
+  position:relative;z-index:10;margin:0 14px 10px;
+  display:flex;gap:10px;align-items:flex-start;
+  background:rgba(255,92,122,.11);border:1px solid rgba(255,92,122,.32);
+  color:#ffc0cc;border-radius:14px;padding:11px 13px;font-size:12.5px;font-weight:700;line-height:1.45;
+}
+.banner.warn{background:rgba(251,191,36,.1);border-color:rgba(251,191,36,.3);color:#fde3a7}
+.banner svg{width:17px;height:17px;flex:0 0 17px;margin-top:1px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.banner .x{margin-left:auto;opacity:.6;flex:0 0 auto}
+.banner[hidden]{display:none}
+
+/* ============================================================
+   Summary
+   ============================================================ */
+.sum-hero{text-align:center;padding:8px 0 4px}
+.sum-hero .kicker{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--accent);font-weight:800}
+.sum-hero .dist{font-family:"Fredoka One","Fredoka",sans-serif;font-size:60px;line-height:1;margin-top:6px;letter-spacing:-1px}
+.sum-hero .dist small{font-size:19px;color:var(--muted);margin-left:4px}
+.sum-hero .when{font-size:12px;color:var(--muted);font-weight:700;margin-top:8px}
+.route-card{padding:0;overflow:hidden;position:relative}
+.route-card canvas{display:block;width:100%;height:172px}
+.route-card .empty{height:172px;display:grid;place-items:center;color:var(--muted);font-size:12px;font-weight:700}
+.xp-breakdown{display:flex;flex-direction:column;gap:9px;margin-top:4px}
+.xp-line{display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:#c6cddd}
+.xp-line b{font-variant-numeric:tabular-nums}
+.xp-line.bonus{color:var(--accent-2)}
+.xp-line.total{border-top:1px dashed var(--line);padding-top:10px;margin-top:2px;font-size:15.5px;color:var(--text);font-weight:800}
+.xp-line.total b{font-family:"Fredoka One","Fredoka",sans-serif;font-size:19px;color:var(--accent)}
+
+.levelup{
+  text-align:center;padding:20px 16px;border-radius:var(--r-lg);
+  background:linear-gradient(150deg, rgba(var(--glow),.20), rgba(var(--glow),.05));
+  border:1px solid rgba(var(--glow),.36);position:relative;overflow:hidden;
+}
+.levelup h3{font-size:23px;margin-bottom:4px}
+.levelup p{font-size:12.5px;color:#c6cddd;font-weight:700;margin:0}
+.levelup .burst{
+  position:absolute;inset:0;background:
+    radial-gradient(circle at 50% 55%, rgba(var(--glow),.4), transparent 60%);
+  animation:halo 2.6s ease-in-out infinite;
+}
+.levelup>*{position:relative}
+.confetti{position:absolute;top:-12px;width:7px;height:11px;border-radius:2px;opacity:0;animation:confFall linear forwards}
+@keyframes confFall{0%{opacity:1;transform:translateY(-10px) rotate(0)}100%{opacity:0;transform:translateY(340px) rotate(680deg)}}
+
+.evo-reveal{display:flex;align-items:center;justify-content:center;gap:14px;margin:12px 0 2px}
+.evo-reveal .arrow{color:var(--accent);animation:nudge 1.3s ease-in-out infinite}
+@keyframes nudge{0%,100%{transform:translateX(-3px)}50%{transform:translateX(3px)}}
+.evo-reveal .pet-holder{width:96px;height:96px}
+.evo-reveal .new{filter:drop-shadow(0 0 22px rgba(var(--glow),.9));animation:popIn .8s var(--ease) both}
+@keyframes popIn{0%{transform:scale(.3) rotate(-14deg);opacity:0}62%{transform:scale(1.14) rotate(4deg);opacity:1}100%{transform:scale(1) rotate(0)}}
+
+/* ============================================================
+   Evolution / profile
+   ============================================================ */
+.spec-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;background:var(--card);padding:5px;border-radius:15px;border:1px solid var(--line)}
+.spec-tab{
+  padding:9px 4px;border-radius:11px;font-size:11.5px;font-weight:800;color:var(--muted);
+  transition:.2s var(--ease);display:flex;flex-direction:column;align-items:center;gap:3px;
+}
+.spec-tab .yours{font-size:8.5px;letter-spacing:.6px;color:var(--accent);text-transform:uppercase}
+.spec-tab.on{background:var(--card-2);color:var(--text);box-shadow:inset 0 0 0 1px var(--line)}
+
+.evo-tree{display:flex;flex-direction:column;gap:9px;margin-top:12px}
+.evo-node{
+  display:flex;align-items:center;gap:13px;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);
+  padding:11px 13px;position:relative;transition:.25s var(--ease);
+}
+.evo-node .pet-holder{width:66px;height:66px;flex:0 0 66px}
+.evo-node .pet-holder svg{filter:none}
+.evo-node.locked{opacity:.42}
+.evo-node.locked .pet-holder svg{filter:grayscale(1) brightness(.55) contrast(.9)}
+.evo-node.current{
+  border-color:rgba(var(--glow),.55);
+  background:linear-gradient(100deg, rgba(var(--glow),.13), var(--card) 60%);
+  box-shadow:0 0 0 1px rgba(var(--glow),.22), 0 12px 30px -16px rgba(var(--glow),.9);
+}
+.evo-node .info{flex:1;min-width:0}
+.evo-node .nm{font-family:"Fredoka One","Fredoka",sans-serif;font-size:16px}
+.evo-node .rq{font-size:11px;color:var(--muted);font-weight:800;margin-top:3px;letter-spacing:.3px}
+.evo-node .ds{font-size:11.5px;color:#98a1b6;font-weight:600;margin-top:5px;line-height:1.4}
+.evo-node .stagenum{
+  position:absolute;top:9px;right:11px;font-size:9px;font-weight:800;
+  color:var(--muted);letter-spacing:1px;
+}
+.evo-connector{width:2px;height:9px;background:var(--line);margin-left:44px;border-radius:2px}
+
+.badge-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+.badge{
+  aspect-ratio:1;border-radius:16px;background:var(--card);border:1px solid var(--line);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+  padding:6px 4px;text-align:center;transition:.2s var(--ease);position:relative;
+}
+.badge .ico{font-size:23px;line-height:1;filter:grayscale(1) opacity(.32)}
+.badge .nm{font-size:8.5px;font-weight:800;color:var(--muted);line-height:1.2;letter-spacing:.2px}
+.badge.got{background:linear-gradient(160deg, rgba(var(--glow),.16), var(--card));border-color:rgba(var(--glow),.36)}
+.badge.got .ico{filter:none;animation:badgePop .5s var(--ease) both}
+.badge.got .nm{color:#d5dcea}
+@keyframes badgePop{0%{transform:scale(.4)}70%{transform:scale(1.16)}100%{transform:scale(1)}}
+.badge:active{transform:scale(.94)}
+
+/* ============================================================
+   History
+   ============================================================ */
+.run-item{
+  display:flex;align-items:center;gap:13px;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);
+  padding:13px;margin-bottom:9px;transition:.18s var(--ease);width:100%;text-align:left;
+}
+.run-item:active{transform:scale(.985);border-color:rgba(var(--glow),.4)}
+.run-item .thumb{
+  width:52px;height:52px;flex:0 0 52px;border-radius:13px;overflow:hidden;
+  background:#0e1119;border:1px solid var(--line);position:relative;
+}
+.run-item .thumb canvas{width:100%;height:100%;display:block}
+.run-item .main{flex:1;min-width:0}
+.run-item .d1{display:flex;align-items:baseline;gap:7px}
+.run-item .km{font-family:"Fredoka One","Fredoka",sans-serif;font-size:19px}
+.run-item .km small{font-size:11px;color:var(--muted);font-weight:800;font-family:"Nunito"}
+.run-item .dt{font-size:11px;color:var(--muted);font-weight:800}
+.run-item .d2{font-size:11.5px;color:#8f98ad;font-weight:700;margin-top:4px;display:flex;gap:11px;flex-wrap:wrap}
+.run-item .xp{
+  flex:0 0 auto;text-align:right;font-family:"Fredoka One","Fredoka",sans-serif;
+  font-size:15px;color:var(--accent);
+}
+.run-item .xp small{display:block;font-size:8.5px;color:var(--muted);letter-spacing:1px;font-family:"Nunito";font-weight:800}
+.month-head{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:1.3px;text-transform:uppercase;margin:18px 0 9px}
+
+.empty-state{text-align:center;padding:46px 22px;color:var(--muted)}
+.empty-state .ico{font-size:44px;margin-bottom:12px;opacity:.65}
+.empty-state h3{font-size:18px;color:var(--text);margin-bottom:7px}
+.empty-state p{font-size:13px;line-height:1.6;font-weight:600;margin:0 0 18px}
+
+/* week strip */
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.week .d{
+  text-align:center;padding:9px 0 8px;border-radius:12px;
+  background:var(--card);border:1px solid var(--line);
+}
+.week .d .lbl{font-size:9px;color:var(--muted);font-weight:800;letter-spacing:.6px}
+.week .d .mk{
+  width:9px;height:9px;border-radius:50%;background:var(--line);margin:7px auto 0;
+}
+.week .d.hit{border-color:rgba(var(--glow),.45);background:linear-gradient(180deg,rgba(var(--glow),.16),var(--card))}
+.week .d.hit .mk{background:var(--accent);box-shadow:0 0 10px rgba(var(--glow),1)}
+.week .d.today{outline:1.5px solid rgba(var(--glow),.55);outline-offset:1px}
+
+/* ============================================================
+   Forms / settings
+   ============================================================ */
+.row{
+  display:flex;align-items:center;gap:13px;padding:14px 15px;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);margin-bottom:9px;
+}
+.row .t{flex:1;min-width:0}
+.row .t .n{font-size:14px;font-weight:800}
+.row .t .h{font-size:11.5px;color:var(--muted);font-weight:600;margin-top:3px;line-height:1.45}
+.row.tap{transition:.16s var(--ease)}
+.row.tap:active{transform:scale(.985)}
+.seg{display:flex;background:var(--bg-2);border:1px solid var(--line);border-radius:11px;padding:3px;gap:3px}
+.seg button{padding:7px 13px;border-radius:8px;font-size:12px;font-weight:800;color:var(--muted);transition:.18s}
+.seg button.on{background:var(--accent);color:var(--accent-ink)}
+.toggle{
+  width:48px;height:28px;border-radius:999px;background:var(--bg-2);border:1px solid var(--line);
+  position:relative;transition:.24s var(--ease);flex:0 0 48px;
+}
+.toggle i{
+  position:absolute;top:2.5px;left:3px;width:21px;height:21px;border-radius:50%;
+  background:var(--muted);transition:.24s var(--ease);display:block;
+}
+.toggle.on{background:rgba(var(--glow),.24);border-color:rgba(var(--glow),.5)}
+.toggle.on i{left:22px;background:var(--accent);box-shadow:0 0 12px rgba(var(--glow),1)}
+.inp{
+  width:100%;background:var(--bg-2);border:1px solid var(--line);border-radius:12px;
+  padding:13px 14px;color:var(--text);font-size:15px;font-weight:700;outline:none;transition:.18s;
+}
+.inp:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(var(--glow),.14)}
+.inp.num{width:78px;text-align:center;padding:10px 6px;font-variant-numeric:tabular-nums}
+textarea.inp{min-height:110px;resize:vertical;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.5;font-weight:500}
+label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin:0 0 7px}
+
+/* ============================================================
+   Onboarding
+   ============================================================ */
+.overlay{
+  position:absolute;inset:0;z-index:60;
+  background:var(--bg);
+  display:flex;flex-direction:column;
+  padding:calc(24px + var(--safe-t)) 20px calc(20px + var(--safe-b));
+  overflow-y:auto;
+  opacity:0;visibility:hidden;transition:opacity .34s var(--ease), visibility 0s linear .34s;
+}
+.overlay.show{opacity:1;visibility:visible;transition-delay:0s}
+.ob-step{display:none;flex-direction:column;flex:1;animation:fadeUp .45s var(--ease) both}
+.ob-step.on{display:flex}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+.ob-logo{text-align:center;margin-bottom:6px}
+.ob-logo h1{font-size:38px;letter-spacing:.5px;background:linear-gradient(120deg,#ff6b35,#ffd23f 30%,#4ade80 62%,#7cd4fd);-webkit-background-clip:text;background-clip:text;color:transparent}
+.ob-logo p{font-size:13px;color:var(--muted);font-weight:700;margin:9px 0 0;line-height:1.55}
+.pick-grid{display:flex;flex-direction:column;gap:11px;margin:18px 0}
+.pick{
+  display:flex;align-items:center;gap:14px;text-align:left;
+  background:var(--card);border:1.5px solid var(--line);border-radius:20px;padding:13px;
+  transition:.24s var(--ease);position:relative;overflow:hidden;
+}
+.pick .pet-holder{width:74px;height:74px;flex:0 0 74px}
+.pick .nm{font-family:"Fredoka One","Fredoka",sans-serif;font-size:18px}
+.pick .tag{font-size:10px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;margin-top:3px}
+.pick .ds{font-size:11.5px;color:#96a0b5;font-weight:600;margin-top:6px;line-height:1.45}
+.pick::before{
+  content:"";position:absolute;inset:0;opacity:0;transition:.24s var(--ease);
+  background:linear-gradient(100deg, rgba(var(--pg),.16), transparent 62%);
+}
+.pick.sel{border-color:rgba(var(--pg),.7);box-shadow:0 0 0 1px rgba(var(--pg),.3), 0 16px 34px -18px rgba(var(--pg),1)}
+.pick.sel::before{opacity:1}
+.pick>*{position:relative}
+.pick:active{transform:scale(.985)}
+
+.ob-foot{margin-top:auto;padding-top:16px}
+.egg-crack{animation:eggShake 1.6s ease-in-out infinite}
+@keyframes eggShake{0%,72%,100%{transform:rotate(0)}78%{transform:rotate(-6deg)}84%{transform:rotate(6deg)}90%{transform:rotate(-3deg)}}
+
+/* ============================================================
+   Modal + toast
+   ============================================================ */
+.sheet-wrap{
+  position:absolute;inset:0;z-index:70;display:flex;align-items:flex-end;justify-content:center;
+  background:rgba(4,6,10,.7);backdrop-filter:blur(4px);
+  opacity:0;visibility:hidden;transition:opacity .26s var(--ease), visibility 0s linear .26s;
+}
+.sheet-wrap.show{opacity:1;visibility:visible;transition-delay:0s}
+.sheet{
+  width:100%;background:var(--card);border:1px solid var(--line);border-bottom:0;
+  border-radius:26px 26px 0 0;padding:18px 18px calc(20px + var(--safe-b));
+  transform:translateY(102%);transition:transform .34s var(--ease);
+  max-height:88%;overflow-y:auto;
+}
+.sheet-wrap.show .sheet{transform:none}
+.sheet h3{font-size:19px;margin-bottom:6px}
+.sheet .desc{font-size:13px;color:var(--muted);font-weight:600;line-height:1.55;margin:0 0 16px}
+.sheet-btns{display:flex;gap:10px;margin-top:16px}
+.sheet-btns .btn{flex:1}
+
+.toasts{position:absolute;left:0;right:0;top:calc(10px + var(--safe-t));z-index:90;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;padding:0 16px}
+.toast{
+  background:rgba(22,27,40,.97);border:1px solid var(--line);
+  border-radius:14px;padding:11px 16px;font-size:13px;font-weight:800;
+  box-shadow:0 14px 34px rgba(0,0,0,.5);backdrop-filter:blur(12px);
+  display:flex;align-items:center;gap:9px;max-width:100%;
+  animation:toastIn .4s var(--ease) both;
+}
+.toast.out{animation:toastOut .3s var(--ease) both}
+.toast .em{font-size:17px}
+.toast.good{border-color:rgba(74,222,128,.4)}
+.toast.bad{border-color:rgba(255,92,122,.4)}
+@keyframes toastIn{from{opacity:0;transform:translateY(-18px) scale(.94)}to{opacity:1;transform:none}}
+@keyframes toastOut{to{opacity:0;transform:translateY(-14px) scale(.96)}}
+
+.linkish{color:var(--accent);font-weight:800;text-decoration:none;border-bottom:1px dashed rgba(var(--glow),.5)}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px}
+.muted{color:var(--muted)}
+.center{text-align:center}
+.mt{margin-top:12px}.mt2{margin-top:20px}
+.hide{display:none!important}
+
+/* sprite-sheet driven pet (user supplied art) */
+.sprite{
+  image-rendering:pixelated;background-repeat:no-repeat;
+  background-size:auto 100%;
+  width:100%;height:100%;
+}
+.sprite.playing{animation:spriteRun steps(var(--frames)) var(--dur) infinite}
+@keyframes spriteRun{from{background-position-x:0}to{background-position-x:calc(var(--frames) * -100%)}}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.08s!important}
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="stage" id="stage">
+
+    <!-- ===================== HOME ===================== -->
+    <section class="screen" id="screen-home">
+      <div class="hdr">
+        <div>
+          <h2 id="greeting">Hey there</h2>
+          <div class="sub" id="greeting-sub">Let's get moving</div>
+        </div>
+        <div class="hdr-spacer"></div>
+        <button class="iconbtn" data-nav="settings" aria-label="Settings">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.5.68.86 1.22.98H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
+
+      <div class="pet-stage" id="pet-stage">
+        <div class="pet-halo"></div>
+        <div class="pet-shadow"></div>
+        <div class="pet-holder" id="home-pet"></div>
+      </div>
+
+      <div class="pet-name">
+        <h1 id="pet-name-txt">Ember</h1>
+        <button class="edit" id="rename-btn" aria-label="Rename pet">
+          <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+        </button>
+      </div>
+      <div class="pet-species" id="pet-species-txt">Cinderling · Stage 1</div>
+
+      <div class="speech" id="pet-speech">…</div>
+
+      <div class="card" style="margin-top:18px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px">
+          <span class="lvl-badge">LV <span id="home-level">1</span></span>
+          <span class="chip grey" id="home-nextevo">Next form at Lv 5</span>
+        </div>
+        <div class="xpbar lg"><div class="fill" id="home-xpfill"></div></div>
+        <div class="xp-meta">
+          <span><b id="home-xpnow">0</b> / <span id="home-xpneed">200</span> XP</span>
+          <span id="home-xpleft">200 XP to Lv 2</span>
+        </div>
+      </div>
+
+      <div class="section-title">This week</div>
+      <div class="week" id="home-week"></div>
+
+      <div class="stat-grid" style="margin-top:11px">
+        <div class="stat"><div class="v" id="home-streak">0</div><div class="k">Day streak</div></div>
+        <div class="stat"><div class="v" id="home-weekdist">0<small>km</small></div><div class="k">This week</div></div>
+        <div class="stat"><div class="v" id="home-total">0<small>km</small></div><div class="k">Lifetime</div></div>
+      </div>
+
+      <div class="section-title">Recent runs</div>
+      <div id="home-recent"></div>
+
+      <div class="screen-pad"></div>
+    </section>
+
+    <!-- ===================== TRACK ===================== -->
+    <section class="screen flush no-nav" id="screen-track">
+      <div class="track-wrap">
+        <div id="map"></div>
+        <div class="map-fallback hide" id="map-fallback">
+          <div>
+            <canvas id="fallback-canvas" width="600" height="400"></canvas>
+            <div class="muted" style="font-size:12px;font-weight:700" id="fallback-msg">Map tiles unavailable — your route is still being recorded.</div>
+          </div>
+        </div>
+
+        <div class="track-top">
+          <button class="iconbtn" id="track-back" aria-label="Back" style="background:rgba(10,12,19,.82);backdrop-filter:blur(10px)">
+            <svg viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+          </button>
+          <div class="gps-pill" id="gps-pill" data-q="off"><span class="dot"></span><span id="gps-txt">Waiting for GPS…</span></div>
+        </div>
+
+        <div class="banner" id="track-banner" hidden>
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>
+          <span id="track-banner-txt"></span>
+          <button class="x" id="track-banner-x" aria-label="Dismiss">
+            <svg viewBox="0 0 24 24" style="width:15px;height:15px"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <button class="recenter" id="recenter" aria-label="Re-centre map">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8"/></svg>
+        </button>
+
+        <div class="track-panel">
+          <div class="grab"></div>
+          <div class="big-metric">
+            <div class="n" id="t-dist">0.00</div>
+            <div class="u" id="t-dist-u">kilometres</div>
+          </div>
+          <div class="track-row">
+            <div class="stat"><div class="v" id="t-time">0:00</div><div class="k">Duration</div></div>
+            <div class="stat"><div class="v" id="t-pace">--:--</div><div class="k" id="t-pace-k">Avg /km</div></div>
+            <div class="stat"><div class="v" id="t-kcal">0</div><div class="k">Kcal</div></div>
+          </div>
+          <div class="run-ctl single" id="run-ctl">
+            <button class="ctl go" id="btn-start">
+              <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg> Start run
+            </button>
+          </div>
+          <div class="hold-hint hide" id="hold-hint">Hold the stop button to finish</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== SUMMARY ===================== -->
+    <section class="screen" id="screen-summary">
+      <div class="hdr">
+        <button class="iconbtn" id="sum-close" aria-label="Close">
+          <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+        <div class="hdr-spacer"></div>
+        <button class="iconbtn hide" id="sum-delete" aria-label="Delete run">
+          <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+        </button>
+      </div>
+
+      <div class="sum-hero">
+        <div class="kicker" id="sum-kicker">Run complete</div>
+        <div class="dist"><span id="sum-dist">0.00</span><small id="sum-dist-u">km</small></div>
+        <div class="when" id="sum-when"></div>
+      </div>
+
+      <div class="card route-card" style="margin-top:16px">
+        <canvas id="sum-canvas" width="760" height="430"></canvas>
+      </div>
+
+      <div class="stat-grid" style="margin-top:11px">
+        <div class="stat"><div class="v" id="sum-time">0:00</div><div class="k">Duration</div></div>
+        <div class="stat"><div class="v" id="sum-pace">--:--</div><div class="k" id="sum-pace-k">Avg pace</div></div>
+        <div class="stat"><div class="v" id="sum-kcal">0</div><div class="k">Calories</div></div>
+      </div>
+
+      <div class="section-title">Experience earned</div>
+      <div class="card">
+        <div class="xp-breakdown" id="sum-xp-lines"></div>
+      </div>
+
+      <div id="sum-progress-wrap" class="card" style="margin-top:11px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px">
+          <span class="lvl-badge">LV <span id="sum-level">1</span></span>
+          <span class="chip grey" id="sum-levelnote"></span>
+        </div>
+        <div class="xpbar lg"><div class="fill" id="sum-xpfill"></div></div>
+        <div class="xp-meta"><span><b id="sum-xpnow">0</b> / <span id="sum-xpneed">200</span> XP</span><span id="sum-xpleft"></span></div>
+      </div>
+
+      <div id="sum-levelup" class="hide" style="margin-top:14px"></div>
+
+      <button class="btn primary" id="sum-done" style="margin-top:18px">Nice one — back to my pet</button>
+      <div class="screen-pad"></div>
+    </section>
+
+    <!-- ===================== EVOLUTION / PROFILE ===================== -->
+    <section class="screen" id="screen-evolve">
+      <div class="hdr">
+        <div><h2>Evolution</h2><div class="sub" id="evo-sub">Your journey so far</div></div>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat"><div class="v" id="ev-total">0<small>km</small></div><div class="k">Lifetime</div></div>
+        <div class="stat"><div class="v" id="ev-runs">0</div><div class="k">Runs</div></div>
+        <div class="stat"><div class="v" id="ev-time">0<small>h</small></div><div class="k">Moving</div></div>
+      </div>
+      <div class="stat-grid" style="margin-top:9px">
+        <div class="stat"><div class="v" id="ev-streak">0</div><div class="k">Streak</div></div>
+        <div class="stat"><div class="v" id="ev-best">0</div><div class="k">Best streak</div></div>
+        <div class="stat"><div class="v" id="ev-xp">0</div><div class="k">Total XP</div></div>
+      </div>
+
+      <div class="section-title">Evolution tree</div>
+      <div class="spec-tabs" id="spec-tabs"></div>
+      <div class="evo-tree" id="evo-tree"></div>
+
+      <div class="section-title">Badges <span class="chip grey" id="badge-count" style="margin-left:auto">0/0</span></div>
+      <div class="badge-grid" id="badge-grid"></div>
+
+      <div class="screen-pad"></div>
+    </section>
+
+    <!-- ===================== HISTORY ===================== -->
+    <section class="screen" id="screen-history">
+      <div class="hdr">
+        <div><h2>History</h2><div class="sub" id="hist-sub">No runs yet</div></div>
+        <div class="hdr-spacer"></div>
+        <div class="chip" id="hist-total">0 km</div>
+      </div>
+      <div id="hist-list"></div>
+      <div class="screen-pad"></div>
+    </section>
+
+    <!-- ===================== SETTINGS ===================== -->
+    <section class="screen" id="screen-settings">
+      <div class="hdr">
+        <button class="iconbtn" data-nav="home" aria-label="Back">
+          <svg viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+        </button>
+        <div><h2>Settings</h2></div>
+      </div>
+
+      <div class="section-title">Your pet</div>
+      <div class="row">
+        <div class="t"><div class="n">Name</div><div class="h" id="set-petname">—</div></div>
+        <button class="btn ghost" style="width:auto;padding:9px 15px;font-size:13px" id="set-rename">Rename</button>
+      </div>
+
+      <div class="section-title">Units &amp; body</div>
+      <div class="row">
+        <div class="t"><div class="n">Distance units</div><div class="h">Affects distance and pace everywhere</div></div>
+        <div class="seg" id="seg-units"><button data-u="km" class="on">km</button><button data-u="mi">mi</button></div>
+      </div>
+      <div class="row">
+        <div class="t"><div class="n">Body weight</div><div class="h">Used for the calorie estimate only</div></div>
+        <input class="inp num" id="set-weight" type="number" min="25" max="250" step="1" value="70" inputmode="numeric">
+        <span class="muted" style="font-size:12px;font-weight:800" id="set-weight-u">kg</span>
+      </div>
+
+      <div class="section-title">Tracking</div>
+      <div class="row tap" id="row-sim">
+        <div class="t"><div class="n">Simulated GPS</div><div class="h">Fakes a route so you can try the app indoors or on a desktop. Runs are tagged as simulated.</div></div>
+        <div class="toggle" id="tg-sim"><i></i></div>
+      </div>
+      <div class="row tap" id="row-keepawake">
+        <div class="t"><div class="n">Keep screen awake</div><div class="h">Holds a wake lock while a run is in progress (supported browsers only)</div></div>
+        <div class="toggle on" id="tg-wake"><i></i></div>
+      </div>
+
+      <div class="section-title">Artwork</div>
+      <div class="row tap" id="row-sprites">
+        <div class="t"><div class="n">Sprite packs</div><div class="h" id="sprite-summary">Using the built-in vector pets</div></div>
+        <svg viewBox="0 0 24 24" style="width:17px;height:17px;fill:none;stroke:var(--muted);stroke-width:2.2;stroke-linecap:round"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+
+      <div class="section-title">Data</div>
+      <div class="row tap" id="row-export">
+        <div class="t"><div class="n">Export save file</div><div class="h">Download every run, your pet and its XP as JSON</div></div>
+        <svg viewBox="0 0 24 24" style="width:17px;height:17px;fill:none;stroke:var(--muted);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+      </div>
+      <div class="row tap" id="row-import">
+        <div class="t"><div class="n">Import save file</div><div class="h">Restore from a previously exported JSON file</div></div>
+        <svg viewBox="0 0 24 24" style="width:17px;height:17px;fill:none;stroke:var(--muted);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+      </div>
+      <button class="btn danger" id="btn-reset" style="margin-top:6px">
+        <svg viewBox="0 0 24 24"><path d="M3 2v6h6"/><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1L3 8"/></svg>
+        New game — reset everything
+      </button>
+
+      <p class="muted center" style="font-size:11px;font-weight:700;line-height:1.7;margin-top:22px">
+        RunPet stores everything on this device in <span class="mono">localStorage</span>.<br>
+        No account, no server, no tracking.<br>
+        <span id="storage-note" class="mono"></span>
+      </p>
+      <div class="screen-pad"></div>
+    </section>
+  </div>
+
+  <!-- ===================== NAV ===================== -->
+  <nav class="tabbar" id="tabbar">
+    <button class="tab on" data-nav="home">
+      <svg viewBox="0 0 24 24"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/></svg><span>Pet</span>
+    </button>
+    <button class="tab" data-nav="evolve">
+      <svg viewBox="0 0 24 24"><path d="M12 3v6"/><circle cx="12" cy="12" r="3"/><path d="M12 15v6"/><path d="M5 8l3 2"/><path d="M19 8l-3 2"/><path d="M5 17l3-2"/><path d="M19 17l-3-2"/></svg><span>Evolve</span>
+    </button>
+    <button class="tab spacer" disabled></button>
+    <button class="tab" data-nav="history">
+      <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3.5 2"/></svg><span>History</span>
+    </button>
+    <button class="tab" data-nav="settings">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M4 12h2M18 12h2M12 4v2M12 18v2M6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M17.7 6.3l-1.4 1.4M7.7 16.3l-1.4 1.4"/></svg><span>Settings</span>
+    </button>
+  </nav>
+
+  <button class="fab" id="fab" aria-label="Start a run">
+    <svg viewBox="0 0 24 24"><path d="M13 3l-1.5 5.5L15 10l2 4"/><circle cx="16.5" cy="4.5" r="1.6" fill="currentColor" stroke="none"/><path d="M11.5 8.5L8 11l1 4-3 5"/><path d="M8 11l-3.5 1"/></svg>
+  </button>
+
+  <!-- ===================== ONBOARDING ===================== -->
+  <div class="overlay" id="onboard">
+    <div class="ob-step on" id="ob-1">
+      <div class="ob-logo" style="margin-top:22px">
+        <h1>RunPet</h1>
+        <p>Every kilometre you run feeds a little creature.<br>Keep running and it will grow up.</p>
+      </div>
+      <div class="pet-stage" style="min-height:200px">
+        <div class="pet-halo"></div>
+        <div class="pet-holder egg-crack" id="ob-hero"></div>
+      </div>
+      <div class="ob-foot">
+        <button class="btn primary" id="ob-go">Choose an egg</button>
+        <p class="muted center" style="font-size:11px;font-weight:700;margin-top:14px;line-height:1.6">
+          Needs location permission while a run is in progress.<br>Nothing ever leaves your device.
+        </p>
+      </div>
+    </div>
+
+    <div class="ob-step" id="ob-2">
+      <h2 style="font-size:26px;margin-top:14px">Pick your egg</h2>
+      <p class="muted" style="font-size:13px;font-weight:600;line-height:1.55;margin:8px 0 0">
+        Each species has five forms and its own colour scheme. You cannot change this later without starting a new game — choose the one you like looking at.
+      </p>
+      <div class="pick-grid" id="species-picks"></div>
+      <div class="ob-foot">
+        <button class="btn primary" id="ob-next" disabled>Continue</button>
+      </div>
+    </div>
+
+    <div class="ob-step" id="ob-3">
+      <h2 style="font-size:26px;margin-top:14px">Name your pet</h2>
+      <p class="muted" style="font-size:13px;font-weight:600;line-height:1.55;margin:8px 0 20px">Something you will not mind shouting at 6am.</p>
+      <div class="pet-stage" style="min-height:190px">
+        <div class="pet-halo"></div>
+        <div class="pet-holder egg-crack" id="ob-egg"></div>
+      </div>
+      <div style="margin-top:20px">
+        <label class="fl" for="ob-name">Pet name</label>
+        <input class="inp" id="ob-name" maxlength="16" placeholder="Ember" autocomplete="off">
+      </div>
+      <div class="ob-foot">
+        <button class="btn primary" id="ob-hatch">Hatch my egg</button>
+        <button class="btn ghost" id="ob-back" style="margin-top:9px">Back</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== SHEET + TOASTS ===================== -->
+  <div class="sheet-wrap" id="sheet-wrap"><div class="sheet" id="sheet"></div></div>
+  <div class="toasts" id="toasts"></div>
+</div>
+
+<input type="file" id="file-import" accept="application/json,.json" class="hide">
+<input type="file" id="file-sprite" accept="image/*" class="hide">
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+<script>
+"use strict";
+/* ============================================================================
+   RunPet — a single-file running tracker with a virtual pet.
+   Sections:  1 config   2 maths   3 state   4 art   5 render
+              6 tracking 7 screens 8 settings 9 boot
+   ========================================================================== */
+
+/* ---------------------------------------------------------------------------
+   1. CONFIG
+   ------------------------------------------------------------------------- */
+const SAVE_KEY = "runpet.save.v1";
+
+/* XP curve ------------------------------------------------------------------
+   Base rate is 100 XP per km. On top of that every extra kilometre inside a
+   single run is worth slightly more than the one before it, so a long run
+   pays better than the same distance split across several short ones.
+
+   rate(x) = 100 * (1 + ENDURANCE_K * x)   capped at ENDURANCE_CAP_KM
+   XP(D)   = integral of rate from 0..D
+           = 100*D + 100*ENDURANCE_K/2 * D^2                (D <= cap)
+   Beyond the cap the rate stays flat at its capped value.                    */
+const XP_PER_KM        = 100;
+const ENDURANCE_K      = 0.05;   // +5% of base per km run
+const ENDURANCE_CAP_KM = 20;     // multiplier tops out at x2.0 at 20 km
+
+/* Level curve ---------------------------------------------------------------
+   Level 1 -> 2 costs 200 XP and each following level costs more, exactly as
+   specified. A flat x1.5 forever would put level 50 at ~2.8e10 XP (roughly a
+   hundred million kilometres), so the growth factor eases off as levels climb:
+
+     factor(n) = 1 + 0.5 * LEVEL_DECAY^(n-1)
+
+   n=1 gives exactly x1.5, and it relaxes towards ~x1.02 near level 50. Early
+   levels match the brief and the final form lands at ~1,500 lifetime km.     */
+const LEVEL_BASE  = 200;
+const LEVEL_DECAY = 0.86;
+const MAX_LEVEL   = 99;
+
+const STREAK_BONUS_STEP = 0.10;  // +10% for a 2-day streak
+const STREAK_BONUS_MAX  = 0.50;  // capped at +50%
+
+const EVO_LEVELS = [1, 5, 15, 30, 50];   // stage index -> level required
+
+/* GPS sanity filters */
+const GPS = {
+  minAccuracyM:   45,   // above this a fix is "weak" and does not extend the route
+  hardRejectM:    90,   // above this the fix is dropped entirely
+  minStepM:       1.5,  // floor for the jitter filter (scaled by accuracy below)
+  maxSpeedMS:     12,   // ~43 km/h — anything faster is a GPS jump
+  staleAfterMs:   15000
+};
+
+/* --------------------------------------------------------------------------
+   Species. Each has 5 stages. `art` is looked up in PET_ART.
+   -------------------------------------------------------------------------- */
+const SPECIES = {
+  ember: {
+    id:"ember", name:"Ember", element:"Fire",
+    tagline:"Aggressive · energetic",
+    blurb:"A magma-blooded drake. Sprints hard, sulks harder, and burns brightest when you run often.",
+    theme:{ accent:"#ff6b35", accent2:"#ffd23f", ink:"#220d02", glow:"255,107,53" },
+    stages:[
+      { name:"Cinder Egg",  desc:"An obsidian shell with a furnace inside. Something in there is impatient." },
+      { name:"Cinderling",  desc:"All head, tiny wings, permanently overheating. Hiccups sparks." },
+      { name:"Blazewyrm",   desc:"Wings that finally work and a temper that mostly does not." },
+      { name:"Pyrelord",    desc:"A proper drake. The air above it shimmers when you come home from a run." },
+      { name:"Infernarch",  desc:"Crowned in living fire. It only bows to people who keep showing up." }
+    ]
+  },
+  verdant: {
+    id:"verdant", name:"Verdant", element:"Forest",
+    tagline:"Calm · leafy · glowing",
+    blurb:"A quiet spirit of moss and old wood. Grows steadily, forgives slowly, glows when you are consistent.",
+    theme:{ accent:"#4ade80", accent2:"#bef264", ink:"#05230f", glow:"74,222,128" },
+    stages:[
+      { name:"Seedpod",     desc:"A dormant pod wrapped in moss. Faint green light leaks from the seams." },
+      { name:"Sproutling",  desc:"A soft round thing under an oversized leaf hat. Smells like rain." },
+      { name:"Fernkin",     desc:"Twig antlers, a moss cloak, and the beginnings of a serious opinion about mornings." },
+      { name:"Thicketmane", desc:"Antlers heavy with leaves. Small flowers open when your streak is alive." },
+      { name:"Grovewarden", desc:"An entire season walking around in one body. The forest leans towards it." }
+    ]
+  },
+  nimbus: {
+    id:"nimbus", name:"Nimbus", element:"Storm",
+    tagline:"Playful · sparky · floaty",
+    blurb:"A pocket thunderhead. Never quite touches the ground and cannot sit still for more than a day.",
+    theme:{ accent:"#7cd4fd", accent2:"#fde047", ink:"#04202e", glow:"124,212,253" },
+    stages:[
+      { name:"Static Egg",  desc:"A cloud wrapped tightly around something that keeps zapping it." },
+      { name:"Puffling",    desc:"A giggling scrap of cloud with a bolt for a tail. Hovers about a foot up." },
+      { name:"Zephyrite",   desc:"Bolt-shaped wings and far too much energy for its size." },
+      { name:"Tempestor",   desc:"A rolling storm front with a face. Your hair stands up nearby." },
+      { name:"Thunderarch", desc:"A crowned stormhead orbited by its own lightning. Weather happens around it." }
+    ]
+  }
+};
+const SPECIES_ORDER = ["ember","verdant","nimbus"];
+
+/* Moods, worst to best. `gap` = whole days since the last run. */
+const MOODS = {
+  elated:{ key:"elated", label:"Elated",   emoji:"🤩" },
+  happy: { key:"happy",  label:"Happy",    emoji:"😄" },
+  okay:  { key:"okay",   label:"Content",  emoji:"🙂" },
+  bored: { key:"bored",  label:"Restless", emoji:"😕" },
+  sad:   { key:"sad",    label:"Sad",      emoji:"😢" },
+  asleep:{ key:"asleep", label:"Hungry",   emoji:"😴" }
+};
+
+const BADGES = [
+  { id:"first",     ico:"👟", name:"First Steps",  test:s=>s.runs.length>=1 },
+  { id:"run10",     ico:"🔟", name:"Ten Runs",     test:s=>s.runs.length>=10 },
+  { id:"run50",     ico:"🏅", name:"Fifty Runs",   test:s=>s.runs.length>=50 },
+  { id:"d5k",       ico:"🥉", name:"5K Club",      test:s=>s.runs.some(r=>r.km>=5) },
+  { id:"d10k",      ico:"🥈", name:"10K Club",     test:s=>s.runs.some(r=>r.km>=10) },
+  { id:"half",      ico:"🥇", name:"Half Mara",    test:s=>s.runs.some(r=>r.km>=21.0975) },
+  { id:"full",      ico:"👑", name:"Marathon",     test:s=>s.runs.some(r=>r.km>=42.195) },
+  { id:"km100",     ico:"💯", name:"100 km",       test:s=>s.totalKm>=100 },
+  { id:"km500",     ico:"🌍", name:"500 km",       test:s=>s.totalKm>=500 },
+  { id:"km1000",    ico:"🚀", name:"1000 km",      test:s=>s.totalKm>=1000 },
+  { id:"streak3",   ico:"🔥", name:"3 Day Streak", test:s=>s.bestStreak>=3 },
+  { id:"streak7",   ico:"⚡", name:"7 Day Streak", test:s=>s.bestStreak>=7 },
+  { id:"streak30",  ico:"🏆", name:"30 Day Run",   test:s=>s.bestStreak>=30 },
+  { id:"early",     ico:"🌅", name:"Early Bird",   test:s=>s.runs.some(r=>new Date(r.t).getHours()<6) },
+  { id:"night",     ico:"🌙", name:"Night Owl",    test:s=>s.runs.some(r=>new Date(r.t).getHours()>=21) },
+  { id:"evolved",   ico:"🧬", name:"Evolved",      test:s=>s.stage>=1 },
+  { id:"teen",      ico:"✨", name:"Teenager",     test:s=>s.stage>=2 },
+  { id:"adult",     ico:"🛡️", name:"Fully Grown", test:s=>s.stage>=3 },
+  { id:"final",     ico:"💎", name:"Final Form",   test:s=>s.stage>=4 },
+  { id:"speedy",    ico:"💨", name:"Sub-5 Pace",   test:s=>s.runs.some(r=>r.km>=1 && (r.sec/60)/r.km < 5) }
+];
+
+/* ---------------------------------------------------------------------------
+   2. MATHS
+   ------------------------------------------------------------------------- */
+
+/** Great-circle distance in metres between two {lat,lng} points. */
+function haversine(a, b){
+  const R = 6371000;
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const la1 = toRad(a.lat), la2 = toRad(b.lat);
+  const h = Math.sin(dLat/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin(dLng/2)**2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/** Raw XP for a run of D km, before the streak bonus. */
+function baseXpForDistance(D){
+  if (D <= 0) return 0;
+  const cap = ENDURANCE_CAP_KM;
+  if (D <= cap) return XP_PER_KM * D + (XP_PER_KM * ENDURANCE_K / 2) * D * D;
+  const atCap = XP_PER_KM * cap + (XP_PER_KM * ENDURANCE_K / 2) * cap * cap;
+  return atCap + XP_PER_KM * (1 + ENDURANCE_K * cap) * (D - cap);
+}
+/** The flat part (100 XP/km) so the summary can show the bonus separately. */
+function flatXp(D){ return XP_PER_KM * Math.max(0, D); }
+function enduranceXp(D){ return Math.max(0, baseXpForDistance(D) - flatXp(D)); }
+function streakMultiplier(streakDays){
+  if (streakDays < 2) return 1;
+  return 1 + Math.min(STREAK_BONUS_STEP * (streakDays - 1), STREAK_BONUS_MAX);
+}
+/** Full XP for one run. `streakDays` counts the run's own day. */
+function xpForRun(D, streakDays){
+  return Math.round(baseXpForDistance(D) * streakMultiplier(streakDays));
+}
+
+/** XP needed to go from `level` to `level+1`. */
+const _reqCache = [];
+function xpToNext(level){
+  if (level >= MAX_LEVEL) return Infinity;
+  if (_reqCache[level] != null) return _reqCache[level];
+  let req = LEVEL_BASE;
+  for (let n = 1; n < level; n++) req *= 1 + 0.5 * Math.pow(LEVEL_DECAY, n - 1);
+  _reqCache[level] = Math.round(req);
+  return _reqCache[level];
+}
+/** Cumulative XP required to *reach* `level`. */
+const _cumCache = [0, 0];
+function xpAtLevel(level){
+  if (_cumCache[level] != null) return _cumCache[level];
+  let total = _cumCache[_cumCache.length - 1];
+  for (let l = _cumCache.length - 1; l < level; l++){
+    total += xpToNext(l);
+    _cumCache[l + 1] = total;
+  }
+  return _cumCache[level];
+}
+/** Level + progress within it, from a lifetime XP total. */
+function levelFromXp(totalXp){
+  let level = 1;
+  while (level < MAX_LEVEL && totalXp >= xpAtLevel(level + 1)) level++;
+  const floor = xpAtLevel(level);
+  const need  = xpToNext(level);
+  const into  = totalXp - floor;
+  return { level, into, need, pct: need === Infinity ? 1 : Math.max(0, Math.min(1, into / need)) };
+}
+function stageForLevel(level){
+  let s = 0;
+  for (let i = 0; i < EVO_LEVELS.length; i++) if (level >= EVO_LEVELS[i]) s = i;
+  return s;
+}
+
+/** ACSM running equation -> kilocalories. */
+function calories(km, seconds, weightKg){
+  if (km <= 0 || seconds <= 0) return 0;
+  const minutes = seconds / 60;
+  const metresPerMin = (km * 1000) / minutes;
+  const vo2 = 0.2 * metresPerMin + 3.5;          // ml/kg/min
+  return Math.max(0, Math.round(vo2 * weightKg / 1000 * 5 * minutes));
+}
+
+/* formatting ------------------------------------------------------------- */
+const KM_PER_MI = 1.609344;
+function fmtDur(sec){
+  sec = Math.max(0, Math.floor(sec));
+  const h = Math.floor(sec/3600), m = Math.floor(sec%3600/60), s = sec%60;
+  return h ? `${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`
+           : `${m}:${String(s).padStart(2,"0")}`;
+}
+function fmtPace(secPerUnit){
+  if (!isFinite(secPerUnit) || secPerUnit <= 0 || secPerUnit > 3600) return "--:--";
+  const m = Math.floor(secPerUnit/60), s = Math.round(secPerUnit%60);
+  return s === 60 ? `${m+1}:00` : `${m}:${String(s).padStart(2,"0")}`;
+}
+function dayKey(ts){
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+function daysBetweenKeys(a, b){
+  return Math.round((new Date(b+"T00:00:00") - new Date(a+"T00:00:00")) / 86400000);
+}
+function relDate(ts){
+  const diff = daysBetweenKeys(dayKey(ts), dayKey(Date.now()));
+  if (diff === 0) return "Today";
+  if (diff === 1) return "Yesterday";
+  if (diff < 7)   return new Date(ts).toLocaleDateString(undefined,{weekday:"long"});
+  return new Date(ts).toLocaleDateString(undefined,{day:"numeric",month:"short"});
+}
+function nf(n, dp=0){ return n.toLocaleString(undefined,{minimumFractionDigits:dp,maximumFractionDigits:dp}); }
+</script>
+
+<script>
+"use strict";
+/* ---------------------------------------------------------------------------
+   3. STATE  —  everything derives from `save.runs`, so deleting a run rolls
+   XP, level, streaks and badges back correctly.
+   ------------------------------------------------------------------------- */
+const DEFAULT_SAVE = {
+  v: 1,
+  species: null,
+  petName: "",
+  createdAt: null,
+  runs: [],
+  badges: {},           // id -> timestamp first earned
+  seenStage: 0,         // highest evolution stage already celebrated
+  settings: { units:"km", weightKg:70, simulate:false, wakeLock:true },
+  sprites: {}           // "species:stage" -> sprite config
+};
+
+let save = structuredCloneSafe(DEFAULT_SAVE);
+let derived = null;
+
+function structuredCloneSafe(o){ return JSON.parse(JSON.stringify(o)); }
+
+let storageOK = true;
+function loadSave(){
+  let raw = null;
+  try { raw = localStorage.getItem(SAVE_KEY); }
+  catch(e){ storageOK = false; }
+  if (!raw) return false;
+  try {
+    const parsed = JSON.parse(raw);
+    save = Object.assign(structuredCloneSafe(DEFAULT_SAVE), parsed);
+    save.settings = Object.assign({}, DEFAULT_SAVE.settings, parsed.settings || {});
+    save.runs = Array.isArray(parsed.runs) ? parsed.runs : [];
+    save.badges = parsed.badges || {};
+    save.sprites = parsed.sprites || {};
+    return !!save.species;
+  } catch(e){
+    console.warn("Save file was corrupt, starting fresh.", e);
+    return false;
+  }
+}
+function persist(){
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }
+  catch(e){
+    storageOK = false;
+    toast("Could not save — storage is full or blocked", "bad", "⚠️");
+  }
+}
+
+/** Recompute every derived value from the raw run log. */
+function recompute(){
+  const runs = save.runs.slice().sort((a,b)=>a.t-b.t);
+  let totalKm = 0, totalXp = 0, totalSec = 0;
+  for (const r of runs){ totalKm += r.km; totalXp += r.xp; totalSec += r.sec; }
+
+  const days = [...new Set(runs.map(r=>dayKey(r.t)))].sort();
+  let best = 0, run = 0;
+  for (let i = 0; i < days.length; i++){
+    run = (i > 0 && daysBetweenKeys(days[i-1], days[i]) === 1) ? run + 1 : 1;
+    if (run > best) best = run;
+  }
+  // current streak only counts if the last run was today or yesterday
+  let current = 0;
+  if (days.length){
+    const gap = daysBetweenKeys(days[days.length-1], dayKey(Date.now()));
+    if (gap <= 1){
+      current = 1;
+      for (let i = days.length - 1; i > 0; i--){
+        if (daysBetweenKeys(days[i-1], days[i]) === 1) current++; else break;
+      }
+    }
+  }
+
+  const lv = levelFromXp(totalXp);
+  const stage = stageForLevel(lv.level);
+  const lastRunTs = runs.length ? runs[runs.length-1].t : null;
+  const gapDays = lastRunTs == null ? Infinity : daysBetweenKeys(dayKey(lastRunTs), dayKey(Date.now()));
+
+  derived = {
+    runs, totalKm, totalXp, totalSec,
+    streak: current, bestStreak: best,
+    level: lv.level, into: lv.into, need: lv.need, pct: lv.pct,
+    stage, lastRunTs, gapDays,
+    mood: moodFor(gapDays, runs.length),
+    species: save.species ? SPECIES[save.species] : SPECIES.ember,
+    days: new Set(days)
+  };
+
+  // badges — sticky once earned
+  const ctx = { runs, totalKm, bestStreak:best, stage };
+  for (const b of BADGES){
+    if (!save.badges[b.id] && b.test(ctx)) save.badges[b.id] = Date.now();
+  }
+  return derived;
+}
+
+function moodFor(gapDays, runCount){
+  if (!runCount) return MOODS.okay;
+  if (gapDays <= 0) return MOODS.elated;
+  if (gapDays === 1) return MOODS.happy;
+  if (gapDays === 2) return MOODS.bored;
+  if (gapDays <= 4)  return MOODS.sad;
+  return MOODS.asleep;
+}
+
+/** Streak that a run finishing right now would land on. */
+function streakIfRunNow(atTs){
+  const key = dayKey(atTs);
+  const days = new Set(save.runs.map(r=>dayKey(r.t)));
+  if (days.has(key)) {           // already ran today — streak unchanged
+    return currentStreakEndingOn(days, key);
+  }
+  days.add(key);
+  return currentStreakEndingOn(days, key);
+}
+function currentStreakEndingOn(daySet, endKey){
+  let n = 0, cursor = endKey;
+  while (daySet.has(cursor)){
+    n++;
+    const d = new Date(cursor + "T00:00:00");
+    d.setDate(d.getDate() - 1);
+    cursor = dayKey(d.getTime());
+  }
+  return n;
+}
+
+/* unit helpers ------------------------------------------------------------ */
+const U = {
+  get isMi(){ return save.settings.units === "mi"; },
+  get label(){ return U.isMi ? "mi" : "km"; },
+  get longLabel(){ return U.isMi ? "miles" : "kilometres"; },
+  dist(km){ return U.isMi ? km / KM_PER_MI : km; },
+  distStr(km, dp=2){ return nf(U.dist(km), dp); },
+  paceSec(km, sec){ const d = U.dist(km); return d > 0 ? sec / d : Infinity; },
+  weight(kg){ return U.isMi ? Math.round(kg * 2.20462) : kg },
+  weightLabel(){ return U.isMi ? "lb" : "kg"; }
+};
+</script>
+
+<script>
+"use strict";
+/* ---------------------------------------------------------------------------
+   4. ART
+   Every pet is inline SVG on a 200x200 canvas, animated with the CSS classes
+   declared in the stylesheet (.p-flick, .p-wag, .p-float ...).
+
+   Swapping in your own sprite sheets later: see SpriteKit at the bottom of
+   this section. If a sprite is registered for "<species>:<stage>" it replaces
+   the vector art everywhere in the app, no other changes needed.
+   ------------------------------------------------------------------------- */
+
+let _uidN = 0;
+const uid = () => "g" + (++_uidN);
+
+/* -- shared parts --------------------------------------------------------- */
+
+function face(o){
+  const m = o.mood || "okay";
+  const x = o.x != null ? o.x : 100;
+  const y = o.y != null ? o.y : 92;
+  const s = o.s != null ? o.s : 1;
+  const ink   = o.ink   || "#22121a";
+  const glow  = o.glow  || null;      // glowing-eye species pass a colour
+  const blush = o.blush || null;
+  const spread = o.spread != null ? o.spread : 19;
+  const p = [];
+
+  const eyeFill = glow || ink;
+  const shine   = glow ? "#ffffff" : "#ffffff";
+
+  function eyeOpen(sx){
+    return `<g class="p-blink" style="transform-origin:${sx}px 0px">
+      <ellipse cx="${sx}" cy="0" rx="8.4" ry="9.6" fill="${eyeFill}"${glow?` filter="url(#${o.blurId})"`:""}/>
+      <circle cx="${sx + 2.6}" cy="-3.4" r="3.1" fill="${shine}" opacity=".95"/>
+      <circle cx="${sx - 2.8}" cy="3.4" r="1.5" fill="${shine}" opacity=".55"/></g>`;
+  }
+  function eyeArc(sx){
+    return `<path d="M${sx-8.5} 2.5 q8.5 -11.5 17 0" stroke="${eyeFill}" stroke-width="4.2" fill="none" stroke-linecap="round"/>`;
+  }
+  function eyeHalf(sx){
+    return `<g><ellipse cx="${sx}" cy="1.5" rx="8" ry="5.4" fill="${eyeFill}"/>
+      <circle cx="${sx + 2.4}" cy="-.5" r="2.2" fill="${shine}" opacity=".8"/>
+      <path d="M${sx-9} -5 q9 -3.5 18 0" stroke="${eyeFill}" stroke-width="2.6" fill="none" stroke-linecap="round" opacity=".75"/></g>`;
+  }
+  function eyeSad(sx, dir){
+    return `<g><ellipse cx="${sx}" cy="2" rx="7.6" ry="8.2" fill="${eyeFill}"/>
+      <circle cx="${sx + 2.2}" cy="-1"  r="2.6" fill="${shine}" opacity=".9"/>
+      <path d="M${sx - 9*dir} -8 q9 ${dir>0?-4:4} 18 ${dir>0?5:-5}" transform="translate(${dir>0?0:0},0)" stroke="${eyeFill}" stroke-width="2.8" fill="none" stroke-linecap="round" opacity=".8"/></g>`;
+  }
+  function eyeShut(sx){
+    return `<path d="M${sx-8.5} -1 q8.5 8.5 17 0" stroke="${eyeFill}" stroke-width="4" fill="none" stroke-linecap="round"/>`;
+  }
+
+  let mouth = "";
+  if (m === "elated"){
+    p.push(eyeArc(-spread), eyeArc(spread));
+    mouth = `<path d="M-12 15 q12 17 24 0 q-12 6 -24 0 Z" fill="#43101f"/>
+             <path d="M-5 24 q5 6 10 0 q-5 3 -10 0 Z" fill="#ff6f8a"/>`;
+  } else if (m === "happy"){
+    p.push(eyeOpen(-spread), eyeOpen(spread));
+    mouth = `<path d="M-10 16 q10 12 20 0" stroke="${ink}" stroke-width="3.4" fill="none" stroke-linecap="round"/>`;
+  } else if (m === "okay"){
+    p.push(eyeOpen(-spread), eyeOpen(spread));
+    mouth = `<path d="M-7 18 q7 7 14 0" stroke="${ink}" stroke-width="3.2" fill="none" stroke-linecap="round"/>`;
+  } else if (m === "bored"){
+    p.push(eyeHalf(-spread), eyeHalf(spread));
+    mouth = `<path d="M-8 20 q8 2 16 0" stroke="${ink}" stroke-width="3.2" fill="none" stroke-linecap="round"/>`;
+  } else if (m === "sad"){
+    p.push(eyeSad(-spread, 1), eyeSad(spread, -1));
+    mouth = `<path d="M-8 22 q8 -8 16 0" stroke="${ink}" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+             <ellipse cx="${-spread-6}" cy="12" rx="2.6" ry="4" fill="#7cd4fd" opacity=".9"/>`;
+  } else { /* asleep */
+    p.push(eyeShut(-spread), eyeShut(spread));
+    mouth = `<ellipse cx="0" cy="21" rx="4.5" ry="5.5" fill="${ink}" opacity=".85"/>`;
+  }
+
+  if (blush){
+    p.push(`<ellipse cx="${-spread-13}" cy="10" rx="7.5" ry="4.6" fill="${blush}" opacity=".55"/>
+            <ellipse cx="${spread+13}" cy="10" rx="7.5" ry="4.6" fill="${blush}" opacity=".55"/>`);
+  }
+  p.push(mouth);
+  return `<g transform="translate(${x} ${y}) scale(${s})">${p.join("")}</g>`;
+}
+
+/* NOTE: a CSS animation on `transform` beats the SVG transform *attribute*, so
+   every animated part gets an outer <g> for placement and an inner <g> for the
+   animation. Collapsing these two groups will teleport the part to the origin. */
+const flame = (x,y,s,fill,core,cls) =>
+  `<g transform="translate(${x} ${y}) scale(${s})"><g class="${cls === undefined ? "p-flick" : cls}">
+     <path d="M0 3 C-13 -4 -13 -21 0 -40 C13 -21 13 -4 0 3 Z" fill="${fill}"/>
+     <path d="M0 -1 C-6.5 -6 -6.5 -17 0 -28 C6.5 -17 6.5 -6 0 -1 Z" fill="${core}" opacity=".95"/>
+   </g></g>`;
+
+const leaf = (x,y,rot,s,fill,vein,cls) =>
+  `<g transform="translate(${x} ${y}) rotate(${rot}) scale(${s})"><g class="${cls||""}">
+     <path d="M0 0 C-15 -7 -17 -27 0 -36 C17 -27 15 -7 0 0 Z" fill="${fill}"/>
+     <path d="M0 -2 L0 -32" stroke="${vein}" stroke-width="1.8" opacity=".55" stroke-linecap="round"/>
+     <path d="M0 -12 l-6 -5 M0 -20 l6 -5 M0 -26 l-5 -4" stroke="${vein}" stroke-width="1.4" opacity=".4" stroke-linecap="round"/>
+   </g></g>`;
+
+const bolt = (x,y,s,fill,rot,cls) =>
+  `<g transform="translate(${x} ${y}) rotate(${rot||0}) scale(${s})"><g class="${cls||""}">
+     <path d="M5 -24 L-9 -1 L-1 -1 L-5 20 L11 -5 L2 -5 Z" fill="${fill}"/>
+   </g></g>`;
+
+/** A cloud built from overlapping circles — same fill so it reads as one mass. */
+function cloud(cx, cy, w, h, fill, extra){
+  const r = h * 0.55;
+  return `<g fill="${fill}" ${extra||""}>
+    <ellipse cx="${cx}" cy="${cy}" rx="${w*0.5}" ry="${h*0.42}"/>
+    <circle cx="${cx - w*0.28}" cy="${cy - h*0.06}" r="${r*0.72}"/>
+    <circle cx="${cx + w*0.28}" cy="${cy - h*0.02}" r="${r*0.66}"/>
+    <circle cx="${cx - w*0.08}" cy="${cy - h*0.34}" r="${r*0.82}"/>
+    <circle cx="${cx + w*0.16}" cy="${cy - h*0.3}"  r="${r*0.7}"/>
+  </g>`;
+}
+
+const sparkle = (x,y,s,fill,delay) =>
+  `<g transform="translate(${x} ${y}) scale(${s})"><path class="p-spark" style="animation-delay:${delay||0}s"
+     d="M0 -9 Q1.6 -1.6 9 0 Q1.6 1.6 0 9 Q-1.6 1.6 -9 0 Q-1.6 -1.6 0 -9 Z" fill="${fill}"/></g>`;
+
+const zzz = (x,y) =>
+  `<g opacity=".9" fill="#c9d2e6" font-family="Fredoka One, sans-serif">
+     <text class="p-zzz" x="${x}" y="${y}" font-size="15">z</text>
+     <text class="p-zzz" style="animation-delay:1.1s" x="${x+7}" y="${y-9}" font-size="12">z</text>
+     <text class="p-zzz" style="animation-delay:2.2s" x="${x+13}" y="${y-16}" font-size="9">z</text>
+   </g>`;
+</script>
+
+<script>
+"use strict";
+/* --- EMBER: fire drake ---------------------------------------------------- */
+const PET_ART = {};
+
+PET_ART.ember = [
+/* 0 — Cinder Egg */ (c) => { const i = c.id; return `
+  <defs>
+    <radialGradient id="sh${i}" cx="34%" cy="26%"><stop offset="0" stop-color="#4e2c30"/><stop offset="1" stop-color="#150b10"/></radialGradient>
+    <linearGradient id="mg${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd23f"/><stop offset="1" stop-color="#ff4e18"/></linearGradient>
+    <filter id="bl${i}" x="-70%" y="-70%" width="240%" height="240%"><feGaussianBlur stdDeviation="4"/></filter>
+  </defs>
+  <g class="pet-anim">
+    ${flame(100,42,.55,"#ff8c42","#ffe08a")}
+    <path d="M100 32 C134 32 158 66 158 103 C158 137 132 165 100 165 C68 165 42 137 42 103 C42 66 66 32 100 32 Z" fill="url(#sh${i})" stroke="#0d0709" stroke-width="2.4"/>
+    <g class="p-crack" filter="url(#bl${i})" opacity=".85">
+      <path d="M76 64 L88 90 L74 102 L92 120 L83 144" stroke="url(#mg${i})" stroke-width="6" fill="none" stroke-linecap="round"/>
+      <path d="M121 72 L112 98 L127 114 L117 138" stroke="url(#mg${i})" stroke-width="5" fill="none" stroke-linecap="round"/>
+    </g>
+    <path class="p-crack" d="M76 64 L88 90 L74 102 L92 120 L83 144" stroke="url(#mg${i})" stroke-width="2.8" fill="none" stroke-linecap="round"/>
+    <path class="p-crack" d="M121 72 L112 98 L127 114 L117 138" stroke="url(#mg${i})" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+    <ellipse cx="80" cy="64" rx="16" ry="9" fill="#fff" opacity=".08" transform="rotate(-26 80 64)"/>
+    ${sparkle(150,86,.7,"#ffd23f",0)}${sparkle(54,124,.55,"#ff8c42",.9)}
+    ${c.mood === "asleep" ? zzz(152,58) : ""}
+  </g>`; },
+
+/* 1 — Cinderling */ (c) => { const i = c.id; return `
+  <defs>
+    <radialGradient id="bd${i}" cx="36%" cy="26%"><stop offset="0" stop-color="#ff9a55"/><stop offset="1" stop-color="#e2401d"/></radialGradient>
+    <linearGradient id="bl${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe1ab"/><stop offset="1" stop-color="#ffb977"/></linearGradient>
+  </defs>
+  <g class="pet-anim">
+    <g class="p-wag" style="transform-origin:132px 140px">
+      <path d="M132 142 C152 140 162 132 166 122" stroke="#e2401d" stroke-width="11" fill="none" stroke-linecap="round"/>
+      ${flame(168,120,.5,"#ff8c42","#ffe08a")}
+    </g>
+    <ellipse cx="80" cy="170" rx="15" ry="9" fill="#d8391a"/><ellipse cx="120" cy="170" rx="15" ry="9" fill="#d8391a"/>
+    <path d="M68 168 l0 5 M76 169 l0 5 M84 168 l0 5" stroke="#ffe1ab" stroke-width="3" stroke-linecap="round"/>
+    <path d="M108 168 l0 5 M116 169 l0 5 M124 168 l0 5" stroke="#ffe1ab" stroke-width="3" stroke-linecap="round"/>
+    <g class="p-flap" style="transform-origin:66px 128px"><path d="M70 128 C50 116 44 128 48 140 C54 148 66 144 70 138 Z" fill="#ff7a3d" opacity=".92"/></g>
+    <g class="p-flap" style="transform-origin:134px 128px;animation-delay:.2s"><path d="M130 128 C150 116 156 128 152 140 C146 148 134 144 130 138 Z" fill="#ff7a3d" opacity=".92"/></g>
+    <ellipse cx="100" cy="141" rx="40" ry="32" fill="url(#bd${i})"/>
+    <ellipse cx="100" cy="149" rx="25" ry="21" fill="url(#bl${i})"/>
+    <circle cx="100" cy="87" r="45" fill="url(#bd${i})"/>
+    <path d="M92 45 C94 32 100 28 104 42 C102 46 96 47 92 45 Z" fill="#ffd7a1"/>
+    ${flame(100,42,.32,"#ff8c42","#ffe08a")}
+    <ellipse cx="100" cy="103" rx="21" ry="15" fill="url(#bl${i})" opacity=".85"/>
+    <path d="M76 60 q10 -8 20 -3 M124 60 q-10 -8 -20 -3" stroke="#c9331a" stroke-width="3" fill="none" stroke-linecap="round" opacity=".5"/>
+    ${face({ y:92, s:1, mood:c.mood, ink:"#4a1208", blush:"#ff6b6b", spread:18 })}
+    ${c.mood === "elated" ? sparkle(46,60,.7,"#ffd23f",0) + sparkle(156,72,.6,"#ffd23f",.6) : ""}
+    ${c.mood === "asleep" ? zzz(150,56) : ""}
+  </g>`; },
+
+/* 2 — Blazewyrm */ (c) => { const i = c.id; return `
+  <defs>
+    <radialGradient id="bd${i}" cx="36%" cy="24%"><stop offset="0" stop-color="#ff8f47"/><stop offset="1" stop-color="#cf3416"/></radialGradient>
+    <linearGradient id="bl${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe1ab"/><stop offset="1" stop-color="#ffab63"/></linearGradient>
+    <linearGradient id="wg${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff9a5c"/><stop offset="1" stop-color="#b9280f"/></linearGradient>
+  </defs>
+  <g class="pet-anim">
+    <g class="p-flap" style="transform-origin:100px 118px">
+      <path d="M74 116 C42 96 22 108 16 128 C34 124 40 132 34 146 C56 148 70 138 76 128 Z" fill="url(#wg${i})" opacity=".95"/>
+      <path d="M74 116 C52 108 38 116 30 130 M74 120 C56 122 46 132 40 144" stroke="#7d1b0a" stroke-width="2" fill="none" opacity=".5"/>
+    </g>
+    <g class="p-flap" style="transform-origin:100px 118px;animation-delay:.18s">
+      <path d="M126 116 C158 96 178 108 184 128 C166 124 160 132 166 146 C144 148 130 138 124 128 Z" fill="url(#wg${i})" opacity=".95"/>
+      <path d="M126 116 C148 108 162 116 170 130 M126 120 C144 122 154 132 160 144" stroke="#7d1b0a" stroke-width="2" fill="none" opacity=".5"/>
+    </g>
+    <g class="p-wag" style="transform-origin:124px 152px">
+      <path d="M124 154 C146 156 160 146 166 132" stroke="#cf3416" stroke-width="12" fill="none" stroke-linecap="round"/>
+      ${flame(168,130,.62,"#ff8c42","#ffe08a")}
+    </g>
+    <ellipse cx="82" cy="176" rx="14" ry="8" fill="#b9280f"/><ellipse cx="118" cy="176" rx="14" ry="8" fill="#b9280f"/>
+    <ellipse cx="100" cy="136" rx="36" ry="42" fill="url(#bd${i})"/>
+    <ellipse cx="100" cy="144" rx="23" ry="30" fill="url(#bl${i})"/>
+    <path d="M100 100 l-9 12 h18 Z M100 118 l-8 11 h16 Z" fill="#ffd7a1" opacity=".5"/>
+    <path d="M84 96 l-6 -14 l12 6 Z M100 90 l-6 -16 l12 6 Z M116 96 l6 -14 l-12 6 Z" fill="#ffb04a"/>
+    <circle cx="100" cy="74" r="35" fill="url(#bd${i})"/>
+    <ellipse cx="100" cy="90" rx="19" ry="14" fill="url(#bl${i})"/>
+    <path d="M78 46 C74 30 82 26 90 40 Z" fill="#ffd7a1"/><path d="M122 46 C126 30 118 26 110 40 Z" fill="#ffd7a1"/>
+    ${flame(100,40,.34,"#ff8c42","#ffe08a")}
+    ${face({ y:78, s:.92, mood:c.mood, ink:"#4a1208", spread:17 })}
+    <path d="M92 96 q8 4 16 0" stroke="#c9331a" stroke-width="2" fill="none" opacity=".45"/>
+    ${c.mood === "asleep" ? zzz(150,44) : ""}
+  </g>`; },
+
+/* 3 — Pyrelord */ (c) => { const i = c.id; return `
+  <defs>
+    <radialGradient id="bd${i}" cx="34%" cy="22%"><stop offset="0" stop-color="#ff8235"/><stop offset="1" stop-color="#b32a0f"/></radialGradient>
+    <linearGradient id="bl${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffdf9e"/><stop offset="1" stop-color="#ff9a45"/></linearGradient>
+    <linearGradient id="wg${i}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8c42"/><stop offset="1" stop-color="#8f1d08"/></linearGradient>
+    <radialGradient id="cr${i}"><stop offset="0" stop-color="#fff4c4"/><stop offset="1" stop-color="#ff6b1f" stop-opacity="0"/></radialGradient>
+  </defs>
+  <g class="pet-anim">
+    <g class="p-flap" style="transform-origin:100px 110px">
+      <path d="M72 106 C34 74 8 84 2 112 C22 106 30 116 24 134 C48 142 68 128 76 116 Z" fill="url(#wg${i})"/>
+      <path d="M72 106 C46 90 28 96 16 116 M72 112 C50 112 34 122 26 138" stroke="#6d1505" stroke-width="2.2" fill="none" opacity=".55"/>
+    </g>
+    <g class="p-flap" style="transform-origin:100px 110px;animation-delay:.16s">
+      <path d="M128 106 C166 74 192 84 198 112 C178 106 170 116 176 134 C152 142 132 128 124 116 Z" fill="url(#wg${i})"/>
+      <path d="M128 106 C154 90 172 96 184 116 M128 112 C150 112 166 122 174 138" stroke="#6d1505" stroke-width="2.2" fill="none" opacity=".55"/>
+    </g>
+    <g class="p-wag" style="transform-origin:120px 158px">
+      <path d="M118 160 C146 168 168 156 176 136" stroke="#b32a0f" stroke-width="13" fill="none" stroke-linecap="round"/>
+      ${flame(178,134,.8,"#ff8c42","#ffe08a")}
+    </g>
+    <ellipse cx="80" cy="180" rx="16" ry="9" fill="#8f1d08"/><ellipse cx="120" cy="180" rx="16" ry="9" fill="#8f1d08"/>
+    <path d="M68 178 l-1 6 M76 179 l0 6 M84 178 l1 6 M108 178 l-1 6 M116 179 l0 6 M124 178 l1 6" stroke="#ffdf9e" stroke-width="3.2" stroke-linecap="round"/>
+    <ellipse cx="100" cy="142" rx="37" ry="40" fill="url(#bd${i})"/>
+    <ellipse cx="100" cy="148" rx="24" ry="29" fill="url(#bl${i})"/>
+    <circle cx="100" cy="140" r="24" fill="url(#cr${i})" class="p-pulse"/>
+    <circle cx="100" cy="140" r="9" fill="#fff2bd" class="p-pulse"/>
+    <path d="M100 84 C88 96 88 108 100 112 C112 108 112 96 100 84 Z" fill="url(#bd${i})"/>
+    <path d="M86 92 l-6 -16 l12 7 Z M100 82 l-6 -18 l12 7 Z M114 92 l6 -16 l-12 7 Z" fill="#ffb04a"/>
+    <circle cx="100" cy="62" r="31" fill="url(#bd${i})"/>
+    <path d="M100 62 C118 62 128 70 128 78 C128 86 116 90 100 90 C84 90 72 86 72 78 C72 70 82 62 100 62 Z" fill="url(#bl${i})" opacity=".9"/>
+    <path d="M74 36 C64 16 78 12 88 30 Z" fill="#ffdf9e"/><path d="M126 36 C136 16 122 12 112 30 Z" fill="#ffdf9e"/>
+    ${flame(80,28,.4,"#ff8c42","#ffe08a")}${flame(120,28,.4,"#ff8c42","#ffe08a")}
+    ${face({ y:64, s:.86, mood:c.mood, ink:"#3d0f06", spread:16 })}
+    <circle cx="92" cy="82" r="2.2" fill="#3d0f06" opacity=".7"/><circle cx="108" cy="82" r="2.2" fill="#3d0f06" opacity=".7"/>
+    ${c.mood === "asleep" ? zzz(154,34) : ""}
+  </g>`; },
+
+/* 4 — Infernarch */ (c) => { const i = c.id; return `
+  <defs>
+    <radialGradient id="bd${i}" cx="34%" cy="20%"><stop offset="0" stop-color="#ffa14b"/><stop offset=".6" stop-color="#f0501c"/><stop offset="1" stop-color="#8f1d08"/></radialGradient>
+    <linearGradient id="bl${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff0c2"/><stop offset="1" stop-color="#ffa145"/></linearGradient>
+    <linearGradient id="wg${i}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffb347"/><stop offset=".55" stop-color="#f04f1c"/><stop offset="1" stop-color="#6d1505"/></linearGradient>
+    <radialGradient id="cr${i}"><stop offset="0" stop-color="#fffbe0"/><stop offset=".5" stop-color="#ffd23f"/><stop offset="1" stop-color="#ff6b1f" stop-opacity="0"/></radialGradient>
+  </defs>
+  <g class="pet-anim">
+    <circle cx="100" cy="100" r="86" fill="none" stroke="url(#wg${i})" stroke-width="1.6" opacity=".35" stroke-dasharray="5 11"/>
+    <g class="p-orbit">${flame(100,26,.34,"#ffd23f","#fffbe0","")}</g>
+    <g class="p-orbit-r" style="animation-delay:-3s">${flame(100,20,.28,"#ff8c42","#ffe08a","")}</g>
+    <g class="p-flap" style="transform-origin:100px 104px">
+      <path d="M70 100 C28 62 -2 74 -4 108 C20 100 30 112 22 134 C52 144 66 124 74 110 Z" fill="url(#wg${i})"/>
+      <path d="M70 100 C40 82 18 88 6 112 M70 106 C44 106 26 118 20 138" stroke="#5c1104" stroke-width="2.2" fill="none" opacity=".55"/>
+    </g>
+    <g class="p-flap" style="transform-origin:100px 104px;animation-delay:.15s">
+      <path d="M130 100 C172 62 202 74 204 108 C180 100 170 112 178 134 C148 144 134 124 126 110 Z" fill="url(#wg${i})"/>
+      <path d="M130 100 C160 82 182 88 194 112 M130 106 C156 106 174 118 180 138" stroke="#5c1104" stroke-width="2.2" fill="none" opacity=".55"/>
+    </g>
+    <g class="p-wag" style="transform-origin:118px 160px">
+      <path d="M116 162 C148 174 176 160 184 136" stroke="#b32a0f" stroke-width="14" fill="none" stroke-linecap="round"/>
+      ${flame(186,132,1,"#ff8c42","#ffe08a")}
+    </g>
+    <ellipse cx="78" cy="182" rx="17" ry="9" fill="#8f1d08"/><ellipse cx="122" cy="182" rx="17" ry="9" fill="#8f1d08"/>
+    <path d="M66 180 l-1 6 M74 181 l0 7 M82 180 l1 6 M106 180 l-1 6 M114 181 l0 7 M122 180 l1 6" stroke="#fff0c2" stroke-width="3.4" stroke-linecap="round"/>
+    <ellipse cx="100" cy="142" rx="39" ry="40" fill="url(#bd${i})"/>
+    <ellipse cx="100" cy="148" rx="25" ry="29" fill="url(#bl${i})"/>
+    <circle cx="100" cy="138" r="30" fill="url(#cr${i})" class="p-pulse"/>
+    <circle cx="100" cy="138" r="11" fill="#fffbe0" class="p-pulse"/>
+    <path d="M100 82 C86 96 86 108 100 112 C114 108 114 96 100 82 Z" fill="url(#bd${i})"/>
+    <circle cx="100" cy="58" r="32" fill="url(#bd${i})"/>
+    <path d="M100 58 C119 58 130 67 130 76 C130 85 117 89 100 89 C83 89 70 85 70 76 C70 67 81 58 100 58 Z" fill="url(#bl${i})" opacity=".92"/>
+    <path d="M70 34 C56 10 74 4 86 26 Z" fill="#fff0c2"/><path d="M130 34 C144 10 126 4 114 26 Z" fill="#fff0c2"/>
+    <path d="M88 30 l-4 -12 M100 26 l0 -14 M112 30 l4 -12" stroke="#ffd23f" stroke-width="3" stroke-linecap="round" opacity=".85"/>
+    ${flame(74,24,.5,"#ffd23f","#fffbe0")}${flame(100,16,.6,"#ff8c42","#ffe08a")}${flame(126,24,.5,"#ffd23f","#fffbe0")}
+    ${face({ y:60, s:.84, mood:c.mood, ink:"#360d05", spread:16 })}
+    ${sparkle(40,72,.8,"#ffd23f",0)}${sparkle(162,90,.7,"#ff8c42",.7)}${sparkle(52,150,.6,"#ffd23f",1.3)}
+    ${c.mood === "asleep" ? zzz(158,30) : ""}
+  </g>`; }
+];
+</script>
+
+<script>
+"use strict";
+/* --- VERDANT: forest spirit ---------------------------------------------- */
+PET_ART.verdant = [
+/* 0 — Seedpod */ (c) => { const i = c.id; return `
+  <defs>
+    <radialGradient id="sh${i}" cx="34%" cy="26%"><stop offset="0" stop-color="#6b7f52"/><stop offset="1" stop-color="#22301f"/></radialGradient>
+    <linearGradient id="gl${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9f99d"/><stop offset="1" stop-color="#4ade80"/></linearGradient>
+    <filter id="bl${i}" x="-70%" y="-70%" width="240%" height="240%"><feGaussianBlur stdDeviation="4"/></filter>
+  </defs>
+  <g class="pet-anim">
+    <g class="p-sway" style="transform-origin:100px 46px">
+      <path d="M100 46 L100 22" stroke="#5f8f4a" stroke-width="4" stroke-linecap="round"/>
+      ${leaf(100,26,-38,.42,"#4ade80","#166534")}${leaf(100,26,38,.42,"#86efac","#166534")}
+    </g>
+    <path d="M100 34 C136 34 160 68 158 106 C156 140 130 166 100 166 C70 166 44 140 42 106 C40 68 64 34 100 34 Z" fill="url(#sh${i})" stroke="#141d13" stroke-width="2.4"/>
+    <g class="p-crack" filter="url(#bl${i})" opacity=".8">
+      <path d="M70 78 C86 92 82 112 96 128 M132 88 C118 100 124 122 110 140" stroke="url(#gl${i})" stroke-width="6" fill="none" stroke-linecap="round"/>
+    </g>
+    <path class="p-crack" d="M70 78 C86 92 82 112 96 128 M132 88 C118 100 124 122 110 140" stroke="url(#gl${i})" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+    <ellipse cx="76" cy="72" rx="13" ry="8" fill="#a3e635" opacity=".22" transform="rotate(-30 76 72)"/>
+    <circle cx="70" cy="128" r="8" fill="#4d6b3c" opacity=".55"/><circle cx="128" cy="72" r="6" fill="#4d6b3c" opacity=".5"/>
+    <circle cx="122" cy="140" r="5" fill="#4d6b3c" opacity=".45"/>
+    ${sparkle(154,92,.6,"#bef264",0)}${sparkle(48,120,.5,"#4ade80",1)}${sparkle(140,150,.45,"#bef264",1.7)}
+    ${c.mood === "asleep" ? zzz(152,62) : ""}
+  </g>`; },
+
+/* 1 — Sproutling */ (c) => { const i = c.id; return `
+  <defs>
+    <radialGradient id="bd${i}" cx="36%" cy="26%"><stop offset="0" stop-color="#bbf7d0"/><stop offset="1" stop-color="#4ade80"/></radialGradient>
+    <filter id="gb${i}" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2.6"/></filter>
+  </defs>
+  <g class="pet-anim">
+    <g class="p-wag" style="transform-origin:136px 148px">
+      <path d="M136 148 C154 148 162 138 160 124" stroke="#3f9e63" stroke-width="7" fill="none" stroke-linecap="round"/>
+      ${leaf(160,122,18,.4,"#86efac","#166534")}
+    </g>
+    <ellipse cx="82" cy="172" rx="14" ry="8" fill="#3f9e63"/><ellipse cx="118" cy="172" rx="14" ry="8" fill="#3f9e63"/>
+    <ellipse cx="100" cy="122" rx="50" ry="48" fill="url(#bd${i})"/>
+    <ellipse cx="100" cy="136" rx="30" ry="26" fill="#ecfccb" opacity=".55"/>
+    <path d="M56 128 C44 122 40 132 46 140 C52 144 58 138 58 132 Z" fill="#4ade80"/>
+    <path d="M144 128 C156 122 160 132 154 140 C148 144 142 138 142 132 Z" fill="#4ade80"/>
+    <g class="p-sway" style="transform-origin:100px 78px">
+      <path d="M100 80 L100 62" stroke="#3f7d3a" stroke-width="4.5" stroke-linecap="round"/>
+      ${leaf(100,64,-44,.6,"#4ade80","#14532d")}${leaf(100,64,44,.52,"#86efac","#14532d")}
+      ${leaf(100,60,0,.34,"#bef264","#14532d")}
+    </g>
+    <ellipse cx="100" cy="86" rx="46" ry="14" fill="#3f9e63" opacity=".2"/>
+    ${face({ y:118, s:1.02, mood:c.mood, ink:"#14532d", glow:c.mood === "asleep" ? null : "#166534", blush:"#a3e635", spread:19, blurId:"gb"+i })}
+    ${sparkle(48,90,.6,"#bef264",0)}${sparkle(154,100,.5,"#d9f99d",.8)}
+    ${c.mood === "elated" ? sparkle(70,58,.5,"#bef264",.4) + sparkle(132,62,.5,"#d9f99d",1.1) : ""}
+    ${c.mood === "asleep" ? zzz(150,84) : ""}
+  </g>`; },
+
+/* 2 — Fernkin */ (c) => { const i = c.id; return `
+  <defs>
+    <radialGradient id="bd${i}" cx="36%" cy="24%"><stop offset="0" stop-color="#a7f3c8"/><stop offset="1" stop-color="#37a35f"/></radialGradient>
+    <linearGradient id="ck${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4ade80"/><stop offset="1" stop-color="#166534"/></linearGradient>
+  </defs>
+  <g class="pet-anim">
+    <g class="p-sway" style="transform-origin:78px 60px"><path d="M78 62 C68 48 70 34 62 26" stroke="#8b6b3f" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <path d="M72 46 l-12 -8 M76 56 l-13 -3" stroke="#8b6b3f" stroke-width="3.6" stroke-linecap="round"/>
+      ${leaf(60,26,-30,.34,"#4ade80","#14532d")}${leaf(60,38,-70,.24,"#86efac","#14532d")}</g>
+    <g class="p-sway" style="transform-origin:122px 60px;animation-delay:.4s"><path d="M122 62 C132 48 130 34 138 26" stroke="#8b6b3f" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <path d="M128 46 l12 -8 M124 56 l13 -3" stroke="#8b6b3f" stroke-width="3.6" stroke-linecap="round"/>
+      ${leaf(140,26,30,.34,"#4ade80","#14532d")}${leaf(140,38,70,.24,"#86efac","#14532d")}</g>
+    <ellipse cx="84" cy="176" rx="14" ry="8" fill="#2c7a48"/><ellipse cx="116" cy="176" rx="14" ry="8" fill="#2c7a48"/>
+    <path d="M100 106 C70 106 58 130 60 160 C60 170 140 170 140 160 C142 130 130 106 100 106 Z" fill="url(#ck${i})"/>
+    <path d="M74 132 q26 10 52 0 M70 148 q30 12 60 0" stroke="#0f3d21" stroke-width="2.2" fill="none" opacity=".4"/>
+    <ellipse cx="100" cy="150" rx="20" ry="18" fill="#d9f99d" opacity=".5"/>
+    <circle cx="100" cy="86" r="40" fill="url(#bd${i})"/>
+    <path d="M60 84 q40 -34 80 0 q-40 -14 -80 0 Z" fill="#37a35f" opacity=".35"/>
+    ${leaf(126,56,44,.36,"#bef264","#14532d","p-sway")}
+    <circle cx="100" cy="112" r="5" fill="#bef264" class="p-pulse"/>
+    ${face({ y:90, s:.94, mood:c.mood, ink:"#0f3d21", glow:c.mood === "asleep" ? null : "#14532d", spread:17 })}
+    ${sparkle(44,106,.55,"#bef264",0)}${sparkle(158,120,.5,"#d9f99d",.9)}
+    ${c.mood === "asleep" ? zzz(150,60) : ""}
+  </g>`; },
+
+/* 3 — Thicketmane */ (c) => { const i = c.id; return `
+  <defs>
+    <radialGradient id="bd${i}" cx="36%" cy="22%"><stop offset="0" stop-color="#b6f5d0"/><stop offset="1" stop-color="#2b8f52"/></radialGradient>
+    <linearGradient id="ck${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3fbc6e"/><stop offset="1" stop-color="#0f3d21"/></linearGradient>
+    <radialGradient id="au${i}"><stop offset="0" stop-color="#d9f99d" stop-opacity=".55"/><stop offset="1" stop-color="#4ade80" stop-opacity="0"/></radialGradient>
+  </defs>
+  <g class="pet-anim">
+    <circle cx="100" cy="104" r="82" fill="url(#au${i})" class="p-pulse"/>
+    <g class="p-sway" style="transform-origin:76px 56px">
+      <path d="M76 58 C62 44 66 26 52 14" stroke="#8b6b3f" stroke-width="6" fill="none" stroke-linecap="round"/>
+      <path d="M68 44 l-18 -8 M72 52 l-18 0 M62 30 l-14 -12" stroke="#8b6b3f" stroke-width="4.2" stroke-linecap="round"/>
+      ${leaf(50,14,-24,.38,"#4ade80","#14532d")}${leaf(50,36,-78,.3,"#86efac","#14532d")}${leaf(48,18,-56,.26,"#bef264","#14532d")}
+    </g>
+    <g class="p-sway" style="transform-origin:124px 56px;animation-delay:.5s">
+      <path d="M124 58 C138 44 134 26 148 14" stroke="#8b6b3f" stroke-width="6" fill="none" stroke-linecap="round"/>
+      <path d="M132 44 l18 -8 M128 52 l18 0 M138 30 l14 -12" stroke="#8b6b3f" stroke-width="4.2" stroke-linecap="round"/>
+      ${leaf(150,14,24,.38,"#4ade80","#14532d")}${leaf(150,36,78,.3,"#86efac","#14532d")}${leaf(152,18,56,.26,"#bef264","#14532d")}
+    </g>
+    <ellipse cx="82" cy="180" rx="16" ry="9" fill="#1f6b3d"/><ellipse cx="118" cy="180" rx="16" ry="9" fill="#1f6b3d"/>
+    <path d="M100 100 C64 100 50 128 52 166 C52 176 148 176 148 166 C150 128 136 100 100 100 Z" fill="url(#ck${i})"/>
+    <path d="M66 126 q34 12 68 0 M60 144 q40 14 80 0 M58 160 q42 12 84 0" stroke="#0a2a16" stroke-width="2.2" fill="none" opacity=".45"/>
+    <circle cx="100" cy="132" r="13" fill="#bef264" class="p-pulse" opacity=".85"/>
+    <path d="M100 120 l4 8 h-8 Z M100 144 l4 -8 h-8 Z" fill="#0f3d21" opacity=".5"/>
+    <circle cx="100" cy="82" r="38" fill="url(#bd${i})"/>
+    <path d="M62 82 q38 -34 76 0 q-38 -16 -76 0 Z" fill="#2b8f52" opacity=".4"/>
+    <circle cx="72" cy="52" r="6" fill="#f9a8d4"/><circle cx="72" cy="52" r="2.4" fill="#fde68a"/>
+    <circle cx="130" cy="58" r="5" fill="#fbcfe8"/><circle cx="130" cy="58" r="2" fill="#fde68a"/>
+    ${face({ y:86, s:.9, mood:c.mood, ink:"#0a2a16", glow:c.mood === "asleep" ? null : "#0f3d21", spread:17 })}
+    ${sparkle(38,118,.6,"#bef264",0)}${sparkle(164,136,.55,"#d9f99d",.8)}${sparkle(52,64,.45,"#4ade80",1.5)}
+    ${c.mood === "asleep" ? zzz(154,56) : ""}
+  </g>`; },
+
+/* 4 — Grovewarden */ (c) => { const i = c.id; return `
+  <defs>
+    <radialGradient id="bd${i}" cx="36%" cy="20%"><stop offset="0" stop-color="#ccffe0"/><stop offset="1" stop-color="#1f7a45"/></radialGradient>
+    <linearGradient id="ck${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#48d47f"/><stop offset=".6" stop-color="#166534"/><stop offset="1" stop-color="#08260f"/></linearGradient>
+    <radialGradient id="au${i}"><stop offset="0" stop-color="#d9f99d" stop-opacity=".6"/><stop offset="1" stop-color="#4ade80" stop-opacity="0"/></radialGradient>
+  </defs>
+  <g class="pet-anim">
+    <circle cx="100" cy="102" r="94" fill="url(#au${i})" class="p-pulse"/>
+    <circle cx="100" cy="105" r="84" fill="none" stroke="#4ade80" stroke-width="1.4" opacity=".3" stroke-dasharray="4 12"/>
+    <g class="p-orbit">${leaf(100,26,150,.3,"#86efac","#14532d")}</g>
+    <g class="p-orbit" style="animation-delay:-2.4s">${leaf(100,22,190,.26,"#bef264","#14532d")}</g>
+    <g class="p-orbit-r" style="animation-delay:-4s">${leaf(100,30,120,.24,"#4ade80","#14532d")}</g>
+    <g class="p-sway" style="transform-origin:74px 54px">
+      <path d="M74 56 C56 40 62 20 44 6" stroke="#7d5f36" stroke-width="7" fill="none" stroke-linecap="round"/>
+      <path d="M66 40 l-22 -8 M70 50 l-22 2 M56 22 l-18 -14 M62 30 l-20 -2" stroke="#7d5f36" stroke-width="4.6" stroke-linecap="round"/>
+      ${leaf(42,6,-22,.4,"#4ade80","#14532d")}${leaf(40,34,-84,.32,"#86efac","#14532d")}${leaf(40,10,-58,.28,"#bef264","#14532d")}
+      <circle cx="52" cy="28" r="6.5" fill="#f9a8d4"/><circle cx="52" cy="28" r="2.6" fill="#fde68a"/>
+    </g>
+    <g class="p-sway" style="transform-origin:126px 54px;animation-delay:.5s">
+      <path d="M126 56 C144 40 138 20 156 6" stroke="#7d5f36" stroke-width="7" fill="none" stroke-linecap="round"/>
+      <path d="M134 40 l22 -8 M130 50 l22 2 M144 22 l18 -14 M138 30 l20 -2" stroke="#7d5f36" stroke-width="4.6" stroke-linecap="round"/>
+      ${leaf(158,6,22,.4,"#4ade80","#14532d")}${leaf(160,34,84,.32,"#86efac","#14532d")}${leaf(160,10,58,.28,"#bef264","#14532d")}
+      <circle cx="148" cy="28" r="6" fill="#fbcfe8"/><circle cx="148" cy="28" r="2.4" fill="#fde68a"/>
+    </g>
+    <ellipse cx="80" cy="182" rx="17" ry="9" fill="#155e33"/><ellipse cx="120" cy="182" rx="17" ry="9" fill="#155e33"/>
+    <path d="M100 96 C60 96 44 126 46 168 C46 178 154 178 154 168 C156 126 140 96 100 96 Z" fill="url(#ck${i})"/>
+    <path d="M62 122 q38 14 76 0 M54 142 q46 16 92 0 M52 160 q48 14 96 0" stroke="#061c0d" stroke-width="2.4" fill="none" opacity=".45"/>
+    <circle cx="100" cy="130" r="17" fill="#d9f99d" class="p-pulse"/>
+    <circle cx="100" cy="130" r="8" fill="#ffffff" opacity=".85" class="p-pulse"/>
+    <path d="M100 108 l5 10 h-10 Z M100 152 l5 -10 h-10 Z M78 130 l10 5 v-10 Z M122 130 l-10 5 v-10 Z" fill="#08260f" opacity=".45"/>
+    <circle cx="100" cy="78" r="39" fill="url(#bd${i})"/>
+    <path d="M61 78 q39 -36 78 0 q-39 -16 -78 0 Z" fill="#1f7a45" opacity=".42"/>
+    <path d="M100 39 q-8 -10 0 -18 q8 8 0 18 Z" fill="#bef264"/>
+    ${face({ y:82, s:.88, mood:c.mood, ink:"#061c0d", glow:c.mood === "asleep" ? null : "#0a2a16", spread:17 })}
+    ${sparkle(32,110,.7,"#bef264",0)}${sparkle(170,128,.6,"#d9f99d",.7)}${sparkle(46,158,.5,"#4ade80",1.4)}${sparkle(158,72,.5,"#bef264",2)}
+    ${c.mood === "asleep" ? zzz(158,52) : ""}
+  </g>`; }
+];
+</script>
+
+<script>
+"use strict";
+/* --- NIMBUS: storm cloud -------------------------------------------------- */
+PET_ART.nimbus = [
+/* 0 — Static Egg */ (c) => { const i = c.id; return `
+  <defs>
+    <radialGradient id="sh${i}" cx="34%" cy="26%"><stop offset="0" stop-color="#5b7590"/><stop offset="1" stop-color="#161f2c"/></radialGradient>
+    <linearGradient id="gl${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fde047"/><stop offset="1" stop-color="#7cd4fd"/></linearGradient>
+    <filter id="bl${i}" x="-70%" y="-70%" width="240%" height="240%"><feGaussianBlur stdDeviation="4"/></filter>
+  </defs>
+  <g class="pet-anim">
+    <path d="M100 34 C133 34 156 68 156 104 C156 138 131 166 100 166 C69 166 44 138 44 104 C44 68 67 34 100 34 Z" fill="url(#sh${i})" stroke="#0c121b" stroke-width="2.4"/>
+    <g class="p-crack" filter="url(#bl${i})" opacity=".85">
+      <path d="M84 62 L96 92 L80 100 L98 126" stroke="url(#gl${i})" stroke-width="6" fill="none" stroke-linecap="round"/>
+      <path d="M122 84 L112 106 L126 118" stroke="url(#gl${i})" stroke-width="5" fill="none" stroke-linecap="round"/>
+    </g>
+    <path class="p-crack" d="M84 62 L96 92 L80 100 L98 126" stroke="#fde047" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+    <path class="p-crack" d="M122 84 L112 106 L126 118" stroke="#7cd4fd" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+    ${cloud(72,58,66,34,"#dbeafe",'opacity=".92"')}
+    ${cloud(132,146,60,30,"#cbd5e1",'opacity=".85"')}
+    <ellipse cx="118" cy="66" rx="14" ry="8" fill="#fff" opacity=".14" transform="rotate(24 118 66)"/>
+    ${sparkle(48,116,.6,"#fde047",0)}${sparkle(156,104,.5,"#7cd4fd",.9)}
+    ${c.mood === "asleep" ? zzz(154,60) : ""}
+  </g>`; },
+
+/* 1 — Puffling */ (c) => { const i = c.id; return `
+  <defs>
+    <radialGradient id="bd${i}" cx="36%" cy="26%"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#bcd7f0"/></radialGradient>
+    <filter id="gb${i}" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2.4"/></filter>
+  </defs>
+  <g class="pet-anim"><g class="p-float">
+    <g class="p-wag" style="transform-origin:140px 142px">${bolt(154,140,1.1,"#fde047",18)}</g>
+    ${cloud(100,126,104,74,"url(#bd"+i+")")}
+    <ellipse cx="100" cy="140" rx="34" ry="20" fill="#eaf4ff" opacity=".8"/>
+    ${cloud(62,150,44,26,"#cfe4f8",'opacity=".9"')}
+    ${cloud(140,152,42,24,"#cfe4f8",'opacity=".9"')}
+    ${face({ y:118, s:1.0, mood:c.mood, ink:"#20384f", blush:"#7cd4fd", spread:19, blurId:"gb"+i })}
+    ${sparkle(46,102,.55,"#7cd4fd",0)}${sparkle(158,112,.5,"#fde047",.8)}${sparkle(100,64,.4,"#fde047",1.5)}
+    ${c.mood === "elated" ? sparkle(76,64,.5,"#fde047",.3) + sparkle(126,60,.5,"#7cd4fd",1) : ""}
+    ${c.mood === "asleep" ? zzz(150,84) : ""}
+  </g></g>`; },
+
+/* 2 — Zephyrite */ (c) => { const i = c.id; return `
+  <defs>
+    <radialGradient id="bd${i}" cx="36%" cy="24%"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#a7c8e8"/></radialGradient>
+    <linearGradient id="wg${i}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fde047"/><stop offset="1" stop-color="#f59e0b"/></linearGradient>
+    <filter id="gb${i}" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2.4"/></filter>
+  </defs>
+  <g class="pet-anim"><g class="p-float">
+    <g class="p-flap" style="transform-origin:70px 108px"><path d="M70 106 L26 88 L48 106 L20 118 L64 122 Z" fill="url(#wg${i})" opacity=".95"/></g>
+    <g class="p-flap" style="transform-origin:130px 108px;animation-delay:.2s"><path d="M130 106 L174 88 L152 106 L180 118 L136 122 Z" fill="url(#wg${i})" opacity=".95"/></g>
+    <g class="p-wag" style="transform-origin:132px 152px">${bolt(152,152,1.2,"#fde047",22)}</g>
+    ${cloud(100,120,98,72,"url(#bd"+i+")")}
+    ${cloud(100,80,58,32,"#e8f2fd",'opacity=".95"')}
+    <ellipse cx="100" cy="136" rx="30" ry="18" fill="#eaf4ff" opacity=".75"/>
+    ${cloud(66,156,42,24,"#c3daf2",'opacity=".9"')}${cloud(136,158,40,22,"#c3daf2",'opacity=".9"')}
+    ${face({ y:112, s:.96, mood:c.mood, ink:"#1b3348", blush:"#7cd4fd", spread:18, blurId:"gb"+i })}
+    ${bolt(100,66,.42,"#fde047",0,"p-spark")}
+    ${sparkle(40,96,.6,"#7cd4fd",0)}${sparkle(162,104,.5,"#fde047",.9)}
+    ${c.mood === "asleep" ? zzz(154,74) : ""}
+  </g></g>`; },
+
+/* 3 — Tempestor */ (c) => { const i = c.id; return `
+  <defs>
+    <radialGradient id="bd${i}" cx="36%" cy="22%"><stop offset="0" stop-color="#f4f9ff"/><stop offset="1" stop-color="#7e9fc4"/></radialGradient>
+    <radialGradient id="dk${i}" cx="40%" cy="20%"><stop offset="0" stop-color="#8fb0d4"/><stop offset="1" stop-color="#43607f"/></radialGradient>
+    <linearGradient id="wg${i}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fde047"/><stop offset="1" stop-color="#ea9e0b"/></linearGradient>
+    <filter id="gb${i}" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2.6"/></filter>
+  </defs>
+  <g class="pet-anim"><g class="p-float">
+    <circle cx="100" cy="108" r="80" fill="none" stroke="#7cd4fd" stroke-width="1.6" opacity=".32" stroke-dasharray="5 10"/>
+    <g class="p-flap" style="transform-origin:64px 104px"><path d="M66 100 L12 76 L40 100 L4 116 L60 122 Z" fill="url(#wg${i})"/></g>
+    <g class="p-flap" style="transform-origin:136px 104px;animation-delay:.18s"><path d="M134 100 L188 76 L160 100 L196 116 L140 122 Z" fill="url(#wg${i})"/></g>
+    <g class="p-wag" style="transform-origin:134px 156px">${bolt(158,156,1.4,"#fde047",24)}</g>
+    ${cloud(100,72,92,44,"url(#dk"+i+")")}
+    ${cloud(100,124,110,78,"url(#bd"+i+")")}
+    <ellipse cx="100" cy="140" rx="34" ry="20" fill="#eaf4ff" opacity=".7"/>
+    <circle cx="100" cy="140" r="11" fill="#fde047" class="p-pulse"/>
+    ${cloud(60,160,46,26,"#a9c6e3",'opacity=".92"')}${cloud(142,162,44,24,"#a9c6e3",'opacity=".92"')}
+    ${face({ y:114, s:.94, mood:c.mood, ink:"#122740", glow:c.mood === "asleep" ? null : "#0f2c47", spread:18, blurId:"gb"+i })}
+    ${bolt(72,58,.5,"#fde047",-16,"p-spark")}${bolt(128,54,.46,"#fde047",14,"p-spark")}
+    ${sparkle(32,102,.65,"#7cd4fd",0)}${sparkle(170,116,.55,"#fde047",.8)}
+    ${c.mood === "asleep" ? zzz(158,64) : ""}
+  </g></g>`; },
+
+/* 4 — Thunderarch */ (c) => { const i = c.id; return `
+  <defs>
+    <radialGradient id="bd${i}" cx="36%" cy="20%"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#6d92bb"/></radialGradient>
+    <radialGradient id="dk${i}" cx="40%" cy="18%"><stop offset="0" stop-color="#7b9dc2"/><stop offset="1" stop-color="#2d465f"/></radialGradient>
+    <linearGradient id="wg${i}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fef08a"/><stop offset="1" stop-color="#e08c05"/></linearGradient>
+    <radialGradient id="au${i}"><stop offset="0" stop-color="#7cd4fd" stop-opacity=".5"/><stop offset="1" stop-color="#7cd4fd" stop-opacity="0"/></radialGradient>
+    <filter id="gb${i}" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2.6"/></filter>
+  </defs>
+  <g class="pet-anim"><g class="p-float">
+    <circle cx="100" cy="104" r="94" fill="url(#au${i})" class="p-pulse"/>
+    <circle cx="100" cy="105" r="86" fill="none" stroke="#fde047" stroke-width="1.5" opacity=".35" stroke-dasharray="3 13"/>
+    <g class="p-orbit">${bolt(100,22,.5,"#fde047",0)}</g>
+    <g class="p-orbit" style="animation-delay:-2.3s">${bolt(100,20,.4,"#7cd4fd",0)}</g>
+    <g class="p-orbit-r" style="animation-delay:-5s">${bolt(100,26,.36,"#fde047",0)}</g>
+    <g class="p-flap" style="transform-origin:60px 100px"><path d="M62 96 L2 66 L34 96 L-6 114 L56 120 Z" fill="url(#wg${i})"/></g>
+    <g class="p-flap" style="transform-origin:140px 100px;animation-delay:.16s"><path d="M138 96 L198 66 L166 96 L206 114 L144 120 Z" fill="url(#wg${i})"/></g>
+    <g class="p-wag" style="transform-origin:136px 158px">${bolt(164,158,1.6,"#fde047",26)}</g>
+    ${cloud(100,60,96,46,"url(#dk"+i+")")}
+    <path d="M74 44 l6 -20 l8 14 l10 -22 l9 22 l9 -14 l6 20 Z" fill="#fde047" opacity=".95"/>
+    ${cloud(100,124,116,82,"url(#bd"+i+")")}
+    <ellipse cx="100" cy="142" rx="36" ry="22" fill="#f2f8ff" opacity=".72"/>
+    <circle cx="100" cy="140" r="18" fill="#fde047" class="p-pulse"/>
+    <circle cx="100" cy="140" r="8" fill="#fffbe0" class="p-pulse"/>
+    ${cloud(56,162,48,28,"#93b5d8",'opacity=".92"')}${cloud(146,164,46,26,"#93b5d8",'opacity=".92"')}
+    ${face({ y:112, s:.92, mood:c.mood, ink:"#0c1e33", glow:c.mood === "asleep" ? null : "#0a1b2e", spread:18, blurId:"gb"+i })}
+    ${sparkle(26,106,.7,"#7cd4fd",0)}${sparkle(176,120,.6,"#fde047",.7)}${sparkle(44,164,.5,"#7cd4fd",1.4)}
+    ${c.mood === "asleep" ? zzz(162,52) : ""}
+  </g></g>`; }
+];
+
+/* ---------------------------------------------------------------------------
+   SpriteKit — drop-in replacement art
+   ---------------------------------------------------------------------------
+   Register a horizontal sprite sheet for any species/stage and it is used in
+   place of the vector pet everywhere (home, evolution tree, summary, picker).
+
+     RunPet.setSprite("ember", 2, {
+       src: "art/blazewyrm.png",  // URL, relative path or data: URI
+       frames: 6,                 // frames laid out left to right
+       fps: 8,                    // playback speed
+       moods: { sad: 1, asleep: 2 }   // optional: row index per mood
+     });
+
+   Rows are optional. With `moods`, the sheet is a grid: every row is one mood
+   and `frames` columns wide. Without it a single row is used for every mood.
+   RunPet.clearSprite(species, stage) puts the vector art back, and
+   RunPet.listSprites() shows what is registered. Everything is saved to
+   localStorage with the rest of the game.
+   ------------------------------------------------------------------------- */
+function spriteKey(species, stage){ return species + ":" + stage; }
+
+function spriteMarkup(species, stage, mood){
+  const cfg = save.sprites[spriteKey(species, stage)];
+  if (!cfg || !cfg.src) return null;
+  const frames = Math.max(1, cfg.frames || 1);
+  const fps    = Math.max(1, cfg.fps || 8);
+  const rows   = cfg.rows || (cfg.moods ? Math.max(...Object.values(cfg.moods)) + 1 : 1);
+  const row    = (cfg.moods && cfg.moods[mood] != null) ? cfg.moods[mood] : 0;
+  const posY   = rows > 1 ? (row / (rows - 1)) * 100 : 0;
+  const dur    = (frames / fps).toFixed(3) + "s";
+  const esc    = String(cfg.src).replace(/"/g, "&quot;");
+  return `<div class="sprite playing" style="
+      background-image:url(&quot;${esc}&quot;);
+      background-size:${frames * 100}% ${rows * 100}%;
+      background-position-y:${posY}%;
+      --frames:${frames}; --dur:${dur};"></div>`;
+}
+
+/** Full pet markup for a species + stage, honouring any registered sprite. */
+function petMarkup(speciesId, stage, mood){
+  const sp = spriteMarkup(speciesId, stage, mood);
+  if (sp) return sp;
+  const art = (PET_ART[speciesId] || PET_ART.ember)[Math.max(0, Math.min(4, stage))];
+  return `<svg viewBox="0 0 200 200" class="mood-${mood}" role="img" aria-label="${SPECIES[speciesId].stages[stage].name}">
+    ${art({ id: uid(), mood })}
+  </svg>`;
+}
+/** Paint a pet into a `.pet-holder` element. */
+function paintPet(el, speciesId, stage, mood){
+  if (!el) return;
+  el.className = el.className.replace(/\bmood-\w+\b/g, "").trim() + " mood-" + mood;
+  el.innerHTML = petMarkup(speciesId, stage, mood);
+}
+</script>
+
+<script>
+"use strict";
+/* ---------------------------------------------------------------------------
+   5. RENDER
+   ------------------------------------------------------------------------- */
+const $  = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+
+/* --- toast --------------------------------------------------------------- */
+function toast(msg, kind, emoji){
+  const el = document.createElement("div");
+  el.className = "toast" + (kind ? " " + kind : "");
+  el.innerHTML = (emoji ? `<span class="em">${emoji}</span>` : "") + `<span>${msg}</span>`;
+  $("#toasts").appendChild(el);
+  setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 320); }, 2900);
+}
+
+/* --- theme --------------------------------------------------------------- */
+function applyTheme(speciesId){
+  const t = (SPECIES[speciesId] || SPECIES.ember).theme;
+  const r = document.documentElement.style;
+  r.setProperty("--accent",  t.accent);
+  r.setProperty("--accent-2", t.accent2);
+  r.setProperty("--accent-ink", t.ink);
+  r.setProperty("--glow",    t.glow);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", "#0a0c13");
+}
+
+/* --- what the pet says --------------------------------------------------- */
+const LINES = {
+  ember: {
+    elated: ["That was a good burn. Again tomorrow?","You smell like effort. I approve.","My fire is roaring. Do that again."],
+    happy:  ["Still warm from yesterday.","Ready when you are.","I have been practising my roar."],
+    okay:   ["Feeling steady. A run would help.","Embers are fine. Flames are better.","Shall we?"],
+    bored:  ["Two days. My fire is getting low.","I am bored. Boredom makes me chew things.","Laces. Door. Go."],
+    sad:    ["It has been days. I am basically a candle.","Did I do something wrong?","I keep watching the door."],
+    asleep: ["Zzz… wake me when you run.","Too cold to move. Need kilometres.","*a very small puff of smoke*"]
+  },
+  verdant: {
+    elated: ["The whole grove felt that one.","New leaves today. Thank you.","I grew a little while you were out."],
+    happy:  ["Yesterday's rain is still in me.","Good soil, good pace.","I am ready to grow again."],
+    okay:   ["Quiet day. Quiet roots.","A walk becomes a run if you keep going.","I am patient. But not infinitely."],
+    bored:  ["Two days without water, so to speak.","My leaves are curling a bit.","The path is still there, you know."],
+    sad:    ["I have gone a little brown at the edges.","Sunlight would help. Or you, running.","I am wilting, politely."],
+    asleep: ["Dormant. Come back with kilometres.","Zzz… roots only, no leaves.","Winter came early this year."]
+  },
+  nimbus: {
+    elated: ["ZAP! That was electric!","I was hovering the whole time!","Again! Again! Again!"],
+    happy:  ["Still buzzing from yesterday.","Charge is good. Let's top it up.","Wanna go? We could go."],
+    okay:   ["Slight drizzle. Nothing serious.","I could be a storm with a bit of help.","Batteries at 60%."],
+    bored:  ["Two days flat. I am basically fog.","No sparks left. Rude.","I have been zapping the furniture."],
+    sad:    ["Static gone. Just grey now.","I miss the running.","Drip. Drip. That is me."],
+    asleep: ["…out of charge…","Zzz. Plug me into a 5k.","Cloud offline. Try running."]
+  }
+};
+function speechFor(){
+  const d = derived;
+  if (!d.runs.length) return `Nothing logged yet — take me out for a first run and I will start growing.`;
+  const set = LINES[save.species] || LINES.ember;
+  const pool = set[d.mood.key] || set.okay;
+  const idx = Math.floor((Date.now() / 60000 + d.runs.length) % pool.length);
+  return `${pool[idx]} <span class="mood-tag">${d.mood.emoji} ${d.mood.label}</span>`;
+}
+
+/* --- route drawing (used for summary + history thumbnails) --------------- */
+function flattenPath(path){
+  if (!path) return [];
+  if (Array.isArray(path[0]) && Array.isArray(path[0][0])) return path;   // segmented
+  return [path];
+}
+function drawRoute(canvas, path, opts){
+  opts = opts || {};
+  const segs = flattenPath(path).filter(s => s && s.length > 1);
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = opts.bg || "#0e1119";
+  ctx.fillRect(0, 0, W, H);
+  if (!segs.length) return false;
+
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  const proj = p => {
+    const lat = p[0], lng = p[1];
+    return [lng, -Math.log(Math.tan(Math.PI/4 + lat * Math.PI/360))];
+  };
+  const projected = segs.map(s => s.map(proj));
+  for (const s of projected) for (const p of s){
+    if (p[0] < minX) minX = p[0]; if (p[0] > maxX) maxX = p[0];
+    if (p[1] < minY) minY = p[1]; if (p[1] > maxY) maxY = p[1];
+  }
+  const pad = opts.pad != null ? opts.pad : 24;
+  const spanX = Math.max(maxX - minX, 1e-9), spanY = Math.max(maxY - minY, 1e-9);
+  const scale = Math.min((W - pad*2) / spanX, (H - pad*2) / spanY);
+  const ox = (W - spanX * scale) / 2, oy = (H - spanY * scale) / 2;
+  const X = p => ox + (p[0] - minX) * scale;
+  const Y = p => oy + (p[1] - minY) * scale;
+
+  const accent = opts.color || getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#ff6b35";
+  const lw = opts.width || 6;
+
+  ctx.lineJoin = ctx.lineCap = "round";
+  // soft glow underneath
+  ctx.strokeStyle = accent; ctx.globalAlpha = .22; ctx.lineWidth = lw * 3;
+  for (const s of projected){ ctx.beginPath(); s.forEach((p,k) => k ? ctx.lineTo(X(p),Y(p)) : ctx.moveTo(X(p),Y(p))); ctx.stroke(); }
+  ctx.globalAlpha = 1; ctx.lineWidth = lw;
+  for (const s of projected){ ctx.beginPath(); s.forEach((p,k) => k ? ctx.lineTo(X(p),Y(p)) : ctx.moveTo(X(p),Y(p))); ctx.stroke(); }
+
+  if (opts.markers !== false){
+    const first = projected[0][0];
+    const lastSeg = projected[projected.length-1];
+    const last = lastSeg[lastSeg.length-1];
+    ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(X(first), Y(first), lw*1.35, 0, 7); ctx.fill();
+    ctx.fillStyle = accent;    ctx.beginPath(); ctx.arc(X(first), Y(first), lw*.8, 0, 7); ctx.fill();
+    ctx.fillStyle = accent;    ctx.beginPath(); ctx.arc(X(last),  Y(last),  lw*1.5, 0, 7); ctx.fill();
+    ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(X(last),  Y(last),  lw*.7, 0, 7); ctx.fill();
+  }
+  return true;
+}
+
+/* --- home ---------------------------------------------------------------- */
+function renderHome(){
+  const d = derived, sp = d.species;
+  paintPet($("#home-pet"), sp.id, d.stage, d.mood.key);
+  $("#pet-name-txt").textContent = save.petName || sp.name;
+  $("#pet-species-txt").textContent = `${sp.stages[d.stage].name} · Stage ${d.stage + 1} of 5`;
+  $("#pet-speech").innerHTML = speechFor();
+
+  const hour = new Date().getHours();
+  $("#greeting").textContent = hour < 5 ? "Still up?" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  $("#greeting-sub").textContent = d.runs.length
+    ? (d.gapDays === 0 ? "You already ran today — nice." : d.gapDays === 1 ? "You ran yesterday. Keep it rolling." : `${d.gapDays} days since your last run`)
+    : "Let's log your first run";
+
+  $("#home-level").textContent = d.level;
+  $("#home-xpnow").textContent = nf(Math.round(d.into));
+  $("#home-xpneed").textContent = d.need === Infinity ? "MAX" : nf(d.need);
+  $("#home-xpleft").textContent = d.need === Infinity ? "Max level" : `${nf(Math.max(0, d.need - d.into))} XP to Lv ${d.level + 1}`;
+  requestAnimationFrame(() => { $("#home-xpfill").style.width = (d.pct * 100).toFixed(2) + "%"; });
+
+  const nextEvo = EVO_LEVELS.find(l => l > d.level);
+  $("#home-nextevo").textContent = nextEvo ? `Next form at Lv ${nextEvo}` : "Final form reached";
+
+  $("#home-streak").innerHTML = d.streak + (d.streak >= 2 ? ' <small>🔥</small>' : "");
+  const weekStart = startOfWeek();
+  const weekKm = d.runs.filter(r => r.t >= weekStart).reduce((a, r) => a + r.km, 0);
+  $("#home-weekdist").innerHTML = `${U.distStr(weekKm, 1)}<small>${U.label}</small>`;
+  $("#home-total").innerHTML = `${U.distStr(d.totalKm, d.totalKm >= 100 ? 0 : 1)}<small>${U.label}</small>`;
+
+  renderWeek();
+  renderRecent();
+}
+function startOfWeek(){
+  const n = new Date(); n.setHours(0,0,0,0);
+  n.setDate(n.getDate() - ((n.getDay() + 6) % 7));   // Monday
+  return n.getTime();
+}
+function renderWeek(){
+  const labels = ["M","T","W","T","F","S","S"];
+  const start = startOfWeek();
+  const todayKey = dayKey(Date.now());
+  const html = labels.map((lb, i) => {
+    const d = new Date(start); d.setDate(d.getDate() + i);
+    const k = dayKey(d.getTime());
+    const hit = derived.days.has(k);
+    const isToday = k === todayKey;
+    const future = d.getTime() > Date.now();
+    return `<div class="d ${hit ? "hit" : ""} ${isToday ? "today" : ""}" style="${future ? "opacity:.4" : ""}">
+      <div class="lbl">${lb}</div><div class="mk"></div></div>`;
+  }).join("");
+  $("#home-week").innerHTML = html;
+}
+function runItemHTML(r){
+  const paceSec = U.paceSec(r.km, r.sec);
+  return `<button class="run-item" data-run="${r.id}">
+    <div class="thumb"><canvas width="104" height="104" data-thumb="${r.id}"></canvas></div>
+    <div class="main">
+      <div class="d1"><span class="km">${U.distStr(r.km, 2)}<small>${U.label}</small></span>
+        <span class="dt">${relDate(r.t)}${r.sim ? " · sim" : ""}</span></div>
+      <div class="d2"><span>⏱ ${fmtDur(r.sec)}</span><span>⚡ ${fmtPace(paceSec)} /${U.label}</span><span>🔥 ${r.kcal}</span></div>
+    </div>
+    <div class="xp">+${nf(r.xp)}<small>XP</small></div>
+  </button>`;
+}
+function paintThumbs(scope){
+  $$("canvas[data-thumb]", scope || document).forEach(cv => {
+    const r = save.runs.find(x => x.id === cv.dataset.thumb);
+    if (!r) return;
+    if (!drawRoute(cv, r.path, { pad: 10, width: 4, markers: false, bg: "#0e1119" })){
+      const ctx = cv.getContext("2d");
+      ctx.fillStyle = "#6b7488"; ctx.font = "600 30px Nunito, sans-serif";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("🏃", cv.width/2, cv.height/2);
+    }
+  });
+}
+function renderRecent(){
+  const list = derived.runs.slice(-3).reverse();
+  const el = $("#home-recent");
+  if (!list.length){
+    el.innerHTML = `<div class="card center" style="color:var(--muted);font-size:13px;font-weight:700;line-height:1.6">
+      No runs logged yet.<br>Tap the runner button to start one.</div>`;
+    return;
+  }
+  el.innerHTML = list.map(runItemHTML).join("");
+  paintThumbs(el);
+}
+
+/* --- history ------------------------------------------------------------- */
+function renderHistory(){
+  const runs = derived.runs.slice().reverse();
+  $("#hist-sub").textContent = runs.length
+    ? `${runs.length} run${runs.length === 1 ? "" : "s"} · ${fmtDur(derived.totalSec)} moving`
+    : "No runs yet";
+  $("#hist-total").textContent = `${U.distStr(derived.totalKm, 1)} ${U.label}`;
+  const el = $("#hist-list");
+  if (!runs.length){
+    el.innerHTML = `<div class="empty-state"><div class="ico">🏃</div>
+      <h3>No runs yet</h3><p>Every run you log lands here — and feeds your pet.</p>
+      <button class="btn primary" data-nav="track" style="max-width:240px;margin:0 auto">Start your first run</button></div>`;
+    return;
+  }
+  let html = "", lastMonth = "";
+  for (const r of runs){
+    const m = new Date(r.t).toLocaleDateString(undefined, { month:"long", year:"numeric" });
+    if (m !== lastMonth){
+      const monthRuns = runs.filter(x => new Date(x.t).toLocaleDateString(undefined,{month:"long",year:"numeric"}) === m);
+      const km = monthRuns.reduce((a,x) => a + x.km, 0);
+      html += `<div class="month-head">${m} · ${U.distStr(km,1)} ${U.label} · ${monthRuns.length} runs</div>`;
+      lastMonth = m;
+    }
+    html += runItemHTML(r);
+  }
+  el.innerHTML = html;
+  paintThumbs(el);
+}
+
+/* --- evolution / profile ------------------------------------------------- */
+let evoTab = null;
+function renderEvolve(){
+  const d = derived;
+  $("#evo-sub").textContent = `${save.petName || d.species.name} · ${d.species.stages[d.stage].name}`;
+  $("#ev-total").innerHTML = `${U.distStr(d.totalKm, d.totalKm >= 100 ? 0 : 1)}<small>${U.label}</small>`;
+  $("#ev-runs").textContent = d.runs.length;
+  $("#ev-time").innerHTML = d.totalSec >= 3600
+    ? `${nf(d.totalSec/3600, 1)}<small>h</small>` : `${Math.round(d.totalSec/60)}<small>m</small>`;
+  $("#ev-streak").innerHTML = d.streak + (d.streak >= 2 ? ' <small>🔥</small>' : "");
+  $("#ev-best").textContent = d.bestStreak;
+  $("#ev-xp").textContent = d.totalXp >= 10000 ? nf(d.totalXp/1000, 1) + "k" : nf(d.totalXp);
+
+  if (!evoTab) evoTab = save.species;
+  $("#spec-tabs").innerHTML = SPECIES_ORDER.map(id => `
+    <button class="spec-tab ${id === evoTab ? "on" : ""}" data-spec="${id}">
+      ${SPECIES[id].name}${id === save.species ? '<span class="yours">yours</span>' : '<span class="yours" style="color:var(--muted)">locked</span>'}
+    </button>`).join("");
+
+  const sp = SPECIES[evoTab];
+  const mine = evoTab === save.species;
+  $("#evo-tree").innerHTML = sp.stages.map((st, k) => {
+    const req = EVO_LEVELS[k];
+    const unlocked = mine && d.level >= req;
+    const current = mine && d.stage === k;
+    return `${k ? '<div class="evo-connector"></div>' : ""}
+      <div class="evo-node ${unlocked ? "" : "locked"} ${current ? "current" : ""}">
+        <div class="pet-holder mood-${current ? d.mood.key : "okay"}" data-evo="${evoTab}:${k}"></div>
+        <div class="info">
+          <div class="nm">${unlocked || !mine ? st.name : "???"}</div>
+          <div class="rq">${k === 0 ? "Starting form" : `Unlocks at level ${req}`}${current ? " · current" : ""}</div>
+          <div class="ds">${unlocked || !mine ? st.desc : "Keep running to reveal this form."}</div>
+        </div>
+        <div class="stagenum">${k + 1}/5</div>
+      </div>`;
+  }).join("");
+  $$("[data-evo]").forEach(el => {
+    const [s, k] = el.dataset.evo.split(":");
+    paintPet(el, s, +k, (evoTab === save.species && derived.stage === +k) ? derived.mood.key : "okay");
+  });
+
+  const got = Object.keys(save.badges).length;
+  $("#badge-count").textContent = `${got}/${BADGES.length}`;
+  $("#badge-grid").innerHTML = BADGES.map(b => `
+    <div class="badge ${save.badges[b.id] ? "got" : ""}" data-badge="${b.id}" title="${b.name}">
+      <div class="ico">${b.ico}</div><div class="nm">${b.name}</div></div>`).join("");
+}
+
+/* --- master render ------------------------------------------------------- */
+function renderAll(){
+  recompute();
+  applyTheme(save.species);
+  renderHome();
+  renderHistory();
+  renderEvolve();
+  renderSettings();
+  persist();
+}
+
+/* --- navigation ---------------------------------------------------------- */
+let currentScreen = "home";
+function go(name){
+  if (name === currentScreen) return;
+  if (currentScreen === "track" && tracker.active && name !== "track"){
+    // leaving the run screen does not stop the run
+  }
+  const from = $("#screen-" + currentScreen);
+  const to   = $("#screen-" + name);
+  if (!to) return;
+  if (from) from.classList.remove("active");
+  to.classList.add("active");
+  to.scrollTop = 0;
+  currentScreen = name;
+
+  $$(".tab[data-nav]").forEach(t => t.classList.toggle("on", t.dataset.nav === name));
+  const chromeless = name === "track" || name === "summary";
+  $("#tabbar").classList.toggle("hidden", chromeless);
+  $("#fab").classList.toggle("hidden", chromeless);
+
+  if (name === "history") { renderHistory(); }
+  if (name === "evolve")  { renderEvolve(); }
+  if (name === "home")    { renderHome(); }
+  if (name === "track")   { onTrackScreenShown(); }
+}
+</script>
+
+<script>
+"use strict";
+/* ---------------------------------------------------------------------------
+   6. TRACKING
+   ------------------------------------------------------------------------- */
+const tracker = {
+  active:false, paused:false, finished:false,
+  watchId:null, timerId:null, simId:null,
+  segments:[],          // array of arrays of [lat,lng]
+  last:null,            // last accepted {lat,lng,t}
+  distanceM:0,
+  startedAt:0, elapsedMs:0, resumedAt:0,
+  accuracy:null, lastFixAt:0,
+  sim:false, simHeading:0, simPos:null,
+  wakeLock:null
+};
+
+let map = null, mapReady = false, routeLayers = [], meMarker = null, follow = true;
+let mapWarned = false;
+
+function leafletAvailable(){ return typeof window.L !== "undefined" && window.L && window.L.map; }
+
+function initMap(){
+  if (mapReady || !leafletAvailable()) return;
+  try{
+    map = L.map("map", { zoomControl:false, attributionControl:true, preferCanvas:true });
+    map.setView([51.5007, -0.1246], 15);
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+      maxZoom: 19, subdomains: "abcd",
+      attribution: '&copy; OpenStreetMap &copy; CARTO'
+    }).addTo(map);
+    map.on("dragstart zoomstart", () => {
+      if (tracker.active){ follow = false; $("#recenter").classList.add("show"); }
+    });
+    mapReady = true;
+  } catch(e){
+    console.warn("Leaflet failed to start", e);
+    showMapFallback("Map could not start — your route is still recorded.");
+  }
+}
+function showMapFallback(msg){
+  $("#map-fallback").classList.remove("hide");
+  $("#fallback-msg").textContent = msg;
+}
+function redrawFallback(){
+  if ($("#map-fallback").classList.contains("hide")) return;
+  const cv = $("#fallback-canvas");
+  if (!drawRoute(cv, tracker.segments, { pad:26, width:7, bg:"#0f131d" })){
+    const ctx = cv.getContext("2d");
+    ctx.fillStyle = "#5d6478"; ctx.font = "600 20px Nunito, sans-serif"; ctx.textAlign = "center";
+    ctx.fillText("Waiting for a GPS fix…", cv.width/2, cv.height/2);
+  }
+}
+
+function onTrackScreenShown(){
+  initMap();
+  if (!mapReady && !mapWarned){
+    mapWarned = true;
+    showMapFallback("Map tiles unavailable offline — your route is still being recorded.");
+  }
+  setTimeout(() => { if (map) map.invalidateSize(); }, 320);
+  if (!tracker.active && !tracker.finished) resetTrackUI();
+}
+
+function resetTrackUI(){
+  $("#t-dist").textContent = "0.00";
+  $("#t-dist-u").textContent = U.longLabel;
+  $("#t-time").textContent = "0:00";
+  $("#t-pace").textContent = "--:--";
+  $("#t-pace-k").textContent = `Avg /${U.label}`;
+  $("#t-kcal").textContent = "0";
+  $("#run-ctl").className = "run-ctl single";
+  $("#run-ctl").innerHTML = `<button class="ctl go" id="btn-start"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg> Start run</button>`;
+  $("#btn-start").addEventListener("click", startRun);
+  $("#hold-hint").classList.add("hide");
+  setGps("off", "Ready when you are");
+}
+
+function setGps(quality, text){
+  const pill = $("#gps-pill");
+  pill.dataset.q = quality;
+  $("#gps-txt").textContent = text;
+}
+function banner(msg, kind){
+  const b = $("#track-banner");
+  if (!msg){ b.hidden = true; return; }
+  b.hidden = false;
+  b.className = "banner" + (kind === "warn" ? " warn" : "");
+  $("#track-banner-txt").innerHTML = msg;
+}
+
+/* --- position handling --------------------------------------------------- */
+function acceptPosition(lat, lng, accuracy, tsMs){
+  tracker.lastFixAt = Date.now();
+  tracker.accuracy = accuracy;
+
+  if (accuracy > GPS.hardRejectM){
+    setGps("bad", `Very weak signal (±${Math.round(accuracy)} m)`);
+    banner("GPS accuracy is poor right now, so these fixes are being ignored. Move away from buildings or wait a moment — the timer keeps running.", "warn");
+    return;
+  }
+  setGps(accuracy <= 12 ? "good" : accuracy <= GPS.minAccuracyM ? "ok" : "bad",
+         accuracy <= 12 ? `Strong signal · ±${Math.round(accuracy)} m`
+         : accuracy <= GPS.minAccuracyM ? `Good signal · ±${Math.round(accuracy)} m`
+         : `Weak signal · ±${Math.round(accuracy)} m`);
+  if (accuracy <= GPS.minAccuracyM) banner(null);
+
+  const here = { lat, lng, t: tsMs || Date.now() };
+  updateMe(here);
+
+  if (!tracker.active || tracker.paused) { tracker.last = here; return; }
+  if (accuracy > GPS.minAccuracyM){ return; }     // keep the fix for the marker, not the route
+
+  const seg = tracker.segments[tracker.segments.length - 1];
+  if (!seg.length){ seg.push([lat, lng]); tracker.last = here; drawLive(); return; }
+
+  const prev = tracker.last;
+  const d = haversine(prev, here);
+  const dt = Math.max(0.001, (here.t - prev.t) / 1000);
+  // A stationary phone still wobbles, and the wobble scales with the reported
+  // accuracy — so the jitter gate does too, instead of using one fixed value
+  // that would swallow real strides at 1 Hz.
+  const jitterGate = Math.max(GPS.minStepM, Math.min(accuracy * 0.35, 6));
+  if (d < jitterGate) return;
+  if (d / dt > GPS.maxSpeedMS){                    // teleport — drop it
+    tracker.last = here;
+    return;
+  }
+  tracker.distanceM += d;
+  tracker.last = here;
+  seg.push([lat, lng]);
+  drawLive();
+  updateMetrics();
+}
+
+function updateMe(pos){
+  if (!mapReady) return;
+  const ll = [pos.lat, pos.lng];
+  if (!meMarker){
+    meMarker = L.marker(ll, { icon: L.divIcon({ className:"pulse-dot", html:"<i></i>", iconSize:[16,16] }), interactive:false }).addTo(map);
+    map.setView(ll, 17);
+  } else {
+    meMarker.setLatLng(ll);
+  }
+  if (follow) map.panTo(ll, { animate:true, duration:.55 });
+}
+function drawLive(){
+  if (!mapReady){ redrawFallback(); return; }
+  const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
+  tracker.segments.forEach((seg, i) => {
+    if (seg.length < 2) return;
+    if (routeLayers[i]) routeLayers[i].setLatLngs(seg);
+    else routeLayers[i] = L.polyline(seg, { color: accent, weight: 6, opacity: .95, lineJoin:"round", lineCap:"round" }).addTo(map);
+  });
+}
+function clearRouteLayers(){
+  routeLayers.forEach(l => { try{ map.removeLayer(l); }catch(e){} });
+  routeLayers = [];
+  if (meMarker){ try{ map.removeLayer(meMarker); }catch(e){} meMarker = null; }
+}
+
+/* --- metrics ------------------------------------------------------------- */
+function elapsedSec(){
+  const live = tracker.active && !tracker.paused ? Date.now() - tracker.resumedAt : 0;
+  return (tracker.elapsedMs + live) / 1000;
+}
+function updateMetrics(){
+  const km  = tracker.distanceM / 1000;
+  const sec = elapsedSec();
+  $("#t-dist").textContent = U.distStr(km, 2);
+  $("#t-time").textContent = fmtDur(sec);
+  $("#t-pace").textContent = fmtPace(U.paceSec(km, sec));
+  $("#t-kcal").textContent = calories(km, sec, save.settings.weightKg);
+
+  if (tracker.active && !tracker.paused && tracker.lastFixAt &&
+      Date.now() - tracker.lastFixAt > GPS.staleAfterMs && !tracker.sim){
+    setGps("bad", "No GPS update for a while…");
+  }
+}
+
+/* --- simulated GPS ------------------------------------------------------- */
+function startSim(){
+  tracker.sim = true;
+  const base = tracker.last || { lat: 51.5007, lng: -0.1246 };
+  tracker.simPos = { lat: base.lat, lng: base.lng };
+  tracker.simHeading = Math.random() * Math.PI * 2;
+  setGps("good", "Simulated GPS · demo run");
+  banner("Simulated GPS is on — this run is fake and will be tagged <b>sim</b> in your history. Turn it off in Settings for real runs.", "warn");
+  tracker.simId = setInterval(() => {
+    if (!tracker.active || tracker.paused) return;
+    const speed = 3.05 + Math.sin(Date.now() / 9000) * 0.55;   // ~9-13 km/h
+    tracker.simHeading += (Math.random() - .5) * 0.22;          // gentle curves
+    const dist = speed * 1.0;                                   // one tick per second
+    const dLat = (dist * Math.cos(tracker.simHeading)) / 111320;
+    const dLng = (dist * Math.sin(tracker.simHeading)) / (111320 * Math.cos(tracker.simPos.lat * Math.PI/180));
+    tracker.simPos.lat += dLat; tracker.simPos.lng += dLng;
+    acceptPosition(tracker.simPos.lat, tracker.simPos.lng, 6, Date.now());
+  }, 1000);
+}
+function stopSim(){ if (tracker.simId){ clearInterval(tracker.simId); tracker.simId = null; } }
+
+/* --- geolocation --------------------------------------------------------- */
+function startGeo(){
+  if (!("geolocation" in navigator)){
+    banner("This browser has no Geolocation API, so real GPS tracking is not available. You can still try the app with <b>Simulated GPS</b> in Settings.");
+    setGps("off", "GPS unavailable");
+    return false;
+  }
+  tracker.watchId = navigator.geolocation.watchPosition(
+    p => acceptPosition(p.coords.latitude, p.coords.longitude, p.coords.accuracy || 999, p.timestamp),
+    err => {
+      if (err.code === 1){
+        banner("Location permission was denied. Allow location for this site in your browser settings, then start the run again — or switch on <b>Simulated GPS</b> in Settings to try the app.");
+        setGps("off", "Permission denied");
+        if (tracker.active) abortRun();
+      } else if (err.code === 2){
+        banner("Your device cannot get a position right now. If you are indoors, step outside — the timer keeps running.", "warn");
+        setGps("bad", "Position unavailable");
+      } else {
+        setGps("bad", "GPS timed out — still trying");
+      }
+    },
+    { enableHighAccuracy:true, maximumAge:1000, timeout:20000 }
+  );
+  return true;
+}
+function stopGeo(){
+  if (tracker.watchId != null){ navigator.geolocation.clearWatch(tracker.watchId); tracker.watchId = null; }
+}
+
+/* --- wake lock ----------------------------------------------------------- */
+async function acquireWakeLock(){
+  if (!save.settings.wakeLock || !("wakeLock" in navigator)) return;
+  try { tracker.wakeLock = await navigator.wakeLock.request("screen"); } catch(e){ /* not fatal */ }
+}
+function releaseWakeLock(){
+  if (tracker.wakeLock){ try{ tracker.wakeLock.release(); }catch(e){} tracker.wakeLock = null; }
+}
+
+/* --- run lifecycle ------------------------------------------------------- */
+function startRun(){
+  tracker.active = true; tracker.paused = false; tracker.finished = false;
+  tracker.segments = [[]]; tracker.distanceM = 0; tracker.last = null;
+  tracker.startedAt = Date.now(); tracker.elapsedMs = 0; tracker.resumedAt = Date.now();
+  tracker.accuracy = null; tracker.lastFixAt = 0;
+  follow = true; $("#recenter").classList.remove("show");
+  if (mapReady) clearRouteLayers();
+  banner(null);
+
+  if (save.settings.simulate) startSim(); else { setGps("off", "Acquiring GPS…"); startGeo(); }
+  acquireWakeLock();
+
+  tracker.timerId = setInterval(updateMetrics, 250);
+  renderRunControls();
+  toast("Run started — go get 'em", "good", "🏃");
+}
+function pauseRun(){
+  if (!tracker.active || tracker.paused) return;
+  tracker.paused = true;
+  tracker.elapsedMs += Date.now() - tracker.resumedAt;
+  renderRunControls();
+}
+function resumeRun(){
+  if (!tracker.active || !tracker.paused) return;
+  tracker.paused = false;
+  tracker.resumedAt = Date.now();
+  tracker.segments.push([]);          // new segment so the line breaks at the pause
+  tracker.last = null;
+  renderRunControls();
+}
+function abortRun(){
+  teardownRun();
+  resetTrackUI();
+}
+function teardownRun(){
+  tracker.active = false; tracker.paused = false;
+  clearInterval(tracker.timerId); tracker.timerId = null;
+  stopGeo(); stopSim(); releaseWakeLock();
+}
+
+function renderRunControls(){
+  const ctl = $("#run-ctl");
+  ctl.className = "run-ctl";
+  if (!tracker.active){ resetTrackUI(); return; }
+  ctl.innerHTML = tracker.paused
+    ? `<button class="ctl go" id="btn-resume"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg> Resume</button>
+       <button class="ctl stop" id="btn-stop"><span class="holdfill"></span><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> Finish</button>`
+    : `<button class="ctl" id="btn-pause"><svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1.4"/><rect x="14" y="5" width="4" height="14" rx="1.4"/></svg> Pause</button>
+       <button class="ctl stop" id="btn-stop"><span class="holdfill"></span><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> Finish</button>`;
+  $("#hold-hint").classList.remove("hide");
+  const pause = $("#btn-pause"), resume = $("#btn-resume");
+  if (pause)  pause.addEventListener("click", pauseRun);
+  if (resume) resume.addEventListener("click", resumeRun);
+  wireHoldToStop($("#btn-stop"));
+}
+
+/** Finish needs a deliberate press-and-hold so it cannot be hit by accident. */
+function wireHoldToStop(btn){
+  if (!btn) return;
+  const fill = $(".holdfill", btn);
+  let raf = null, t0 = 0;
+  const HOLD = 750;
+  const tick = () => {
+    const p = Math.min(1, (performance.now() - t0) / HOLD);
+    fill.style.width = (p * 100) + "%";
+    if (p >= 1){ cancel(); finishRun(); return; }
+    raf = requestAnimationFrame(tick);
+  };
+  const cancel = () => { if (raf) cancelAnimationFrame(raf); raf = null; fill.style.width = "0%"; };
+  const begin = e => { e.preventDefault(); t0 = performance.now(); raf = requestAnimationFrame(tick); };
+  btn.addEventListener("pointerdown", begin);
+  btn.addEventListener("pointerup", cancel);
+  btn.addEventListener("pointerleave", cancel);
+  btn.addEventListener("pointercancel", cancel);
+}
+
+/** Trim a route down so a long run does not bloat localStorage. */
+function compressPath(segments, maxPoints){
+  const round = p => [Math.round(p[0] * 1e5) / 1e5, Math.round(p[1] * 1e5) / 1e5];
+  const total = segments.reduce((a, s) => a + s.length, 0);
+  if (total <= maxPoints) return segments.map(s => s.map(round)).filter(s => s.length > 1);
+  const step = Math.ceil(total / maxPoints);
+  return segments.map(s => {
+    if (s.length < 2) return [];
+    const out = s.filter((_, i) => i % step === 0).map(round);
+    const lastRounded = round(s[s.length - 1]);
+    if (out.length && (out[out.length-1][0] !== lastRounded[0] || out[out.length-1][1] !== lastRounded[1])) out.push(lastRounded);
+    return out;
+  }).filter(s => s.length > 1);
+}
+
+function finishRun(){
+  const km  = tracker.distanceM / 1000;
+  const sec = Math.round(elapsedSec());
+  const wasSim = tracker.sim;
+  teardownRun();
+  tracker.finished = true;
+
+  if (km < 0.05 || sec < 20){
+    openSheet({
+      title:"Too short to count",
+      desc:`That run was ${U.distStr(km,2)} ${U.label} over ${fmtDur(sec)}. Runs need at least 50 m and 20 seconds before they earn XP — nothing has been saved.`,
+      actions:[{ label:"Discard", cls:"primary", fn: () => { closeSheet(); tracker.finished = false; resetTrackUI(); go("home"); } }]
+    });
+    return;
+  }
+
+  const now = Date.now();
+  const levelBefore = derived.level, stageBefore = derived.stage;
+  const streakDays  = streakIfRunNow(now);
+  const base   = baseXpForDistance(km);
+  const flat   = flatXp(km);
+  const endur  = enduranceXp(km);
+  const mult   = streakMultiplier(streakDays);
+  const total  = Math.round(base * mult);
+
+  const run = {
+    id: "r" + now.toString(36) + Math.random().toString(36).slice(2, 6),
+    t: now, km, sec,
+    kcal: calories(km, sec, save.settings.weightKg),
+    xp: total,
+    xpFlat: Math.round(flat), xpEndurance: Math.round(endur),
+    xpStreakBonus: Math.round(base * mult - base),
+    streak: streakDays,
+    sim: !!wasSim,
+    path: compressPath(tracker.segments, 320)
+  };
+  save.runs.push(run);
+  recompute();
+  persist();
+
+  showSummary(run, { levelBefore, stageBefore, celebrate:true });
+  tracker.finished = false;
+  tracker.segments = []; tracker.distanceM = 0;
+}
+</script>
+
+<script>
+"use strict";
+/* ---------------------------------------------------------------------------
+   7. SUMMARY + SHEETS + SETTINGS
+   ------------------------------------------------------------------------- */
+
+/** XP/level context around one run, computed from the chronological log. */
+function levelContextForRun(run){
+  const ordered = save.runs.slice().sort((a,b) => a.t - b.t);
+  let before = 0;
+  for (const r of ordered){ if (r.id === run.id) break; before += r.xp; }
+  const after = before + run.xp;
+  const b = levelFromXp(before), a = levelFromXp(after);
+  return {
+    beforeXp: before, afterXp: after,
+    beforeLevel: b.level, afterLevel: a.level,
+    beforeStage: stageForLevel(b.level), afterStage: stageForLevel(a.level),
+    beforePct: b.pct, afterPct: a.pct,
+    into: a.into, need: a.need
+  };
+}
+
+let summaryRunId = null;
+function showSummary(run, opts){
+  opts = opts || {};
+  summaryRunId = run.id;
+  const ctx = levelContextForRun(run);
+  const review = !!opts.review;
+
+  $("#sum-kicker").textContent = review ? "Run details" : (run.sim ? "Simulated run complete" : "Run complete");
+  $("#sum-dist").textContent = U.distStr(run.km, 2);
+  $("#sum-dist-u").textContent = U.label;
+  $("#sum-when").textContent = new Date(run.t).toLocaleString(undefined,
+    { weekday:"short", day:"numeric", month:"short", hour:"2-digit", minute:"2-digit" }) + (run.sim ? " · simulated" : "");
+  $("#sum-time").textContent = fmtDur(run.sec);
+  $("#sum-pace").textContent = fmtPace(U.paceSec(run.km, run.sec));
+  $("#sum-pace-k").textContent = `Avg /${U.label}`;
+  $("#sum-kcal").textContent = run.kcal;
+  $("#sum-delete").classList.toggle("hide", !review);
+
+  const cv = $("#sum-canvas");
+  const card = cv.parentElement;
+  const drew = drawRoute(cv, run.path, { pad:26, width:7 });
+  cv.style.display = drew ? "block" : "none";
+  const oldEmpty = $(".empty", card); if (oldEmpty) oldEmpty.remove();
+  if (!drew){
+    const d = document.createElement("div");
+    d.className = "empty";
+    d.textContent = "No GPS trace was recorded for this run.";
+    card.appendChild(d);
+  }
+
+  const bonusPct = Math.round((streakMultiplier(run.streak || 1) - 1) * 100);
+  const lines = [
+    `<div class="xp-line"><span>Distance · ${U.distStr(run.km,2)} ${U.label} at ${XP_PER_KM} XP/km</span><b>+${nf(run.xpFlat || 0)}</b></div>`,
+    (run.xpEndurance > 0
+      ? `<div class="xp-line bonus"><span>Endurance bonus · longer runs pay more per km</span><b>+${nf(run.xpEndurance)}</b></div>`
+      : `<div class="xp-line" style="opacity:.55"><span>Endurance bonus · builds up as a run gets longer</span><b>+0</b></div>`)
+  ];
+  if (bonusPct > 0)
+    lines.push(`<div class="xp-line bonus"><span>Streak bonus · ${run.streak} days in a row (+${bonusPct}%)</span><b>+${nf(run.xpStreakBonus || 0)}</b></div>`);
+  else
+    lines.push(`<div class="xp-line" style="opacity:.55"><span>Streak bonus · run again tomorrow for +10%</span><b>+0</b></div>`);
+  lines.push(`<div class="xp-line total"><span>Total earned</span><b>${nf(run.xp)} XP</b></div>`);
+  $("#sum-xp-lines").innerHTML = lines.join("");
+
+  $("#sum-level").textContent = ctx.afterLevel;
+  $("#sum-xpnow").textContent = nf(Math.round(ctx.into));
+  $("#sum-xpneed").textContent = ctx.need === Infinity ? "MAX" : nf(ctx.need);
+  $("#sum-xpleft").textContent = ctx.need === Infinity ? "Max level" : `${nf(Math.max(0, ctx.need - ctx.into))} XP to Lv ${ctx.afterLevel + 1}`;
+  $("#sum-levelnote").textContent = ctx.afterLevel > ctx.beforeLevel
+    ? `+${ctx.afterLevel - ctx.beforeLevel} level${ctx.afterLevel - ctx.beforeLevel > 1 ? "s" : ""}`
+    : `Was Lv ${ctx.beforeLevel}`;
+
+  // animate the bar from where it was to where it is
+  const fill = $("#sum-xpfill");
+  fill.style.transition = "none";
+  fill.style.width = (ctx.afterLevel > ctx.beforeLevel ? 100 : ctx.beforePct * 100).toFixed(2) + "%";
+  void fill.offsetWidth;
+  fill.style.transition = "";
+  setTimeout(() => {
+    if (ctx.afterLevel > ctx.beforeLevel) fill.style.width = "0%";
+    requestAnimationFrame(() => setTimeout(() => { fill.style.width = (ctx.afterPct * 100).toFixed(2) + "%"; }, 60));
+  }, 260);
+
+  // level up + evolution
+  const lu = $("#sum-levelup");
+  if (ctx.afterLevel > ctx.beforeLevel){
+    const evolved = ctx.afterStage > ctx.beforeStage;
+    const sp = SPECIES[save.species];
+    lu.classList.remove("hide");
+    lu.innerHTML = `<div class="levelup"><div class="burst"></div>
+      <h3>${evolved ? "Evolution!" : "Level up!"}</h3>
+      <p>${save.petName || sp.name} reached <b>level ${ctx.afterLevel}</b>${evolved ? ` and became a <b>${sp.stages[ctx.afterStage].name}</b>` : ""}.</p>
+      ${evolved ? `<div class="evo-reveal">
+          <div class="pet-holder mood-happy" id="evo-old"></div>
+          <div class="arrow"><svg viewBox="0 0 24 24" style="width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></div>
+          <div class="pet-holder mood-elated new" id="evo-new"></div>
+        </div>
+        <p style="margin-top:10px">${sp.stages[ctx.afterStage].desc}</p>` : ""}
+    </div>`;
+    if (evolved){
+      paintPet($("#evo-old", lu), sp.id, ctx.beforeStage, "happy");
+      paintPet($("#evo-new", lu), sp.id, ctx.afterStage, "elated");
+      save.seenStage = Math.max(save.seenStage, ctx.afterStage);
+    }
+    if (!review && opts.celebrate) confetti(evolved ? 90 : 44);
+  } else {
+    lu.classList.add("hide");
+    lu.innerHTML = "";
+  }
+
+  $("#sum-done").textContent = review ? "Back to history" : "Nice one — back to my pet";
+  $("#sum-done").dataset.back = review ? "history" : "home";
+  $("#sum-close").dataset.back = review ? "history" : "home";
+  go("summary");
+}
+
+function confetti(n){
+  const host = $("#screen-summary");
+  const colors = ["#ff6b35","#ffd23f","#4ade80","#7cd4fd","#f472b6","#ffffff"];
+  for (let i = 0; i < n; i++){
+    const c = document.createElement("i");
+    c.className = "confetti";
+    c.style.left = (Math.random() * 100) + "%";
+    c.style.background = colors[(Math.random() * colors.length) | 0];
+    c.style.animationDuration = (1.5 + Math.random() * 1.4) + "s";
+    c.style.animationDelay = (Math.random() * .5) + "s";
+    c.style.top = (60 + Math.random() * 120) + "px";
+    host.appendChild(c);
+    setTimeout(() => c.remove(), 3400);
+  }
+}
+
+/* --- bottom sheet -------------------------------------------------------- */
+let sheetActions = [];
+function openSheet(cfg){
+  sheetActions = cfg.actions || [];
+  $("#sheet").innerHTML = `
+    <h3>${cfg.title}</h3>
+    ${cfg.desc ? `<p class="desc">${cfg.desc}</p>` : ""}
+    ${cfg.body || ""}
+    <div class="sheet-btns">${sheetActions.map((a, i) =>
+      `<button class="btn ${a.cls || "ghost"}" data-sheet-act="${i}">${a.label}</button>`).join("")}</div>`;
+  $("#sheet-wrap").classList.add("show");
+  if (cfg.onOpen) cfg.onOpen($("#sheet"));
+}
+function closeSheet(){ $("#sheet-wrap").classList.remove("show"); }
+
+/* --- settings ------------------------------------------------------------ */
+function renderSettings(){
+  $("#set-petname").textContent = save.petName || "—";
+  $$("#seg-units button").forEach(b => b.classList.toggle("on", b.dataset.u === save.settings.units));
+  $("#set-weight").value = save.settings.weightKg;
+  $("#set-weight-u").textContent = "kg";
+  $("#tg-sim").classList.toggle("on", !!save.settings.simulate);
+  $("#tg-wake").classList.toggle("on", !!save.settings.wakeLock);
+  const n = Object.keys(save.sprites).length;
+  $("#sprite-summary").textContent = n
+    ? `${n} custom sprite${n === 1 ? "" : "s"} registered — tap to manage`
+    : "Using the built-in vector pets — tap to add your own sheets";
+  $("#storage-note").textContent = storageOK ? "" : "⚠️ localStorage is unavailable — progress will not survive a reload.";
+}
+
+function openSpriteSheetManager(){
+  const rows = [];
+  for (const id of SPECIES_ORDER){
+    for (let k = 0; k < 5; k++){
+      const key = spriteKey(id, k);
+      const has = !!save.sprites[key];
+      rows.push(`<div class="row" style="margin-bottom:7px;padding:10px 12px">
+        <div class="pet-holder tiny" data-sprite-prev="${key}"></div>
+        <div class="t"><div class="n" style="font-size:13px">${SPECIES[id].name} · ${SPECIES[id].stages[k].name}</div>
+          <div class="h">${has ? `custom · ${save.sprites[key].frames || 1} frames` : "built-in vector"}</div></div>
+        <button class="btn ghost" style="width:auto;padding:8px 12px;font-size:12px" data-sprite-set="${key}">${has ? "Replace" : "Add"}</button>
+        ${has ? `<button class="btn ghost" style="width:auto;padding:8px 10px;font-size:12px;color:var(--danger)" data-sprite-clear="${key}">✕</button>` : ""}
+      </div>`);
+    }
+  }
+  openSheet({
+    title:"Sprite packs",
+    desc:`Replace any pet with your own horizontal sprite sheet. Frames run left to right; add a <span class="mono">moods</span> map if your sheet has one row per mood. Everything else in the app keeps working — the sheet simply takes the place of the vector art.<br><br>You can also do this from the console: <span class="mono">RunPet.setSprite("ember", 2, {src, frames, fps})</span>`,
+    body: rows.join(""),
+    actions:[{ label:"Done", cls:"primary", fn: closeSheet }],
+    onOpen: root => {
+      $$("[data-sprite-prev]", root).forEach(el => {
+        const [s, k] = el.dataset.spritePrev.split(":");
+        paintPet(el, s, +k, "okay");
+      });
+    }
+  });
+}
+
+function openSpriteEditor(key){
+  const [species, stageStr] = key.split(":");
+  const stage = +stageStr;
+  const cur = save.sprites[key] || { src:"", frames:4, fps:8 };
+  openSheet({
+    title:`${SPECIES[species].name} · ${SPECIES[species].stages[stage].name}`,
+    desc:"Pick a PNG or GIF sprite sheet from this device, or paste a URL. The image is stored with your save file.",
+    body:`
+      <button class="btn ghost" id="sprite-file" style="margin-bottom:11px">Choose an image file…</button>
+      <label class="fl" for="sprite-src">Image URL or data URI</label>
+      <input class="inp" id="sprite-src" placeholder="art/blazewyrm.png" value="${(cur.src || "").startsWith("data:") ? "" : (cur.src || "")}">
+      <div style="display:flex;gap:10px;margin-top:11px">
+        <div style="flex:1"><label class="fl" for="sprite-frames">Frames</label>
+          <input class="inp" id="sprite-frames" type="number" min="1" max="60" value="${cur.frames || 4}"></div>
+        <div style="flex:1"><label class="fl" for="sprite-fps">FPS</label>
+          <input class="inp" id="sprite-fps" type="number" min="1" max="60" value="${cur.fps || 8}"></div>
+      </div>
+      <label class="fl" style="margin-top:11px" for="sprite-moods">Mood rows (optional JSON)</label>
+      <textarea class="inp" id="sprite-moods" placeholder='{"happy":0,"sad":1,"asleep":2}'>${cur.moods ? JSON.stringify(cur.moods) : ""}</textarea>
+      <div class="center" style="margin-top:12px">
+        <div class="pet-holder mini" id="sprite-preview" style="margin:0 auto"></div>
+        <div class="muted" style="font-size:11px;font-weight:700;margin-top:4px">live preview</div>
+      </div>`,
+    actions:[
+      { label:"Cancel", cls:"ghost", fn: () => { openSpriteSheetManager(); } },
+      { label:"Save sprite", cls:"primary", fn: () => {
+          const src = ($("#sprite-src").value || "").trim() || pendingSpriteData || cur.src;
+          if (!src){ toast("Give it an image first", "bad", "🖼️"); return; }
+          let moods = null;
+          const raw = ($("#sprite-moods").value || "").trim();
+          if (raw){ try { moods = JSON.parse(raw); } catch(e){ toast("Mood rows must be valid JSON", "bad", "⚠️"); return; } }
+          save.sprites[key] = {
+            src, frames: Math.max(1, +$("#sprite-frames").value || 1),
+            fps: Math.max(1, +$("#sprite-fps").value || 8)
+          };
+          if (moods) save.sprites[key].moods = moods;
+          pendingSpriteData = null;
+          persist(); renderAll();
+          toast("Sprite saved", "good", "🎨");
+          openSpriteSheetManager();
+        } }
+    ],
+    onOpen: root => {
+      const preview = () => {
+        const src = ($("#sprite-src").value || "").trim() || pendingSpriteData;
+        if (!src){ paintPet($("#sprite-preview"), species, stage, "okay"); return; }
+        const frames = Math.max(1, +$("#sprite-frames").value || 1);
+        const fps = Math.max(1, +$("#sprite-fps").value || 8);
+        $("#sprite-preview").innerHTML =
+          `<div class="sprite playing" style="background-image:url(&quot;${src.replace(/"/g,"&quot;")}&quot;);
+            background-size:${frames*100}% 100%;--frames:${frames};--dur:${(frames/fps).toFixed(3)}s"></div>`;
+      };
+      preview();
+      ["sprite-src","sprite-frames","sprite-fps"].forEach(id => $("#"+id, root).addEventListener("input", preview));
+      $("#sprite-file", root).addEventListener("click", () => {
+        pendingPreviewFn = preview;
+        $("#file-sprite").click();
+      });
+    }
+  });
+}
+let pendingSpriteData = null, pendingPreviewFn = null;
+</script>
+
+<script>
+"use strict";
+/* ---------------------------------------------------------------------------
+   8. ONBOARDING + EVENTS + BOOT
+   ------------------------------------------------------------------------- */
+let obSpecies = null;
+
+function showOnboarding(){
+  $("#onboard").classList.add("show");
+  $("#tabbar").classList.add("hidden");
+  $("#fab").classList.add("hidden");
+  const hero = SPECIES_ORDER[(Math.random() * 3) | 0];
+  applyTheme(hero);
+  paintPet($("#ob-hero"), hero, 0, "okay");
+  renderSpeciesPicks();
+  obStep(1);
+}
+function obStep(n){
+  $$(".ob-step").forEach((s, i) => s.classList.toggle("on", i === n - 1));
+  $("#onboard").scrollTop = 0;
+}
+function renderSpeciesPicks(){
+  $("#species-picks").innerHTML = SPECIES_ORDER.map(id => {
+    const s = SPECIES[id];
+    return `<button class="pick ${obSpecies === id ? "sel" : ""}" data-pick="${id}" style="--pg:${s.theme.glow}">
+      <div class="pet-holder" data-pick-art="${id}"></div>
+      <div style="flex:1;min-width:0">
+        <div class="nm">${s.name}</div>
+        <div class="tag" style="color:${s.theme.accent}">${s.element} · ${s.tagline}</div>
+        <div class="ds">${s.blurb}</div>
+      </div>
+    </button>`;
+  }).join("");
+  $$("[data-pick-art]").forEach(el => paintPet(el, el.dataset.pickArt, 0, "okay"));
+}
+function hatch(){
+  const name = ($("#ob-name").value || "").trim().slice(0, 16) || SPECIES[obSpecies].name;
+  save = structuredCloneSafe(DEFAULT_SAVE);
+  save.species = obSpecies;
+  save.petName = name;
+  save.createdAt = Date.now();
+  persist();
+  renderAll();
+  $("#onboard").classList.remove("show");
+  $("#tabbar").classList.remove("hidden");
+  $("#fab").classList.remove("hidden");
+  go("home");
+  setTimeout(() => {
+    toast(`${name} hatched! Go for a run to feed it.`, "good", "🥚");
+    confetti(50);
+  }, 420);
+}
+
+/* --- import / export ----------------------------------------------------- */
+function exportSave(){
+  const blob = new Blob([JSON.stringify(save, null, 2)], { type:"application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `runpet-${dayKey(Date.now())}.json`;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  toast("Save file downloaded", "good", "💾");
+}
+function importSave(text){
+  let data;
+  try { data = JSON.parse(text); } catch(e){ toast("That file is not valid JSON", "bad", "⚠️"); return; }
+  if (!data || !data.species || !Array.isArray(data.runs)){ toast("That does not look like a RunPet save", "bad", "⚠️"); return; }
+  save = Object.assign(structuredCloneSafe(DEFAULT_SAVE), data);
+  save.settings = Object.assign({}, DEFAULT_SAVE.settings, data.settings || {});
+  persist(); renderAll();
+  $("#onboard").classList.remove("show");
+  $("#tabbar").classList.remove("hidden"); $("#fab").classList.remove("hidden");
+  go("home");
+  toast(`Restored ${save.runs.length} runs`, "good", "📥");
+}
+
+/* --- events -------------------------------------------------------------- */
+function wire(){
+  // navigation
+  document.addEventListener("click", e => {
+    const nav = e.target.closest("[data-nav]");
+    if (nav){ go(nav.dataset.nav); return; }
+
+    const runBtn = e.target.closest("[data-run]");
+    if (runBtn){
+      const r = save.runs.find(x => x.id === runBtn.dataset.run);
+      if (r) showSummary(r, { review:true });
+      return;
+    }
+    const spec = e.target.closest("[data-spec]");
+    if (spec){ evoTab = spec.dataset.spec; renderEvolve(); return; }
+
+    const badge = e.target.closest("[data-badge]");
+    if (badge){
+      const b = BADGES.find(x => x.id === badge.dataset.badge);
+      const when = save.badges[b.id];
+      toast(when ? `${b.name} — earned ${new Date(when).toLocaleDateString()}` : `${b.name} — not earned yet`,
+            when ? "good" : "", b.ico);
+      return;
+    }
+    const pick = e.target.closest("[data-pick]");
+    if (pick){
+      obSpecies = pick.dataset.pick;
+      applyTheme(obSpecies);
+      $$(".pick").forEach(p => p.classList.toggle("sel", p.dataset.pick === obSpecies));
+      $("#ob-next").disabled = false;
+      return;
+    }
+    const act = e.target.closest("[data-sheet-act]");
+    if (act){ const a = sheetActions[+act.dataset.sheetAct]; if (a && a.fn) a.fn(); return; }
+
+    const sSet = e.target.closest("[data-sprite-set]");
+    if (sSet){ pendingSpriteData = null; openSpriteEditor(sSet.dataset.spriteSet); return; }
+    const sClr = e.target.closest("[data-sprite-clear]");
+    if (sClr){ delete save.sprites[sClr.dataset.spriteClear]; persist(); renderAll(); openSpriteSheetManager(); toast("Sprite removed", "", "🧹"); return; }
+
+    if (e.target === $("#sheet-wrap")) closeSheet();
+  });
+
+  $("#fab").addEventListener("click", () => go("track"));
+  $("#track-back").addEventListener("click", () => {
+    if (tracker.active){
+      openSheet({
+        title:"Leave the run screen?",
+        desc:"Your run keeps recording in the background while this tab is open. You can come back with the runner button at any time.",
+        actions:[
+          { label:"Stay", cls:"ghost", fn: closeSheet },
+          { label:"Leave it running", cls:"primary", fn: () => { closeSheet(); go("home"); } }
+        ]
+      });
+    } else go("home");
+  });
+  $("#recenter").addEventListener("click", () => {
+    follow = true; $("#recenter").classList.remove("show");
+    if (mapReady && tracker.last) map.panTo([tracker.last.lat, tracker.last.lng]);
+  });
+  $("#track-banner-x").addEventListener("click", () => banner(null));
+  $("#btn-start").addEventListener("click", startRun);
+
+  $("#sum-close").addEventListener("click", e => go(e.currentTarget.dataset.back || "home"));
+  $("#sum-done").addEventListener("click", e => go(e.currentTarget.dataset.back || "home"));
+  $("#sum-delete").addEventListener("click", () => {
+    const r = save.runs.find(x => x.id === summaryRunId);
+    if (!r) return;
+    openSheet({
+      title:"Delete this run?",
+      desc:`This removes ${U.distStr(r.km,2)} ${U.label} and ${nf(r.xp)} XP. Your pet can lose levels — and evolution stages — if that XP is what was holding them up.`,
+      actions:[
+        { label:"Keep it", cls:"ghost", fn: closeSheet },
+        { label:"Delete", cls:"danger", fn: () => {
+            save.runs = save.runs.filter(x => x.id !== r.id);
+            // badges are re-derived from scratch so a deletion rolls them back too
+            save.badges = {};
+            persist(); renderAll(); closeSheet(); go("history");
+            toast("Run deleted", "", "🗑️");
+          } }
+      ]
+    });
+  });
+
+  // rename
+  const rename = () => {
+    openSheet({
+      title:"Rename your pet",
+      body:`<input class="inp" id="rename-inp" maxlength="16" value="${(save.petName || "").replace(/"/g,"&quot;")}">`,
+      actions:[
+        { label:"Cancel", cls:"ghost", fn: closeSheet },
+        { label:"Save", cls:"primary", fn: () => {
+            const v = ($("#rename-inp").value || "").trim().slice(0,16);
+            if (v){ save.petName = v; persist(); renderAll(); }
+            closeSheet();
+          } }
+      ],
+      onOpen: () => setTimeout(() => $("#rename-inp").focus(), 260)
+    });
+  };
+  $("#rename-btn").addEventListener("click", rename);
+  $("#set-rename").addEventListener("click", rename);
+
+  // settings
+  $("#seg-units").addEventListener("click", e => {
+    const b = e.target.closest("button[data-u]"); if (!b) return;
+    save.settings.units = b.dataset.u; persist(); renderAll();
+    if (currentScreen === "track" && !tracker.active) resetTrackUI(); else updateMetrics();
+  });
+  $("#set-weight").addEventListener("change", e => {
+    const v = Math.max(25, Math.min(250, +e.target.value || 70));
+    save.settings.weightKg = v; e.target.value = v; persist();
+  });
+  $("#row-sim").addEventListener("click", () => {
+    save.settings.simulate = !save.settings.simulate; persist(); renderSettings();
+    toast(save.settings.simulate ? "Simulated GPS on — runs will be tagged sim" : "Simulated GPS off", "", save.settings.simulate ? "🧪" : "📡");
+  });
+  $("#row-keepawake").addEventListener("click", () => {
+    save.settings.wakeLock = !save.settings.wakeLock; persist(); renderSettings();
+  });
+  $("#row-sprites").addEventListener("click", openSpriteSheetManager);
+  $("#row-export").addEventListener("click", exportSave);
+  $("#row-import").addEventListener("click", () => $("#file-import").click());
+  $("#file-import").addEventListener("change", e => {
+    const f = e.target.files[0]; if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => importSave(rd.result);
+    rd.readAsText(f);
+    e.target.value = "";
+  });
+  $("#file-sprite").addEventListener("change", e => {
+    const f = e.target.files[0]; if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => {
+      pendingSpriteData = rd.result;
+      const srcInput = $("#sprite-src");
+      if (srcInput) srcInput.placeholder = "using the file you picked";
+      if (pendingPreviewFn) pendingPreviewFn();
+      toast("Image loaded — set frames, then save", "good", "🖼️");
+    };
+    rd.readAsDataURL(f);
+    e.target.value = "";
+  });
+  $("#btn-reset").addEventListener("click", () => {
+    openSheet({
+      title:"Start a new game?",
+      desc:"This erases your pet, every run, all XP and every badge on this device. Export a save file first if you want to keep it. This cannot be undone.",
+      actions:[
+        { label:"Cancel", cls:"ghost", fn: closeSheet },
+        { label:"Erase everything", cls:"danger", fn: () => {
+            try { localStorage.removeItem(SAVE_KEY); } catch(e){}
+            save = structuredCloneSafe(DEFAULT_SAVE);
+            obSpecies = null;
+            closeSheet();
+            recompute();
+            showOnboarding();
+          } }
+      ]
+    });
+  });
+
+  // onboarding
+  $("#ob-go").addEventListener("click", () => obStep(2));
+  $("#ob-next").addEventListener("click", () => {
+    if (!obSpecies) return;
+    paintPet($("#ob-egg"), obSpecies, 0, "okay");
+    $("#ob-name").placeholder = SPECIES[obSpecies].name;
+    obStep(3);
+  });
+  $("#ob-back").addEventListener("click", () => obStep(2));
+  $("#ob-hatch").addEventListener("click", hatch);
+  $("#ob-name").addEventListener("keydown", e => { if (e.key === "Enter") hatch(); });
+
+  // keep the wake lock alive across tab switches, and refresh mood on return
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    if (tracker.active) acquireWakeLock();
+    if (save.species){ recompute(); if (currentScreen === "home") renderHome(); }
+  });
+  window.addEventListener("resize", () => { if (map) map.invalidateSize(); });
+  window.addEventListener("beforeunload", e => {
+    if (tracker.active){ e.preventDefault(); e.returnValue = ""; }
+  });
+}
+
+/* --- public hooks (console-friendly) ------------------------------------- */
+window.RunPet = {
+  get state(){ return { save, derived }; },
+  setSprite(species, stage, cfg){
+    if (!SPECIES[species]) throw new Error("Unknown species: " + species);
+    if (!(stage >= 0 && stage <= 4)) throw new Error("Stage must be 0-4");
+    if (!cfg || !cfg.src) throw new Error("cfg.src is required");
+    save.sprites[spriteKey(species, stage)] = {
+      src: cfg.src, frames: Math.max(1, cfg.frames || 1), fps: Math.max(1, cfg.fps || 8),
+      ...(cfg.moods ? { moods: cfg.moods } : {}), ...(cfg.rows ? { rows: cfg.rows } : {})
+    };
+    persist(); renderAll();
+    return save.sprites[spriteKey(species, stage)];
+  },
+  clearSprite(species, stage){
+    delete save.sprites[spriteKey(species, stage)];
+    persist(); renderAll();
+  },
+  listSprites(){ return structuredCloneSafe(save.sprites); },
+  /** Add a fake run — handy for previewing later evolution stages. */
+  addRun(km, minutes, daysAgo){
+    const t = Date.now() - (daysAgo || 0) * 86400000;
+    const sec = Math.round((minutes || km * 6) * 60);
+    const streak = streakIfRunNow(t);
+    const base = baseXpForDistance(km), mult = streakMultiplier(streak);
+    save.runs.push({
+      id: "r" + t.toString(36) + Math.random().toString(36).slice(2,6),
+      t, km, sec, kcal: calories(km, sec, save.settings.weightKg),
+      xp: Math.round(base * mult), xpFlat: Math.round(flatXp(km)),
+      xpEndurance: Math.round(enduranceXp(km)),
+      xpStreakBonus: Math.round(base * mult - base),
+      streak, sim: true, path: []
+    });
+    persist(); renderAll();
+    return derived.level;
+  },
+  xpTable(){
+    const rows = [];
+    for (let l = 1; l <= 50; l++) rows.push({ level:l, toNext: xpToNext(l), cumulative: xpAtLevel(l) });
+    return rows;
+  }
+};
+
+/* --- boot ---------------------------------------------------------------- */
+function boot(){
+  wire();
+  const has = loadSave();
+  if (has){
+    recompute();
+    applyTheme(save.species);
+    renderAll();
+    go("home");
+    $("#screen-home").classList.add("active");
+  } else {
+    recompute();
+    showOnboarding();
+    $("#screen-home").classList.add("active");
+  }
+  // Leaflet may still be downloading when the app boots
+  if (!leafletAvailable()){
+    window.addEventListener("load", () => {
+      if (!leafletAvailable() && !mapWarned){
+        mapWarned = true;
+        showMapFallback("Map tiles unavailable offline — your route is still being recorded.");
+      }
+    });
+  }
+}
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+else boot();
+</script>
+</body>
+</html>
