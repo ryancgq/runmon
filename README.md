@@ -65,6 +65,12 @@ so its face cycles through every expression regardless of how recently you ran.
 The engine still supports mood rows (`moods` below); this sheet just does not
 use them.
 
+### Adding a new pet
+
+[`ART-SPEC.md`](ART-SPEC.md) is the production spec for new pet artwork —
+canvas, baseline, frame order, palette and file limits, with the Cinderling as
+the worked example. Read it before drawing anything.
+
 ### Swapping in your own art
 
 Any species and stage can be replaced with a horizontal sprite sheet, from
