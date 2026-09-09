@@ -1,4 +1,4 @@
-# RunPet
+# Runmon
 
 A mobile running tracker where real runs level up a virtual pet. GPS tracks
 your route, distance becomes XP, and XP grows a creature that evolves through
@@ -7,9 +7,20 @@ five forms — and visibly sulks if you stop running.
 The entire app is one file: **[`index.html`](index.html)**. No frameworks, no
 build step, no server, no account. Open it and it works.
 
-**[Play it →](https://ryancgq.github.io/coursera-test/)**
+**[Play it →](https://ryancgq.github.io/runmon/)**
 
 ---
+
+## Demo build
+
+[`demo.html`](demo.html) launches the same app with the egg stage skipped, so
+Ember's pixel art is on screen from level 1 instead of level 5. It runs on its
+own save slot (`runmon.demo.v1`), so nothing you do there touches a real pet.
+A **DEMO** badge sits above the tab bar with shortcuts: log a 5 km run, skip a
+day (which walks the pet down through all six moods), or reset.
+
+The demo is `index.html?demo=1` — the same file, one flag, no second copy to
+keep in sync.
 
 ## Trying it out
 
@@ -45,27 +56,51 @@ Your choice sets the app's accent colour. The pet's expression and idle
 animation follow how recently you ran: elated the day you run, happy the day
 after, restless at two days, sad at three, and asleep from five.
 
+The Cinderling (Ember, stage 2) ships as pixel art in
+[`art/ember-baby.png`](art/ember-baby.png); the rest are inline SVG. Both are
+placeholders — see below.
+
 ### Swapping in your own art
 
-The built-in vector pets are placeholders. Any species and stage can be
-replaced with a horizontal sprite sheet, from **Settings → Sprite packs** (pick
-a file, set frames and FPS, watch the live preview) or from the console:
+Any species and stage can be replaced with a horizontal sprite sheet, from
+**Settings → Sprite packs** (pick a file, set frames, FPS and scale, watch the
+live preview) or from the console:
 
 ```js
-RunPet.setSprite("ember", 2, {
+Runmon.setSprite("ember", 2, {
   src: "art/blazewyrm.png",     // URL, relative path or data: URI
   frames: 6,                    // frames laid out left to right
   fps: 8,
   moods: { sad: 1, asleep: 2 }  // optional: one sheet row per mood
 });
 
-RunPet.clearSprite("ember", 2); // back to the vector art
-RunPet.listSprites();
+Runmon.clearSprite("ember", 2); // back to the vector art
+Runmon.listSprites();
 ```
 
-A registered sheet replaces the vector pet everywhere — home, evolution tree,
+A registered sheet replaces the built-in pet everywhere — home, evolution tree,
 summary, species picker — and is saved with the rest of your game. Nothing else
-needs changing.
+needs changing. If the image cannot be fetched, the pet quietly falls back to
+vector art rather than showing an empty box.
+
+**Sheet layout.** Frames run left to right. Add `moods` and the sheet becomes a
+grid: one row per mood, `frames` columns wide. `art/ember-baby.png` is the
+worked example — 4 columns x 6 rows, rows ordered
+`elated, happy, okay, bored, sad, asleep`:
+
+| key | what it does |
+| --- | --- |
+| `frames` | columns in the sheet; each is one animation frame |
+| `rows` | rows in the sheet (defaults to what `moods` implies) |
+| `moods` | mood name to row index |
+| `fps` | playback speed |
+| `moodFps` | per-mood speed override, e.g. slow breathing while asleep |
+| `aspect` | frame width / height, if the frames are not square |
+| `scale` | grow or shrink the pet within its slot |
+
+Frames must be evenly sized with no gutters between them. There is a script-free
+way to check yours: register it, then watch the live preview in the editor — if
+you see two half-pets, the frame width is off.
 
 ## How XP works
 
@@ -90,7 +125,7 @@ The curve as tuned:
 | Final | 50 | 175,228 | ~1,500 km |
 
 `LEVEL_BASE` and `LEVEL_DECAY` near the top of the file control this, and
-`RunPet.xpTable()` prints the whole curve in the console.
+`Runmon.xpTable()` prints the whole curve in the console.
 
 ## How tracking works
 
@@ -124,9 +159,9 @@ There is nothing to install or build. Edit `index.html` and reload.
 Useful console helpers for previewing later stages without running 1,500 km:
 
 ```js
-RunPet.addRun(9.5, 52, 0);  // km, minutes, days ago
-RunPet.state;               // { save, derived }
-RunPet.xpTable();
+Runmon.addRun(9.5, 52, 0);  // km, minutes, days ago
+Runmon.state;               // { save, derived }
+Runmon.xpTable();
 ```
 
 ## Licence

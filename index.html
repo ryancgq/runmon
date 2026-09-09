@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
 <meta name="theme-color" content="#0b0d14">
-<meta name="description" content="RunPet — log real runs, level up a virtual pet, watch it evolve.">
+<meta name="description" content="Runmon — log real runs, level up a virtual pet, watch it evolve.">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230a0c13'/%3E%3Cpath d='M50 20 C64 38 64 52 50 62 C36 52 36 38 50 20 Z' fill='%23ff6b35'/%3E%3Cpath d='M50 34 C57 44 57 52 50 58 C43 52 43 44 50 34 Z' fill='%23ffd23f'/%3E%3Ccircle cx='34' cy='76' r='7' fill='%234ade80'/%3E%3Ccircle cx='66' cy='76' r='7' fill='%237cd4fd'/%3E%3C/svg%3E">
-<title>RunPet — Run. Level up. Evolve.</title>
+<title>Runmon — Run. Level up. Evolve.</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -19,7 +19,7 @@
 
 <style>
 /* ============================================================
-   RunPet — design tokens
+   Runmon — design tokens
    ============================================================ */
 :root{
   --bg:#0a0c13;
@@ -219,6 +219,7 @@ body::before{
   animation:halo 5s ease-in-out infinite;
 }
 @keyframes halo{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.09);opacity:1}}
+.pet-stage.has-sprite .pet-shadow{opacity:0}
 .pet-shadow{
   position:absolute;bottom:14px;width:120px;height:16px;border-radius:50%;
   background:radial-gradient(ellipse, rgba(0,0,0,.55), transparent 70%);
@@ -452,6 +453,14 @@ body::before{
 .banner.warn{background:rgba(251,191,36,.1);border-color:rgba(251,191,36,.3);color:#fde3a7}
 .banner svg{width:17px;height:17px;flex:0 0 17px;margin-top:1px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 .banner .x{margin-left:auto;opacity:.6;flex:0 0 auto}
+.banner-btn{
+  display:inline-block;margin-top:10px;padding:8px 14px;border-radius:10px;
+  font-size:12.5px;font-weight:800;letter-spacing:.2px;
+  color:inherit;background:rgba(255,255,255,.08);
+  border:1px solid currentColor;transition:.16s var(--ease);
+}
+.banner-btn:hover{background:rgba(255,255,255,.16)}
+.banner-btn:active{transform:scale(.97)}
 .banner[hidden]{display:none}
 
 /* ============================================================
@@ -641,7 +650,11 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
 .ob-step.on{display:flex}
 @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
 .ob-logo{text-align:center;margin-bottom:6px}
-.ob-logo h1{font-size:38px;letter-spacing:.5px;background:linear-gradient(120deg,#ff6b35,#ffd23f 30%,#4ade80 62%,#7cd4fd);-webkit-background-clip:text;background-clip:text;color:transparent}
+/* one stop per species; kept near-horizontal so a short wordmark still shows
+   all four colours rather than just the middle of the ramp */
+/* inline-block so the gradient box is the wordmark itself; as a full-width
+   block the text would only ever sample the middle of the ramp */
+.ob-logo h1{display:inline-block;font-size:40px;letter-spacing:.5px;background:linear-gradient(96deg,#ff6b35 3%,#ffd23f 33%,#4ade80 65%,#7cd4fd 97%);-webkit-background-clip:text;background-clip:text;color:transparent}
 .ob-logo p{font-size:13px;color:var(--muted);font-weight:700;margin:9px 0 0;line-height:1.55}
 .pick-grid{display:flex;flex-direction:column;gap:11px;margin:18px 0}
 .pick{
@@ -702,6 +715,21 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
 @keyframes toastIn{from{opacity:0;transform:translateY(-18px) scale(.94)}to{opacity:1;transform:none}}
 @keyframes toastOut{to{opacity:0;transform:translateY(-14px) scale(.96)}}
 
+/* demo-mode badge; sits clear of the FAB and rides with the tab bar */
+.demo-badge{
+  position:absolute;z-index:46;left:12px;bottom:calc(96px + var(--safe-b));
+  display:inline-flex;align-items:center;gap:7px;
+  padding:8px 13px;border-radius:999px;
+  background:rgba(22,27,40,.94);border:1px solid rgba(var(--glow),.45);
+  color:var(--accent);font-size:10.5px;font-weight:800;letter-spacing:.9px;
+  backdrop-filter:blur(12px);box-shadow:0 8px 24px rgba(0,0,0,.5);
+  transition:transform .3s var(--ease), opacity .25s var(--ease);
+}
+.demo-badge .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px currentColor;animation:blinkDot 1.8s ease-in-out infinite}
+.demo-badge:active{transform:scale(.94)}
+.demo-badge.hidden{transform:translateY(140%);opacity:0;pointer-events:none}
+.demo-badge[hidden]{display:none}
+
 .linkish{color:var(--accent);font-weight:800;text-decoration:none;border-bottom:1px dashed rgba(var(--glow),.5)}
 .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px}
 .muted{color:var(--muted)}
@@ -709,14 +737,18 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
 .mt{margin-top:12px}.mt2{margin-top:20px}
 .hide{display:none!important}
 
-/* sprite-sheet driven pet (user supplied art) */
-.sprite{
-  image-rendering:pixelated;background-repeat:no-repeat;
-  background-size:auto 100%;
-  width:100%;height:100%;
+/* Sprite-sheet driven pets.
+   The strip is `frames` viewports wide and slides by exactly one viewport per
+   step. Do NOT switch this to animating background-position in %: percentage
+   background positions resolve against (container - image), so they never land
+   on frame boundaries. transform:translateX(-100%) of the strip is exact. */
+.sprite-view{position:relative;width:100%;aspect-ratio:var(--saspect,1);overflow:hidden;transform:scale(var(--sscale,1))}
+.sprite-strip{
+  position:absolute;left:0;top:0;height:100%;
+  background-repeat:no-repeat;image-rendering:pixelated;
 }
-.sprite.playing{animation:spriteRun steps(var(--frames)) var(--dur) infinite}
-@keyframes spriteRun{from{background-position-x:0}to{background-position-x:calc(var(--frames) * -100%)}}
+.sprite-strip.playing{animation:spriteRun steps(var(--frames)) var(--dur) infinite}
+@keyframes spriteRun{from{transform:translateX(0)}to{transform:translateX(-100%)}}
 
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.08s!important}
@@ -977,7 +1009,7 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
       </button>
 
       <p class="muted center" style="font-size:11px;font-weight:700;line-height:1.7;margin-top:22px">
-        RunPet stores everything on this device in <span class="mono">localStorage</span>.<br>
+        Runmon stores everything on this device in <span class="mono">localStorage</span>.<br>
         No account, no server, no tracking.<br>
         <span id="storage-note" class="mono"></span>
       </p>
@@ -1006,11 +1038,15 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
     <svg viewBox="0 0 24 24"><path d="M13 3l-1.5 5.5L15 10l2 4"/><circle cx="16.5" cy="4.5" r="1.6" fill="currentColor" stroke="none"/><path d="M11.5 8.5L8 11l1 4-3 5"/><path d="M8 11l-3.5 1"/></svg>
   </button>
 
+  <button class="demo-badge" id="demo-badge" hidden>
+    <span class="dot"></span> DEMO · egg skipped
+  </button>
+
   <!-- ===================== ONBOARDING ===================== -->
   <div class="overlay" id="onboard">
     <div class="ob-step on" id="ob-1">
       <div class="ob-logo" style="margin-top:22px">
-        <h1>RunPet</h1>
+        <h1>Runmon</h1>
         <p>Every kilometre you run feeds a little creature.<br>Keep running and it will grow up.</p>
       </div>
       <div class="pet-stage" style="min-height:200px">
@@ -1068,7 +1104,7 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
 <script>
 "use strict";
 /* ============================================================================
-   RunPet — a single-file running tracker with a virtual pet.
+   Runmon — a single-file running tracker with a virtual pet.
    Sections:  1 config   2 maths   3 state   4 art   5 render
               6 tracking 7 screens 8 settings 9 boot
    ========================================================================== */
@@ -1076,7 +1112,15 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
 /* ---------------------------------------------------------------------------
    1. CONFIG
    ------------------------------------------------------------------------- */
-const SAVE_KEY = "runpet.save.v1";
+/* Demo mode (?demo in the URL) is a sandbox for trying out artwork and pacing.
+   It keeps its own save slot, so playing with it can never touch a real pet. */
+const DEMO = /[?&]demo(=|&|$)/.test(location.search);
+
+const SAVE_KEY = DEMO ? "runmon.demo.v1" : "runmon.save.v1";
+/* Saves written before the app was renamed. Read once, copied to SAVE_KEY, and
+   deliberately left in place as a backup — but cleared on reset, or a "new game"
+   would come back from the dead on the next load. Never migrated into the demo. */
+const LEGACY_SAVE_KEYS = DEMO ? [] : ["runpet.save.v1"];
 
 /* XP curve ------------------------------------------------------------------
    Base rate is 100 XP per km. On top of that every extra kilometre inside a
@@ -1333,7 +1377,15 @@ function structuredCloneSafe(o){ return JSON.parse(JSON.stringify(o)); }
 let storageOK = true;
 function loadSave(){
   let raw = null;
-  try { raw = localStorage.getItem(SAVE_KEY); }
+  try {
+    raw = localStorage.getItem(SAVE_KEY);
+    if (!raw){
+      for (const k of LEGACY_SAVE_KEYS){
+        const old = localStorage.getItem(k);
+        if (old){ raw = old; localStorage.setItem(SAVE_KEY, old); break; }
+      }
+    }
+  }
   catch(e){ storageOK = false; }
   if (!raw) return false;
   try {
@@ -2014,7 +2066,7 @@ PET_ART.nimbus = [
    Register a horizontal sprite sheet for any species/stage and it is used in
    place of the vector pet everywhere (home, evolution tree, summary, picker).
 
-     RunPet.setSprite("ember", 2, {
+     Runmon.setSprite("ember", 2, {
        src: "art/blazewyrm.png",  // URL, relative path or data: URI
        frames: 6,                 // frames laid out left to right
        fps: 8,                    // playback speed
@@ -2023,27 +2075,74 @@ PET_ART.nimbus = [
 
    Rows are optional. With `moods`, the sheet is a grid: every row is one mood
    and `frames` columns wide. Without it a single row is used for every mood.
-   RunPet.clearSprite(species, stage) puts the vector art back, and
-   RunPet.listSprites() shows what is registered. Everything is saved to
+   Runmon.clearSprite(species, stage) puts the vector art back, and
+   Runmon.listSprites() shows what is registered. Everything is saved to
    localStorage with the rest of the game.
    ------------------------------------------------------------------------- */
 function spriteKey(species, stage){ return species + ":" + stage; }
 
+/* Art that ships with the app. A key present in save.sprites wins; an explicit
+   null there means "use the vector pet instead of this default". */
+const DEFAULT_SPRITES = {
+  "ember:1": {
+    src:"art/ember-baby.png",
+    frames:4, rows:6, fps:3.5, aspect:1.587, scale:1.28,
+    moods:{ elated:0, happy:1, okay:2, bored:3, sad:4, asleep:5 },
+    moodFps:{ elated:6, happy:4, okay:3, bored:2.4, sad:2.4, asleep:1.1 }
+  }
+};
+/* The question this demo exists to answer: what does it feel like if the pixel
+   pet is there from level 1 and the egg stage is skipped entirely? */
+if (DEMO){
+  DEFAULT_SPRITES["ember:0"] = Object.assign({}, DEFAULT_SPRITES["ember:1"]);
+  SPECIES.ember.stages[0] = {
+    name: "Cinderling",
+    desc: "Hatched from the off. This demo skips the egg so the pixel art is there from level 1."
+  };
+}
+
+function spriteConfig(species, stage){
+  const key = spriteKey(species, stage);
+  const own = save.sprites[key];
+  return own !== undefined ? own : (DEFAULT_SPRITES[key] || null);
+}
+
+/* If a sheet cannot be fetched (offline, moved, typo) fall back to the vector
+   pet rather than showing an empty box. */
+const spriteBroken = Object.create(null);
+function probeSprite(src){
+  if (src in spriteBroken) return;
+  spriteBroken[src] = false;
+  const img = new Image();
+  img.onerror = () => { spriteBroken[src] = true; if (save.species) renderAll(); };
+  img.src = src;
+}
+
 function spriteMarkup(species, stage, mood){
-  const cfg = save.sprites[spriteKey(species, stage)];
+  const cfg = spriteConfig(species, stage);
   if (!cfg || !cfg.src) return null;
+  if (spriteBroken[cfg.src]) return null;
+  probeSprite(cfg.src);
+  return spriteHTML(cfg, mood);
+}
+
+function spriteHTML(cfg, mood){
   const frames = Math.max(1, cfg.frames || 1);
-  const fps    = Math.max(1, cfg.fps || 8);
   const rows   = cfg.rows || (cfg.moods ? Math.max(...Object.values(cfg.moods)) + 1 : 1);
   const row    = (cfg.moods && cfg.moods[mood] != null) ? cfg.moods[mood] : 0;
+  const fps    = Math.max(.1, (cfg.moodFps && cfg.moodFps[mood]) || cfg.fps || 8);
+  // percentage background-position resolves against (container - image), which
+  // is exactly what makes k/(rows-1) the right figure for picking row k
   const posY   = rows > 1 ? (row / (rows - 1)) * 100 : 0;
   const dur    = (frames / fps).toFixed(3) + "s";
-  const esc    = String(cfg.src).replace(/"/g, "&quot;");
-  return `<div class="sprite playing" style="
-      background-image:url(&quot;${esc}&quot;);
-      background-size:${frames * 100}% ${rows * 100}%;
-      background-position-y:${posY}%;
-      --frames:${frames}; --dur:${dur};"></div>`;
+  const esc    = String(cfg.src).replace(/'/g, "%27").replace(/"/g, "%22");
+  return `<div class="sprite-view" style="--sscale:${cfg.scale || 1};--saspect:${cfg.aspect || 1}">
+    <div class="sprite-strip playing" style="
+      width:${frames * 100}%;
+      background-image:url('${esc}');
+      background-size:100% ${rows * 100}%;
+      background-position:0 ${posY}%;
+      --frames:${frames}; --dur:${dur};"></div></div>`;
 }
 
 /** Full pet markup for a species + stage, honouring any registered sprite. */
@@ -2187,6 +2286,7 @@ function drawRoute(canvas, path, opts){
 function renderHome(){
   const d = derived, sp = d.species;
   paintPet($("#home-pet"), sp.id, d.stage, d.mood.key);
+  $("#pet-stage").classList.toggle("has-sprite", !!$("#home-pet .sprite-view"));
   $("#pet-name-txt").textContent = save.petName || sp.name;
   $("#pet-species-txt").textContent = `${sp.stages[d.stage].name} · Stage ${d.stage + 1} of 5`;
   $("#pet-speech").innerHTML = speechFor();
@@ -2378,6 +2478,7 @@ function go(name){
   const chromeless = name === "track" || name === "summary";
   $("#tabbar").classList.toggle("hidden", chromeless);
   $("#fab").classList.toggle("hidden", chromeless);
+  $("#demo-badge").classList.toggle("hidden", chromeless);
 
   if (name === "history") { renderHistory(); }
   if (name === "evolve")  { renderEvolve(); }
@@ -2469,12 +2570,34 @@ function setGps(quality, text){
   pill.dataset.q = quality;
   $("#gps-txt").textContent = text;
 }
-function banner(msg, kind){
+let bannerAction = null;
+function banner(msg, kind, action){
   const b = $("#track-banner");
+  bannerAction = action || null;
   if (!msg){ b.hidden = true; return; }
   b.hidden = false;
   b.className = "banner" + (kind === "warn" ? " warn" : "");
-  $("#track-banner-txt").innerHTML = msg;
+  $("#track-banner-txt").innerHTML = msg +
+    (action ? `<button class="banner-btn" id="banner-act">${action.label}</button>` : "");
+}
+
+/** Is this most likely a device with a real GPS chip? */
+function looksLikeMobile(){
+  return matchMedia("(pointer:coarse)").matches || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+}
+/** Some browsers can never resolve a position — say so instead of "step outside". */
+function isNoLocationProvider(err){
+  return /api key|network location|provider|403|not available|failed to (query|determine)/i.test(String(err && err.message || ""));
+}
+/** Drop straight into the simulator, mid-run if need be. */
+function switchToSim(){
+  save.settings.simulate = true;
+  persist(); renderSettings();
+  stopGeo();
+  banner(null);
+  if (tracker.active && !tracker.simId) startSim();
+  else setGps("good", "Simulated GPS ready");
+  toast("Simulated GPS on", "good", "\u{1F9EA}");
 }
 
 /* --- position handling --------------------------------------------------- */
@@ -2598,12 +2721,23 @@ function startGeo(){
     p => acceptPosition(p.coords.latitude, p.coords.longitude, p.coords.accuracy || 999, p.timestamp),
     err => {
       if (err.code === 1){
-        banner("Location permission was denied. Allow location for this site in your browser settings, then start the run again — or switch on <b>Simulated GPS</b> in Settings to try the app.");
+        banner("Location permission was denied. Allow location for this site in your browser settings, then start the run again.",
+               null, { label:"Use Simulated GPS instead", fn: switchToSim });
         setGps("off", "Permission denied");
         if (tracker.active) abortRun();
       } else if (err.code === 2){
-        banner("Your device cannot get a position right now. If you are indoors, step outside — the timer keeps running.", "warn");
-        setGps("bad", "Position unavailable");
+        // A desktop browser has no GPS chip: it asks a network location service
+        // instead, and Chromium builds without a Google API key get a 403 back.
+        // That is not something the user can fix by walking outside.
+        if (isNoLocationProvider(err) || !looksLikeMobile()){
+          banner("This browser cannot work out where you are. Desktop browsers have no GPS chip and fall back to a network location service — which some builds (Chromium, Brave, several Linux packages) ship without the key that service needs. <b>Open this page on a phone</b> for real tracking, or try the app right here with a fake route.",
+                 "warn", { label:"Use Simulated GPS", fn: switchToSim });
+          setGps("off", "No location provider");
+          if (tracker.active) abortRun();
+        } else {
+          banner("Your device cannot get a position right now. If you are indoors, step outside — the timer keeps running.", "warn");
+          setGps("bad", "Position unavailable");
+        }
       } else {
         setGps("bad", "GPS timed out — still trying");
       }
@@ -2920,10 +3054,10 @@ function renderSettings(){
   $("#set-weight-u").textContent = "kg";
   $("#tg-sim").classList.toggle("on", !!save.settings.simulate);
   $("#tg-wake").classList.toggle("on", !!save.settings.wakeLock);
-  const n = Object.keys(save.sprites).length;
+  const n = Object.values(save.sprites).filter(Boolean).length;
   $("#sprite-summary").textContent = n
     ? `${n} custom sprite${n === 1 ? "" : "s"} registered — tap to manage`
-    : "Using the built-in vector pets — tap to add your own sheets";
+    : "Built-in art — tap to add your own sheets";
   $("#storage-note").textContent = storageOK ? "" : "⚠️ localStorage is unavailable — progress will not survive a reload.";
 }
 
@@ -2932,19 +3066,29 @@ function openSpriteSheetManager(){
   for (const id of SPECIES_ORDER){
     for (let k = 0; k < 5; k++){
       const key = spriteKey(id, k);
-      const has = !!save.sprites[key];
+      const own = save.sprites[key];              // object = custom, null = forced vector
+      const def = DEFAULT_SPRITES[key];
+      const cfg = spriteConfig(id, k);
+      const label = own ? `custom · ${own.frames || 1} frames`
+                  : own === null ? "vector — built-in art switched off"
+                  : def ? `built-in pixel art · ${def.frames} frames`
+                  : "built-in vector";
+      const alt = own !== undefined
+        ? `<button class="btn ghost" style="width:auto;padding:8px 10px;font-size:12px" data-sprite-default="${key}" title="Back to the shipped art">↺</button>`
+        : def ? `<button class="btn ghost" style="width:auto;padding:8px 10px;font-size:12px;color:var(--danger)" data-sprite-vector="${key}" title="Use the vector pet instead">✕</button>`
+        : "";
       rows.push(`<div class="row" style="margin-bottom:7px;padding:10px 12px">
         <div class="pet-holder tiny" data-sprite-prev="${key}"></div>
         <div class="t"><div class="n" style="font-size:13px">${SPECIES[id].name} · ${SPECIES[id].stages[k].name}</div>
-          <div class="h">${has ? `custom · ${save.sprites[key].frames || 1} frames` : "built-in vector"}</div></div>
-        <button class="btn ghost" style="width:auto;padding:8px 12px;font-size:12px" data-sprite-set="${key}">${has ? "Replace" : "Add"}</button>
-        ${has ? `<button class="btn ghost" style="width:auto;padding:8px 10px;font-size:12px;color:var(--danger)" data-sprite-clear="${key}">✕</button>` : ""}
+          <div class="h">${label}</div></div>
+        <button class="btn ghost" style="width:auto;padding:8px 12px;font-size:12px" data-sprite-set="${key}">${cfg ? "Replace" : "Add"}</button>
+        ${alt}
       </div>`);
     }
   }
   openSheet({
     title:"Sprite packs",
-    desc:`Replace any pet with your own horizontal sprite sheet. Frames run left to right; add a <span class="mono">moods</span> map if your sheet has one row per mood. Everything else in the app keeps working — the sheet simply takes the place of the vector art.<br><br>You can also do this from the console: <span class="mono">RunPet.setSprite("ember", 2, {src, frames, fps})</span>`,
+    desc:`Replace any pet with your own horizontal sprite sheet. Frames run left to right; add a <span class="mono">moods</span> map if your sheet has one row per mood. Everything else in the app keeps working — the sheet simply takes the place of the vector art.<br><br>You can also do this from the console: <span class="mono">Runmon.setSprite("ember", 2, {src, frames, fps})</span>`,
     body: rows.join(""),
     actions:[{ label:"Done", cls:"primary", fn: closeSheet }],
     onOpen: root => {
@@ -2959,7 +3103,7 @@ function openSpriteSheetManager(){
 function openSpriteEditor(key){
   const [species, stageStr] = key.split(":");
   const stage = +stageStr;
-  const cur = save.sprites[key] || { src:"", frames:4, fps:8 };
+  const cur = save.sprites[key] || DEFAULT_SPRITES[key] || { src:"", frames:4, fps:8 };
   openSheet({
     title:`${SPECIES[species].name} · ${SPECIES[species].stages[stage].name}`,
     desc:"Pick a PNG or GIF sprite sheet from this device, or paste a URL. The image is stored with your save file.",
@@ -2972,6 +3116,8 @@ function openSpriteEditor(key){
           <input class="inp" id="sprite-frames" type="number" min="1" max="60" value="${cur.frames || 4}"></div>
         <div style="flex:1"><label class="fl" for="sprite-fps">FPS</label>
           <input class="inp" id="sprite-fps" type="number" min="1" max="60" value="${cur.fps || 8}"></div>
+        <div style="flex:1"><label class="fl" for="sprite-scale">Scale</label>
+          <input class="inp" id="sprite-scale" type="number" min="0.4" max="3" step="0.02" value="${cur.scale || 1}"></div>
       </div>
       <label class="fl" style="margin-top:11px" for="sprite-moods">Mood rows (optional JSON)</label>
       <textarea class="inp" id="sprite-moods" placeholder='{"happy":0,"sad":1,"asleep":2}'>${cur.moods ? JSON.stringify(cur.moods) : ""}</textarea>
@@ -2989,9 +3135,12 @@ function openSpriteEditor(key){
           if (raw){ try { moods = JSON.parse(raw); } catch(e){ toast("Mood rows must be valid JSON", "bad", "⚠️"); return; } }
           save.sprites[key] = {
             src, frames: Math.max(1, +$("#sprite-frames").value || 1),
-            fps: Math.max(1, +$("#sprite-fps").value || 8)
+            fps: Math.max(1, +$("#sprite-fps").value || 8),
+            scale: Math.max(.4, Math.min(3, +$("#sprite-scale").value || 1))
           };
           if (moods) save.sprites[key].moods = moods;
+          if (cur.moodFps && src === cur.src) save.sprites[key].moodFps = cur.moodFps;
+          if (cur.aspect  && src === cur.src) save.sprites[key].aspect  = cur.aspect;
           pendingSpriteData = null;
           persist(); renderAll();
           toast("Sprite saved", "good", "🎨");
@@ -3002,14 +3151,18 @@ function openSpriteEditor(key){
       const preview = () => {
         const src = ($("#sprite-src").value || "").trim() || pendingSpriteData;
         if (!src){ paintPet($("#sprite-preview"), species, stage, "okay"); return; }
-        const frames = Math.max(1, +$("#sprite-frames").value || 1);
-        const fps = Math.max(1, +$("#sprite-fps").value || 8);
-        $("#sprite-preview").innerHTML =
-          `<div class="sprite playing" style="background-image:url(&quot;${src.replace(/"/g,"&quot;")}&quot;);
-            background-size:${frames*100}% 100%;--frames:${frames};--dur:${(frames/fps).toFixed(3)}s"></div>`;
+        let moods = null;
+        try { moods = JSON.parse(($("#sprite-moods").value || "").trim() || "null"); } catch(e){}
+        $("#sprite-preview").innerHTML = spriteHTML({
+          src,
+          frames: Math.max(1, +$("#sprite-frames").value || 1),
+          fps: Math.max(1, +$("#sprite-fps").value || 8),
+          scale: Math.max(.4, Math.min(3, +$("#sprite-scale").value || 1)),
+          aspect: cur.aspect, moods: moods || undefined
+        }, "okay");
       };
       preview();
-      ["sprite-src","sprite-frames","sprite-fps"].forEach(id => $("#"+id, root).addEventListener("input", preview));
+      ["sprite-src","sprite-frames","sprite-fps","sprite-scale","sprite-moods"].forEach(id => $("#"+id, root).addEventListener("input", preview));
       $("#sprite-file", root).addEventListener("click", () => {
         pendingPreviewFn = preview;
         $("#file-sprite").click();
@@ -3031,7 +3184,12 @@ function showOnboarding(){
   $("#onboard").classList.add("show");
   $("#tabbar").classList.add("hidden");
   $("#fab").classList.add("hidden");
-  const hero = SPECIES_ORDER[(Math.random() * 3) | 0];
+  const hero = DEMO ? "ember" : SPECIES_ORDER[(Math.random() * 3) | 0];
+  if (DEMO){
+    $("#ob-hero").classList.remove("egg-crack");
+    $(".ob-logo p", $("#ob-1")).innerHTML =
+      "Demo build — the egg stage is skipped, so Ember's pixel art is on screen<br>from level 1. Its own save slot; your real pet is untouched.";
+  }
   applyTheme(hero);
   paintPet($("#ob-hero"), hero, 0, "okay");
   renderSpeciesPicks();
@@ -3073,12 +3231,51 @@ function hatch(){
   }, 420);
 }
 
+/* --- demo controls -------------------------------------------------------
+   Reaching the later moods honestly takes days of not running, and the later
+   forms take hundreds of kilometres. These shortcuts exist so the artwork and
+   pacing can be judged in a couple of minutes.
+   ------------------------------------------------------------------------- */
+function openDemoPanel(){
+  const d = derived;
+  openSheet({
+    title:"Demo mode",
+    desc:`The egg stage is skipped here, so the pixel Cinderling is on screen from level 1. This runs on its own save slot — nothing you do in the demo touches a real pet.<br><br>
+      Right now: <b>level ${d.level}</b>, ${d.species.stages[d.stage].name}, mood <b>${d.mood.label.toLowerCase()}</b>${d.gapDays === Infinity ? "" : ` (${d.gapDays === 0 ? "ran today" : d.gapDays + " day" + (d.gapDays === 1 ? "" : "s") + " idle"})`}.
+      ${d.runs.length ? "Skip a day to walk it down through all six moods." : "Log a run first — mood is measured from your last run, so it needs one to move."}`,
+    actions:[
+      { label:"Log a 5 km run", cls:"primary", fn: () => {
+          closeSheet();
+          Runmon.addRun(5, 28, 0);
+          const r = save.runs[save.runs.length - 1];
+          showSummary(r, { celebrate:true });
+        } },
+      { label:"Skip a day", cls:"ghost", fn: () => {
+          if (!save.runs.length){
+            // nothing to shift: mood is driven by the gap since the last run
+            toast("Log a run first — mood follows your last run", "", "🗓️");
+            return;
+          }
+          // push every run back a day, so the pet slides down through its moods
+          save.runs.forEach(r => { r.t -= 86400000; });
+          persist(); renderAll(); closeSheet();
+          toast(`A day passes — ${derived.mood.label.toLowerCase()}`, "", derived.mood.emoji);
+        } },
+      { label:"Reset demo", cls:"danger", fn: () => {
+          try { localStorage.removeItem(SAVE_KEY); } catch(e){}
+          save = structuredCloneSafe(DEFAULT_SAVE);
+          obSpecies = null; closeSheet(); recompute(); showOnboarding();
+        } }
+    ]
+  });
+}
+
 /* --- import / export ----------------------------------------------------- */
 function exportSave(){
   const blob = new Blob([JSON.stringify(save, null, 2)], { type:"application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `runpet-${dayKey(Date.now())}.json`;
+  a.download = `runmon-${dayKey(Date.now())}.json`;
   document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
   toast("Save file downloaded", "good", "💾");
@@ -3086,7 +3283,7 @@ function exportSave(){
 function importSave(text){
   let data;
   try { data = JSON.parse(text); } catch(e){ toast("That file is not valid JSON", "bad", "⚠️"); return; }
-  if (!data || !data.species || !Array.isArray(data.runs)){ toast("That does not look like a RunPet save", "bad", "⚠️"); return; }
+  if (!data || !data.species || !Array.isArray(data.runs)){ toast("That does not look like a Runmon save", "bad", "⚠️"); return; }
   save = Object.assign(structuredCloneSafe(DEFAULT_SAVE), data);
   save.settings = Object.assign({}, DEFAULT_SAVE.settings, data.settings || {});
   persist(); renderAll();
@@ -3133,13 +3330,19 @@ function wire(){
 
     const sSet = e.target.closest("[data-sprite-set]");
     if (sSet){ pendingSpriteData = null; openSpriteEditor(sSet.dataset.spriteSet); return; }
-    const sClr = e.target.closest("[data-sprite-clear]");
-    if (sClr){ delete save.sprites[sClr.dataset.spriteClear]; persist(); renderAll(); openSpriteSheetManager(); toast("Sprite removed", "", "🧹"); return; }
+    const sVec = e.target.closest("[data-sprite-vector]");
+    if (sVec){ save.sprites[sVec.dataset.spriteVector] = null; persist(); renderAll(); openSpriteSheetManager(); toast("Using the vector pet", "", "🧹"); return; }
+    const sDef = e.target.closest("[data-sprite-default]");
+    if (sDef){ delete save.sprites[sDef.dataset.spriteDefault]; persist(); renderAll(); openSpriteSheetManager(); toast("Back to the shipped art", "", "↺"); return; }
 
     if (e.target === $("#sheet-wrap")) closeSheet();
   });
 
   $("#fab").addEventListener("click", () => go("track"));
+  if (DEMO){
+    $("#demo-badge").hidden = false;
+    $("#demo-badge").addEventListener("click", openDemoPanel);
+  }
   $("#track-back").addEventListener("click", () => {
     if (tracker.active){
       openSheet({
@@ -3157,6 +3360,9 @@ function wire(){
     if (mapReady && tracker.last) map.panTo([tracker.last.lat, tracker.last.lng]);
   });
   $("#track-banner-x").addEventListener("click", () => banner(null));
+  $("#track-banner").addEventListener("click", e => {
+    if (e.target.closest("#banner-act") && bannerAction) bannerAction.fn();
+  });
   $("#btn-start").addEventListener("click", startRun);
 
   $("#sum-close").addEventListener("click", e => go(e.currentTarget.dataset.back || "home"));
@@ -3246,7 +3452,10 @@ function wire(){
       actions:[
         { label:"Cancel", cls:"ghost", fn: closeSheet },
         { label:"Erase everything", cls:"danger", fn: () => {
-            try { localStorage.removeItem(SAVE_KEY); } catch(e){}
+            try {
+              localStorage.removeItem(SAVE_KEY);
+              LEGACY_SAVE_KEYS.forEach(k => localStorage.removeItem(k));
+            } catch(e){}
             save = structuredCloneSafe(DEFAULT_SAVE);
             obSpecies = null;
             closeSheet();
@@ -3282,7 +3491,7 @@ function wire(){
 }
 
 /* --- public hooks (console-friendly) ------------------------------------- */
-window.RunPet = {
+window.Runmon = {
   get state(){ return { save, derived }; },
   setSprite(species, stage, cfg){
     if (!SPECIES[species]) throw new Error("Unknown species: " + species);
@@ -3295,8 +3504,11 @@ window.RunPet = {
     persist(); renderAll();
     return save.sprites[spriteKey(species, stage)];
   },
-  clearSprite(species, stage){
-    delete save.sprites[spriteKey(species, stage)];
+  /** Drop a custom sheet. Pass useVector:true to also switch off shipped art. */
+  clearSprite(species, stage, useVector){
+    const key = spriteKey(species, stage);
+    if (useVector && DEFAULT_SPRITES[key]) save.sprites[key] = null;
+    else delete save.sprites[key];
     persist(); renderAll();
   },
   listSprites(){ return structuredCloneSafe(save.sprites); },
@@ -3323,6 +3535,9 @@ window.RunPet = {
     return rows;
   }
 };
+/* The app used to be called RunPet. Console snippets and notes written against
+   the old name keep working. */
+window.RunPet = window.Runmon;
 
 /* --- boot ---------------------------------------------------------------- */
 function boot(){

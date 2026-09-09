@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0c13">
+<meta name="robots" content="noindex">
+<title>Runmon — pixel art demo</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230a0c13'/%3E%3Cpath d='M50 20 C64 38 64 52 50 62 C36 52 36 38 50 20 Z' fill='%23ff6b35'/%3E%3Cpath d='M50 34 C57 44 57 52 50 58 C43 52 43 44 50 34 Z' fill='%23ffd23f'/%3E%3C/svg%3E">
+<style>
+  *,*::before,*::after{box-sizing:border-box}
+  body{
+    margin:0;min-height:100svh;display:grid;place-items:center;padding:28px 20px;
+    background:radial-gradient(120% 70% at 50% -10%, rgba(255,107,53,.20), transparent 62%), #0a0c13;
+    color:#eef1f8;font-family:"Nunito",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-weight:600;
+    -webkit-font-smoothing:antialiased;
+  }
+  .card{max-width:430px;width:100%;text-align:center}
+  h1{font-family:system-ui,sans-serif;font-size:30px;margin:0 0 4px;letter-spacing:.3px}
+  h1 b{background:linear-gradient(96deg,#ff6b35 8%,#ffd23f 92%);-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:inherit}
+  .kicker{font-size:10.5px;letter-spacing:1.6px;text-transform:uppercase;color:#ff6b35;font-weight:800;margin-bottom:12px}
+  p{color:#8791a8;font-size:14px;line-height:1.65;margin:14px 0 0}
+  .pet{width:230px;max-width:70vw;margin:22px auto 4px;image-rendering:pixelated;display:block;
+       filter:drop-shadow(0 12px 34px rgba(255,107,53,.34))}
+  .go{
+    display:block;margin:26px 0 0;padding:16px 20px;border-radius:16px;text-decoration:none;
+    background:linear-gradient(135deg,#ff6b35,#ffd23f);color:#220d02;font-weight:800;font-size:16px;
+    box-shadow:0 12px 30px -8px rgba(255,107,53,.75);
+  }
+  .back{display:inline-block;margin-top:18px;color:#8791a8;font-size:12.5px;font-weight:700;text-decoration:none;border-bottom:1px dashed #3a4358}
+  ul{text-align:left;margin:20px 0 0;padding:0;list-style:none}
+  li{color:#98a1b6;font-size:13px;line-height:1.6;padding:9px 0 9px 24px;position:relative;border-top:1px solid #1e2434}
+  li::before{content:"›";position:absolute;left:8px;color:#ff6b35;font-weight:800}
+  .note{font-size:11.5px;color:#6b7488;margin-top:20px;line-height:1.6}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="kicker">Runmon · sandbox build</div>
+    <h1>Pixel art from <b>level 1</b></h1>
+    <img class="pet" src="art/ember-baby.png" alt="The Cinderling, Ember's baby form, in pixel art"
+         style="object-fit:none;object-position:0 0;width:200px;height:126px">
+    <p>The normal game starts you with an egg and hatches the Cinderling at level&nbsp;5. This build skips the egg, so the pixel art is on screen from the first moment.</p>
+    <a class="go" href="index.html?demo=1">Open the demo</a>
+    <ul>
+      <li>Runs on its own save slot — your real pet is never touched</li>
+      <li>Tap the <strong>DEMO</strong> badge for shortcuts: log a run, skip a day, reset</li>
+      <li>“Skip a day” walks the pet down through all six moods</li>
+    </ul>
+    <p class="note">For real GPS you still need this page over HTTPS on a phone.<br>On a desktop, switch on Simulated GPS in Settings.</p>
+    <a class="back" href="index.html">← the real game</a>
+  </div>
+</body>
+</html>
