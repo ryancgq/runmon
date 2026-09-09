@@ -1,3 +1,16 @@
+## RunPet
+
+A single-file mobile running tracker where real runs level up a virtual pet.
+Open **[runpet.html](runpet.html)** (or `/runpet.html` on the published site) on a phone.
+
+- GPS tracking via `navigator.geolocation.watchPosition`, live route on a Leaflet map, distance by Haversine
+- 3 pet species x 5 evolution stages, drawn as animated inline SVG
+- XP, levels, streak bonuses, badges and full run history, all stored in `localStorage`
+- Settings has a **Simulated GPS** switch so you can try the whole flow indoors or on a desktop
+- Pet art can be swapped for your own sprite sheets (Settings -> Sprite packs)
+
+---
+
 ## Welcome to GitHub Pages
 
 You can use the [editor on GitHub](https://github.com/ryancgq/coursera-test/edit/main/README.md) to maintain and preview the content for your website in Markdown files.
