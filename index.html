@@ -3253,9 +3253,10 @@ function openDemoPanel(){
   const d = derived;
   openSheet({
     title:"Demo mode",
-    desc:`The egg stage is skipped here, so the pixel Cinderling is on screen from level 1. This runs on its own save slot — nothing you do in the demo touches a real pet.<br><br>
-      Right now: <b>level ${d.level}</b>, ${d.species.stages[d.stage].name}, mood <b>${d.mood.label.toLowerCase()}</b>${d.gapDays === Infinity ? "" : ` (${d.gapDays === 0 ? "ran today" : d.gapDays + " day" + (d.gapDays === 1 ? "" : "s") + " idle"})`}.
-      ${d.runs.length ? "Skip a day to walk it down through all six moods." : "Log a run first — mood is measured from your last run, so it needs one to move."}`,
+    desc:`The egg stage is skipped here, so a pet with pixel art is on screen from level 1. This runs on its own save slot — nothing you do in the demo touches a real pet.<br><br>
+      You are on <b>${d.species.name}</b> — level ${d.level}, ${d.species.stages[d.stage].name}, mood <b>${d.mood.label.toLowerCase()}</b>${d.gapDays === Infinity ? "" : ` (${d.gapDays === 0 ? "ran today" : d.gapDays + " day" + (d.gapDays === 1 ? "" : "s") + " idle"})`}.<br>
+      Pixel art so far: <b>${SPECIES_ORDER.filter(id => DEFAULT_SPRITES[id + ":1"]).map(id => SPECIES[id].name).join(" and ")}</b>. To see a different one, start over and pick it.
+      ${d.runs.length ? "Skip a day walks the pet down through all six moods." : "Log a run first — mood is measured from your last run, so it needs one to move."}`,
     actions:[
       { label:"Log a 5 km run", cls:"primary", fn: () => {
           closeSheet();
@@ -3274,7 +3275,7 @@ function openDemoPanel(){
           persist(); renderAll(); closeSheet();
           toast(`A day passes — ${derived.mood.label.toLowerCase()}`, "", derived.mood.emoji);
         } },
-      { label:"Reset demo", cls:"danger", fn: () => {
+      { label:"Start over — pick another pet", cls:"danger", fn: () => {
           try { localStorage.removeItem(SAVE_KEY); } catch(e){}
           save = structuredCloneSafe(DEFAULT_SAVE);
           obSpecies = null; closeSheet(); recompute(); showOnboarding();
