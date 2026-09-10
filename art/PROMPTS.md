@@ -107,7 +107,7 @@ Mossy greens, warm bark browns, pale glowing yellow-green light.
 | Form | Subject line | Size in frame |
 | --- | --- | --- |
 | 1 · Seedpod | `SUBJECT: a dormant seed pod wrapped in moss, faint green light leaking from the seams, a single small sprout at its top` | fills ~55% |
-| 2 · Sproutling | `SUBJECT: a soft round forest spirit under an oversized leaf hat, big glowing eyes, tiny leaf-tipped tail, smells of rain` | ~70% |
+| 2 · Bamboo Cub | *done* — `art/panda-cub.png` (a panda cub; the rest of this line is still moss spirits) | ~70% |
 | 3 · Fernkin | `SUBJECT: a young forest spirit with small twig antlers, a moss cloak over its shoulders, glowing eyes, a single fern frond behind one ear` | ~80% |
 | 4 · Thicketmane | `SUBJECT: a forest guardian with broad antlers heavy with leaves, a thick moss mantle, small flowers opening along the antlers, a glowing rune on its chest` | ~90% |
 | 5 · Grovewarden | `SUBJECT: an ancient forest warden, a crown of antlers in blossom, moss robes, a bright green heartlight in its chest, leaves drifting around it` | ~95% |

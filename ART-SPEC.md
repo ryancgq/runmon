@@ -110,10 +110,14 @@ final one, unlocking at levels 1, 5, 15, 30 and 50.
 | # | Ember — fire | Verdant — forest | Nimbus — storm |
 | --- | --- | --- | --- |
 | 1 | Cinder Egg | Seedpod | Static Egg |
-| 2 | **Cinderling** ✅ | Sproutling | Puffling |
+| 2 | **Cinderling** ✅ | **Bamboo Cub** ✅ | Puffling |
 | 3 | Blazewyrm | Fernkin | Zephyrite |
 | 4 | Pyrelord | Thicketmane | Tempestor |
 | 5 | Infernarch | Grovewarden | Thunderarch |
+
+Verdant's baby form is a panda cub, while its other four forms are moss
+spirits. Either supply panda art for the rest of that line, or replace the cub
+later — the species currently reads as two ideas.
 
 Egg forms need far less than twelve frames — a pulse, a wobble, a crack. Four
 frames is plenty; supply what the form needs and say how many.
