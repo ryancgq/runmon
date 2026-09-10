@@ -697,7 +697,8 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
 .sheet-wrap.show .sheet{transform:none}
 .sheet h3{font-size:19px;margin-bottom:6px}
 .sheet .desc{font-size:13px;color:var(--muted);font-weight:600;line-height:1.55;margin:0 0 16px}
-.sheet-btns{display:flex;gap:10px;margin-top:16px}
+.sheet-btns{display:flex;gap:8px;margin-top:16px}
+.sheet-btns .btn{padding:14px 6px;font-size:14px;white-space:nowrap}
 .sheet-btns .btn{flex:1}
 
 .toasts{position:absolute;left:0;right:0;top:calc(10px + var(--safe-t));z-index:90;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;padding:0 16px}
@@ -714,6 +715,21 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
 .toast.bad{border-color:rgba(255,92,122,.4)}
 @keyframes toastIn{from{opacity:0;transform:translateY(-18px) scale(.94)}to{opacity:1;transform:none}}
 @keyframes toastOut{to{opacity:0;transform:translateY(-14px) scale(.96)}}
+
+/* demo-mode form picker */
+.fj-label{font-size:10.5px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin:2px 0 9px}
+.fj-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:4px}
+.fj{
+  background:var(--card);border:1px solid var(--line);border-radius:13px;
+  padding:7px 3px 8px;display:flex;flex-direction:column;align-items:center;gap:2px;
+  transition:.16s var(--ease);
+}
+.fj .pet-holder{width:100%;aspect-ratio:1;height:auto}
+.fj .nm{font-size:8.5px;font-weight:800;color:#c2cadb;line-height:1.15;text-align:center}
+.fj .lv{font-size:8px;font-weight:800;color:var(--muted);letter-spacing:.4px}
+.fj.on{border-color:rgba(var(--glow),.6);background:linear-gradient(180deg,rgba(var(--glow),.15),var(--card))}
+.fj.on .nm{color:var(--accent)}
+.fj:active{transform:scale(.94)}
 
 /* demo-mode badge; sits clear of the FAB and rides with the tab bar */
 .demo-badge{
@@ -1274,6 +1290,18 @@ function streakMultiplier(streakDays){
 /** Full XP for one run. `streakDays` counts the run's own day. */
 function xpForRun(D, streakDays){
   return Math.round(baseXpForDistance(D) * streakMultiplier(streakDays));
+}
+
+/** Distance that would earn `xp`, i.e. the inverse of baseXpForDistance. */
+function kmForXp(xp){
+  if (xp <= 0) return 0;
+  const cap = ENDURANCE_CAP_KM;
+  const atCap = XP_PER_KM * cap + (XP_PER_KM * ENDURANCE_K / 2) * cap * cap;
+  if (xp <= atCap){
+    const a = XP_PER_KM * ENDURANCE_K / 2, b = XP_PER_KM;
+    return (-b + Math.sqrt(b * b + 4 * a * xp)) / (2 * a);
+  }
+  return cap + (xp - atCap) / (XP_PER_KM * (1 + ENDURANCE_K * cap));
 }
 
 /** XP needed to go from `level` to `level+1`. */
@@ -3254,6 +3282,36 @@ function hatch(){
    forms take hundreds of kilometres. These shortcuts exist so the artwork and
    pacing can be judged in a couple of minutes.
    ------------------------------------------------------------------------- */
+/* Rebuild the run log so the pet lands exactly on a chosen form. Runs are
+   plausible 10 km outings on consecutive days rather than one absurd 900 km
+   one, so the stats screens stay readable. */
+function demoJumpToForm(stageIdx){
+  const target = xpAtLevel(EVO_LEVELS[stageIdx]);
+  const kms = [];
+  let total = 0;
+  while (total < target && kms.length < 400){
+    const short = target - total;
+    const km = Math.min(10, Math.max(0.1, kmForXp(short)));
+    kms.push(km);
+    total += Math.round(baseXpForDistance(km));
+  }
+  const today = Date.now();
+  save.runs = kms.map((km, i) => {
+    const t = today - (kms.length - 1 - i) * 86400000;
+    const sec = Math.round(km * 6 * 60);
+    return {
+      id: "d" + t.toString(36) + i, t, km, sec,
+      kcal: calories(km, sec, save.settings.weightKg),
+      xp: Math.round(baseXpForDistance(km)),
+      xpFlat: Math.round(flatXp(km)), xpEndurance: Math.round(enduranceXp(km)),
+      xpStreakBonus: 0, streak: i + 1, sim: true, path: []
+    };
+  });
+  save.badges = {};
+  persist(); renderAll(); closeSheet();
+  toast(`Now a ${derived.species.stages[derived.stage].name}`, "good", "🧬");
+}
+
 function openDemoPanel(){
   const d = derived;
   openSheet({
@@ -3261,9 +3319,16 @@ function openDemoPanel(){
     desc:`The egg stage is skipped here, so a pet with pixel art is on screen from level 1. This runs on its own save slot — nothing you do in the demo touches a real pet.<br><br>
       You are on <b>${d.species.name}</b> — level ${d.level}, ${d.species.stages[d.stage].name}, mood <b>${d.mood.label.toLowerCase()}</b>${d.gapDays === Infinity ? "" : ` (${d.gapDays === 0 ? "ran today" : d.gapDays + " day" + (d.gapDays === 1 ? "" : "s") + " idle"})`}.<br>
       Pixel art so far: <b>${SPECIES_ORDER.filter(id => DEFAULT_SPRITES[id + ":1"]).map(id => SPECIES[id].name).join(" and ")}</b>. To see a different one, start over and pick it.
-      ${d.runs.length ? "Skip a day walks the pet down through all six moods." : "Log a run first — mood is measured from your last run, so it needs one to move."}`,
+      <br>${d.runs.length ? "<b>Skip a day</b> walks the pet down through all six moods." : "<b>Log a run</b> first — mood is measured from your last run, so it needs one to move."}`,
+    body: `<div class="fj-label">Jump to any form</div>
+      <div class="fj-grid">${d.species.stages.map((st, i) => `
+        <button class="fj ${i === d.stage ? "on" : ""}" data-form="${i}">
+          <div class="pet-holder tiny" data-fj="${i}"></div>
+          <div class="nm">${st.name}</div>
+          <div class="lv">Lv ${EVO_LEVELS[i]}</div>
+        </button>`).join("")}</div>`,
     actions:[
-      { label:"Log a 5 km run", cls:"primary", fn: () => {
+      { label:"Log a run", cls:"primary", fn: () => {
           closeSheet();
           Runmon.addRun(5, 28, 0);
           const r = save.runs[save.runs.length - 1];
@@ -3280,12 +3345,15 @@ function openDemoPanel(){
           persist(); renderAll(); closeSheet();
           toast(`A day passes — ${derived.mood.label.toLowerCase()}`, "", derived.mood.emoji);
         } },
-      { label:"Start over — pick another pet", cls:"danger", fn: () => {
+      { label:"Start over", cls:"danger", fn: () => {
           try { localStorage.removeItem(SAVE_KEY); } catch(e){}
           save = structuredCloneSafe(DEFAULT_SAVE);
           obSpecies = null; closeSheet(); recompute(); showOnboarding();
         } }
-    ]
+    ],
+    onOpen: root => {
+      $$("[data-fj]", root).forEach(el => paintPet(el, d.species.id, +el.dataset.fj, d.mood.key));
+    }
   });
 }
 
@@ -3358,6 +3426,10 @@ function wire(){
   });
 
   $("#fab").addEventListener("click", () => go("track"));
+  document.addEventListener("click", e => {
+    const fj = e.target.closest("[data-form]");
+    if (fj) demoJumpToForm(+fj.dataset.form);
+  });
   if (DEMO){
     $("#demo-badge").hidden = false;
     $("#demo-badge").addEventListener("click", openDemoPanel);

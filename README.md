@@ -23,9 +23,10 @@ The same app with the egg stage skipped, so any pet that has pixel art is on
 screen from level 1 instead of level 5. It runs on its own save slot
 (`runmon.demo.v1`), so nothing you do there touches a real pet.
 
-Tap the **DEMO** badge above the tab bar for shortcuts: log a 5 km run, skip a
-day (which walks the pet down through all six moods), or start over and pick a
-different pet.
+Tap the **DEMO** badge above the tab bar. It shows all five forms of the pet
+you are on — **tap any of them to jump straight there**, no running required.
+Below that: log a run, skip a day (which walks the pet down through all six
+moods), or start over and pick a different pet.
 
 Pets with pixel art so far are **Ember** and **Verdant** — pick one of those to
 see it at level 1. Nimbus still starts as an egg.
