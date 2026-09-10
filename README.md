@@ -9,9 +9,9 @@ build step, no server, no account. Open it and it works.
 
 ### ▶ [**Play it**](https://ryancgq.github.io/runmon/) &nbsp;·&nbsp; 🎮 [**Open the demo**](https://ryancgq.github.io/runmon/demo.html)
 
-*Play it* is the real game — you start with an egg. *The demo* skips the egg so
-the pixel art is on screen from level 1, and has shortcuts for logging runs and
-changing the pet's mood.
+*Play it* is the real game. *The demo* is a sandbox — jump to any of a pet's
+five forms in one tap, change its mood, and log runs instantly, on a save slot
+of its own.
 
 ---
 
@@ -19,17 +19,17 @@ changing the pet's mood.
 
 **→ https://ryancgq.github.io/runmon/demo.html**
 
-The same app with the egg stage skipped, so any pet that has pixel art is on
-screen from level 1 instead of level 5. It runs on its own save slot
-(`runmon.demo.v1`), so nothing you do there touches a real pet.
+The same app, with shortcuts for looking at artwork and pacing without running
+for it. It uses its own save slot (`runmon.demo.v1`), so nothing you do there
+touches a real pet.
 
 Tap the **DEMO** badge above the tab bar. It shows all five forms of the pet
 you are on — **tap any of them to jump straight there**, no running required.
 Below that: log a run, skip a day (which walks the pet down through all six
 moods), or start over and pick a different pet.
 
-Pets with pixel art so far are **Ember** and **Verdant** — pick one of those to
-see it at level 1. Nimbus still starts as an egg.
+Pets with pixel art so far are **Ember** (baby and teen) and **Verdant** (baby).
+Everything else is still placeholder vector art.
 
 Under the hood the demo is `index.html?demo=1` — the same file, one flag, no
 second copy to keep in sync. [`demo.html`](demo.html) is just a small launcher.

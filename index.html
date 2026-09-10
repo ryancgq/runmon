@@ -1055,7 +1055,7 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
   </button>
 
   <button class="demo-badge" id="demo-badge" hidden>
-    <span class="dot"></span> DEMO · egg skipped
+    <span class="dot"></span> DEMO · sandbox
   </button>
 
   <!-- ===================== ONBOARDING ===================== -->
@@ -2131,22 +2131,6 @@ const DEFAULT_SPRITES = {
     frames:12, rows:1, fps:2, aspect:1.157, scale:1.0
   }
 };
-/* The question this demo exists to answer: what does it feel like if the pixel
-   pet is there from level 1 and the egg stage is skipped entirely? */
-if (DEMO){
-  // Any species whose baby form has pixel art skips its egg, so picking it in
-  // the demo puts that art on screen at level 1. Covers new sheets for free.
-  for (const id of SPECIES_ORDER){
-    const baby = DEFAULT_SPRITES[id + ":1"];
-    if (!baby) continue;
-    DEFAULT_SPRITES[id + ":0"] = Object.assign({}, baby);
-    SPECIES[id].stages[0] = {
-      name: SPECIES[id].stages[1].name,
-      desc: "Hatched from the off. This demo skips the egg so the pixel art is there from level 1."
-    };
-  }
-}
-
 function spriteConfig(species, stage){
   const key = spriteKey(species, stage);
   const own = save.sprites[key];
@@ -3232,9 +3216,8 @@ function showOnboarding(){
   $("#fab").classList.add("hidden");
   const hero = DEMO ? "ember" : SPECIES_ORDER[(Math.random() * 3) | 0];
   if (DEMO){
-    $("#ob-hero").classList.remove("egg-crack");
     $(".ob-logo p", $("#ob-1")).innerHTML =
-      "Demo build — the egg stage is skipped, so any pet with pixel art is on<br>screen from level 1. Its own save slot; your real pet is untouched.";
+      "Sandbox build — jump to any form, change the pet's mood, log runs<br>instantly. Its own save slot; your real pet is untouched.";
   }
   applyTheme(hero);
   paintPet($("#ob-hero"), hero, 0, "okay");
@@ -3316,7 +3299,7 @@ function openDemoPanel(){
   const d = derived;
   openSheet({
     title:"Demo mode",
-    desc:`The egg stage is skipped here, so a pet with pixel art is on screen from level 1. This runs on its own save slot — nothing you do in the demo touches a real pet.<br><br>
+    desc:`A sandbox for looking at artwork and pacing without running for it. Its own save slot — nothing you do here touches a real pet.<br><br>
       You are on <b>${d.species.name}</b> — level ${d.level}, ${d.species.stages[d.stage].name}, mood <b>${d.mood.label.toLowerCase()}</b>${d.gapDays === Infinity ? "" : ` (${d.gapDays === 0 ? "ran today" : d.gapDays + " day" + (d.gapDays === 1 ? "" : "s") + " idle"})`}.<br>
       Pixel art so far: <b>${SPECIES_ORDER.filter(id => DEFAULT_SPRITES[id + ":1"]).map(id => SPECIES[id].name).join(" and ")}</b>. To see a different one, start over and pick it.
       <br>${d.runs.length ? "<b>Skip a day</b> walks the pet down through all six moods." : "<b>Log a run</b> first — mood is measured from your last run, so it needs one to move."}`,
