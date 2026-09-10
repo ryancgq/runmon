@@ -2101,11 +2101,17 @@ const DEFAULT_SPRITES = {
 /* The question this demo exists to answer: what does it feel like if the pixel
    pet is there from level 1 and the egg stage is skipped entirely? */
 if (DEMO){
-  DEFAULT_SPRITES["ember:0"] = Object.assign({}, DEFAULT_SPRITES["ember:1"]);
-  SPECIES.ember.stages[0] = {
-    name: "Cinderling",
-    desc: "Hatched from the off. This demo skips the egg so the pixel art is there from level 1."
-  };
+  // Any species whose baby form has pixel art skips its egg, so picking it in
+  // the demo puts that art on screen at level 1. Covers new sheets for free.
+  for (const id of SPECIES_ORDER){
+    const baby = DEFAULT_SPRITES[id + ":1"];
+    if (!baby) continue;
+    DEFAULT_SPRITES[id + ":0"] = Object.assign({}, baby);
+    SPECIES[id].stages[0] = {
+      name: SPECIES[id].stages[1].name,
+      desc: "Hatched from the off. This demo skips the egg so the pixel art is there from level 1."
+    };
+  }
 }
 
 function spriteConfig(species, stage){
@@ -3195,7 +3201,7 @@ function showOnboarding(){
   if (DEMO){
     $("#ob-hero").classList.remove("egg-crack");
     $(".ob-logo p", $("#ob-1")).innerHTML =
-      "Demo build — the egg stage is skipped, so Ember's pixel art is on screen<br>from level 1. Its own save slot; your real pet is untouched.";
+      "Demo build — the egg stage is skipped, so any pet with pixel art is on<br>screen from level 1. Its own save slot; your real pet is untouched.";
   }
   applyTheme(hero);
   paintPet($("#ob-hero"), hero, 0, "okay");
