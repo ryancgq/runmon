@@ -71,14 +71,41 @@ Your choice sets the app's accent colour. The pet's expression and idle
 animation follow how recently you ran: elated the day you run, happy the day
 after, restless at two days, sad at three, and asleep from five.
 
-The Cinderling (Ember, stage 2) ships as pixel art in
-[`art/ember-cinderling.png`](art/ember-cinderling.png) — a single 12-frame loop
-at 2 fps. The rest are inline SVG. Both are placeholders — see below.
+The Cinderling and the Blazewyrm (Ember, stages 2 and 3) ship as pixel art in
+[`art/ember-cinderling.png`](art/ember-cinderling.png) and
+[`art/ember-blazewyrm.png`](art/ember-blazewyrm.png) — 12-frame loops at 2 fps
+— and the Bamboo Cub (Verdant, stage 2) in
+[`art/panda-cub.png`](art/panda-cub.png). The rest are inline SVG.
 
 Note that this pet plays one continuous loop rather than a per-mood animation,
 so its face cycles through every expression regardless of how recently you ran.
 The engine still supports mood rows (`moods` below); this sheet just does not
 use them.
+
+## Skills
+
+A form is not the end of a stage, it is the start of one: a pet keeps learning
+inside the form it grew into. The Blazewyrm (Ember, stage 3) learns all three
+of its moves between level 15, where the form arrives, and level 30, where the
+next one does.
+
+| Skill | Learns at | What it does |
+| --- | --- | --- |
+| 🔥 Fireball | Level 18 | Draws a breath and spits a packed ball of flame |
+| 💥 Flame Stomp | Level 22 | Lands hard enough to throw a ring of fire out around it |
+| 💨 Flying Swoop | Level 26 | A low, fast pass trailing fire |
+
+Learning one is called out on the run summary that earned it. After that the
+move shows up as a chip under the pet — tap a chip, or the pet itself, to play
+it. Evolution lists all three with the level each needs, and tapping a learnt
+one there plays it on the pet screen.
+
+Each is a 16-frame sheet that plays once and hands the stage back to the idle
+loop. The movement is drawn into the frames, so the app never moves the sprite
+itself; every frame is cropped from one rectangle to keep that motion intact.
+`SKILLS` in `index.html` holds the whole definition, sprite geometry included —
+`dx` and `dy` nudge a sheet so its ground line sits exactly where the idle
+pet's does.
 
 ### Adding a new pet
 

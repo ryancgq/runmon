@@ -504,6 +504,38 @@ body::before{
 .evo-reveal .new{filter:drop-shadow(0 0 22px rgba(var(--glow),.9));animation:popIn .8s var(--ease) both}
 @keyframes popIn{0%{transform:scale(.3) rotate(-14deg);opacity:0}62%{transform:scale(1.14) rotate(4deg);opacity:1}100%{transform:scale(1) rotate(0)}}
 
+/* skills */
+.skill-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px}
+.skill-chip{
+  display:inline-flex;align-items:center;gap:7px;padding:8px 13px;border-radius:999px;
+  background:var(--card);border:1px solid var(--line);font-size:12px;font-weight:800;
+  color:#c8d0e2;transition:.16s var(--ease);
+}
+.skill-chip .em{font-size:14px;line-height:1}
+.skill-chip:active{transform:scale(.94)}
+.skill-chip.busy{opacity:.5}
+.skill-chip.on{border-color:rgba(var(--glow),.6);color:var(--accent);background:linear-gradient(180deg,rgba(var(--glow),.16),var(--card))}
+.skill-list{display:flex;flex-direction:column;gap:9px}
+.skill-item{
+  display:flex;align-items:center;gap:13px;padding:13px 14px;background:var(--card);
+  border:1px solid var(--line);border-radius:var(--r-md);transition:.16s var(--ease);
+}
+.skill-item .ico{
+  width:42px;height:42px;flex:0 0 42px;border-radius:13px;display:grid;place-items:center;
+  font-size:20px;background:var(--bg-2);border:1px solid var(--line);
+}
+.skill-item .t{flex:1;min-width:0}
+.skill-item .nm{font-size:14px;font-weight:800}
+.skill-item .rq{font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-top:2px}
+.skill-item .ds{font-size:11.5px;color:var(--muted);font-weight:600;margin-top:5px;line-height:1.45}
+.skill-item.known{border-color:rgba(var(--glow),.4)}
+.skill-item.known .ico{background:linear-gradient(180deg,rgba(var(--glow),.22),var(--bg-2));border-color:rgba(var(--glow),.45)}
+.skill-item.known .rq{color:var(--accent)}
+.skill-item.known:active{transform:scale(.985)}
+.skill-item.locked{opacity:.5}
+.skill-item.locked .ico{filter:grayscale(1)}
+.skill-learn{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px}
+
 /* ============================================================
    Evolution / profile
    ============================================================ */
@@ -761,12 +793,16 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
    step. Do NOT switch this to animating background-position in %: percentage
    background positions resolve against (container - image), so they never land
    on frame boundaries. transform:translateX(-100%) of the strip is exact. */
-.sprite-view{position:relative;width:100%;aspect-ratio:var(--saspect,1);overflow:hidden;transform:scale(var(--sscale,1))}
+.sprite-view{position:relative;width:100%;aspect-ratio:var(--saspect,1);overflow:hidden;
+  transform:translate(var(--sdx,0),var(--sdy,0)) scale(var(--sscale,1))}
 .sprite-strip{
   position:absolute;left:0;top:0;height:100%;
   background-repeat:no-repeat;image-rendering:pixelated;
 }
 .sprite-strip.playing{animation:spriteRun steps(var(--frames)) var(--dur) infinite}
+/* a skill is a one-off: hold the last frame rather than snapping back to the
+   first, because the code swaps the idle in a beat later */
+.sprite-strip.playing.once{animation-iteration-count:1;animation-fill-mode:forwards}
 @keyframes spriteRun{from{transform:translateX(0)}to{transform:translateX(-100%)}}
 
 @media (prefers-reduced-motion:reduce){
@@ -806,6 +842,8 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
       <div class="pet-species" id="pet-species-txt">Cinderling · Stage 1</div>
 
       <div class="speech" id="pet-speech">…</div>
+
+      <div class="skill-row" id="home-skills" hidden></div>
 
       <div class="card" style="margin-top:18px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px">
@@ -952,6 +990,9 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
       <div class="section-title">Evolution tree</div>
       <div class="spec-tabs" id="spec-tabs"></div>
       <div class="evo-tree" id="evo-tree"></div>
+
+      <div class="section-title" id="skills-title" hidden>Skills <span class="chip grey" id="skill-count" style="margin-left:auto">0/0</span></div>
+      <div class="skill-list" id="skill-list" hidden></div>
 
       <div class="section-title">Badges <span class="chip grey" id="badge-count" style="margin-left:auto">0/0</span></div>
       <div class="badge-grid" id="badge-grid"></div>
@@ -1174,6 +1215,25 @@ const STREAK_BONUS_STEP = 0.10;  // +10% for a 2-day streak
 const STREAK_BONUS_MAX  = 0.50;  // capped at +50%
 
 const EVO_LEVELS = [1, 5, 15, 30, 50];   // stage index -> level required
+
+/* Moves a pet picks up as it grows. Each one belongs to a single form and is
+   learnt inside that form's own stretch of levels, so evolving is not the end
+   of a stage - it is the start of one. The Blazewyrm holds levels 15-29 and
+   learns all three of its moves there, well before the next form arrives. */
+const SKILLS = {
+  ember: [
+    { id:"fireball", name:"Fireball", ico:"\u{1F525}", stage:2, level:18,
+      blurb:"Draws a breath, then spits a packed ball of flame down the road ahead.",
+      sprite:{ src:"art/skill-fireball.png",     frames:16, fps:12.5, aspect:1.270, scale:1.98, dx:12, dy:-36 } },
+    { id:"flame-stomp", name:"Flame Stomp", ico:"\u{1F4A5}", stage:2, level:22,
+      blurb:"Rears up and lands hard enough to throw a ring of fire out around it.",
+      sprite:{ src:"art/skill-flame-stomp.png",  frames:16, fps:12.5, aspect:1.270, scale:1.98, dx:13, dy:-25 } },
+    { id:"flying-swoop", name:"Flying Swoop", ico:"\u{1F4A8}", stage:2, level:26,
+      blurb:"Those wings finally earn their keep: a low, fast pass trailing fire.",
+      sprite:{ src:"art/skill-flying-swoop.png", frames:16, fps:14.3, aspect:1.270, scale:1.80, dx:1, dy:-27 } }
+  ]
+};
+function skillsFor(speciesId){ return SKILLS[speciesId] || []; }
 
 /* GPS sanity filters */
 /* How much faster than real time a simulated run's clock may be wound. The
@@ -1484,6 +1544,7 @@ function recompute(){
     stage, lastRunTs, gapDays,
     mood: moodFor(gapDays, runs.length),
     species: save.species ? SPECIES[save.species] : SPECIES.ember,
+    skills: skillsFor(save.species).map(sk => ({ ...sk, known: lv.level >= sk.level })),
     days: new Set(days)
   };
 
@@ -2176,7 +2237,7 @@ function spriteMarkup(species, stage, mood){
   return spriteHTML(cfg, mood);
 }
 
-function spriteHTML(cfg, mood){
+function spriteHTML(cfg, mood, once){
   const frames = Math.max(1, cfg.frames || 1);
   const rows   = cfg.rows || (cfg.moods ? Math.max(...Object.values(cfg.moods)) + 1 : 1);
   const row    = (cfg.moods && cfg.moods[mood] != null) ? cfg.moods[mood] : 0;
@@ -2186,8 +2247,8 @@ function spriteHTML(cfg, mood){
   const posY   = rows > 1 ? (row / (rows - 1)) * 100 : 0;
   const dur    = (frames / fps).toFixed(3) + "s";
   const esc    = assetURL(String(cfg.src)).replace(/'/g, "%27").replace(/"/g, "%22");
-  return `<div class="sprite-view" style="--sscale:${cfg.scale || 1};--saspect:${cfg.aspect || 1}">
-    <div class="sprite-strip playing" style="
+  return `<div class="sprite-view" style="--sscale:${cfg.scale || 1};--saspect:${cfg.aspect || 1};--sdx:${cfg.dx ? cfg.dx + "%" : "0"};--sdy:${cfg.dy ? cfg.dy + "%" : "0"}">
+    <div class="sprite-strip playing${once ? " once" : ""}" style="
       width:${frames * 100}%;
       background-image:url('${esc}');
       background-size:100% ${rows * 100}%;
@@ -2332,11 +2393,45 @@ function drawRoute(canvas, path, opts){
   return true;
 }
 
+/* --- skills -------------------------------------------------------------- */
+/* A skill takes over the pet stage for one pass and then hands it back. The
+   art carries its own movement, so nothing here animates the pet - it just
+   swaps the sheet in, waits out the clip, and re-renders. */
+let skillTimer = null, skillPlaying = null, skillCycle = -1;
+function playSkill(id){
+  const sk = derived.skills.find(k => k.id === id && k.known);
+  if (!sk || skillPlaying) return;
+  const holder = $("#home-pet");
+  if (!holder) return;
+  if (spriteBroken[sk.sprite.src]){ toast(`${sk.name} artwork is missing`, "warn", "\u26A0\uFE0F"); return; }
+  probeSprite(sk.sprite.src);
+  skillPlaying = id;
+  holder.innerHTML = spriteHTML(sk.sprite, "okay", true);
+  renderSkillChips();
+  clearTimeout(skillTimer);
+  skillTimer = setTimeout(() => {
+    skillPlaying = null;
+    if (currentScreen === "home") renderHome(); else renderSkillChips();
+  }, (sk.sprite.frames / sk.sprite.fps) * 1000 + 120);
+}
+function renderSkillChips(){
+  const row = $("#home-skills");
+  const known = derived.skills.filter(k => k.known);
+  // fetch the sheets as soon as the pet knows the move, so the first tap plays
+  // straight away instead of waiting on a download
+  known.forEach(k => probeSprite(k.sprite.src));
+  row.hidden = !known.length;
+  row.innerHTML = known.map(k =>
+    `<button class="skill-chip ${skillPlaying === k.id ? "on" : ""} ${skillPlaying && skillPlaying !== k.id ? "busy" : ""}" data-skill="${k.id}">
+       <span class="em">${k.ico}</span>${k.name}</button>`).join("");
+}
+
 /* --- home ---------------------------------------------------------------- */
 function renderHome(){
   const d = derived, sp = d.species;
-  paintPet($("#home-pet"), sp.id, d.stage, d.mood.key);
+  if (!skillPlaying) paintPet($("#home-pet"), sp.id, d.stage, d.mood.key);
   $("#pet-stage").classList.toggle("has-sprite", !!$("#home-pet .sprite-view"));
+  renderSkillChips();
   $("#pet-name-txt").textContent = save.petName || sp.name;
   $("#pet-species-txt").textContent = `${sp.stages[d.stage].name} · Stage ${d.stage + 1} of 5`;
   $("#pet-speech").innerHTML = speechFor();
@@ -2490,6 +2585,25 @@ function renderEvolve(){
     const [s, k] = el.dataset.evo.split(":");
     paintPet(el, s, +k, (evoTab === save.species && derived.stage === +k) ? derived.mood.key : "okay");
   });
+
+  // skills belong to the pet you actually have, so they follow the species tab
+  const list = mine ? d.skills : skillsFor(evoTab).map(sk => ({ ...sk, known:false }));
+  const show = list.length > 0;
+  $("#skills-title").hidden = !show;
+  $("#skill-list").hidden = !show;
+  if (show){
+    const known = list.filter(k => k.known).length;
+    $("#skill-count").textContent = `${known}/${list.length}`;
+    $("#skill-list").innerHTML = list.map(k => `
+      <div class="skill-item ${k.known ? "known" : "locked"}" ${k.known ? `data-skill-go="${k.id}"` : ""}>
+        <div class="ico">${k.known ? k.ico : "\u{1F512}"}</div>
+        <div class="t">
+          <div class="nm">${k.name}</div>
+          <div class="rq">${k.known ? "Learnt \u00b7 tap to use" : `Learns at level ${k.level}`}</div>
+          <div class="ds">${k.blurb}</div>
+        </div>
+      </div>`).join("");
+  }
 
   const got = Object.keys(save.badges).length;
   $("#badge-count").textContent = `${got}/${BADGES.length}`;
@@ -3062,10 +3176,15 @@ function showSummary(run, opts){
   if (ctx.afterLevel > ctx.beforeLevel){
     const evolved = ctx.afterStage > ctx.beforeStage;
     const sp = SPECIES[save.species];
+    const learnt = skillsFor(save.species)
+      .filter(k => k.level > ctx.beforeLevel && k.level <= ctx.afterLevel);
     lu.classList.remove("hide");
     lu.innerHTML = `<div class="levelup"><div class="burst"></div>
       <h3>${evolved ? "Evolution!" : "Level up!"}</h3>
       <p>${save.petName || sp.name} reached <b>level ${ctx.afterLevel}</b>${evolved ? ` and became a <b>${sp.stages[ctx.afterStage].name}</b>` : ""}.</p>
+      ${learnt.length ? `<div class="skill-learn">${learnt.map(k =>
+          `<span class="skill-chip on"><span class="em">${k.ico}</span>${k.name}</span>`).join("")}</div>
+        <p style="margin-top:10px">Learnt ${learnt.length > 1 ? "new moves" : "a new move"} \u2014 try ${learnt.length > 1 ? "them" : "it"} on your pet.</p>` : ""}
       ${evolved ? `<div class="evo-reveal">
           <div class="pet-holder mood-happy" id="evo-old"></div>
           <div class="arrow"><svg viewBox="0 0 24 24" style="width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></div>
@@ -3328,7 +3447,11 @@ function hatch(){
    plausible 10 km outings on consecutive days rather than one absurd 900 km
    one, so the stats screens stay readable. */
 function demoJumpToForm(stageIdx){
-  const target = xpAtLevel(EVO_LEVELS[stageIdx]);
+  demoJumpToLevel(EVO_LEVELS[stageIdx], () =>
+    toast(`Now a ${derived.species.stages[derived.stage].name}`, "good", "\u{1F9EC}"));
+}
+function demoJumpToLevel(level, done){
+  const target = xpAtLevel(level);
   const kms = [];
   let total = 0;
   while (total < target && kms.length < 400){
@@ -3350,10 +3473,11 @@ function demoJumpToForm(stageIdx){
     };
   });
   save.badges = {};
-  persist(); renderAll(); closeSheet();
-  toast(`Now a ${derived.species.stages[derived.stage].name}`, "good", "🧬");
+  persist(); recompute(); renderAll(); closeSheet();
+  if (done) done();
 }
 
+function nextSkill(d){ return d.skills.find(k => !k.known) || null; }
 function openDemoPanel(){
   const d = derived;
   openSheet({
@@ -3375,6 +3499,11 @@ function openDemoPanel(){
           Runmon.addRun(5, 28, 0);
           const r = save.runs[save.runs.length - 1];
           showSummary(r, { celebrate:true });
+        } },
+      { label: nextSkill(d) ? `Learn ${nextSkill(d).name}` : "All skills learnt", cls:"ghost", fn: () => {
+          const nx = nextSkill(derived);
+          if (!nx){ toast("Every skill for this form is already learnt", "", "\u2728"); return; }
+          demoJumpToLevel(nx.level, () => toast(`Learnt ${nx.name}`, "good", nx.ico));
         } },
       { label:"Skip a day", cls:"ghost", fn: () => {
           if (!save.runs.length){
@@ -3471,6 +3600,17 @@ function wire(){
   document.addEventListener("click", e => {
     const fj = e.target.closest("[data-form]");
     if (fj) demoJumpToForm(+fj.dataset.form);
+    const chip = e.target.closest("[data-skill]");
+    if (chip) playSkill(chip.dataset.skill);
+    const go2 = e.target.closest("[data-skill-go]");
+    if (go2){ go("home"); playSkill(go2.dataset.skillGo); }
+  });
+  // the pet itself is the most obvious thing to poke
+  $("#pet-stage").addEventListener("click", () => {
+    const known = derived.skills.filter(k => k.known);
+    if (!known.length || skillPlaying) return;
+    skillCycle = (skillCycle + 1) % known.length;
+    playSkill(known[skillCycle].id);
   });
   if (DEMO){
     $("#demo-badge").hidden = false;
