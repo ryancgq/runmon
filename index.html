@@ -2123,7 +2123,7 @@ const DEFAULT_SPRITES = {
   "ember:2": {
     src:"art/ember-blazewyrm.png",
     // 12-frame loop; frame 6 is a hop, its shadow keeping the ground line
-    frames:12, rows:1, fps:2, aspect:1.26, scale:1.2
+    frames:12, rows:1, fps:2, aspect:1.268, scale:1.2
   },
   "verdant:1": {
     src:"art/panda-cub.png",
@@ -2137,6 +2137,15 @@ function spriteConfig(species, stage){
   return own !== undefined ? own : (DEFAULT_SPRITES[key] || null);
 }
 
+/* Bundled sheets keep their filename when the art changes, so a browser that
+   already has one will happily go on showing the old drawing. Bump this and
+   every cache along the way fetches the new file. Only the sheets that ship
+   with the app are stamped; a sheet you point at yourself is used verbatim. */
+const ART_VERSION = "3";
+function assetURL(src){
+  return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
+}
+
 /* If a sheet cannot be fetched (offline, moved, typo) fall back to the vector
    pet rather than showing an empty box. */
 const spriteBroken = Object.create(null);
@@ -2145,7 +2154,7 @@ function probeSprite(src){
   spriteBroken[src] = false;
   const img = new Image();
   img.onerror = () => { spriteBroken[src] = true; if (save.species) renderAll(); };
-  img.src = src;
+  img.src = assetURL(src);
 }
 
 function spriteMarkup(species, stage, mood){
@@ -2165,7 +2174,7 @@ function spriteHTML(cfg, mood){
   // is exactly what makes k/(rows-1) the right figure for picking row k
   const posY   = rows > 1 ? (row / (rows - 1)) * 100 : 0;
   const dur    = (frames / fps).toFixed(3) + "s";
-  const esc    = String(cfg.src).replace(/'/g, "%27").replace(/"/g, "%22");
+  const esc    = assetURL(String(cfg.src)).replace(/'/g, "%27").replace(/"/g, "%22");
   return `<div class="sprite-view" style="--sscale:${cfg.scale || 1};--saspect:${cfg.aspect || 1}">
     <div class="sprite-strip playing" style="
       width:${frames * 100}%;
