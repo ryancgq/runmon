@@ -443,9 +443,6 @@ body::before{
 .ctl svg{width:20px;height:20px;fill:currentColor}
 .ctl.go{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:var(--accent-ink);border-color:transparent;box-shadow:0 10px 26px -8px rgba(var(--glow),.8)}
 .ctl.stop{background:rgba(255,92,122,.13);color:#ff8098;border-color:rgba(255,92,122,.35)}
-.hold-hint{font-size:10px;color:var(--muted);text-align:center;margin-top:9px;font-weight:700;letter-spacing:.4px}
-.ctl.stop{position:relative;overflow:hidden}
-.ctl.stop .holdfill{position:absolute;inset:0;background:rgba(255,92,122,.3);width:0;transition:width .05s linear}
 
 .banner{
   position:relative;z-index:10;margin:0 14px 10px;
@@ -883,7 +880,6 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
               <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg> Start run
             </button>
           </div>
-          <div class="hold-hint hide" id="hold-hint">Hold the stop button to finish</div>
         </div>
       </div>
     </section>
@@ -2554,7 +2550,7 @@ const tracker = {
   distanceM:0,
   startedAt:0, elapsedMs:0, resumedAt:0,
   accuracy:null, lastFixAt:0,
-  sim:false, simHeading:0, simPos:null, simClock:0, warp:1,
+  sim:false, simHeading:0, simPos:null, simClock:0, warp:1, pausedAt:0,
   wakeLock:null
 };
 
@@ -2615,7 +2611,6 @@ function resetTrackUI(){
   $("#run-ctl").className = "run-ctl single";
   $("#run-ctl").innerHTML = `<button class="ctl go" id="btn-start"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg> Start run</button>`;
   $("#btn-start").addEventListener("click", startRun);
-  $("#hold-hint").classList.add("hide");
   setGps("off", "Ready when you are");
 }
 
@@ -2855,14 +2850,19 @@ function pauseRun(){
   if (!tracker.active || tracker.paused) return;
   tracker.paused = true;
   tracker.elapsedMs += (Date.now() - tracker.resumedAt) * tracker.warp;
+  tracker.pausedAt = Date.now();
   renderRunControls();
 }
 function resumeRun(){
   if (!tracker.active || !tracker.paused) return;
   tracker.paused = false;
   tracker.resumedAt = Date.now();
-  tracker.segments.push([]);          // new segment so the line breaks at the pause
-  tracker.last = null;
+  // a real break in a run gets a break in the drawn line; a moment spent
+  // answering a prompt does not, or every finish you back out of scars it
+  if (Date.now() - tracker.pausedAt > 3000){
+    tracker.segments.push([]);
+    tracker.last = null;
+  }
   renderRunControls();
 }
 function abortRun(){
@@ -2881,34 +2881,34 @@ function renderRunControls(){
   if (!tracker.active){ resetTrackUI(); return; }
   ctl.innerHTML = tracker.paused
     ? `<button class="ctl go" id="btn-resume"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg> Resume</button>
-       <button class="ctl stop" id="btn-stop"><span class="holdfill"></span><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> Finish</button>`
+       <button class="ctl stop" id="btn-stop"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> Finish</button>`
     : `<button class="ctl" id="btn-pause"><svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1.4"/><rect x="14" y="5" width="4" height="14" rx="1.4"/></svg> Pause</button>
-       <button class="ctl stop" id="btn-stop"><span class="holdfill"></span><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> Finish</button>`;
-  $("#hold-hint").classList.remove("hide");
+       <button class="ctl stop" id="btn-stop"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> Finish</button>`;
   const pause = $("#btn-pause"), resume = $("#btn-resume");
   if (pause)  pause.addEventListener("click", pauseRun);
   if (resume) resume.addEventListener("click", resumeRun);
-  wireHoldToStop($("#btn-stop"));
+  $("#btn-stop").addEventListener("click", confirmFinish);
 }
 
-/** Finish needs a deliberate press-and-hold so it cannot be hit by accident. */
-function wireHoldToStop(btn){
-  if (!btn) return;
-  const fill = $(".holdfill", btn);
-  let raf = null, t0 = 0;
-  const HOLD = 750;
-  const tick = () => {
-    const p = Math.min(1, (performance.now() - t0) / HOLD);
-    fill.style.width = (p * 100) + "%";
-    if (p >= 1){ cancel(); finishRun(); return; }
-    raf = requestAnimationFrame(tick);
-  };
-  const cancel = () => { if (raf) cancelAnimationFrame(raf); raf = null; fill.style.width = "0%"; };
-  const begin = e => { e.preventDefault(); t0 = performance.now(); raf = requestAnimationFrame(tick); };
-  btn.addEventListener("pointerdown", begin);
-  btn.addEventListener("pointerup", cancel);
-  btn.addEventListener("pointerleave", cancel);
-  btn.addEventListener("pointercancel", cancel);
+/* Finish stops the clock first and asks. A hold would be the safer gesture on
+   paper, but not with sweaty fingers half way through a run - and pausing
+   costs nothing, since backing out just resumes. */
+function confirmFinish(){
+  if (!tracker.active) return;
+  const wasRunning = !tracker.paused;
+  if (wasRunning) pauseRun();
+  let resumeOnClose = wasRunning;
+  const km = tracker.distanceM / 1000, sec = elapsedSec();
+  openSheet({
+    title:"Finish this run?",
+    desc:`<b>${U.distStr(km, 2)} ${U.label}</b> in <b>${fmtDur(sec)}</b> at ${fmtPace(U.paceSec(km, sec))} /${U.label}.<br>
+      The clock is paused while you decide.`,
+    actions:[
+      { label:"Finish run", cls:"primary", fn: () => { resumeOnClose = false; closeSheet(); finishRun(); } },
+      { label: wasRunning ? "Keep running" : "Stay paused", cls:"ghost", fn: closeSheet }
+    ],
+    onClose: () => { if (resumeOnClose && tracker.active && tracker.paused) resumeRun(); }
+  });
 }
 
 /** Trim a route down so a long run does not bloat localStorage. */
@@ -3107,9 +3107,10 @@ function confetti(n){
 }
 
 /* --- bottom sheet -------------------------------------------------------- */
-let sheetActions = [];
+let sheetActions = [], sheetOnClose = null;
 function openSheet(cfg){
   sheetActions = cfg.actions || [];
+  sheetOnClose = cfg.onClose || null;
   $("#sheet").innerHTML = `
     <h3>${cfg.title}</h3>
     ${cfg.desc ? `<p class="desc">${cfg.desc}</p>` : ""}
@@ -3119,7 +3120,13 @@ function openSheet(cfg){
   $("#sheet-wrap").classList.add("show");
   if (cfg.onOpen) cfg.onOpen($("#sheet"));
 }
-function closeSheet(){ $("#sheet-wrap").classList.remove("show"); }
+function closeSheet(){
+  $("#sheet-wrap").classList.remove("show");
+  // runs on every way out, the backdrop included, so nothing can strand a
+  // paused run behind a dismissed prompt
+  const done = sheetOnClose; sheetOnClose = null;
+  if (done) done();
+}
 
 /* --- settings ------------------------------------------------------------ */
 function renderSettings(){
