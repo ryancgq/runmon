@@ -4,14 +4,17 @@ A mobile running tracker where real runs level up a virtual pet. GPS tracks
 your route, distance becomes XP, and XP grows a creature that evolves through
 five forms — and visibly sulks if you stop running.
 
-The entire app is one file: **[`index.html`](index.html)**. No frameworks, no
-build step, no server, no account. Open it and it works.
+The entire app is one file, `index.html`. No frameworks, no build step, no
+server, no account. Open it and it works.
 
-### ▶ [**Play it**](https://ryancgq.github.io/runmon/) &nbsp;·&nbsp; 🎮 [**Open the demo**](https://ryancgq.github.io/runmon/demo.html)
+## ▶ [Play it](https://ryancgq.github.io/runmon/) &nbsp;·&nbsp; 🎮 [Open the sandbox](https://ryancgq.github.io/runmon/demo.html)
 
-*Play it* is the real game. *The demo* is a sandbox — jump to any of a pet's
-five forms in one tap, change its mood, and log runs instantly, on a save slot
-of its own.
+Those two links open the running app. *Play it* is the real game; *the sandbox*
+lets you jump to any of a pet's five forms in one tap, change its mood and log
+runs instantly, on a save slot of its own.
+
+Filenames below in `code style` are files in this repository — browse them in
+the file list above, not by following a link that looks like the app.
 
 ---
 
@@ -32,7 +35,7 @@ Pets with pixel art so far are **Ember** (baby and teen) and **Verdant** (baby).
 Everything else is still placeholder vector art.
 
 Under the hood the demo is `index.html?demo=1` — the same file, one flag, no
-second copy to keep in sync. [`demo.html`](demo.html) is just a small launcher.
+second copy to keep in sync. `demo.html` is just a small launcher page.
 
 ## Trying it out
 
