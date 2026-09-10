@@ -1186,7 +1186,7 @@ const SPECIES = {
     theme:{ accent:"#4ade80", accent2:"#bef264", ink:"#05230f", glow:"74,222,128" },
     stages:[
       { name:"Seedpod",     desc:"A dormant pod wrapped in moss. Faint green light leaks from the seams." },
-      { name:"Sproutling",  desc:"A soft round thing under an oversized leaf hat. Smells like rain." },
+      { name:"Bamboo Cub",  desc:"Round, hungry, and entirely bamboo-motivated. Will drop everything for a fresh stalk." },
       { name:"Fernkin",     desc:"Twig antlers, a moss cloak, and the beginnings of a serious opinion about mornings." },
       { name:"Thicketmane", desc:"Antlers heavy with leaves. Small flowers open when your streak is alive." },
       { name:"Grovewarden", desc:"An entire season walking around in one body. The forest leans towards it." }
@@ -1528,11 +1528,14 @@ function face(o){
   const p = [];
 
   const eyeFill = glow || ink;
-  const shine   = glow ? "#ffffff" : "#ffffff";
+  const shine   = "#ffffff";
+  // a glow without a blurId produced filter="url(#undefined)" — an unresolvable
+  // reference that some engines treat as "do not render", losing the eyes
+  const blurAttr = (glow && o.blurId) ? ` filter="url(#${o.blurId})"` : "";
 
   function eyeOpen(sx){
     return `<g class="p-blink" style="transform-origin:${sx}px 0px">
-      <ellipse cx="${sx}" cy="0" rx="8.4" ry="9.6" fill="${eyeFill}"${glow?` filter="url(#${o.blurId})"`:""}/>
+      <ellipse cx="${sx}" cy="0" rx="8.4" ry="9.6" fill="${eyeFill}"${blurAttr}/>
       <circle cx="${sx + 2.6}" cy="-3.4" r="3.1" fill="${shine}" opacity=".95"/>
       <circle cx="${sx - 2.8}" cy="3.4" r="1.5" fill="${shine}" opacity=".55"/></g>`;
   }
@@ -2088,16 +2091,27 @@ const DEFAULT_SPRITES = {
     src:"art/ember-cinderling.png",
     // one continuous 12-frame loop at the source animation's own 2 fps
     frames:12, rows:1, fps:2, aspect:1.447, scale:1.2
+  },
+  "verdant:1": {
+    src:"art/panda-cub.png",
+    // 12-frame loop: bamboo arrives, cub eats, cub is content
+    frames:12, rows:1, fps:2, aspect:1.157, scale:1.0
   }
 };
 /* The question this demo exists to answer: what does it feel like if the pixel
    pet is there from level 1 and the egg stage is skipped entirely? */
 if (DEMO){
-  DEFAULT_SPRITES["ember:0"] = Object.assign({}, DEFAULT_SPRITES["ember:1"]);
-  SPECIES.ember.stages[0] = {
-    name: "Cinderling",
-    desc: "Hatched from the off. This demo skips the egg so the pixel art is there from level 1."
-  };
+  // Any species whose baby form has pixel art skips its egg, so picking it in
+  // the demo puts that art on screen at level 1. Covers new sheets for free.
+  for (const id of SPECIES_ORDER){
+    const baby = DEFAULT_SPRITES[id + ":1"];
+    if (!baby) continue;
+    DEFAULT_SPRITES[id + ":0"] = Object.assign({}, baby);
+    SPECIES[id].stages[0] = {
+      name: SPECIES[id].stages[1].name,
+      desc: "Hatched from the off. This demo skips the egg so the pixel art is there from level 1."
+    };
+  }
 }
 
 function spriteConfig(species, stage){
@@ -3187,7 +3201,7 @@ function showOnboarding(){
   if (DEMO){
     $("#ob-hero").classList.remove("egg-crack");
     $(".ob-logo p", $("#ob-1")).innerHTML =
-      "Demo build — the egg stage is skipped, so Ember's pixel art is on screen<br>from level 1. Its own save slot; your real pet is untouched.";
+      "Demo build — the egg stage is skipped, so any pet with pixel art is on<br>screen from level 1. Its own save slot; your real pet is untouched.";
   }
   applyTheme(hero);
   paintPet($("#ob-hero"), hero, 0, "okay");
