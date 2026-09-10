@@ -96,7 +96,7 @@ Warm reds and oranges, dark charcoal horns and wings, glowing amber highlights.
 | --- | --- | --- |
 | 1 · Cinder Egg | `SUBJECT: a dark obsidian egg veined with glowing molten cracks, a small flame flickering at its tip, heat radiating from the shell` | fills ~55% of frame height |
 | 2 · Cinderling | *done* — `art/ember-cinderling.png` | ~70% |
-| 3 · Blazewyrm | `SUBJECT: a young fire drake, round body but longer neck, small wings that now work, two curved dark horns, a flame-tipped tail, hot-tempered` | ~80% |
+| 3 · Blazewyrm | *done* — `art/ember-blazewyrm.png` | ~80% |
 | 4 · Pyrelord | `SUBJECT: a full-grown fire drake, broad spread wings, a glowing molten core in its chest, heavy horns, air shimmering with heat around it` | ~90% |
 | 5 · Infernarch | `SUBJECT: a regal fire dragon crowned in living flame, wide wings, blazing chest core, orbiting embers, imperious` | ~95% |
 

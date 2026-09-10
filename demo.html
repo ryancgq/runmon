@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a0c13">
 <meta name="robots" content="noindex">
-<title>Runmon — pixel art demo</title>
+<title>Runmon — sandbox</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230a0c13'/%3E%3Cpath d='M50 20 C64 38 64 52 50 62 C36 52 36 38 50 20 Z' fill='%23ff6b35'/%3E%3Cpath d='M50 34 C57 44 57 52 50 58 C43 52 43 44 50 34 Z' fill='%23ffd23f'/%3E%3C/svg%3E">
 <style>
   *,*::before,*::after{box-sizing:border-box}
@@ -20,8 +20,15 @@
   h1 b{background:linear-gradient(96deg,#ff6b35 8%,#ffd23f 92%);-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:inherit}
   .kicker{font-size:10.5px;letter-spacing:1.6px;text-transform:uppercase;color:#ff6b35;font-weight:800;margin-bottom:12px}
   p{color:#8791a8;font-size:14px;line-height:1.65;margin:14px 0 0}
-  .pet{width:230px;max-width:70vw;margin:22px auto 4px;image-rendering:pixelated;display:block;
-       filter:drop-shadow(0 12px 34px rgba(255,107,53,.34))}
+  .pet{
+    width:191px;height:132px;margin:24px auto 4px;display:block;
+    background-image:url("art/ember-cinderling.png");
+    background-size:2292px 132px;          /* 12 frames of 191px */
+    background-position:-573px 0;          /* frame 4 */
+    background-repeat:no-repeat;
+    image-rendering:pixelated;
+    filter:drop-shadow(0 12px 34px rgba(255,107,53,.34));
+  }
   .go{
     display:block;margin:26px 0 0;padding:16px 20px;border-radius:16px;text-decoration:none;
     background:linear-gradient(135deg,#ff6b35,#ffd23f);color:#220d02;font-weight:800;font-size:16px;
@@ -37,15 +44,15 @@
 <body>
   <div class="card">
     <div class="kicker">Runmon · sandbox build</div>
-    <h1>Pixel art from <b>level 1</b></h1>
-    <img class="pet" src="art/ember-baby.png" alt="The Cinderling, Ember's baby form, in pixel art"
-         style="object-fit:none;object-position:0 0;width:200px;height:126px">
-    <p>The normal game starts you with an egg and hatches the Cinderling at level&nbsp;5. This build skips the egg, so the pixel art is on screen from the first moment.</p>
-    <a class="go" href="index.html?demo=1">Open the demo</a>
+    <h1>Every form, <b>one tap away</b></h1>
+    <div class="pet" role="img" aria-label="The Cinderling, Ember's baby form, in pixel art"></div>
+    <p>The real game earns its five forms over about 1,500&nbsp;km. This build hands them to you straight away, so artwork and pacing can be judged in a minute.</p>
+    <a class="go" href="index.html?demo=1">Open the sandbox</a>
     <ul>
-      <li>Runs on its own save slot — your real pet is never touched</li>
-      <li>Tap the <strong>DEMO</strong> badge for shortcuts: log a run, skip a day, reset</li>
+      <li>Tap the <strong>DEMO</strong> badge, then any of the five forms to jump there</li>
       <li>“Skip a day” walks the pet down through all six moods</li>
+      <li>Runs on its own save slot — your real pet is never touched</li>
+      <li>Everything else behaves exactly like the real game</li>
     </ul>
     <p class="note">For real GPS you still need this page over HTTPS on a phone.<br>On a desktop, switch on Simulated GPS in Settings.</p>
     <a class="back" href="index.html">← the real game</a>

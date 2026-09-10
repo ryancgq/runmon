@@ -4,23 +4,38 @@ A mobile running tracker where real runs level up a virtual pet. GPS tracks
 your route, distance becomes XP, and XP grows a creature that evolves through
 five forms — and visibly sulks if you stop running.
 
-The entire app is one file: **[`index.html`](index.html)**. No frameworks, no
-build step, no server, no account. Open it and it works.
+The entire app is one file, `index.html`. No frameworks, no build step, no
+server, no account. Open it and it works.
 
-**[Play it →](https://ryancgq.github.io/runmon/)**
+## ▶ [Play it](https://ryancgq.github.io/runmon/) &nbsp;·&nbsp; 🎮 [Open the sandbox](https://ryancgq.github.io/runmon/demo.html)
+
+Those two links open the running app. *Play it* is the real game; *the sandbox*
+lets you jump to any of a pet's five forms in one tap, change its mood and log
+runs instantly, on a save slot of its own.
+
+Filenames below in `code style` are files in this repository — browse them in
+the file list above, not by following a link that looks like the app.
 
 ---
 
 ## Demo build
 
-[`demo.html`](demo.html) launches the same app with the egg stage skipped, so
-Ember's pixel art is on screen from level 1 instead of level 5. It runs on its
-own save slot (`runmon.demo.v1`), so nothing you do there touches a real pet.
-A **DEMO** badge sits above the tab bar with shortcuts: log a 5 km run, skip a
-day (which walks the pet down through all six moods), or reset.
+**→ https://ryancgq.github.io/runmon/demo.html**
 
-The demo is `index.html?demo=1` — the same file, one flag, no second copy to
-keep in sync.
+The same app, with shortcuts for looking at artwork and pacing without running
+for it. It uses its own save slot (`runmon.demo.v1`), so nothing you do there
+touches a real pet.
+
+Tap the **DEMO** badge above the tab bar. It shows all five forms of the pet
+you are on — **tap any of them to jump straight there**, no running required.
+Below that: log a run, skip a day (which walks the pet down through all six
+moods), or start over and pick a different pet.
+
+Pets with pixel art so far are **Ember** (baby and teen) and **Verdant** (baby).
+Everything else is still placeholder vector art.
+
+Under the hood the demo is `index.html?demo=1` — the same file, one flag, no
+second copy to keep in sync. `demo.html` is just a small launcher page.
 
 ## Trying it out
 
