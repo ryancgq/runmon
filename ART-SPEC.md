@@ -121,9 +121,17 @@ later — the species currently reads as two ideas.
 
 Egg forms need far less than twelve frames — a pulse, a wobble, a crack. Four
 frames is plenty; supply what the form needs and say how many. The Cinder Egg
-came as twelve anyway, and they barely differ: the speckles shimmer and nothing
-travels. Frames like that are interchangeable, so they were packed in order of
-size rather than as drawn — see the note in `DEFAULT_SPRITES`.
+came as five sheets of twelve: three idles (intact, split, webbed) and the two
+transitions between them, which play as its level-up celebrations. Within an
+idle the frames barely differ — the speckles shimmer, nothing travels — while
+a transition's four rows are four crack states, three shimmer frames each.
+
+If a form ships as several sheets like that, they must agree on size and
+position or every handover jumps. These five did not: each row of each grid is
+drawn 4 to 6% larger than the last. Every frame of every sheet was scaled to
+one silhouette area and anchored to one centre before packing, which costs a
+1.8% resample at worst and leaves the shell inside 1.5 CSS px of one ground
+line across all sixty frames.
 
 Species should stay recognisably themselves across all five forms: same palette
 family, same silhouette language, same eyes. Ember reads as fire, Verdant as
