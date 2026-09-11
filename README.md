@@ -135,6 +135,24 @@ A gold **Level Up!** lands as the burst resolves, rides the settle and lifts
 away — timed off the sheet's own frame list rather than a fixed delay, so it
 still lands on the right beat if those holds are ever retuned.
 
+Every celebration runs to one template, `LEVEL_UP_TIMING`, so a level-up feels
+the same whichever pet you are watching: 1.5s of CSS wind-up, then a held lead,
+650ms or so of gold gathering and quickening, the flash at 810ms into the
+sheet, an easing settle, and **Level Up!** at 1380ms. A sheet does not carry
+those sixteen numbers — it names two frames, `gather` (the first frame with
+something happening in it) and `burst` (the frame the flash breaks on), and
+`levelUpBeats()` stretches each phase across however many frames it was given.
+
+That matters because artists do not pace their sheets alike. The Blazewyrm's
+gold starts gathering on frame 2, the Cinderling's not until frame 4 — it
+scowls, then shuts its eyes, before anything lights up. Timed off one shared
+frame list the Cinderling's build read for 330ms against the Blazewyrm's
+650ms: the same clip length, half the anticipation, and it showed. Under the
+template its lead snaps by at 80ms a frame and its three build frames hold
+214/163/113ms instead of 130/110/90, so the gold gathers for 490ms and the
+flash still breaks at exactly 810ms. Adding a celebration is now two numbers
+rather than a retuning session.
+
 Splitting it that way is deliberate. Motion stretches to any length, frames do
 not: much past 400ms a held frame stops reading as movement and starts reading
 as a stutter. So the length lives in `LEVEL_UP_CHARGE_MS` and the drawing lives
