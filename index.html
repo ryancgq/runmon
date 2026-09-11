@@ -805,9 +805,17 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
   background-repeat:no-repeat;image-rendering:pixelated;
 }
 .sprite-strip.playing{animation:spriteRun steps(var(--frames)) var(--dur) infinite}
-/* a skill is a one-off: hold the last frame rather than snapping back to the
-   first, because the code swaps the idle in a beat later */
-.sprite-strip.playing.once{animation-iteration-count:1;animation-fill-mode:forwards}
+/* A one-off has to finish ON its last frame. Running to translateX(-100%)
+   walks the strip a full frame past the end, so the held state was blank -
+   invisible in a loop, a flicker at the end of every skill. Stop one frame
+   short and take one fewer step, and the end state is the last frame. */
+.sprite-strip.playing.once{
+  animation-name:spriteOnce;
+  animation-timing-function:steps(var(--steps));
+  animation-iteration-count:1;
+  animation-fill-mode:forwards;
+}
+@keyframes spriteOnce{from{transform:translateX(0)}to{transform:translateX(calc(-100% + 100% / var(--frames)))}}
 @keyframes spriteRun{from{transform:translateX(0)}to{transform:translateX(-100%)}}
 
 @media (prefers-reduced-motion:reduce){
@@ -1239,6 +1247,13 @@ const SKILLS = {
   ]
 };
 function skillsFor(speciesId){ return SKILLS[speciesId] || []; }
+
+/* A form's own level-up celebration, keyed by species and stage so it only
+   plays for the form it was drawn for. Missing art simply means no clip. */
+const LEVEL_UP_ART = {
+  "ember:2": { src:"art/levelup-blazewyrm.png", frames:16, fps:9.4, aspect:1, scale:1.86, dx:-4, dy:-35 }
+};
+function levelUpArt(speciesId, stage){ return LEVEL_UP_ART[speciesId + ":" + stage] || null; }
 
 /* GPS sanity filters */
 /* How much faster than real time a simulated run's clock may be wound. The
@@ -2250,7 +2265,9 @@ function spriteHTML(cfg, mood, once){
   // percentage background-position resolves against (container - image), which
   // is exactly what makes k/(rows-1) the right figure for picking row k
   const posY   = rows > 1 ? (row / (rows - 1)) * 100 : 0;
-  const dur    = (frames / fps).toFixed(3) + "s";
+  // a one-off stops on its last frame, so it takes one step fewer
+  const steps  = once ? Math.max(1, frames - 1) : frames;
+  const dur    = (steps / fps).toFixed(3) + "s";
   const esc    = assetURL(String(cfg.src)).replace(/'/g, "%27").replace(/"/g, "%22");
   return `<div class="sprite-view" style="--sscale:${cfg.scale || 1};--saspect:${cfg.aspect || 1};--sdx:${cfg.dx ? cfg.dx + "%" : "0"};--sdy:${cfg.dy ? cfg.dy + "%" : "0"}">
     <div class="sprite-strip playing${once ? " once" : ""}" style="
@@ -2258,7 +2275,7 @@ function spriteHTML(cfg, mood, once){
       background-image:url('${esc}');
       background-size:100% ${rows * 100}%;
       background-position:0 ${posY}%;
-      --frames:${frames}; --dur:${dur};"></div></div>`;
+      --frames:${frames}; --steps:${steps}; --dur:${dur};"></div></div>`;
 }
 
 /** Full pet markup for a species + stage, honouring any registered sprite. */
@@ -2406,21 +2423,44 @@ function drawRoute(canvas, path, opts){
    art carries its own movement, so nothing here animates the pet - it just
    swaps the sheet in, waits out the clip, and re-renders. */
 let skillTimer = null, skillPlaying = null, skillCycle = -1;
-function playSkill(id){
-  const sk = derived.skills.find(k => k.id === id && k.known);
-  if (!sk || skillPlaying) return;
+/** Hand the pet stage to a one-shot sheet, then give it back to the idle. */
+function playClip(cfg, tag){
   const holder = $("#home-pet");
-  if (!holder) return;
-  if (spriteBroken[sk.sprite.src]){ toast(`${sk.name} artwork is missing`, "warn", "\u26A0\uFE0F"); return; }
-  probeSprite(sk.sprite.src);
-  skillPlaying = id;
-  holder.innerHTML = spriteHTML(sk.sprite, "okay", true);
+  if (!holder || skillPlaying || !cfg || spriteBroken[cfg.src]) return false;
+  probeSprite(cfg.src);
+  skillPlaying = tag;
+  holder.innerHTML = spriteHTML(cfg, "okay", true);
   renderSkillChips();
   clearTimeout(skillTimer);
   skillTimer = setTimeout(() => {
     skillPlaying = null;
     if (currentScreen === "home") renderHome(); else renderSkillChips();
-  }, (sk.sprite.frames / sk.sprite.fps) * 1000 + 120);
+  }, (cfg.frames / cfg.fps) * 1000 + 120);
+  return true;
+}
+function playSkill(id){
+  const sk = derived.skills.find(k => k.id === id && k.known);
+  if (!sk) return;
+  if (spriteBroken[sk.sprite.src]){ toast(`${sk.name} artwork is missing`, "warn", "\u26A0\uFE0F"); return; }
+  playClip(sk.sprite, id);
+}
+
+/* A level earned on a run is celebrated on the pet screen, not over the
+   summary - the run's numbers get read first, then you come home to the pet
+   that grew. Set when the run is saved, spent on the next arrival home. */
+let pendingLevelUp = false;
+function playPendingLevelUp(){
+  if (!pendingLevelUp) return;
+  const art = levelUpArt(save.species, derived.stage);
+  if (!art){ pendingLevelUp = false; return; }
+  // let the screen settle first, or the clip starts behind the transition
+  setTimeout(() => {
+    if (!pendingLevelUp || currentScreen !== "home") return;
+    if (playClip(art, "levelup")){
+      pendingLevelUp = false;
+      confetti(46);
+    }
+  }, 260);
 }
 function renderSkillChips(){
   const row = $("#home-skills");
@@ -2654,7 +2694,7 @@ function go(name){
 
   if (name === "history") { renderHistory(); }
   if (name === "evolve")  { renderEvolve(); }
-  if (name === "home")    { renderHome(); }
+  if (name === "home")    { renderHome(); playPendingLevelUp(); }
   if (name === "track")   { onTrackScreenShown(); }
 }
 </script>
@@ -3096,6 +3136,10 @@ function finishRun(){
   recompute();
   persist();
 
+  // arm the celebration for whichever form the pet is now, not the one it was
+  pendingLevelUp = derived.level > levelBefore && !!levelUpArt(save.species, derived.stage);
+  // fetch it while the summary is being read, so it plays the moment you land
+  if (pendingLevelUp) probeSprite(levelUpArt(save.species, derived.stage).src);
   showSummary(run, { levelBefore, stageBefore, celebrate:true });
   tracker.finished = false;
   tracker.segments = []; tracker.distanceM = 0;
@@ -3514,7 +3558,9 @@ function openDemoPanel(){
     actions:[
       { label:"Log a run", cls:"primary", fn: () => {
           closeSheet();
+          const before = derived.level;
           Runmon.addRun(5, 28, 0);
+          pendingLevelUp = derived.level > before && !!levelUpArt(save.species, derived.stage);
           const r = save.runs[save.runs.length - 1];
           showSummary(r, { celebrate:true });
         } },
