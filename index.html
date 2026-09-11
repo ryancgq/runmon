@@ -1305,8 +1305,10 @@ const LEVEL_UP_BEATS = [80,80, 170,150,130,110,90, 90, 90,110,130,150, 170,190,2
 
 const SKILLS = {
   ember: [
-    { id:"fizzle", name:"Fizzle", ico:"\u{1F624}", stage:1, level:8,
-      blurb:"Takes an enormous breath, aims, and produces a cough and a puff of smoke. It is trying.",
+    // the id stays "fizzle" - the Blazewyrm's real one already owns "fireball",
+    // and the whole joke is that this one is named and sold as the same thing
+    { id:"fizzle", name:"fireball", ico:"\u{1F525}", stage:1, level:8,
+      blurb:"The strongest, most powerful breath of fire you will ever see!",
       sprite:{ src:"art/skill-fizzle.png", frames:16, fps:8.1,
         durations:[120,120,120,120,120,120,120,120,150,120,120,150,120,120,120,120],
         aspect:1.3125, scale:1.23, dx:-5, dy:-6 } },

@@ -98,7 +98,7 @@ level 30, where the next one does.
 
 | Skill | Form | Learns at | What it does |
 | --- | --- | --- | --- |
-| 😤 Fizzle | Cinderling | Level 8 | Huge breath, careful aim, a cough and some smoke |
+| 🔥 fireball | Cinderling | Level 8 | Sold as the strongest fire you will ever see. It is a cough and some smoke. |
 | 🔥 Fireball | Blazewyrm | Level 18 | Draws a breath and spits a packed ball of flame |
 | 💥 Flame Stomp | Blazewyrm | Level 22 | Lands hard enough to throw a ring of fire out around it |
 | ☄️ Flying Swoop | Blazewyrm | Level 26 | A low, fast pass trailing fire |
