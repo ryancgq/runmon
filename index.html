@@ -224,13 +224,19 @@ body::before{
 @keyframes halo{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.09);opacity:1}}
 .pet-stage.has-sprite .pet-shadow{opacity:0}
 .pet-shadow{
-  position:absolute;bottom:34px;width:98px;height:14px;border-radius:50%;
+  position:absolute;bottom:46px;width:83px;height:12px;border-radius:50%;
   background:radial-gradient(ellipse, rgba(0,0,0,.55), transparent 70%);
   animation:shadowPulse 2.6s ease-in-out infinite;
 }
 @keyframes shadowPulse{0%,100%{transform:scale(1);opacity:.6}50%{transform:scale(.86);opacity:.4}}
 
 .pet-holder{position:relative;width:168px;height:168px;display:grid;place-items:center}
+/* The pet screen gives its pet more room than anywhere else, so a skill or a
+   level-up has somewhere to happen. Every sheet keeps its alignment through
+   this: dx and dy are percentages of the sprite box and scale() carries no
+   units, so the whole composition shrinks about the holder's centre. */
+#pet-stage .pet-holder{width:143px;height:143px}
+#pet-stage .pet-halo{width:174px;height:174px}
 .pet-holder svg{width:100%;height:100%;overflow:visible}
 .pet-holder.mini{width:88px;height:88px}
 .pet-holder.tiny{width:52px;height:52px}
@@ -1237,13 +1243,13 @@ const SKILLS = {
   ember: [
     { id:"fireball", name:"Fireball", ico:"\u{1F525}", stage:2, level:18,
       blurb:"Draws a breath, then spits a packed ball of flame down the road ahead.",
-      sprite:{ src:"art/skill-fireball.png",     frames:16, fps:12.5, aspect:1.270, scale:1.98, dx:12, dy:-36 } },
+      sprite:{ src:"art/skill-fireball.png",     frames:16, fps:12.5, aspect:1.270, scale:1.85, dx:12, dy:-31 } },
     { id:"flame-stomp", name:"Flame Stomp", ico:"\u{1F4A5}", stage:2, level:22,
       blurb:"Rears up and lands hard enough to throw a ring of fire out around it.",
       sprite:{ src:"art/skill-flame-stomp.png",  frames:16, fps:12.5, aspect:1.270, scale:1.98, dx:13, dy:-25 } },
     { id:"flying-swoop", name:"Flying Swoop", ico:"\u2604\uFE0F", stage:2, level:26,
       blurb:"Those wings finally earn their keep: a low, fast pass trailing fire.",
-      sprite:{ src:"art/skill-flying-swoop.png", frames:16, fps:14.3, aspect:1.270, scale:1.80, dx:1, dy:-27 } }
+      sprite:{ src:"art/skill-flying-swoop.png", frames:16, fps:14.3, aspect:1.270, scale:1.98, dx:1, dy:-36 } }
   ]
 };
 function skillsFor(speciesId){ return SKILLS[speciesId] || []; }
