@@ -78,6 +78,11 @@ Your choice sets the app's accent colour. The pet's expression and idle
 animation follow how recently you ran: elated the day you run, happy the day
 after, restless at two days, sad at three, and asleep from five.
 
+The Cinderling's idle is the fuzzy baby that matches its skill and
+celebration packs. The smoother original it replaced is kept beside it at
+`art/ember-cinderling-original.png` — point the `ember:1` src back at that
+file, with `aspect:1.447, fps:2, scale:1.2` and no `dx`/`dy`, to return to it.
+
 The Cinderling and the Blazewyrm (Ember, stages 2 and 3) ship as pixel art in
 [`art/ember-cinderling.png`](art/ember-cinderling.png) and
 [`art/ember-blazewyrm.png`](art/ember-blazewyrm.png) — 12-frame loops at 2 fps
