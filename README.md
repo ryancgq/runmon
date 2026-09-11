@@ -137,7 +137,13 @@ a level. `LEVEL_UP_ART` keys it by species and stage, so it belongs to the
 form it was drawn for and another form simply has none until one is drawn.
 
 Each of these is a 16-frame sheet that plays once and hands the stage back to
-the idle loop. The movement is drawn into the frames, so the app never moves the sprite
+the idle loop, and each carries its own `durations` — the hold per frame. The
+packs' own suggested timings are combat speeds; here a move is a performance
+you tap to watch, so they run about 1.6 to 2 times longer, with the pacing
+shaped to the move: a breath that holds and a release that snaps, a swoop
+whose pass stays fast so the dragon does not float, a failed fireball whose
+pauses are the joke. Speed lives entirely in the app — a sheet never needs
+re-exporting to change it. The movement is drawn into the frames, so the app never moves the sprite
 itself; every frame is cropped from one rectangle to keep that motion intact.
 `SKILLS` in `index.html` holds the whole definition, sprite geometry included —
 `dx` and `dy` nudge a sheet so its ground line sits exactly where the idle

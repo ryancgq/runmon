@@ -1310,17 +1310,27 @@ const SKILLS = {
     { id:"fizzle", name:"fireball", ico:"\u{1F525}", stage:1, level:8,
       blurb:"The strongest, most powerful breath of fire you will ever see!",
       sprite:{ src:"art/skill-fizzle.png", frames:16, fps:8.1,
-        durations:[120,120,120,120,120,120,120,120,150,120,120,150,120,120,120,120],
+        // the pauses are the joke: the strain, the puff, and each cough land
+        durations:[170,160,150, 190, 170,160,150, 230, 260, 180,190, 260, 170,170,190,280],
         aspect:1.3125, scale:1.23, dx:-5, dy:-6 } },
     { id:"fireball", name:"Fireball", ico:"\u{1F525}", stage:2, level:18,
       blurb:"Draws a breath, then spits a packed ball of flame down the road ahead.",
-      sprite:{ src:"art/skill-fireball.png",     frames:16, fps:12.5, aspect:1.270, scale:1.85, dx:12, dy:-31 } },
+      sprite:{ src:"art/skill-fireball.png",     frames:16, fps:12.5,
+        // the breath holds, the release is sharp, the ball carries on out
+        durations:[150,150,140,130, 120,110,100, 90,90,90, 110,110,120,130,140,200],
+        aspect:1.270, scale:1.85, dx:12, dy:-31 } },
     { id:"flame-stomp", name:"Flame Stomp", ico:"\u{1F4A5}", stage:2, level:22,
       blurb:"Rears up and lands hard enough to throw a ring of fire out around it.",
-      sprite:{ src:"art/skill-flame-stomp.png",  frames:16, fps:12.5, aspect:1.270, scale:1.98, dx:13, dy:-25 } },
+      sprite:{ src:"art/skill-flame-stomp.png",  frames:16, fps:12.5,
+        // the rear-up hangs, the slam is quick, the ring spreads and fades
+        durations:[160,150,140,130, 120,100,90,80, 100,120,130,140, 150,160,170,220],
+        aspect:1.270, scale:1.98, dx:13, dy:-25 } },
     { id:"flying-swoop", name:"Flying Swoop", ico:"\u2604\uFE0F", stage:2, level:26,
       blurb:"Those wings finally earn their keep: a low, fast pass trailing fire.",
-      sprite:{ src:"art/skill-flying-swoop.png", frames:16, fps:14.3, aspect:1.270, scale:1.98, dx:1, dy:-36 } }
+      sprite:{ src:"art/skill-flying-swoop.png", frames:16, fps:14.3,
+        // slow either end, but the pass stays fast or the dragon floats
+        durations:[170,160,150, 130,110,90, 80,80,80,90,100, 120,140,160,180,220],
+        aspect:1.270, scale:1.98, dx:1, dy:-36 } }
   ]
 };
 function skillsFor(speciesId){ return SKILLS[speciesId] || []; }
