@@ -1377,7 +1377,7 @@ const SKILLS = {
         order:    [0, 1,2,4,  1,2,4,  1,2,4,  3,5,3,5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15],
         durations:[380, 300,270,245, 225,205,185, 160,145,130, 185,150,150,270,
                    150,230,260,180,190,260,170,170,190,280],
-        aspect:1.3125, scale:1.23, dx:-5, dy:-6 } },
+        aspect:1.3125, scale:1.23, dx:-5, dy:-4.2 } },
     { id:"fireball", name:"Fireball", ico:"\u{1F525}", stage:2, level:18,
       blurb:"Draws a breath, then spits a packed ball of flame down the road ahead.",
       sprite:{ src:"art/skill-fireball.png",     frames:16, fps:12.5,
@@ -1412,7 +1412,7 @@ const LEVEL_UP_ART = {
   "ember:1": levelUpClip({ src:"art/levelup-cinderling.png", frames:16,
     gather:4, burst:7, aspect:1.3125, scale:1.18, dx:-15, dy:1 }),
   "ember:2": levelUpClip({ src:"art/levelup-blazewyrm.png", frames:16,
-    gather:2, burst:7, aspect:1, scale:1.58, dx:2, dy:-23 })
+    gather:2, burst:7, aspect:1, scale:1.58, dx:2, dy:-1.1 })
 };
 function levelUpArt(speciesId, stage){ return LEVEL_UP_ART[speciesId + ":" + stage] || null; }
 
@@ -2403,7 +2403,7 @@ function spriteConfig(species, stage){
    already has one will happily go on showing the old drawing. Bump this and
    every cache along the way fetches the new file. Only the sheets that ship
    with the app are stamped; a sheet you point at yourself is used verbatim. */
-const ART_VERSION = "7";
+const ART_VERSION = "8";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
 }
