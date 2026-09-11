@@ -556,7 +556,12 @@ body::before{
 .evo-node .pet-holder{width:66px;height:66px;flex:0 0 66px}
 .evo-node .pet-holder svg{filter:none}
 .evo-node.locked{opacity:.42}
-.evo-node.locked .pet-holder svg{filter:grayscale(1) brightness(.55) contrast(.9)}
+/* a form you have not reached is a shape, not a dimmed portrait. brightness(0)
+   flattens every colour to black while keeping the alpha, invert lifts that to
+   white so it reads against the dark card - and it works the same on a drawn
+   pet or a sprite sheet. */
+.evo-node.locked .pet-holder svg,
+.evo-node.locked .pet-holder .sprite-view{filter:brightness(0) invert(1) opacity(.8)}
 .evo-node.current{
   border-color:rgba(var(--glow),.55);
   background:linear-gradient(100deg, rgba(var(--glow),.13), var(--card) 60%);
