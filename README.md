@@ -32,10 +32,11 @@ Below that: log a run, learn the next skill, skip a day (which walks the pet
 down through all six moods), or start over and pick a different pet.
 
 Starting a run in the sandbox runs it for you. The simulated runner covers
-ground three times as fast as a real one, and Settings → Tracking winds the
-run's clock forward on top of that (1×, 10×, 30× or 60×), so a few seconds of
-watching is worth several kilometres. The pace it records is deliberately
-inhuman; real runs are never sped up.
+ground forty times as fast as a real one, and Settings → Tracking winds the
+run's clock forward on top of that (1×, 10×, 30× or 60×), so seconds of
+watching are worth tens of kilometres — fifteen seconds at 60× is a hundred
+kilometres and a level-15 pet. The pace it records is deliberately inhuman;
+real runs are never sped up.
 
 Pets with pixel art so far are **Ember** (baby and teen) and **Verdant** (baby).
 Everything else is still placeholder vector art.
@@ -196,6 +197,8 @@ The curve as tuned:
 - The jitter gate scales with reported accuracy instead of using one fixed
   threshold, which would swallow real strides at 1 Hz
 - Segments implying more than 12 m/s are treated as GPS jumps and discarded
+  (the sandbox's simulated runner raises that ceiling in step with its own
+  speed, so its fixes are not thrown away as teleports)
 - Pausing breaks the route into a new segment, so the line does not draw a
   straight jump across wherever you stopped
 - Denied permission, unavailable position and weak signal each get their own
