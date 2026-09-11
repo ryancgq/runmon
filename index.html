@@ -2331,7 +2331,7 @@ function spriteConfig(species, stage){
    already has one will happily go on showing the old drawing. Bump this and
    every cache along the way fetches the new file. Only the sheets that ship
    with the app are stamped; a sheet you point at yourself is used verbatim. */
-const ART_VERSION = "3";
+const ART_VERSION = "4";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
 }
