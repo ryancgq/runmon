@@ -78,6 +78,23 @@ Your choice sets the app's accent colour. The pet's expression and idle
 animation follow how recently you ran: elated the day you run, happy the day
 after, restless at two days, sad at three, and asleep from five.
 
+The Cinder Egg is a sprite too, as of the pack that replaced the vector one.
+It arrived as a 3x4 grid on a checkerboard baked into the pixels rather than
+real transparency, so the pattern was keyed out and the rim decontaminated —
+every edge pixel is background mixed into art, so the art colour is recovered
+from the nearest solid pixel and the mix ratio becomes the alpha. Flood the
+background in from the border rather than keying every neutral pixel, or the
+white highlight on the shell goes with it.
+
+Its twelve frames barely differ — the speckles shimmer, nothing travels — so
+they are packed in order of size rather than as drawn. The pack's frames grow
+4% in area from the first to the last, which played as drawn is a slow swell
+and a snap back at the loop; packed smallest-out-and-back the egg breathes, and
+the largest step between neighbours is 1.6%. Scale is set so the shell has the
+same painted area as the Cinderling that hatches from it — the vector egg it
+replaced had that relationship, and losing it makes the egg look bigger than
+the creature inside.
+
 The Cinderling's idle is the fuzzy baby that matches its skill and
 celebration packs. Its frames are anchored before packing — each shifted so
 the dragon's feet land on one row and its body on one column — because the

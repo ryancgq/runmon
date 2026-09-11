@@ -109,7 +109,7 @@ final one, unlocking at levels 1, 5, 15, 30 and 50.
 
 | # | Ember — fire | Verdant — forest | Nimbus — storm |
 | --- | --- | --- | --- |
-| 1 | Cinder Egg | Seedpod | Static Egg |
+| 1 | **Cinder Egg** ✅ | Seedpod | Static Egg |
 | 2 | **Cinderling** ✅ | **Bamboo Cub** ✅ | Puffling |
 | 3 | **Blazewyrm** ✅ | Fernkin | Zephyrite |
 | 4 | Pyrelord | Thicketmane | Tempestor |
@@ -120,7 +120,10 @@ spirits. Either supply panda art for the rest of that line, or replace the cub
 later — the species currently reads as two ideas.
 
 Egg forms need far less than twelve frames — a pulse, a wobble, a crack. Four
-frames is plenty; supply what the form needs and say how many.
+frames is plenty; supply what the form needs and say how many. The Cinder Egg
+came as twelve anyway, and they barely differ: the speckles shimmer and nothing
+travels. Frames like that are interchangeable, so they were packed in order of
+size rather than as drawn — see the note in `DEFAULT_SPRITES`.
 
 Species should stay recognisably themselves across all five forms: same palette
 family, same silhouette language, same eyes. Ember reads as fire, Verdant as

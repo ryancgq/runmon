@@ -1452,7 +1452,7 @@ const SPECIES = {
     blurb:"A magma-blooded drake. Sprints hard, sulks harder, and burns brightest when you run often.",
     theme:{ accent:"#ff6b35", accent2:"#ffd23f", ink:"#220d02", glow:"255,107,53" },
     stages:[
-      { name:"Cinder Egg",  desc:"An obsidian shell with a furnace inside. Something in there is impatient." },
+      { name:"Cinder Egg",  desc:"A speckled shell, warm to the touch. Something in there is impatient." },
       { name:"Cinderling",  desc:"All head, tiny wings, permanently overheating. Hiccups sparks." },
       { name:"Blazewyrm",   desc:"Wings that finally work and a temper that mostly does not." },
       { name:"Pyrelord",    desc:"A proper drake. The air above it shimmers when you come home from a run." },
@@ -2384,6 +2384,15 @@ function spriteKey(species, stage){ return species + ":" + stage; }
 /* Art that ships with the app. A key present in save.sprites wins; an explicit
    null there means "use the vector pet instead of this default". */
 const DEFAULT_SPRITES = {
+  "ember:0": {
+    // The Cinder Egg. Its twelve frames barely differ - the shell's speckles
+    // shimmer, nothing travels - so they are packed smallest-out-and-back
+    // rather than as drawn: the pack's frames grow 4% in area from the first
+    // to the last, which as drawn is a slow swell and then a snap back at the
+    // loop. Packed this way the egg breathes instead.
+    src:"art/ember-egg.png",
+    frames:12, rows:1, fps:2, aspect:0.871, scale:0.71, dx:0, dy:-0.9
+  },
   "ember:1": {
     // the fuzzy baby, matching the skill and celebration packs. the smoother
     // original is kept beside it: point src at ember-cinderling-original.png
