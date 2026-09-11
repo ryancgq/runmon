@@ -260,21 +260,25 @@ body::before{
    than following a gap */
 .pet-stage.charged .pet-halo{animation:haloRelease var(--release,800ms) ease-out both}
 /* the caption on the celebration: lands with the sparkles as the burst
-   resolves, holds, then lifts away */
+   resolves, holds, then lifts away. It sits in the stage's top right corner,
+   clear of the pet and of the burst going off underneath it, and scales from
+   that corner so the bounce never pushes it off the edge */
 .levelup-pop{
-  position:absolute;left:0;right:0;bottom:6px;pointer-events:none;
-  font-family:"Fredoka One","Fredoka",sans-serif;font-size:28px;letter-spacing:.6px;
-  text-align:center;color:#ffd875;
+  position:absolute;top:12px;right:12px;pointer-events:none;
+  z-index:95;                                /* a toast must not cover this */
+  font-family:"Fredoka One","Fredoka",sans-serif;font-size:23px;letter-spacing:.4px;
+  text-align:right;color:#ffd875;
   text-shadow:0 0 18px rgba(255,190,60,.85), 0 0 40px rgba(255,150,30,.55), 0 3px 0 rgba(120,45,0,.45);
+  transform-origin:100% 50%;
   animation:levelPop var(--pop,2200ms) cubic-bezier(.2,1.5,.45,1) both;
 }
 @keyframes levelPop{
-  0%{opacity:0;transform:translateY(14px) scale(.5) rotate(-5deg)}
+  0%{opacity:0;transform:translateY(10px) scale(.5) rotate(-5deg)}
   14%{opacity:1;transform:translateY(0) scale(1.18) rotate(2deg)}
   24%{transform:translateY(0) scale(.97) rotate(-1deg)}
   32%{transform:translateY(0) scale(1.03) rotate(0)}
   40%,72%{opacity:1;transform:translateY(0) scale(1)}
-  100%{opacity:0;transform:translateY(-26px) scale(1.04)}
+  100%{opacity:0;transform:translateY(-20px) scale(1.04)}
 }
 @keyframes haloRelease{
   0%{transform:scale(1.5);opacity:1;filter:blur(3px) brightness(2.1) saturate(1.35)}
@@ -1363,8 +1367,16 @@ const SKILLS = {
     { id:"fizzle", name:"fireball", ico:"\u{1F525}", stage:1, level:8,
       blurb:"The strongest, most powerful breath of fire you will ever see!",
       sprite:{ src:"art/skill-fizzle.png", frames:16, fps:8.1,
-        // the pauses are the joke: the strain, the puff, and each cough land
-        durations:[170,160,150, 190, 170,160,150, 230, 260, 180,190, 260, 170,170,190,280],
+        /* The joke only works if you believe it this time, so the wind-up runs
+           three seconds - three times what it did - and the sheet's six charge
+           frames could not carry that by holding longer: half a second on one
+           drawing stops reading as effort and starts reading as a stutter. So
+           it pumps instead. Inflate, hold, squash, over and over and faster
+           each round, then the ember catches and dies twice. Only then the
+           puff of smoke, and the coughing is timed exactly as before. */
+        order:    [0, 1,2,4,  1,2,4,  1,2,4,  3,5,3,5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15],
+        durations:[380, 300,270,245, 225,205,185, 160,145,130, 185,150,150,270,
+                   150,230,260,180,190,260,170,170,190,280],
         aspect:1.3125, scale:1.23, dx:-5, dy:-6 } },
     { id:"fireball", name:"Fireball", ico:"\u{1F525}", stage:2, level:18,
       blurb:"Draws a breath, then spits a packed ball of flame down the road ahead.",
@@ -2415,13 +2427,20 @@ function spriteMarkup(species, stage, mood){
   return spriteHTML(cfg, mood);
 }
 
-/* How long a clip runs, in ms. A uniform clip is frames over fps; one with
-   its own per-frame timing is just the sum. */
+/* A clip normally walks its sheet once, left to right, one beat a frame. It
+   can instead name the frames it wants in `order`, which lets a stretch of a
+   sheet cycle - the way a wind-up builds by straining over and over rather
+   than by holding one drawing until it reads as a stutter. So a beat is not
+   always a frame, and everything timed below counts beats. */
+function clipBeats(cfg){ return cfg.order ? cfg.order.length : Math.max(1, cfg.frames || 1); }
+
+/* How long a clip runs, in ms. A uniform clip is beats over fps; one with
+   its own per-beat timing is just the sum. */
 function clipDurationMs(cfg){
-  const frames = Math.max(1, cfg.frames || 1);
-  if (cfg.durations && cfg.durations.length === frames)
+  const beats = clipBeats(cfg);
+  if (cfg.durations && cfg.durations.length === beats)
     return cfg.durations.reduce((a, b) => a + b, 0);
-  return (frames / Math.max(.1, cfg.fps || 8)) * 1000;
+  return (beats / Math.max(.1, cfg.fps || 8)) * 1000;
 }
 
 /* steps() can only hold every frame for the same length of time. When a clip
@@ -2430,15 +2449,16 @@ function clipDurationMs(cfg){
    let step-end hold each until the next. Built once per clip and cached. */
 const clipKeyframes = Object.create(null);
 function clipAnimationName(cfg){
-  const frames = cfg.frames, d = cfg.durations;
-  const name = "clip" + cfgHash(cfg.src + "|" + d.join(","));
+  const frames = cfg.frames, d = cfg.durations, order = cfg.order;
+  const name = "clip" + cfgHash(cfg.src + "|" + d.join(",") + "|" + (order ? order.join(",") : ""));
   if (clipKeyframes[name]) return name;
   const total = d.reduce((a, b) => a + b, 0);
   let at = 0;
   const stops = d.map((ms, k) => {
     const pct = (at / total * 100).toFixed(4);
     at += ms;
-    return `${pct}%{transform:translateX(-${(k * 100 / frames).toFixed(4)}%)}`;
+    const frame = order ? order[k] : k;
+    return `${pct}%{transform:translateX(-${(frame * 100 / frames).toFixed(4)}%)}`;
   }).join("");
   const el = document.createElement("style");
   el.textContent = `@keyframes ${name}{${stops}}`;
@@ -2462,7 +2482,7 @@ function spriteHTML(cfg, mood, once){
   const posY   = rows > 1 ? (row / (rows - 1)) * 100 : 0;
   // a one-off stops on its last frame, so it takes one step fewer
   const steps  = once ? Math.max(1, frames - 1) : frames;
-  const timed  = !!(once && cfg.durations && cfg.durations.length === frames);
+  const timed  = !!(once && cfg.durations && cfg.durations.length === clipBeats(cfg));
   const dur    = timed ? (clipDurationMs(cfg) / 1000).toFixed(3) + "s"
                        : (steps / fps).toFixed(3) + "s";
   const anim   = timed ? `animation-name:${clipAnimationName(cfg)};animation-timing-function:step-end;` : "";

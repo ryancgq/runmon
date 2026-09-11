@@ -109,7 +109,7 @@ level 30, where the next one does.
 
 | Skill | Form | Learns at | What it does |
 | --- | --- | --- | --- |
-| 🔥 fireball | Cinderling | Level 8 | Sold as the strongest fire you will ever see. It is a cough and some smoke. |
+| 🔥 fireball | Cinderling | Level 8 | Sold as the strongest fire you will ever see. Three seconds of winding up, then a cough and some smoke. |
 | 🔥 Fireball | Blazewyrm | Level 18 | Draws a breath and spits a packed ball of flame |
 | 💥 Flame Stomp | Blazewyrm | Level 22 | Lands hard enough to throw a ring of fire out around it |
 | ☄️ Flying Swoop | Blazewyrm | Level 26 | A low, fast pass trailing fire |
@@ -133,7 +133,10 @@ rather than restarting.
 
 A gold **Level Up!** lands as the burst resolves, rides the settle and lifts
 away — timed off the sheet's own frame list rather than a fixed delay, so it
-still lands on the right beat if those holds are ever retuned.
+still lands on the right beat if those holds are ever retuned. It sits in the
+stage's top right corner, clear of the pet and of the burst going off
+underneath it, and scales from that corner so the bounce never runs off the
+edge.
 
 Every celebration runs to one template, `LEVEL_UP_TIMING`, so a level-up feels
 the same whichever pet you are watching: 1.5s of CSS wind-up, then a held lead,
@@ -177,6 +180,16 @@ itself; every frame is cropped from one rectangle to keep that motion intact.
 `SKILLS` in `index.html` holds the whole definition, sprite geometry included —
 `dx` and `dy` nudge a sheet so its ground line sits exactly where the idle
 pet's does.
+
+A clip can also name the frames it wants, in any order, with `order` — a beat
+is then a frame of that list rather than the next cell along. The Cinderling's
+fireball is the reason: its joke only works if you believe it this time, so the
+wind-up runs three seconds, three times what it did. Its sheet draws six charge
+frames, and holding those half a second each would have read as a stutter
+rather than as effort. So it pumps instead — inflate, hold, squash, over and
+over and faster each round, then the ember catches and dies twice — out of the
+same six cells, with the coughing after it timed exactly as before. No sheet
+needs re-exporting to loop a stretch of itself.
 
 ### Adding a new pet
 
