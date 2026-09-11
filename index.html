@@ -1298,8 +1298,18 @@ const EVO_LEVELS = [1, 5, 15, 30, 50];   // stage index -> level required
    learnt inside that form's own stretch of levels, so evolving is not the end
    of a stage - it is the start of one. The Blazewyrm holds levels 15-29 and
    learns all three of its moves there, well before the next form arrives. */
+/* A celebration's frames do not all hold for the same length: a brief
+   eyes-shut, gold gathering and quickening, the burst, then an easing settle.
+   The wind-up in front of it is done in CSS, so the sheet picks up tense. */
+const LEVEL_UP_BEATS = [80,80, 170,150,130,110,90, 90, 90,110,130,150, 170,190,210,300];
+
 const SKILLS = {
   ember: [
+    { id:"fizzle", name:"Fizzle", ico:"\u{1F624}", stage:1, level:8,
+      blurb:"Takes an enormous breath, aims, and produces a cough and a puff of smoke. It is trying.",
+      sprite:{ src:"art/skill-fizzle.png", frames:16, fps:8.1,
+        durations:[120,120,120,120,120,120,120,120,150,120,120,150,120,120,120,120],
+        aspect:1.3125, scale:1.23, dx:-5, dy:-6 } },
     { id:"fireball", name:"Fireball", ico:"\u{1F525}", stage:2, level:18,
       blurb:"Draws a breath, then spits a packed ball of flame down the road ahead.",
       sprite:{ src:"art/skill-fireball.png",     frames:16, fps:12.5, aspect:1.270, scale:1.85, dx:12, dy:-31 } },
@@ -1316,13 +1326,14 @@ function skillsFor(speciesId){ return SKILLS[speciesId] || []; }
 /* A form's own level-up celebration, keyed by species and stage so it only
    plays for the form it was drawn for. Missing art simply means no clip. */
 const LEVEL_UP_ART = {
+  "ember:1": { src:"art/levelup-cinderling.png", frames:16,
+    durations:LEVEL_UP_BEATS, aspect:1.3125, scale:1.18, dx:-15, dy:1 },
   // the charge holds, then quickens into the burst on frame 8, then settles
   "ember:2": { src:"art/levelup-blazewyrm.png", frames:16, fps:9.4,
     // the wind-up in front of this is done in CSS, so the sheet picks up
     // already tense and drives straight on: brief eyes-shut, gold gathering
     // and quickening, then the burst
-    durations:[80,80, 170,150,130,110,90, 90, 90,110,130,150, 170,190,210,300],
-    aspect:1, scale:1.58, dx:2, dy:-23 }
+    durations:LEVEL_UP_BEATS, aspect:1, scale:1.58, dx:2, dy:-23 }
 };
 function levelUpArt(speciesId, stage){ return LEVEL_UP_ART[speciesId + ":" + stage] || null; }
 
@@ -1635,7 +1646,11 @@ function recompute(){
     stage, lastRunTs, gapDays,
     mood: moodFor(gapDays, runs.length),
     species: save.species ? SPECIES[save.species] : SPECIES.ember,
-    skills: skillsFor(save.species).map(sk => ({ ...sk, known: lv.level >= sk.level })),
+    skills: skillsFor(save.species).map(sk => ({
+      ...sk,
+      known: lv.level >= sk.level,
+      playable: lv.level >= sk.level && stage === sk.stage
+    })),
     days: new Set(days)
   };
 
@@ -2551,7 +2566,7 @@ function playClip(cfg, tag){
   return true;
 }
 function playSkill(id){
-  const sk = derived.skills.find(k => k.id === id && k.known);
+  const sk = derived.skills.find(k => k.id === id && k.playable);
   if (!sk) return;
   if (spriteBroken[sk.sprite.src]){ toast(`${sk.name} artwork is missing`, "warn", "\u26A0\uFE0F"); return; }
   playClip(sk.sprite, id);
@@ -2614,7 +2629,7 @@ function playPendingLevelUp(){
 }
 function renderSkillChips(){
   const row = $("#home-skills");
-  const known = derived.skills.filter(k => k.known);
+  const known = derived.skills.filter(k => k.playable);
   // fetch the sheets as soon as the pet knows the move, so the first tap plays
   // straight away instead of waiting on a download
   known.forEach(k => probeSprite(k.sprite.src));
@@ -2785,22 +2800,28 @@ function renderEvolve(){
   });
 
   // skills belong to the pet you actually have, so they follow the species tab
-  const list = mine ? d.skills : skillsFor(evoTab).map(sk => ({ ...sk, known:false }));
+  const list = mine ? d.skills
+    : skillsFor(evoTab).map(sk => ({ ...sk, known:false, playable:false }));
   const show = list.length > 0;
   $("#skills-title").hidden = !show;
   $("#skill-list").hidden = !show;
   if (show){
-    const known = list.filter(k => k.known).length;
-    $("#skill-count").textContent = `${known}/${list.length}`;
-    $("#skill-list").innerHTML = list.map(k => `
-      <div class="skill-item ${k.known ? "known" : "locked"}" ${k.known ? `data-skill-go="${k.id}"` : ""}>
+    $("#skill-count").textContent = `${list.filter(k => k.known).length}/${list.length}`;
+    $("#skill-list").innerHTML = list.map(k => {
+      const form = sp.stages[k.stage].name;
+      // a move belongs to the form that learnt it, so it retires with that form
+      const note = k.playable ? "Learnt \u00b7 tap to use"
+                 : k.known    ? `Outgrown \u00b7 was ${form}'s`
+                              : `${form} learns this at level ${k.level}`;
+      return `<div class="skill-item ${k.playable ? "known" : "locked"}" ${k.playable ? `data-skill-go="${k.id}"` : ""}>
         <div class="ico">${k.known ? k.ico : "\u{1F512}"}</div>
         <div class="t">
           <div class="nm">${k.name}</div>
-          <div class="rq">${k.known ? "Learnt \u00b7 tap to use" : `Learns at level ${k.level}`}</div>
+          <div class="rq">${note}</div>
           <div class="ds">${k.blurb}</div>
         </div>
-      </div>`).join("");
+      </div>`;
+    }).join("");
   }
 
   const got = Object.keys(save.badges).length;
@@ -3689,7 +3710,9 @@ function demoJumpToLevel(level, done){
   if (done) done();
 }
 
-function nextSkill(d){ return d.skills.find(k => !k.known) || null; }
+function nextSkill(d){
+  return d.skills.find(k => !k.known && k.stage >= d.stage) || null;
+}
 function openDemoPanel(){
   const d = derived;
   openSheet({
@@ -3821,7 +3844,7 @@ function wire(){
   });
   // the pet itself is the most obvious thing to poke
   $("#pet-stage").addEventListener("click", () => {
-    const known = derived.skills.filter(k => k.known);
+    const known = derived.skills.filter(k => k.playable);
     if (!known.length || skillPlaying) return;
     skillCycle = (skillCycle + 1) % known.length;
     playSkill(known[skillCycle].id);
