@@ -28,8 +28,14 @@ touches a real pet.
 
 Tap the **DEMO** badge above the tab bar. It shows all five forms of the pet
 you are on — **tap any of them to jump straight there**, no running required.
-Below that: log a run, skip a day (which walks the pet down through all six
-moods), or start over and pick a different pet.
+Below that: log a run, learn the next skill, skip a day (which walks the pet
+down through all six moods), or start over and pick a different pet.
+
+Starting a run in the sandbox runs it for you. The simulated runner covers
+ground three times as fast as a real one, and Settings → Tracking winds the
+run's clock forward on top of that (1×, 10×, 30× or 60×), so a few seconds of
+watching is worth several kilometres. The pace it records is deliberately
+inhuman; real runs are never sped up.
 
 Pets with pixel art so far are **Ember** (baby and teen) and **Verdant** (baby).
 Everything else is still placeholder vector art.

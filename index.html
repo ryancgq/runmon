@@ -1043,7 +1043,7 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
         <div class="toggle" id="tg-sim"><i></i></div>
       </div>
       <div class="row stack" id="row-simspeed" hidden>
-        <div class="t"><div class="n">Simulated run speed</div><div class="h">The sandbox runs for you at about 11&nbsp;km/h. This winds the run's clock forward, so a 5&nbsp;km run takes minutes instead of half an hour — distance, duration and pace stay in step with each other.</div></div>
+        <div class="t"><div class="n">Simulated run speed</div><div class="h">The sandbox runs for you, covering ground three times as fast as a runner so the kilometres and the XP pile up quickly. This winds the run's clock forward on top of that, so a 5&nbsp;km run takes seconds rather than half an hour. The pace it records is deliberately inhuman.</div></div>
         <div class="seg" id="seg-simspeed"></div>
       </div>
       <div class="row tap" id="row-keepawake">
@@ -2859,6 +2859,12 @@ function updateMetrics(){
 
 /* --- simulated GPS ------------------------------------------------------- */
 const SIM_TICK_MS = 250;
+/* How much ground the sandbox runner covers against the clock. At 1 it keeps a
+   real runner's pace; above that the kilometres - and so the XP - pile up that
+   much faster for the same run time, at the cost of a pace no human could hold.
+   Only the sandbox uses it, so nothing recorded from a real run is affected. */
+const DEMO_DISTANCE_BOOST = 3;
+function simSpeedBoost(){ return DEMO ? DEMO_DISTANCE_BOOST : 1; }
 function startSim(){
   tracker.sim = true;
   tracker.warp = runWarp();
@@ -2868,11 +2874,11 @@ function startSim(){
   tracker.simClock = Date.now();
   setGps("good", "Simulated GPS · demo run");
   banner(tracker.warp > 1
-    ? `Simulated run at <b>${tracker.warp}\u00d7 speed</b> — the pet keeps a runner's pace, its clock just hurries. Tagged <b>sim</b> in your history; change the speed in Settings.`
+    ? `Simulated run at <b>${tracker.warp}\u00d7 speed</b>, covering ground <b>${simSpeedBoost()}\u00d7</b> as fast as a runner. Tagged <b>sim</b> in your history; change the speed in Settings.`
     : "Simulated GPS is on — this run is fake and will be tagged <b>sim</b> in your history. Turn it off in Settings for real runs.", "warn");
   tracker.simId = setInterval(() => {
     if (!tracker.active || tracker.paused) return;
-    const speed = 3.05 + Math.sin(tracker.simClock / 9000) * 0.55;  // ~9-13 km/h
+    const speed = (3.05 + Math.sin(tracker.simClock / 9000) * 0.55) * simSpeedBoost();
     tracker.simHeading += (Math.random() - .5) * 0.22;              // gentle curves
     // both the step and the timestamp advance on the run's own clock, so the
     // speed the route implies is a runner's, not a warped one
