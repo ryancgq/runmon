@@ -147,10 +147,19 @@ rather than restarting.
 
 A gold **Level Up!** lands as the burst resolves, rides the settle and lifts
 away — timed off the sheet's own frame list rather than a fixed delay, so it
-still lands on the right beat if those holds are ever retuned. It sits in the
-stage's top right corner, clear of the pet and of the burst going off
-underneath it, and scales from that corner so the bounce never runs off the
-edge.
+still lands on the right beat if those holds are ever retuned. It sits above
+the pet's right shoulder, clear of it and of the burst going off underneath,
+and scales from that corner so the bounce never runs off the edge. Each form
+places it: the stage's own corner suits the Blazewyrm, which fills 158px of
+the 143px box, but strands the words out in the dark beside the Cinderling,
+which only draws 130px. A `cap` on the celebration's config brings them in, so
+the caption sits the same distance off the art whatever is wearing it.
+
+The wind-up in front of the sheet plays over the idle, so the idle holds its
+first frame while it braces — the Cinderling's has a butterfly wandering
+through four of its twelve frames, and a celebration is no place for it. That
+frame is also the one every celebration sheet opens on, so the handover lands
+on the pose it left.
 
 Every celebration runs to one template, `LEVEL_UP_TIMING`, so a level-up feels
 the same whichever pet you are watching: 1.5s of CSS wind-up, then a held lead,

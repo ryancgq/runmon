@@ -228,6 +228,12 @@ body::before{
    cannot - past about 400ms a frame stops reading as movement and starts
    reading as a stutter. The pet shivers harder and harder and its glow swells
    until the sheet takes over. */
+/* The wind-up plays over the idle sheet, and the Cinderling's idle has a
+   butterfly wander through four of its twelve frames - not something to have
+   fluttering past mid-celebration. So the pet holds its first frame while it
+   braces, which is also the frame every celebration sheet opens on, so the
+   handover lands on the same pose it left. */
+.pet-stage.charging .sprite-strip{animation:none;transform:translateX(0)}
 .pet-stage.charging .pet-holder{animation:petCharge var(--charge,1500ms) ease-in both}
 .pet-stage.charging .pet-halo{animation:haloCharge var(--charge,1500ms) ease-in both}
 @keyframes petCharge{
@@ -264,7 +270,8 @@ body::before{
    clear of the pet and of the burst going off underneath it, and scales from
    that corner so the bounce never pushes it off the edge */
 .levelup-pop{
-  position:absolute;top:12px;right:12px;pointer-events:none;
+  position:absolute;top:var(--cap-top,12px);right:var(--cap-right,12px);
+  pointer-events:none;
   z-index:95;                                /* a toast must not cover this */
   font-family:"Fredoka One","Fredoka",sans-serif;font-size:23px;letter-spacing:.4px;
   text-align:right;color:#ffd875;
@@ -1408,9 +1415,14 @@ function levelUpClip(cfg){
 }
 const LEVEL_UP_ART = {
   // this one scowls and shuts its eyes for four frames before any gold shows,
-  // so its build is shorter in frames and each of them holds longer
+  // so its build is shorter in frames and each of them holds longer. `cap`
+  // brings the caption in to meet it: the baby draws 130px wide inside the
+  // same 143px box the Blazewyrm fills to 158px, so the stage's own corner
+  // leaves the words stranded out in the dark beside it. These two put the
+  // caption the same distance off the art as the Blazewyrm's sits off its.
   "ember:1": levelUpClip({ src:"art/levelup-cinderling.png", frames:16,
-    gather:4, burst:7, aspect:1.3125, scale:1.18, dx:-15, dy:1 }),
+    gather:4, burst:7, aspect:1.3125, scale:1.18, dx:-15, dy:1,
+    cap:{ top:16, right:44 } }),
   "ember:2": levelUpClip({ src:"art/levelup-blazewyrm.png", frames:16,
     gather:2, burst:7, aspect:1, scale:1.58, dx:2, dy:-1.1 })
 };
@@ -2683,10 +2695,13 @@ function settleOffsetMs(cfg){
 }
 const LEVEL_UP_POP_MS = 2200;
 let popTimer = null;
-function popLevelUp(){
+function popLevelUp(art){
   const el = $("#levelup-pop");
   el.hidden = true;
   void el.offsetWidth;                       // restart the animation on a repeat
+  const cap = (art && art.cap) || {};
+  el.style.setProperty("--cap-top",   (cap.top   != null ? cap.top   : 12) + "px");
+  el.style.setProperty("--cap-right", (cap.right != null ? cap.right : 12) + "px");
   el.style.setProperty("--pop", LEVEL_UP_POP_MS + "ms");
   el.hidden = false;
   clearTimeout(popTimer);
@@ -2716,7 +2731,7 @@ function playPendingLevelUp(){
         stage.classList.add("charged");
         setTimeout(() => stage.classList.remove("charged"), burst + 60);
         setTimeout(() => confetti(46), burst);
-        setTimeout(() => { if (currentScreen === "home") popLevelUp(); }, settleOffsetMs(art));
+        setTimeout(() => { if (currentScreen === "home") popLevelUp(art); }, settleOffsetMs(art));
       }
     }, LEVEL_UP_CHARGE_MS);
   }, 260);
