@@ -259,6 +259,23 @@ body::before{
    sheet's own wind-up, so the gold gathering in the frames replaces it rather
    than following a gap */
 .pet-stage.charged .pet-halo{animation:haloRelease var(--release,800ms) ease-out both}
+/* the caption on the celebration: lands with the sparkles as the burst
+   resolves, holds, then lifts away */
+.levelup-pop{
+  position:absolute;left:0;right:0;bottom:6px;pointer-events:none;
+  font-family:"Fredoka One","Fredoka",sans-serif;font-size:28px;letter-spacing:.6px;
+  text-align:center;color:#ffd875;
+  text-shadow:0 0 18px rgba(255,190,60,.85), 0 0 40px rgba(255,150,30,.55), 0 3px 0 rgba(120,45,0,.45);
+  animation:levelPop var(--pop,2200ms) cubic-bezier(.2,1.5,.45,1) both;
+}
+@keyframes levelPop{
+  0%{opacity:0;transform:translateY(14px) scale(.5) rotate(-5deg)}
+  14%{opacity:1;transform:translateY(0) scale(1.18) rotate(2deg)}
+  24%{transform:translateY(0) scale(.97) rotate(-1deg)}
+  32%{transform:translateY(0) scale(1.03) rotate(0)}
+  40%,72%{opacity:1;transform:translateY(0) scale(1)}
+  100%{opacity:0;transform:translateY(-26px) scale(1.04)}
+}
 @keyframes haloRelease{
   0%{transform:scale(1.5);opacity:1;filter:blur(3px) brightness(2.1) saturate(1.35)}
   100%{transform:scale(1);opacity:.85;filter:blur(2px) brightness(1)}
@@ -891,6 +908,7 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
         <div class="pet-halo"></div>
         <div class="pet-shadow"></div>
         <div class="pet-holder" id="home-pet"></div>
+        <div class="levelup-pop" id="levelup-pop" hidden>Level Up!</div>
       </div>
 
       <div class="pet-name">
@@ -2549,6 +2567,22 @@ function burstOffsetMs(cfg){
   if (!cfg.durations) return 0;
   return cfg.durations.slice(0, 7).reduce((a, b) => a + b, 0);
 }
+/** Where the burst has resolved and the pet is settling, for the caption. */
+function settleOffsetMs(cfg){
+  if (!cfg.durations) return clipDurationMs(cfg) * .6;
+  return cfg.durations.slice(0, 12).reduce((a, b) => a + b, 0);
+}
+const LEVEL_UP_POP_MS = 2200;
+let popTimer = null;
+function popLevelUp(){
+  const el = $("#levelup-pop");
+  el.hidden = true;
+  void el.offsetWidth;                       // restart the animation on a repeat
+  el.style.setProperty("--pop", LEVEL_UP_POP_MS + "ms");
+  el.hidden = false;
+  clearTimeout(popTimer);
+  popTimer = setTimeout(() => { el.hidden = true; }, LEVEL_UP_POP_MS + 40);
+}
 function playPendingLevelUp(){
   if (!pendingLevelUp || charging) return;
   const art = levelUpArt(save.species, derived.stage);
@@ -2573,6 +2607,7 @@ function playPendingLevelUp(){
         stage.classList.add("charged");
         setTimeout(() => stage.classList.remove("charged"), burst + 60);
         setTimeout(() => confetti(46), burst);
+        setTimeout(() => { if (currentScreen === "home") popLevelUp(); }, settleOffsetMs(art));
       }
     }, LEVEL_UP_CHARGE_MS);
   }, 260);

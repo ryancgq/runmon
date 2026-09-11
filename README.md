@@ -114,6 +114,10 @@ take over — gold gathering and quickening, the burst, then the settle — with
 the glow easing out across the sheet's own wind-up so one hands to the other
 rather than restarting.
 
+A gold **Level Up!** lands as the burst resolves, rides the settle and lifts
+away — timed off the sheet's own frame list rather than a fixed delay, so it
+still lands on the right beat if those holds are ever retuned.
+
 Splitting it that way is deliberate. Motion stretches to any length, frames do
 not: much past 400ms a held frame stops reading as movement and starts reading
 as a stutter. So the length lives in `LEVEL_UP_CHARGE_MS` and the drawing lives
