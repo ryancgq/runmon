@@ -85,6 +85,20 @@ source cells draw it in a different spot each frame and a pet that wanders
 inside its own box looks like it is hopping about. Anchor on the dragon, not
 on everything opaque: the butterfly is meant to move.
 
+Anchoring is not only an idle's problem. The packs arrive as 4×4 grids, and
+some of them draw each row a little higher than the last — the Cinderling's
+fireball climbs 43px over its sixteen frames, the Blazewyrm's celebration
+55px, which is a pet visibly floating up off its own ground line and then
+dropping back when the idle returns. Measure it by cross-correlating each
+frame's body against the first frame's rather than by its lowest pixel: a
+lowest pixel is a toe on one frame and a smoke puff or a ray on the next,
+while the correlation reports whole-body movement. Its signature is
+unmistakable — every frame inside a row agrees to a pixel, and the rows step.
+Real animation never lines up that neatly, so what steps between rows gets
+corrected and what moves inside a row is left exactly as drawn. A clip whose
+movement is genuine — the flame stomp's rear-and-land, the flying swoop's
+pass — shows no such pattern and must not be touched.
+
  The smoother original it replaced is kept beside it at
 `art/ember-cinderling-original.png` — point the `ember:1` src back at that
 file, with `aspect:1.447, fps:2, scale:1.2` and no `dx`/`dy`, to return to it.
