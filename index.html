@@ -1251,7 +1251,10 @@ function skillsFor(speciesId){ return SKILLS[speciesId] || []; }
 /* A form's own level-up celebration, keyed by species and stage so it only
    plays for the form it was drawn for. Missing art simply means no clip. */
 const LEVEL_UP_ART = {
-  "ember:2": { src:"art/levelup-blazewyrm.png", frames:16, fps:9.4, aspect:1, scale:1.86, dx:-4, dy:-35 }
+  // the charge holds, then quickens into the burst on frame 8, then settles
+  "ember:2": { src:"art/levelup-blazewyrm.png", frames:16, fps:9.4,
+    durations:[300,300,270,240,210,180,150, 90, 90,110,130,150, 170,190,210,300],
+    aspect:1, scale:1.86, dx:-4, dy:-35 }
 };
 function levelUpArt(speciesId, stage){ return LEVEL_UP_ART[speciesId + ":" + stage] || null; }
 
@@ -2257,6 +2260,43 @@ function spriteMarkup(species, stage, mood){
   return spriteHTML(cfg, mood);
 }
 
+/* How long a clip runs, in ms. A uniform clip is frames over fps; one with
+   its own per-frame timing is just the sum. */
+function clipDurationMs(cfg){
+  const frames = Math.max(1, cfg.frames || 1);
+  if (cfg.durations && cfg.durations.length === frames)
+    return cfg.durations.reduce((a, b) => a + b, 0);
+  return (frames / Math.max(.1, cfg.fps || 8)) * 1000;
+}
+
+/* steps() can only hold every frame for the same length of time. When a clip
+   wants its own rhythm - a long wind-up into a sudden burst - write the stops
+   out as a keyframes rule instead, one per frame at the moment it begins, and
+   let step-end hold each until the next. Built once per clip and cached. */
+const clipKeyframes = Object.create(null);
+function clipAnimationName(cfg){
+  const frames = cfg.frames, d = cfg.durations;
+  const name = "clip" + cfgHash(cfg.src + "|" + d.join(","));
+  if (clipKeyframes[name]) return name;
+  const total = d.reduce((a, b) => a + b, 0);
+  let at = 0;
+  const stops = d.map((ms, k) => {
+    const pct = (at / total * 100).toFixed(4);
+    at += ms;
+    return `${pct}%{transform:translateX(-${(k * 100 / frames).toFixed(4)}%)}`;
+  }).join("");
+  const el = document.createElement("style");
+  el.textContent = `@keyframes ${name}{${stops}}`;
+  document.head.appendChild(el);
+  clipKeyframes[name] = true;
+  return name;
+}
+function cfgHash(str){
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = ((h * 33) ^ str.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+
 function spriteHTML(cfg, mood, once){
   const frames = Math.max(1, cfg.frames || 1);
   const rows   = cfg.rows || (cfg.moods ? Math.max(...Object.values(cfg.moods)) + 1 : 1);
@@ -2267,7 +2307,10 @@ function spriteHTML(cfg, mood, once){
   const posY   = rows > 1 ? (row / (rows - 1)) * 100 : 0;
   // a one-off stops on its last frame, so it takes one step fewer
   const steps  = once ? Math.max(1, frames - 1) : frames;
-  const dur    = (steps / fps).toFixed(3) + "s";
+  const timed  = !!(once && cfg.durations && cfg.durations.length === frames);
+  const dur    = timed ? (clipDurationMs(cfg) / 1000).toFixed(3) + "s"
+                       : (steps / fps).toFixed(3) + "s";
+  const anim   = timed ? `animation-name:${clipAnimationName(cfg)};animation-timing-function:step-end;` : "";
   const esc    = assetURL(String(cfg.src)).replace(/'/g, "%27").replace(/"/g, "%22");
   return `<div class="sprite-view" style="--sscale:${cfg.scale || 1};--saspect:${cfg.aspect || 1};--sdx:${cfg.dx ? cfg.dx + "%" : "0"};--sdy:${cfg.dy ? cfg.dy + "%" : "0"}">
     <div class="sprite-strip playing${once ? " once" : ""}" style="
@@ -2275,6 +2318,7 @@ function spriteHTML(cfg, mood, once){
       background-image:url('${esc}');
       background-size:100% ${rows * 100}%;
       background-position:0 ${posY}%;
+      ${anim}
       --frames:${frames}; --steps:${steps}; --dur:${dur};"></div></div>`;
 }
 
@@ -2435,7 +2479,7 @@ function playClip(cfg, tag){
   skillTimer = setTimeout(() => {
     skillPlaying = null;
     if (currentScreen === "home") renderHome(); else renderSkillChips();
-  }, (cfg.frames / cfg.fps) * 1000 + 120);
+  }, clipDurationMs(cfg) + 120);
   return true;
 }
 function playSkill(id){
