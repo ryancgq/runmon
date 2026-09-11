@@ -107,12 +107,20 @@ move shows up as a chip under the pet — tap a chip, or the pet itself, to play
 it. Evolution lists all three with the level each needs, and tapping a learnt
 one there plays it on the pet screen.
 
-The Blazewyrm also has a level-up celebration: gold energy winds up over about
-a second and a half, bursts, and the dragon opens its eyes on the other side
-of it. Its frames do not all hold for the same length of time — the wind-up
-lingers and quickens into the burst — so `durations` in its config lists a
-hold per frame and the engine writes those out as a keyframes rule rather than
-using `steps()`. It plays on the pet
+The Blazewyrm also has a level-up celebration, and it is in two halves. The
+anticipation is motion, not frames: the pet shivers harder and harder while
+its glow swells, for 1.5s, driven entirely by CSS. Only then does the sheet
+take over — gold gathering and quickening, the burst, then the settle — with
+the glow easing out across the sheet's own wind-up so one hands to the other
+rather than restarting.
+
+Splitting it that way is deliberate. Motion stretches to any length, frames do
+not: much past 400ms a held frame stops reading as movement and starts reading
+as a stutter. So the length lives in `LEVEL_UP_CHARGE_MS` and the drawing lives
+in the sheet. The sheet's frames still hold for different lengths — `durations`
+in its config lists a hold per frame, and the engine writes those out as a
+keyframes rule rather than using `steps()`, which can only hold every frame for
+the same time. It plays on the pet
 screen rather than over the run summary — you read the run's numbers first,
 then come home to the pet that grew — and only for a run that actually earned
 a level. `LEVEL_UP_ART` keys it by species and stage, so it belongs to the
