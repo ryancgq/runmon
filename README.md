@@ -93,7 +93,7 @@ next one does.
 | --- | --- | --- |
 | 🔥 Fireball | Level 18 | Draws a breath and spits a packed ball of flame |
 | 💥 Flame Stomp | Level 22 | Lands hard enough to throw a ring of fire out around it |
-| 💨 Flying Swoop | Level 26 | A low, fast pass trailing fire |
+| ☄️ Flying Swoop | Level 26 | A low, fast pass trailing fire |
 
 Learning one is called out on the run summary that earned it. After that the
 move shows up as a chip under the pet — tap a chip, or the pet itself, to play
