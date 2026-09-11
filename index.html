@@ -2306,9 +2306,11 @@ function spriteKey(species, stage){ return species + ":" + stage; }
    null there means "use the vector pet instead of this default". */
 const DEFAULT_SPRITES = {
   "ember:1": {
+    // the fuzzy baby, matching the skill and celebration packs. the smoother
+    // original is kept beside it: point src at ember-cinderling-original.png
+    // (aspect 1.447, fps 2, scale 1.2, no dx/dy) to go back to it.
     src:"art/ember-cinderling.png",
-    // one continuous 12-frame loop at the source animation's own 2 fps
-    frames:12, rows:1, fps:2, aspect:1.447, scale:1.2
+    frames:12, rows:1, fps:7.1, aspect:1.3125, scale:1.18, dx:-3, dy:-1
   },
   "ember:2": {
     src:"art/ember-blazewyrm.png",
@@ -2331,7 +2333,7 @@ function spriteConfig(species, stage){
    already has one will happily go on showing the old drawing. Bump this and
    every cache along the way fetches the new file. Only the sheets that ship
    with the app are stamped; a sheet you point at yourself is used verbatim. */
-const ART_VERSION = "4";
+const ART_VERSION = "5";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
 }
