@@ -107,8 +107,12 @@ move shows up as a chip under the pet — tap a chip, or the pet itself, to play
 it. Evolution lists all three with the level each needs, and tapping a learnt
 one there plays it on the pet screen.
 
-The Blazewyrm also has a level-up celebration: gold energy winds up, bursts,
-and the dragon opens its eyes on the other side of it. It plays on the pet
+The Blazewyrm also has a level-up celebration: gold energy winds up over about
+a second and a half, bursts, and the dragon opens its eyes on the other side
+of it. Its frames do not all hold for the same length of time — the wind-up
+lingers and quickens into the burst — so `durations` in its config lists a
+hold per frame and the engine writes those out as a keyframes rule rather than
+using `steps()`. It plays on the pet
 screen rather than over the run summary — you read the run's numbers first,
 then come home to the pet that grew — and only for a run that actually earned
 a level. `LEVEL_UP_ART` keys it by species and stage, so it belongs to the
