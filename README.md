@@ -79,7 +79,13 @@ animation follow how recently you ran: elated the day you run, happy the day
 after, restless at two days, sad at three, and asleep from five.
 
 The Cinderling's idle is the fuzzy baby that matches its skill and
-celebration packs. The smoother original it replaced is kept beside it at
+celebration packs. Its frames are anchored before packing — each shifted so
+the dragon's feet land on one row and its body on one column — because the
+source cells draw it in a different spot each frame and a pet that wanders
+inside its own box looks like it is hopping about. Anchor on the dragon, not
+on everything opaque: the butterfly is meant to move.
+
+ The smoother original it replaced is kept beside it at
 `art/ember-cinderling-original.png` — point the `ember:1` src back at that
 file, with `aspect:1.447, fps:2, scale:1.2` and no `dx`/`dy`, to return to it.
 
