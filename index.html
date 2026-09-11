@@ -1043,7 +1043,7 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
         <div class="toggle" id="tg-sim"><i></i></div>
       </div>
       <div class="row stack" id="row-simspeed" hidden>
-        <div class="t"><div class="n">Simulated run speed</div><div class="h">The sandbox runs for you, covering ground three times as fast as a runner so the kilometres and the XP pile up quickly. This winds the run's clock forward on top of that, so a 5&nbsp;km run takes seconds rather than half an hour. The pace it records is deliberately inhuman.</div></div>
+        <div class="t"><div class="n">Simulated run speed</div><div class="h" id="simspeed-help"></div></div>
         <div class="seg" id="seg-simspeed"></div>
       </div>
       <div class="row tap" id="row-keepawake">
@@ -2355,9 +2355,12 @@ function drawRoute(canvas, path, opts){
   if (!segs.length) return false;
 
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  // x and y have to share units. Longitude was left in degrees against a
+  // latitude in the radian log-tangent form, which squashed every drawn route
+  // flat by a factor of 180/pi - a straight line no matter where you ran.
   const proj = p => {
-    const lat = p[0], lng = p[1];
-    return [lng, -Math.log(Math.tan(Math.PI/4 + lat * Math.PI/360))];
+    const lat = p[0] * Math.PI/180, lng = p[1] * Math.PI/180;
+    return [lng, -Math.log(Math.tan(Math.PI/4 + lat/2))];
   };
   const projected = segs.map(s => s.map(proj));
   for (const s of projected) for (const p of s){
@@ -2799,7 +2802,7 @@ function acceptPosition(lat, lng, accuracy, tsMs){
   // that would swallow real strides at 1 Hz.
   const jitterGate = Math.max(GPS.minStepM, Math.min(accuracy * 0.35, 6));
   if (d < jitterGate) return;
-  if (d / dt > GPS.maxSpeedMS){                    // teleport — drop it
+  if (d / dt > GPS.maxSpeedMS * (tracker.sim ? simSpeedBoost() : 1)){   // teleport — drop it
     tracker.last = here;
     return;
   }
@@ -2863,7 +2866,7 @@ const SIM_TICK_MS = 250;
    real runner's pace; above that the kilometres - and so the XP - pile up that
    much faster for the same run time, at the cost of a pace no human could hold.
    Only the sandbox uses it, so nothing recorded from a real run is affected. */
-const DEMO_DISTANCE_BOOST = 3;
+const DEMO_DISTANCE_BOOST = 40;
 function simSpeedBoost(){ return DEMO ? DEMO_DISTANCE_BOOST : 1; }
 function startSim(){
   tracker.sim = true;
@@ -2879,7 +2882,9 @@ function startSim(){
   tracker.simId = setInterval(() => {
     if (!tracker.active || tracker.paused) return;
     const speed = (3.05 + Math.sin(tracker.simClock / 9000) * 0.55) * simSpeedBoost();
-    tracker.simHeading += (Math.random() - .5) * 0.22;              // gentle curves
+    // each tick covers far more ground once boosted, so the heading has to
+    // wander more per tick or the route draws as one straight ruler line
+    tracker.simHeading += (Math.random() - .5) * 0.22 * Math.sqrt(simSpeedBoost());
     // both the step and the timestamp advance on the run's own clock, so the
     // speed the route implies is a runner's, not a warped one
     const step = (SIM_TICK_MS / 1000) * tracker.warp;
@@ -3264,6 +3269,8 @@ function renderSettings(){
     $("#row-sim").hidden = true;
     $("#row-simspeed").hidden = false;
     const w = runWarp();
+    $("#simspeed-help").innerHTML =
+      `The sandbox runs for you, covering ground <b>${DEMO_DISTANCE_BOOST}\u00d7</b> as fast as a runner, so the kilometres and the XP pile up quickly. This winds the run's clock forward on top of that, so a 5&nbsp;km run lands in a moment. The pace it records is deliberately inhuman.`;
     $("#seg-simspeed").innerHTML = RUN_WARPS.map(v =>
       `<button data-w="${v}" class="${v === w ? "on" : ""}">${v}\u00d7</button>`).join("");
   }
