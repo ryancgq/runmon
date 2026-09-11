@@ -92,22 +92,28 @@ use them.
 ## Skills
 
 A form is not the end of a stage, it is the start of one: a pet keeps learning
-inside the form it grew into. The Blazewyrm (Ember, stage 3) learns all three
-of its moves between level 15, where the form arrives, and level 30, where the
-next one does.
+inside the form it grew into. The Cinderling has one move, and the Blazewyrm
+learns all three of its own between level 15, where the form arrives, and
+level 30, where the next one does.
 
-| Skill | Learns at | What it does |
-| --- | --- | --- |
-| 🔥 Fireball | Level 18 | Draws a breath and spits a packed ball of flame |
-| 💥 Flame Stomp | Level 22 | Lands hard enough to throw a ring of fire out around it |
-| ☄️ Flying Swoop | Level 26 | A low, fast pass trailing fire |
+| Skill | Form | Learns at | What it does |
+| --- | --- | --- | --- |
+| 😤 Fizzle | Cinderling | Level 8 | Huge breath, careful aim, a cough and some smoke |
+| 🔥 Fireball | Blazewyrm | Level 18 | Draws a breath and spits a packed ball of flame |
+| 💥 Flame Stomp | Blazewyrm | Level 22 | Lands hard enough to throw a ring of fire out around it |
+| ☄️ Flying Swoop | Blazewyrm | Level 26 | A low, fast pass trailing fire |
+
+A move belongs to the form that learnt it and retires with that form — the art
+is that body's, so a Blazewyrm does not fizzle. Evolution still lists an
+outgrown move, marked as such.
 
 Learning one is called out on the run summary that earned it. After that the
 move shows up as a chip under the pet — tap a chip, or the pet itself, to play
 it. Evolution lists all three with the level each needs, and tapping a learnt
 one there plays it on the pet screen.
 
-The Blazewyrm also has a level-up celebration, and it is in two halves. The
+The Cinderling and the Blazewyrm each have a level-up celebration of their
+own, and it is in two halves. The
 anticipation is motion, not frames: the pet shivers harder and harder while
 its glow swells, for 1.5s, driven entirely by CSS. Only then does the sheet
 take over — gold gathering and quickening, the burst, then the settle — with
