@@ -222,6 +222,47 @@ body::before{
   animation:halo 5s ease-in-out infinite;
 }
 @keyframes halo{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.09);opacity:1}}
+
+/* The level-up sheet holds only the burst. The anticipation before it is done
+   here instead, because motion can be stretched to any length while frames
+   cannot - past about 400ms a frame stops reading as movement and starts
+   reading as a stutter. The pet shivers harder and harder and its glow swells
+   until the sheet takes over. */
+.pet-stage.charging .pet-holder{animation:petCharge var(--charge,1500ms) ease-in both}
+.pet-stage.charging .pet-halo{animation:haloCharge var(--charge,1500ms) ease-in both}
+@keyframes petCharge{
+  0%{transform:translate(0,0) scale(1)}
+  6%{transform:translate(-.5px,.2px) scale(1.002)}
+  12%{transform:translate(.5px,-.3px) scale(1.004)}
+  18%{transform:translate(-.8px,.3px) scale(1.007)}
+  24%{transform:translate(.9px,-.4px) scale(1.01)}
+  30%{transform:translate(-1.2px,.5px) scale(1.013)}
+  36%{transform:translate(1.4px,-.6px) scale(1.016)}
+  42%{transform:translate(-1.7px,.7px) scale(1.02)}
+  48%{transform:translate(2px,-.9px) scale(1.024)}
+  54%{transform:translate(-2.4px,1px) scale(1.028)}
+  60%{transform:translate(2.8px,-1.2px) scale(1.032)}
+  66%{transform:translate(-3.2px,1.3px) scale(1.036)}
+  72%{transform:translate(3.6px,-1.5px) scale(1.04)}
+  78%{transform:translate(-4.1px,1.6px) scale(1.045)}
+  84%{transform:translate(4.5px,-1.8px) scale(1.05)}
+  90%{transform:translate(-5px,2px) scale(1.055)}
+  96%{transform:translate(2.2px,-1px) scale(1.06)}
+  100%{transform:translate(0,0) scale(1.065)}
+}
+@keyframes haloCharge{
+  0%{transform:scale(1);opacity:.8;filter:blur(2px) brightness(1)}
+  55%{transform:scale(1.16);opacity:.95;filter:blur(2px) brightness(1.35) saturate(1.15)}
+  100%{transform:scale(1.5);opacity:1;filter:blur(3px) brightness(2.1) saturate(1.35)}
+}
+/* the glow does not drop when the sheet takes over - it eases out across the
+   sheet's own wind-up, so the gold gathering in the frames replaces it rather
+   than following a gap */
+.pet-stage.charged .pet-halo{animation:haloRelease var(--release,800ms) ease-out both}
+@keyframes haloRelease{
+  0%{transform:scale(1.5);opacity:1;filter:blur(3px) brightness(2.1) saturate(1.35)}
+  100%{transform:scale(1);opacity:.85;filter:blur(2px) brightness(1)}
+}
 .pet-stage.has-sprite .pet-shadow{opacity:0}
 .pet-shadow{
   position:absolute;bottom:46px;width:83px;height:12px;border-radius:50%;
@@ -1259,7 +1300,10 @@ function skillsFor(speciesId){ return SKILLS[speciesId] || []; }
 const LEVEL_UP_ART = {
   // the charge holds, then quickens into the burst on frame 8, then settles
   "ember:2": { src:"art/levelup-blazewyrm.png", frames:16, fps:9.4,
-    durations:[300,300,270,240,210,180,150, 90, 90,110,130,150, 170,190,210,300],
+    // the wind-up in front of this is done in CSS, so the sheet picks up
+    // already tense and drives straight on: brief eyes-shut, gold gathering
+    // and quickening, then the burst
+    durations:[80,80, 170,150,130,110,90, 90, 90,110,130,150, 170,190,210,300],
     aspect:1, scale:1.58, dx:2, dy:-23 }
 };
 function levelUpArt(speciesId, stage){ return LEVEL_UP_ART[speciesId + ":" + stage] || null; }
@@ -2498,18 +2542,39 @@ function playSkill(id){
 /* A level earned on a run is celebrated on the pet screen, not over the
    summary - the run's numbers get read first, then you come home to the pet
    that grew. Set when the run is saved, spent on the next arrival home. */
-let pendingLevelUp = false;
+let pendingLevelUp = false, chargeTimer = null, charging = false;
+const LEVEL_UP_CHARGE_MS = 1500;
+/** Where the burst lands inside the clip, so the confetti goes off with it. */
+function burstOffsetMs(cfg){
+  if (!cfg.durations) return 0;
+  return cfg.durations.slice(0, 7).reduce((a, b) => a + b, 0);
+}
 function playPendingLevelUp(){
-  if (!pendingLevelUp) return;
+  if (!pendingLevelUp || charging) return;
   const art = levelUpArt(save.species, derived.stage);
   if (!art){ pendingLevelUp = false; return; }
-  // let the screen settle first, or the clip starts behind the transition
+  // let the screen settle first, or the wind-up starts behind the transition
   setTimeout(() => {
     if (!pendingLevelUp || currentScreen !== "home") return;
-    if (playClip(art, "levelup")){
-      pendingLevelUp = false;
-      confetti(46);
-    }
+    const stage = $("#pet-stage");
+    charging = true;
+    stage.style.setProperty("--charge", LEVEL_UP_CHARGE_MS + "ms");
+    stage.classList.add("charging");
+    clearTimeout(chargeTimer);
+    chargeTimer = setTimeout(() => {
+      stage.classList.remove("charging");
+      charging = false;
+      // walking away mid-charge leaves it armed rather than spending it
+      if (currentScreen !== "home"){ stage.classList.remove("charged"); return; }
+      if (playClip(art, "levelup")){
+        pendingLevelUp = false;
+        const burst = burstOffsetMs(art);
+        stage.style.setProperty("--release", burst + "ms");
+        stage.classList.add("charged");
+        setTimeout(() => stage.classList.remove("charged"), burst + 60);
+        setTimeout(() => confetti(46), burst);
+      }
+    }, LEVEL_UP_CHARGE_MS);
   }, 260);
 }
 function renderSkillChips(){
