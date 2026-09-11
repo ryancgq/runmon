@@ -107,8 +107,15 @@ move shows up as a chip under the pet — tap a chip, or the pet itself, to play
 it. Evolution lists all three with the level each needs, and tapping a learnt
 one there plays it on the pet screen.
 
-Each is a 16-frame sheet that plays once and hands the stage back to the idle
-loop. The movement is drawn into the frames, so the app never moves the sprite
+The Blazewyrm also has a level-up celebration: gold energy winds up, bursts,
+and the dragon opens its eyes on the other side of it. It plays on the pet
+screen rather than over the run summary — you read the run's numbers first,
+then come home to the pet that grew — and only for a run that actually earned
+a level. `LEVEL_UP_ART` keys it by species and stage, so it belongs to the
+form it was drawn for and another form simply has none until one is drawn.
+
+Each of these is a 16-frame sheet that plays once and hands the stage back to
+the idle loop. The movement is drawn into the frames, so the app never moves the sprite
 itself; every frame is cropped from one rectangle to keep that motion intact.
 `SKILLS` in `index.html` holds the whole definition, sprite geometry included —
 `dx` and `dy` nudge a sheet so its ground line sits exactly where the idle
