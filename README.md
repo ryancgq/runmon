@@ -78,6 +78,37 @@ Your choice sets the app's accent colour. The pet's expression and idle
 animation follow how recently you ran: elated the day you run, happy the day
 after, restless at two days, sad at three, and asleep from five.
 
+The Cinder Egg is a sprite too, as of the pack that replaced the vector one.
+It arrived as a 3x4 grid on a checkerboard baked into the pixels rather than
+real transparency, so the pattern was keyed out and the rim decontaminated —
+every edge pixel is background mixed into art, so the art colour is recovered
+from the nearest solid pixel and the mix ratio becomes the alpha. Flood the
+background in from the border rather than keying every neutral pixel, or the
+white highlight on the shell goes with it.
+
+The egg cracks as it levels. It is the one form whose art changes inside its
+own stage — intact at level 1, a first split at 2, a full web at 3 — and the
+crack is the level-up celebration: `ember:0@2` and `ember:0@3` in
+`LEVEL_UP_ART` carry the shell from one phase to the next and end on the frame
+the new idle opens with, so the celebration and the change of art are one
+event. While a level-up is armed the pet is still drawn as it was *before* it,
+or you would come home to an already cracked shell and then watch it crack.
+
+Those clips sit inside the same timing template as every other celebration, but
+the egg's decisive crack lands on frame 9 of 12, leaving no frames for a
+settle. That time goes to the final hold instead — the shell sits there split
+open while **Level Up!** arrives — so the clip still runs to 2250ms and the
+caption still lands at 1380ms, the same as every other form's.
+
+All five phases — three idles and two transitions — are packed to one
+silhouette size and one position. The packs draw each row of their grid 4 to 6%
+larger than the last, which unpacked would make the egg swell through its loop
+and jump at every handover between phases. Normalised, the ground line moves
+1.5 CSS px across all sixty frames. Scale is set so the shell has the same
+painted area as the Cinderling that hatches from it — the vector egg it
+replaced had that relationship, and losing it makes the egg look bigger than
+the creature inside.
+
 The Cinderling's idle is the fuzzy baby that matches its skill and
 celebration packs. Its frames are anchored before packing — each shifted so
 the dragon's feet land on one row and its body on one column — because the

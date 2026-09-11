@@ -109,7 +109,7 @@ final one, unlocking at levels 1, 5, 15, 30 and 50.
 
 | # | Ember — fire | Verdant — forest | Nimbus — storm |
 | --- | --- | --- | --- |
-| 1 | Cinder Egg | Seedpod | Static Egg |
+| 1 | **Cinder Egg** ✅ | Seedpod | Static Egg |
 | 2 | **Cinderling** ✅ | **Bamboo Cub** ✅ | Puffling |
 | 3 | **Blazewyrm** ✅ | Fernkin | Zephyrite |
 | 4 | Pyrelord | Thicketmane | Tempestor |
@@ -120,7 +120,18 @@ spirits. Either supply panda art for the rest of that line, or replace the cub
 later — the species currently reads as two ideas.
 
 Egg forms need far less than twelve frames — a pulse, a wobble, a crack. Four
-frames is plenty; supply what the form needs and say how many.
+frames is plenty; supply what the form needs and say how many. The Cinder Egg
+came as five sheets of twelve: three idles (intact, split, webbed) and the two
+transitions between them, which play as its level-up celebrations. Within an
+idle the frames barely differ — the speckles shimmer, nothing travels — while
+a transition's four rows are four crack states, three shimmer frames each.
+
+If a form ships as several sheets like that, they must agree on size and
+position or every handover jumps. These five did not: each row of each grid is
+drawn 4 to 6% larger than the last. Every frame of every sheet was scaled to
+one silhouette area and anchored to one centre before packing, which costs a
+1.8% resample at worst and leaves the shell inside 1.5 CSS px of one ground
+line across all sixty frames.
 
 Species should stay recognisably themselves across all five forms: same palette
 family, same silhouette language, same eyes. Ember reads as fire, Verdant as

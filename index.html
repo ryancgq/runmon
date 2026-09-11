@@ -1356,14 +1356,20 @@ function levelUpBeats(frames, gather, burst){
   gather = Math.max(0, Math.min(gather, burst));
   // the lead holds at a steady pace; whatever it leaves over is the build, so
   // a sheet that dawdles before its gold appears gathers faster, not later
-  const leadMs = Math.min(gather * T.hold, T.burstAt * .55);
-  const flash  = beatRamp(Math.min(2, Math.max(0, frames - burst - 1)), T.flash, 1);
+  const leadMs  = Math.min(gather * T.hold, T.burstAt * .55);
+  const flashN  = Math.min(2, Math.max(0, frames - burst - 1));
+  const settleN = Math.max(0, frames - burst - flashN - 1);
+  // a sheet that ends soon after its big moment has no frames left to spend a
+  // settle on - the egg's crack lands on its ninth frame of twelve. That time
+  // goes to the final hold instead, so the clip still runs to the same clock
+  // and the caption still arrives on the same beat as every other form's.
+  const spare = (flashN ? 0 : T.flash) + (settleN ? 0 : T.settle);
   return [
     ...beatRamp(gather, leadMs, 1),
     ...beatRamp(burst - gather, T.burstAt - leadMs, 170 / 90),
-    ...flash,
-    ...beatRamp(frames - burst - flash.length - 1, T.settle, 110 / 210),
-    T.last
+    ...beatRamp(flashN, T.flash, 1),
+    ...beatRamp(settleN, T.settle, 110 / 210),
+    T.last + spare
   ];
 }
 
@@ -1409,11 +1415,39 @@ function skillsFor(speciesId){ return SKILLS[speciesId] || []; }
 
 /* A form's own level-up celebration, keyed by species and stage so it only
    plays for the form it was drawn for. Missing art simply means no clip. */
+/* The Cinder Egg is the one form whose art changes inside its own stage. It
+   cracks as it levels - intact at level 1, a first split at 2, a full web at 3
+   - and the crack itself is the level-up celebration, so what the clip ends on
+   is what the idle takes over with. Every phase is packed to one silhouette
+   size and one position, so none of those handovers moves the shell. */
+const EGG_PHASES = [
+  { from:1, src:"art/ember-egg.png" },
+  { from:2, src:"art/ember-egg-cracked.png" },
+  { from:3, src:"art/ember-egg-breaking.png" }
+];
+function eggPhaseSrc(level){
+  let src = EGG_PHASES[0].src;
+  for (const p of EGG_PHASES) if (level >= p.from) src = p.src;
+  return src;
+}
+
 /** A celebration timed by the template above: mark the two frames, not all 16. */
 function levelUpClip(cfg){
   return { ...cfg, durations: levelUpBeats(cfg.frames, cfg.gather, cfg.burst) };
 }
 const LEVEL_UP_ART = {
+  // The egg does not flash gold - it splits. Its two clips carry the shell from
+  // one phase to the next and end on the frame the new idle opens with, so the
+  // celebration and the change of art are the same event. The decisive crack
+  // lands on frame 9 of 12, which leaves no frames for a settle; the template
+  // spends that time on the last frame instead, and the shell sits there split
+  // open while the caption arrives.
+  "ember:0@2": levelUpClip({ src:"art/ember-egg-crack-1.png", frames:12,
+    gather:2, burst:9, aspect:0.871, scale:0.71, dx:0, dy:-0.9,
+    cap:{ top:12, right:45 } }),
+  "ember:0@3": levelUpClip({ src:"art/ember-egg-crack-2.png", frames:12,
+    gather:2, burst:9, aspect:0.871, scale:0.71, dx:0, dy:-0.9,
+    cap:{ top:12, right:45 } }),
   // this one scowls and shuts its eyes for four frames before any gold shows,
   // so its build is shorter in frames and each of them holds longer. `cap`
   // brings the caption in to meet it: the baby draws 130px wide inside the
@@ -1426,7 +1460,13 @@ const LEVEL_UP_ART = {
   "ember:2": levelUpClip({ src:"art/levelup-blazewyrm.png", frames:16,
     gather:2, burst:7, aspect:1, scale:1.58, dx:2, dy:-1.1 })
 };
-function levelUpArt(speciesId, stage){ return LEVEL_UP_ART[speciesId + ":" + stage] || null; }
+/* Keyed by form, and by level where a form celebrates differently at different
+   levels - which so far is the egg, whose two crack clips belong to levels 2
+   and 3 rather than to the stage as a whole. */
+function levelUpArt(speciesId, stage, level){
+  const form = speciesId + ":" + stage;
+  return LEVEL_UP_ART[form + "@" + level] || LEVEL_UP_ART[form] || null;
+}
 
 /* GPS sanity filters */
 /* How much faster than real time a simulated run's clock may be wound. The
@@ -1452,7 +1492,7 @@ const SPECIES = {
     blurb:"A magma-blooded drake. Sprints hard, sulks harder, and burns brightest when you run often.",
     theme:{ accent:"#ff6b35", accent2:"#ffd23f", ink:"#220d02", glow:"255,107,53" },
     stages:[
-      { name:"Cinder Egg",  desc:"An obsidian shell with a furnace inside. Something in there is impatient." },
+      { name:"Cinder Egg",  desc:"A speckled shell, warm to the touch. Something in there is impatient." },
       { name:"Cinderling",  desc:"All head, tiny wings, permanently overheating. Hiccups sparks." },
       { name:"Blazewyrm",   desc:"Wings that finally work and a temper that mostly does not." },
       { name:"Pyrelord",    desc:"A proper drake. The air above it shimmers when you come home from a run." },
@@ -2384,6 +2424,16 @@ function spriteKey(species, stage){ return species + ":" + stage; }
 /* Art that ships with the app. A key present in save.sprites wins; an explicit
    null there means "use the vector pet instead of this default". */
 const DEFAULT_SPRITES = {
+  "ember:0": {
+    // The Cinder Egg, and the src the level swaps - see EGG_PHASES. Its twelve
+    // frames barely differ: the shell's speckles shimmer, nothing travels. The
+    // packs draw each row of their grid a little larger than the last, 4 to 6%
+    // across a sheet, so every frame of every phase is normalised to one
+    // silhouette size and anchored to one position when packed. Otherwise the
+    // egg swells through its loop and jumps at every handover between phases.
+    src:"art/ember-egg.png",
+    frames:12, rows:1, fps:2, aspect:0.871, scale:0.71, dx:0, dy:-0.9
+  },
   "ember:1": {
     // the fuzzy baby, matching the skill and celebration packs. the smoother
     // original is kept beside it: point src at ember-cinderling-original.png
@@ -2408,14 +2458,21 @@ const DEFAULT_SPRITES = {
 function spriteConfig(species, stage){
   const key = spriteKey(species, stage);
   const own = save.sprites[key];
-  return own !== undefined ? own : (DEFAULT_SPRITES[key] || null);
+  if (own !== undefined) return own;            // a pack you supplied is yours
+  const cfg = DEFAULT_SPRITES[key] || null;
+  // the egg is the one shipped sheet that changes inside its own stage
+  if (cfg && key === "ember:0"){
+    const now = (typeof derived === "object" && derived) ? derived.level : 1;
+    return { ...cfg, src: eggPhaseSrc(pendingLevelUp ? pendingLevelFrom : now) };
+  }
+  return cfg;
 }
 
 /* Bundled sheets keep their filename when the art changes, so a browser that
    already has one will happily go on showing the old drawing. Bump this and
    every cache along the way fetches the new file. Only the sheets that ship
    with the app are stamped; a sheet you point at yourself is used verbatim. */
-const ART_VERSION = "8";
+const ART_VERSION = "9";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
 }
@@ -2679,7 +2736,11 @@ function playSkill(id){
 /* A level earned on a run is celebrated on the pet screen, not over the
    summary - the run's numbers get read first, then you come home to the pet
    that grew. Set when the run is saved, spent on the next arrival home. */
-let pendingLevelUp = false, chargeTimer = null, charging = false;
+/* While a level-up is armed the pet is still shown as it was before it - the
+   celebration is what carries it across. That matters for the egg, whose art
+   changes with the level: without this you would come home to an already
+   cracked shell and then watch it crack. */
+let pendingLevelUp = false, pendingLevelFrom = 0, chargeTimer = null, charging = false;
 const LEVEL_UP_CHARGE_MS = 1500;
 /** Where the burst lands inside the clip, so the confetti goes off with it. */
 function burstOffsetMs(cfg){
@@ -2709,7 +2770,7 @@ function popLevelUp(art){
 }
 function playPendingLevelUp(){
   if (!pendingLevelUp || charging) return;
-  const art = levelUpArt(save.species, derived.stage);
+  const art = levelUpArt(save.species, derived.stage, derived.level);
   if (!art){ pendingLevelUp = false; return; }
   // let the screen settle first, or the wind-up starts behind the transition
   setTimeout(() => {
@@ -3417,9 +3478,15 @@ function finishRun(){
   persist();
 
   // arm the celebration for whichever form the pet is now, not the one it was
-  pendingLevelUp = derived.level > levelBefore && !!levelUpArt(save.species, derived.stage);
+  pendingLevelUp = derived.level > levelBefore && !!levelUpArt(save.species, derived.stage, derived.level);
+  pendingLevelFrom = levelBefore;
   // fetch it while the summary is being read, so it plays the moment you land
-  if (pendingLevelUp) probeSprite(levelUpArt(save.species, derived.stage).src);
+  if (pendingLevelUp){
+    probeSprite(levelUpArt(save.species, derived.stage, derived.level).src);
+    // and the sheet the clip hands back to, so the swap is not a blank frame
+    const after = spriteConfig(save.species, derived.stage);
+    if (after && after.src) probeSprite(after.src);
+  }
   showSummary(run, { levelBefore, stageBefore, celebrate:true });
   tracker.finished = false;
   tracker.segments = []; tracker.distanceM = 0;
@@ -3842,7 +3909,8 @@ function openDemoPanel(){
           closeSheet();
           const before = derived.level;
           Runmon.addRun(5, 28, 0);
-          pendingLevelUp = derived.level > before && !!levelUpArt(save.species, derived.stage);
+          pendingLevelUp = derived.level > before && !!levelUpArt(save.species, derived.stage, derived.level);
+          pendingLevelFrom = before;
           const r = save.runs[save.runs.length - 1];
           showSummary(r, { celebrate:true });
         } },
