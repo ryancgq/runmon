@@ -216,7 +216,7 @@ body::before{
   min-height:236px;
 }
 .pet-halo{
-  position:absolute;width:250px;height:250px;border-radius:50%;
+  position:absolute;width:205px;height:205px;border-radius:50%;
   background:radial-gradient(circle, rgba(var(--glow),.30), rgba(var(--glow),.06) 46%, transparent 68%);
   filter:blur(2px);
   animation:halo 5s ease-in-out infinite;
@@ -224,13 +224,13 @@ body::before{
 @keyframes halo{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.09);opacity:1}}
 .pet-stage.has-sprite .pet-shadow{opacity:0}
 .pet-shadow{
-  position:absolute;bottom:14px;width:120px;height:16px;border-radius:50%;
+  position:absolute;bottom:34px;width:98px;height:14px;border-radius:50%;
   background:radial-gradient(ellipse, rgba(0,0,0,.55), transparent 70%);
   animation:shadowPulse 2.6s ease-in-out infinite;
 }
 @keyframes shadowPulse{0%,100%{transform:scale(1);opacity:.6}50%{transform:scale(.86);opacity:.4}}
 
-.pet-holder{position:relative;width:210px;height:210px;display:grid;place-items:center}
+.pet-holder{position:relative;width:168px;height:168px;display:grid;place-items:center}
 .pet-holder svg{width:100%;height:100%;overflow:visible}
 .pet-holder.mini{width:88px;height:88px}
 .pet-holder.tiny{width:52px;height:52px}
@@ -1228,7 +1228,7 @@ const SKILLS = {
     { id:"flame-stomp", name:"Flame Stomp", ico:"\u{1F4A5}", stage:2, level:22,
       blurb:"Rears up and lands hard enough to throw a ring of fire out around it.",
       sprite:{ src:"art/skill-flame-stomp.png",  frames:16, fps:12.5, aspect:1.270, scale:1.98, dx:13, dy:-25 } },
-    { id:"flying-swoop", name:"Flying Swoop", ico:"\u{1F4A8}", stage:2, level:26,
+    { id:"flying-swoop", name:"Flying Swoop", ico:"\u2604\uFE0F", stage:2, level:26,
       blurb:"Those wings finally earn their keep: a low, fast pass trailing fire.",
       sprite:{ src:"art/skill-flying-swoop.png", frames:16, fps:14.3, aspect:1.270, scale:1.80, dx:1, dy:-27 } }
   ]
