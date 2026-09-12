@@ -31,6 +31,17 @@ you are on — **tap any of them to jump straight there**, no running required.
 Below that: log a run, learn the next skill, skip a day (which walks the pet
 down through all six moods), or start over and pick a different pet.
 
+**Test animations** is the one that levels nothing. It opens a panel that does
+not dim the screen, so the pet stays in view above it while you tap through
+every animation the app has: fifteen idles across all three species, the egg's
+three crack phases, six moods, four skills, four level-up celebrations — each
+with its full wind-up, burst and caption — and the confetti, the caption and
+the wind-up on their own. The pet is painted straight onto the stage and the
+celebrations run without a level to spend, so you can watch a Blazewyrm's
+celebration while your own pet is still an egg and its save comes out exactly
+as it went in. The panel lists itself from `DEFAULT_SPRITES`, `SKILLS` and
+`LEVEL_UP_ART`, so new art turns up in it without being registered twice.
+
 Starting a run in the sandbox runs it for you. The simulated runner covers
 ground forty times as fast as a real one, and Settings → Tracking winds the
 run's clock forward on top of that (1×, 10×, 30× or 60×), so seconds of

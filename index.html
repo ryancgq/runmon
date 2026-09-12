@@ -803,6 +803,24 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
   opacity:0;visibility:hidden;transition:opacity .26s var(--ease), visibility 0s linear .26s;
 }
 .sheet-wrap.show{opacity:1;visibility:visible;transition-delay:0s}
+/* The animation tester has to leave the pet visible while you tap through it,
+   so its panel drops the dimming and lets taps fall through to the app behind;
+   the panel itself still takes them. There is a Done button instead of a
+   backdrop to tap, since there is no backdrop left to catch it. */
+.sheet-wrap.bare{background:none;backdrop-filter:none;pointer-events:none}
+.sheet-wrap.bare .sheet{
+  pointer-events:auto;box-shadow:0 -20px 44px rgba(3,5,9,.6);
+  /* stop short of the pet stage rather than at a share of the screen, so the
+     pet stays in view on a short phone too; the panel scrolls instead */
+  max-height:calc(100% - 322px);
+}
+.anim-chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:13px}
+.anim-now{
+  font-size:11.5px;font-weight:800;color:var(--accent);background:rgba(var(--glow),.11);
+  border:1px solid rgba(var(--glow),.24);border-radius:999px;
+  padding:6px 12px;margin:0 0 13px;display:inline-block;
+}
+.anim-chips .skill-chip{font-size:11.5px;padding:7px 11px}
 .sheet{
   width:100%;background:var(--card);border:1px solid var(--line);border-bottom:0;
   border-radius:26px 26px 0 0;padding:18px 18px calc(20px + var(--safe-b));
@@ -2455,6 +2473,12 @@ const DEFAULT_SPRITES = {
     frames:12, rows:1, fps:2, aspect:1.157, scale:1.0
   }
 };
+/* What the animation tester is showing instead of your own pet: a form, a mood
+   and - for the egg, whose art follows the level - a level to read its phase
+   from. Nothing here is written to the save; clearing it puts the real pet
+   back. */
+let previewPet = null;
+
 function spriteConfig(species, stage){
   const key = spriteKey(species, stage);
   const own = save.sprites[key];
@@ -2463,7 +2487,9 @@ function spriteConfig(species, stage){
   // the egg is the one shipped sheet that changes inside its own stage
   if (cfg && key === "ember:0"){
     const now = (typeof derived === "object" && derived) ? derived.level : 1;
-    return { ...cfg, src: eggPhaseSrc(pendingLevelUp ? pendingLevelFrom : now) };
+    const lv = (previewPet && previewPet.level != null) ? previewPet.level
+             : pendingLevelUp ? pendingLevelFrom : now;
+    return { ...cfg, src: eggPhaseSrc(lv) };
   }
   return cfg;
 }
@@ -2768,13 +2794,18 @@ function popLevelUp(art){
   clearTimeout(popTimer);
   popTimer = setTimeout(() => { el.hidden = true; }, LEVEL_UP_POP_MS + 40);
 }
-function playPendingLevelUp(){
-  if (!pendingLevelUp || charging) return;
-  const art = levelUpArt(save.species, derived.stage, derived.level);
-  if (!art){ pendingLevelUp = false; return; }
+/* The whole celebration in one call: the CSS wind-up, then the sheet, with the
+   confetti on the burst and the caption on the settle. `wanted` is re-checked
+   after the pause and again after the wind-up, so walking away mid-charge
+   leaves a real level-up armed rather than spending it; `spend` is what marks
+   it spent. The animation tester passes neither - it has nothing to spend. */
+function runCelebration(art, opts){
+  opts = opts || {};
+  const wanted = opts.wanted || (() => true);
+  if (!art || charging) return false;
   // let the screen settle first, or the wind-up starts behind the transition
   setTimeout(() => {
-    if (!pendingLevelUp || currentScreen !== "home") return;
+    if (!wanted() || currentScreen !== "home") return;
     const stage = $("#pet-stage");
     charging = true;
     stage.style.setProperty("--charge", LEVEL_UP_CHARGE_MS + "ms");
@@ -2786,7 +2817,7 @@ function playPendingLevelUp(){
       // walking away mid-charge leaves it armed rather than spending it
       if (currentScreen !== "home"){ stage.classList.remove("charged"); return; }
       if (playClip(art, "levelup")){
-        pendingLevelUp = false;
+        if (opts.spend) opts.spend();
         const burst = burstOffsetMs(art);
         stage.style.setProperty("--release", burst + "ms");
         stage.classList.add("charged");
@@ -2796,6 +2827,13 @@ function playPendingLevelUp(){
       }
     }, LEVEL_UP_CHARGE_MS);
   }, 260);
+  return true;
+}
+function playPendingLevelUp(){
+  if (!pendingLevelUp || charging) return;
+  const art = levelUpArt(save.species, derived.stage, derived.level);
+  if (!art){ pendingLevelUp = false; return; }
+  runCelebration(art, { wanted: () => pendingLevelUp, spend: () => { pendingLevelUp = false; } });
 }
 function renderSkillChips(){
   const row = $("#home-skills");
@@ -2812,7 +2850,8 @@ function renderSkillChips(){
 /* --- home ---------------------------------------------------------------- */
 function renderHome(){
   const d = derived, sp = d.species;
-  if (!skillPlaying) paintPet($("#home-pet"), sp.id, d.stage, d.mood.key);
+  const shown = previewPet || { id: sp.id, stage: d.stage, mood: d.mood.key };
+  if (!skillPlaying) paintPet($("#home-pet"), shown.id, shown.stage, shown.mood);
   $("#pet-stage").classList.toggle("has-sprite", !!$("#home-pet .sprite-view"));
   renderSkillChips();
   $("#pet-name-txt").textContent = save.petName || sp.name;
@@ -3643,6 +3682,7 @@ function openSheet(cfg){
     ${cfg.body || ""}
     <div class="sheet-btns">${sheetActions.map((a, i) =>
       `<button class="btn ${a.cls || "ghost"}" data-sheet-act="${i}">${a.label}</button>`).join("")}</div>`;
+  $("#sheet-wrap").classList.toggle("bare", !!cfg.bare);
   $("#sheet-wrap").classList.add("show");
   if (cfg.onOpen) cfg.onOpen($("#sheet"));
 }
@@ -3919,6 +3959,7 @@ function openDemoPanel(){
           if (!nx){ toast("Every skill for this form is already learnt", "", "\u2728"); return; }
           demoJumpToLevel(nx.level, () => toast(`Learnt ${nx.name}`, "good", nx.ico));
         } },
+      { label:"Test animations", cls:"ghost", fn: () => { closeSheet(); openAnimationTester(); } },
       { label:"Skip a day", cls:"ghost", fn: () => {
           if (!save.runs.length){
             // nothing to shift: mood is driven by the gap since the last run
@@ -3940,6 +3981,119 @@ function openDemoPanel(){
       $$("[data-fj]", root).forEach(el => paintPet(el, d.species.id, +el.dataset.fj, d.mood.key));
     }
   });
+}
+
+/* --- animation tester ----------------------------------------------------- */
+/* Everything the app can play, listed from the same tables it plays them from,
+   so a sheet added later turns up here without being registered twice. The
+   panel does not dim the screen, so you tap a chip and watch the pet behind it.
+   Nothing here writes to the save: the pet is painted through `previewPet` and
+   the celebrations run without a level to spend, so you can watch a Blazewyrm
+   evolve-flash while your own pet is still an egg. */
+function animTestChip(kind, label, data){
+  return `<button class="skill-chip" data-anim="${kind}" ${data}>${label}</button>`;
+}
+function openAnimationTester(){
+  const EGG_NAMES = ["Intact", "First split", "Full web"];
+  const idles = SPECIES_ORDER.map(id => `
+    <div class="fj-label">${SPECIES[id].name} idles</div>
+    <div class="fj-grid">${SPECIES[id].stages.map((st, i) => `
+      <button class="fj" data-anim="idle" data-sp="${id}" data-st="${i}">
+        <div class="pet-holder" data-tiny="${id}:${i}"></div>
+        <div class="nm">${st.name}</div>
+      </button>`).join("")}</div>`).join("");
+  const eggs = EGG_PHASES.map((ph, i) =>
+    animTestChip("egg", EGG_NAMES[i] || `Phase ${i + 1}`, `data-lv="${ph.from}"`)).join("");
+  const moods = Object.values(MOODS).map(m =>
+    animTestChip("mood", `<span class="em">${m.emoji}</span>${m.label}`, `data-mood="${m.key}"`)).join("");
+  const skills = SPECIES_ORDER.flatMap(id => skillsFor(id).map(sk =>
+    animTestChip("skill", `<span class="em">${sk.ico}</span>${sk.name}`, `data-sp="${id}" data-sk="${sk.id}"`))).join("");
+  const celebs = Object.keys(LEVEL_UP_ART).map(key => {
+    const [form, lv] = key.split("@");
+    const [sp, st] = form.split(":");
+    return animTestChip("celebrate",
+      `${SPECIES[sp].stages[+st].name}${lv ? ` → Lv ${lv}` : ""}`, `data-key="${key}"`);
+  }).join("");
+
+  openSheet({
+    bare: true,
+    title: "Test animations",
+    desc: "Plays on the pet above — nothing here touches your own. Celebrations run their full wind-up, burst and caption.",
+    body: `<div class="anim-now" id="anim-now">Showing your own pet</div>
+      ${idles}
+      <div class="fj-label">Cinder Egg phases</div><div class="anim-chips">${eggs}</div>
+      <div class="fj-label">Mood</div><div class="anim-chips">${moods}</div>
+      <div class="fj-label">Skills</div><div class="anim-chips">${skills}</div>
+      <div class="fj-label">Level-up celebrations</div><div class="anim-chips">${celebs}</div>
+      <div class="fj-label">On their own</div><div class="anim-chips">
+        ${animTestChip("confetti", `<span class="em">\u{1F389}</span>Confetti`, "")}
+        ${animTestChip("caption", `<span class="em">\u2728</span>Level Up! caption`, "")}
+        ${animTestChip("charge", `<span class="em">\u26A1</span>Wind-up only`, "")}</div>`,
+    actions: [{ label:"Done", cls:"primary", fn: closeSheet }],
+    onClose: () => { previewPet = null; if (currentScreen === "home") renderHome(); },
+    onOpen: root => {
+      $$("[data-tiny]", root).forEach(el => {
+        const [sp, st] = el.dataset.tiny.split(":");
+        paintPet(el, sp, +st, "okay");
+      });
+      $$("[data-anim]", root).forEach(el =>
+        el.addEventListener("click", () => playAnimTest({ ...el.dataset }, root)));
+    }
+  });
+}
+/** Show what the tester is previewing, since the name under the pet is still yours. */
+function animTestNote(text){
+  const el = $("#anim-now");
+  if (el) el.textContent = text;
+}
+function playAnimTest(d, root){
+  if (currentScreen !== "home") go("home");
+  const mood = (previewPet && previewPet.mood) || "okay";
+  const show = (id, stage, level) => {
+    previewPet = { id, stage, mood, level: level != null ? level : null };
+    renderHome();
+    animTestNote(`Showing ${SPECIES[id].stages[stage].name} · ${MOODS[mood].label.toLowerCase()}`);
+  };
+  if (root) $$("[data-anim]", root).forEach(b => b.classList.remove("on"));
+  switch (d.anim){
+    case "idle":  show(d.sp, +d.st); break;
+    case "egg":   show("ember", 0, +d.lv); break;
+    case "mood": {
+      const at = previewPet || { id: derived.species.id, stage: derived.stage };
+      previewPet = { ...at, mood: d.mood };
+      renderHome();
+      animTestNote(`Showing ${SPECIES[previewPet.id].stages[previewPet.stage].name} · ${MOODS[d.mood].label.toLowerCase()}`);
+      break; }
+    case "skill": {
+      const sk = skillsFor(d.sp).find(k => k.id === d.sk);
+      if (!sk) return;
+      show(d.sp, sk.stage);
+      skillPlaying = null;                       // a tester tap always wins
+      playClip(sk.sprite, sk.id);
+      animTestNote(`Playing ${sk.name}`);
+      break; }
+    case "celebrate": {
+      const art = LEVEL_UP_ART[d.key];
+      const [form, lv] = d.key.split("@");
+      const [sp, st] = form.split(":");
+      // the wind-up plays over the form as it was before the level, which for
+      // the egg means the phase it is about to crack out of
+      show(sp, +st, lv ? +lv - 1 : null);
+      skillPlaying = null; charging = false; clearTimeout(chargeTimer);
+      runCelebration(art);
+      animTestNote(`Playing the ${SPECIES[sp].stages[+st].name} celebration`);
+      break; }
+    case "confetti": confetti(46); break;
+    case "caption":  popLevelUp(levelUpArt(previewPet ? previewPet.id : save.species,
+                                           previewPet ? previewPet.stage : derived.stage)); break;
+    case "charge": {
+      const stage = $("#pet-stage");
+      stage.classList.remove("charging"); void stage.offsetWidth;
+      stage.style.setProperty("--charge", LEVEL_UP_CHARGE_MS + "ms");
+      stage.classList.add("charging");
+      setTimeout(() => stage.classList.remove("charging"), LEVEL_UP_CHARGE_MS + 40);
+      break; }
+  }
 }
 
 /* --- import / export ----------------------------------------------------- */
