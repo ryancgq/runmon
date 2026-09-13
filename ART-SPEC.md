@@ -110,7 +110,7 @@ final one, unlocking at levels 1, 5, 15, 30 and 50.
 | # | Ember — fire | Verdant — forest | Nimbus — storm |
 | --- | --- | --- | --- |
 | 1 | **Cinder Egg** ✅ | Seedpod | Static Egg |
-| 2 | **Cinderling** ✅ | **Bamboo Cub** ✅ | Puffling |
+| 2 | **Cinderling** ✅ | **Bamboo Cub** ✅ | **Puffling** ✅ |
 | 3 | **Blazewyrm** ✅ | Fernkin | Zephyrite |
 | 4 | Pyrelord | Thicketmane | Tempestor |
 | 5 | Infernarch | Grovewarden | Thunderarch |
