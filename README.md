@@ -49,7 +49,8 @@ watching are worth tens of kilometres — fifteen seconds at 60× is a hundred
 kilometres and a level-15 pet. The pace it records is deliberately inhuman;
 real runs are never sped up.
 
-Pets with pixel art so far are **Ember** (baby and teen) and **Verdant** (baby).
+Pets with pixel art so far are **Ember** (egg, baby and teen), **Verdant** (baby)
+and **Nimbus** (baby).
 Everything else is still placeholder vector art.
 
 Under the hood the demo is `index.html?demo=1` — the same file, one flag, no
@@ -88,6 +89,22 @@ Three species, five stages each, all drawn as inline SVG and animated in CSS.
 Your choice sets the app's accent colour. The pet's expression and idle
 animation follow how recently you ran: elated the day you run, happy the day
 after, restless at two days, sad at three, and asleep from five.
+
+The Puffling — Nimbus's baby — is a squirrel with a charge in its ears, and its
+twelve frames tell the same kind of story the Bamboo Cub's do: it sits, it
+blinks, an acorn drops in, it eats. That art arrived with real alpha and hard
+edges already, so there was no keying to do; the rows still each drew the
+squirrel higher than the last, 16px and then another 33, so every frame is
+pinned to one ground line. Only the squirrel is pinned — the acorn and the
+lightning bolts are meant to move, and one of the bolts is drawn straight
+across a grid line, so the frames are cut by which piece belongs to which cell
+rather than on the grid itself. Cropping on the lines takes the top off that
+bolt and leaves its tip lying in the corner of the frame above.
+
+Its caption changed with it. The Puffling was written as a scrap of cloud that
+hovers a foot off the ground, which this squirrel plainly does not, so the
+description now matches what you see. The species blurb still says Nimbus never
+quite touches the ground — true of its other four forms, not of this one.
 
 The Cinder Egg is a sprite too, as of the pack that replaced the vector one.
 It arrived as a 3x4 grid on a checkerboard baked into the pixels rather than

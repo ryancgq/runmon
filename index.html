@@ -1537,7 +1537,7 @@ const SPECIES = {
     theme:{ accent:"#7cd4fd", accent2:"#fde047", ink:"#04202e", glow:"124,212,253" },
     stages:[
       { name:"Static Egg",  desc:"A cloud wrapped tightly around something that keeps zapping it." },
-      { name:"Puffling",    desc:"A giggling scrap of cloud with a bolt for a tail. Hovers about a foot up." },
+      { name:"Puffling",    desc:"A static-charged squirrel, ears crackling. Mostly interested in acorns." },
       { name:"Zephyrite",   desc:"Bolt-shaped wings and far too much energy for its size." },
       { name:"Tempestor",   desc:"A rolling storm front with a face. Your hair stands up nearby." },
       { name:"Thunderarch", desc:"A crowned stormhead orbited by its own lightning. Weather happens around it." }
@@ -2466,6 +2466,14 @@ const DEFAULT_SPRITES = {
     src:"art/ember-blazewyrm.png",
     // 12-frame loop; frame 6 is a hop, its shadow keeping the ground line
     frames:12, rows:1, fps:2, aspect:1.268, scale:1.2
+  },
+  "nimbus:1": {
+    src:"art/nimbus-puffling.png",
+    // 12-frame loop: sits, blinks, an acorn drops in, and it eats. The pack's
+    // rows each draw the squirrel higher than the last, so every frame is
+    // pinned to one ground line - only the squirrel, since the acorn and the
+    // bolts are meant to move.
+    frames:12, rows:1, fps:2, aspect:0.997, scale:1.04, dy:-7
   },
   "verdant:1": {
     src:"art/panda-cub.png",
