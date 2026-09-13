@@ -176,16 +176,26 @@ use them.
 ## Skills
 
 A form is not the end of a stage, it is the start of one: a pet keeps learning
-inside the form it grew into. The Cinderling has one move, and the Blazewyrm
-learns all three of its own between level 15, where the form arrives, and
-level 30, where the next one does.
+inside the form it grew into. The Cinderling and the Puffling have one move
+each, both at level 8, and the Blazewyrm learns all three of its own between
+level 15, where the form arrives, and level 30, where the next one does.
 
 | Skill | Form | Learns at | What it does |
 | --- | --- | --- | --- |
 | 🔥 fireball | Cinderling | Level 8 | Sold as the strongest fire you will ever see. Three seconds of winding up, then a cough and some smoke. |
+| ⚡ Thunderbolt | Puffling | Level 8 | Sold as the fury of the storm. It is — and most of it goes into the squirrel. |
 | 🔥 Fireball | Blazewyrm | Level 18 | Draws a breath and spits a packed ball of flame |
 | 💥 Flame Stomp | Blazewyrm | Level 22 | Lands hard enough to throw a ring of fire out around it |
 | ☄️ Flying Swoop | Blazewyrm | Level 26 | A low, fast pass trailing fire |
+
+Both babies' moves are the same joke told twice, which is deliberate: a first
+skill is sold as devastating and then goes wrong. The Cinderling coughs smoke;
+the Puffling gathers the whole storm and earths it through itself, and spends
+the last second and a half sitting there singed while the smoke drifts off it.
+Its charge frames genuinely progress — the bolts multiply — so unlike the
+Cinderling's they are not cycled, just slowed and then quickened, from 400ms a
+frame down to 170. What is cycled is the discharge, two frames alternating so
+the light flickers, and the aftermath, two more so the smoke moves.
 
 A move belongs to the form that learnt it and retires with that form — the art
 is that body's, so a Blazewyrm does not fizzle. Evolution still lists an
