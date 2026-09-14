@@ -202,7 +202,7 @@ The Cinderling and the Blazewyrm (Ember, stages 2 and 3) ship as pixel art in
 [`art/ember-cinderling.png`](art/ember-cinderling.png) and
 [`art/ember-blazewyrm.png`](art/ember-blazewyrm.png) — 12-frame loops at 2 fps
 — and the Bamboo Cub (Verdant, stage 2) in
-[`art/panda-cub.png`](art/panda-cub.png). The rest are inline SVG.
+[`art/verdant-bamboo-cub.png`](art/verdant-bamboo-cub.png). The rest are inline SVG.
 
 Note that this pet plays one continuous loop rather than a per-mood animation,
 so its face cycles through every expression regardless of how recently you ran.
