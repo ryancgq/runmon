@@ -84,84 +84,90 @@ jobs:
           CF_TOKEN:   ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          # wrangler's failures for these three are unreadable on a phone, and
-          # the fix for the first is a dashboard page whose menu label keeps
-          # changing. One API call says which it is, and lets us print a link
-          # with the real account id already in it.
-          api="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/subdomain"
-          code=$(curl -sS -o sub.json -w '%{http_code}' --max-time 30 -H "Authorization: Bearer $CF_TOKEN" "$api" || echo 000)
-          sub=$(python3 -c "import json;print((json.load(open('sub.json')).get('result') or {}).get('subdomain') or '')" 2>/dev/null || true)
-          # Cloudflare's own error text beats anything I can guess from a status
-          # code, so carry it into the summary verbatim.
-          cferr=$(python3 -c "import json;e=(json.load(open('sub.json')).get('errors') or [{}])[0];print('%s %s' % (e.get('code',''), e.get('message','')))" 2>/dev/null || true)
-          cfcode=$(python3 -c "import json;print((json.load(open('sub.json')).get('errors') or [{}])[0].get('code',''))" 2>/dev/null || true)
+          # Cloudflare is unreachable from where this workflow was written, so
+          # every dashboard path in it would be a guess - and two guesses have
+          # already 404'd. This asks Cloudflare instead, and only ever prints
+          # facts it got back.
           say () { echo "$1" >> "$GITHUB_STEP_SUMMARY"; }
+          get () { curl -sS -o "$2" -w '%{http_code}' --max-time 30 -H "Authorization: Bearer $CF_TOKEN" "$1" || echo 000; }
+          jget () { python3 -c "import json,sys;d=json.load(open(sys.argv[1]));r=d.get('result') or {};print(r.get(sys.argv[2]) or '')" "$1" "$2" 2>/dev/null || true; }
+          jerr () { python3 -c "import json,sys;e=(json.load(open(sys.argv[1])).get('errors') or [{}])[0];print('%s %s' % (e.get('code',''), e.get('message','')))" "$1" 2>/dev/null || true; }
 
-          if [ "$code" = "200" ] && [ -n "$sub" ]; then
+          base="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT"
+
+          # 1. Is the account id itself good? This separates "wrong id" from
+          #    "nothing set up yet", which otherwise both surface as a 404.
+          acode=$(get "$base" acct.json)
+          aname=$(jget acct.json name)
+          aerr=$(jerr acct.json)
+
+          if [ "$acode" != "200" ]; then
+            say "## Cloudflare would not accept the account or the token"
+            say ""
+            say "\`GET /accounts/{id}\` returned **HTTP $acode**."
+            [ -n "$aerr" ] && say "" && say "Cloudflare said: \`$aerr\`"
+            say ""
+            case "$acode" in
+              401|403) say "That is the token. Remake it at"
+                       say "https://dash.cloudflare.com/profile/api-tokens with the"
+                       say "*Edit Cloudflare Workers* template, leaving Client IP"
+                       say "filtering and TTL empty, and update the"
+                       say "\`CLOUDFLARE_API_TOKEN\` secret." ;;
+              400|404) say "That is the account id. \`CLOUDFLARE_ACCOUNT_ID\` must be"
+                       say "the 32 hex characters from the dashboard's own URL and"
+                       say "nothing else - no https://, no /workers, no email." ;;
+              *)       say "Neither reason is obvious. The raw response is in the"
+                       say "step log above." ;;
+            esac
+            say ""
+            say "Nothing was deployed."
+            echo "::error::GET /accounts/{id} returned $acode"
+            exit 1
+          fi
+
+          say "Cloudflare account: **$aname**"
+          say ""
+
+          # 2. Account is good, so a 404 here really does mean "no subdomain".
+          scode=$(get "$base/workers/subdomain" sub.json)
+          sub=$(jget sub.json subdomain)
+          serr=$(jerr sub.json)
+
+          if [ "$scode" = "200" ] && [ -n "$sub" ]; then
             echo "workers.dev subdomain: $sub"
             say "Deploying to \`runmon-strava.$sub.workers.dev\`"
             say ""
             exit 0
           fi
 
-          # A brand new account answers 404 here: the subdomain resource does
-          # not exist yet. That is the common case, not a bad account id.
-          if [ "$code" = "200" ] || [ "$code" = "404" ]; then
+          if [ "$scode" = "200" ] || [ "$scode" = "404" ]; then
             say "## Pick a workers.dev subdomain first"
             say ""
-            say "Your Cloudflare account has not chosen one yet. A first deploy"
-            say "stops to ask for it and this runner has nobody to ask, so it has"
-            say "to be done once by hand, in the dashboard:"
+            say "Your account id is correct - Cloudflare just told us the account"
+            say "is **$aname**. What it has not got is a workers.dev subdomain,"
+            say "and a first deploy stops to ask for one. This runner has nobody"
+            say "to ask, so it has to be chosen by hand, once."
+            [ -n "$serr" ] && say "" && say "Cloudflare said: \`$serr\`"
             say ""
-            say "**https://dash.cloudflare.com/$CF_ACCOUNT/workers-and-pages**"
+            say "Open **https://dash.cloudflare.com/$CF_ACCOUNT** - that is your"
+            say "account's home page, not a guess at a deeper path. From there"
+            say "find **Workers** (the section name moves around; the dashboard's"
+            say "own search box finds it). The subdomain prompt is on the Workers"
+            say "overview, usually as *Your subdomain* with a Change or Set link."
             say ""
-            say "That link already has your account id in it. Pick any name; it"
-            say "becomes the worker's address, \`runmon-strava.<name>.workers.dev\`."
-            say "Then re-run this workflow from the Actions tab."
-            if [ -n "$cferr" ]; then
-              say ""
-              say "Cloudflare said: \`$cferr\`"
-              say ""
-              say "If that page shows you *already have* a subdomain, then this"
-              say "is the other thing a 404 can mean and \`CLOUDFLARE_ACCOUNT_ID\`"
-              say "is wrong - it is the 32 hex characters in the dashboard's own"
-              say "URL, nothing else."
-            fi
+            say "Whatever you pick becomes the address:"
+            say "\`runmon-strava.<name>.workers.dev\`. Then re-run this workflow."
             say ""
             say "Nothing was deployed."
-            echo "::error::no workers.dev subdomain (HTTP $code, $cferr)"
+            echo "::error::no workers.dev subdomain ($scode, $serr)"
             exit 1
           fi
 
-          if [ "$code" = "401" ] || [ "$code" = "403" ]; then
-            say "## Cloudflare rejected the API token"
-            say ""
-            say "HTTP $code from the Workers API. Either \`CLOUDFLARE_API_TOKEN\` is"
-            say "wrong or expired, or it lacks Workers permissions. Remake it at"
-            say "https://dash.cloudflare.com/profile/api-tokens with the *Edit"
-            say "Cloudflare Workers* template rather than by hand."
-            [ -n "$cferr" ] && say "" && say "Cloudflare said: \`$cferr\`"
-            say ""
-            say "Nothing was deployed."
-            echo "::error::Cloudflare returned $code for the token"
-            exit 1
-          fi
-
-          if [ "$code" = "400" ]; then
-            say "## That Account ID does not look right"
-            say ""
-            say "Cloudflare returned HTTP $code. \`CLOUDFLARE_ACCOUNT_ID\` is the 32"
-            say "hex characters in the dashboard's own URL, not your email."
-            [ -n "$cferr" ] && say "" && say "Cloudflare said: \`$cferr\`"
-            say ""
-            say "Nothing was deployed."
-            echo "::error::Cloudflare returned $code for that account id"
-            exit 1
-          fi
-
-          # Anything else is a blip, or a token that cannot read this one
-          # endpoint. Not worth blocking a deploy that may well work.
-          echo "::warning::could not check the workers.dev subdomain (HTTP $code); continuing"
+          # Readable but unexpected: say so and let wrangler have its turn.
+          echo "::warning::subdomain check returned HTTP $scode ($serr); continuing"
+          say "Could not read the workers.dev subdomain (HTTP $scode). Trying the"
+          say "deploy anyway."
+          say ""
 
       - name: Deploy to Cloudflare
         id: deploy
