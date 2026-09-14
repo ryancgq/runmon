@@ -31,6 +31,11 @@ on:
       - "worker/**"
       - ".github/workflows/deploy-worker.yml"
   workflow_dispatch:          # lets you run it by hand from the Actions tab
+    inputs:
+      subdomain:
+        description: "workers.dev name to claim, if the account has none yet (lowercase letters, digits, hyphens)"
+        required: false
+        default: ""
 
 jobs:
   deploy:
@@ -151,39 +156,55 @@ jobs:
             exit 0
           fi
 
+          # 3. No subdomain. The dashboard page that creates one has moved
+          #    around enough that three different URLs 404'd, so claim it
+          #    through the API instead - same thing, no navigating.
           if [ "$scode" = "200" ] || [ "$scode" = "404" ]; then
-            say "## Pick a workers.dev subdomain first"
+            want=$(echo "${{ inputs.subdomain }}" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9-')
+
+            if [ -n "$want" ]; then
+              pcode=$(curl -sS -o put.json -w '%{http_code}' --max-time 30 -X PUT \
+                        -H "Authorization: Bearer $CF_TOKEN" \
+                        -H "Content-Type: application/json" \
+                        --data "{\"subdomain\":\"$want\"}" \
+                        "$base/workers/subdomain" || echo 000)
+              perr=$(jerr put.json)
+
+              if [ "$pcode" = "200" ]; then
+                say "Claimed the workers.dev subdomain **$want**."
+                say ""
+                echo "claimed subdomain: $want"
+                exit 0
+              fi
+
+              say "## Could not claim \`$want\`"
+              say ""
+              say "Cloudflare returned **HTTP $pcode**."
+              [ -n "$perr" ] && say "" && say "Cloudflare said: \`$perr\`"
+              say ""
+              say "workers.dev names are unique across all of Cloudflare, so a"
+              say "short common word is usually taken. Run this workflow again"
+              say "with something more specific in the **subdomain** box."
+              say ""
+              say "Nothing was deployed."
+              echo "::error::could not claim subdomain $want ($pcode $perr)"
+              exit 1
+            fi
+
+            say "## This account needs a workers.dev subdomain"
             say ""
-            say "Your account id is correct - Cloudflare just told us the account"
-            say "is **$aname**. What it has not got is a workers.dev subdomain,"
-            say "and a first deploy stops to ask for one. This runner has nobody"
-            say "to ask, so it has to be chosen by hand, once."
+            say ""
+            say "Your account id and token are both fine - Cloudflare just told"
+            say "us the account is **$aname**. It simply has no workers.dev"
+            say "subdomain yet, and a first deploy needs one."
             [ -n "$serr" ] && say "" && say "Cloudflare said: \`$serr\`"
             say ""
-            say "Open this, while signed in to Cloudflare:"
-            say ""
-            if [ -n "$CF_ACCOUNT_SHOWABLE" ]; then
-              say "**https://dash.cloudflare.com/$CF_ACCOUNT_SHOWABLE/workers/workers-and-pages**"
-            else
-              say "    https://dash.cloudflare.com/<your account id>/workers/workers-and-pages"
-              say ""
-              say "Paste your own account id in - GitHub redacts secrets from this"
-              say "summary, so a link built here would read \`***\` where the id"
-              say "belongs. Storing the id as a repository *variable* instead of a"
-              say "secret (Settings -> Secrets and variables -> Actions ->"
-              say "**Variables**, same name) makes this link clickable next time;"
-              say "an account id is an identifier, not a credential, and grants"
-              say "nothing without the token."
-            fi
-            say ""
-            say "That path is Cloudflare's own, quoted in the message above, with"
-            say "your account id in place of \`:account\` - the substitution is why"
-            say "it works when the \`?to=/:account/...\` form does not resolve. Note"
-            say "the \`/workers/\` segment; without it you get a 404."
-            say ""
-            say "You do not have to choose anything there. Cloudflare creates the"
-            say "subdomain the first time that page is opened. Then re-run this"
-            say "workflow and the deploy goes through."
+            say "**Run this workflow again and type a name into the \`subdomain\`"
+            say "box.** It will be claimed through Cloudflare's API, so there is"
+            say "no dashboard page to find. The name becomes the worker's"
+            say "address, \`runmon-strava.<name>.workers.dev\`; lowercase letters,"
+            say "digits and hyphens, and unique across all of Cloudflare, so"
+            say "pick something specific rather than a short common word."
             say ""
             say "Nothing was deployed."
             echo "::error::no workers.dev subdomain ($scode, $serr)"
