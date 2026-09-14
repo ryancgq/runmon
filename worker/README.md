@@ -38,6 +38,11 @@ chat. GitHub encrypts these and does not show them again.
 commit. Committing it triggers the deploy; the Actions tab then shows the
 worker's URL in the run summary.
 
+If you already committed it, or a run failed because a secret was not set yet,
+there is nothing to re-commit: Actions → *Deploy the Strava broker* → **Run
+workflow** starts it again. A run that stops for a missing secret says which
+one in its summary, and deploys nothing.
+
 **5. Back to Strava**, set the **Authorization Callback Domain** to that URL's
 host only — `runmon-strava.<you>.workers.dev`, no scheme, no path.
 
