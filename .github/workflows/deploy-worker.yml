@@ -34,6 +34,50 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check the four secrets are set
+        env:
+          CF_TOKEN:   ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          STRAVA:     ${{ secrets.STRAVA_CLIENT_SECRET }}
+          SESSION:    ${{ secrets.SESSION_SECRET }}
+        run: |
+          # A missing secret otherwise fails deep inside wrangler with a message
+          # that tells you nothing. Say plainly which ones are not set yet.
+          missing=""
+          [ -n "$CF_TOKEN"   ] || missing="$missing CLOUDFLARE_API_TOKEN"
+          [ -n "$CF_ACCOUNT" ] || missing="$missing CLOUDFLARE_ACCOUNT_ID"
+          [ -n "$STRAVA"     ] || missing="$missing STRAVA_CLIENT_SECRET"
+          [ -n "$SESSION"    ] || missing="$missing SESSION_SECRET"
+          [ -n "$missing" ] || exit 0
+
+          {
+            echo "## Not deployed yet - some secrets are missing"
+            echo ""
+            echo "Set these at **Settings -> Secrets and variables -> Actions"
+            echo "-> New repository secret**, then re-run this from the Actions tab:"
+            echo ""
+            for name in $missing; do
+              case "$name" in
+                CLOUDFLARE_API_TOKEN)
+                  echo "- \`$name\` - dash.cloudflare.com -> My Profile -> API Tokens"
+                  echo "  -> Create Token -> use the **Edit Cloudflare Workers** template" ;;
+                CLOUDFLARE_ACCOUNT_ID)
+                  echo "- \`$name\` - dash.cloudflare.com -> Workers & Pages, in the"
+                  echo "  right-hand column (a long string of letters and numbers)" ;;
+                STRAVA_CLIENT_SECRET)
+                  echo "- \`$name\` - strava.com/settings/api, under *Client Secret*" ;;
+                SESSION_SECRET)
+                  echo "- \`$name\` - any long random string you make up. It signs"
+                  echo "  login sessions; it does not come from Strava or Cloudflare." ;;
+              esac
+            done
+            echo ""
+            echo "Nothing else has run, so nothing is half-deployed."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "Missing repository secrets:$missing" >&2
+          exit 1
+
       - name: Deploy to Cloudflare
         id: deploy
         uses: cloudflare/wrangler-action@v4
@@ -51,10 +95,15 @@ jobs:
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
 
       - name: Tell me the URL
-        if: always()
+        # skipped when the preflight stopped us: it already said what to do
+        if: always() && steps.deploy.conclusion != 'skipped'
         run: |
           {
-            echo "## Strava broker deployed"
+            if [ "${{ steps.deploy.outcome }}" = "success" ]; then
+              echo "## Strava broker deployed"
+            else
+              echo "## The deploy failed"
+            fi
             echo ""
             URL="${{ steps.deploy.outputs.deployment-url }}"
             if [ -n "$URL" ]; then
