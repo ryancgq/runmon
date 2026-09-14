@@ -79,6 +79,73 @@ jobs:
           echo "Missing repository secrets:$missing" >&2
           exit 1
 
+      - name: Check Cloudflare is ready
+        env:
+          CF_TOKEN:   ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          # wrangler's failures for these three are unreadable on a phone, and
+          # the fix for the first is a dashboard page whose menu label keeps
+          # changing. One API call says which it is, and lets us print a link
+          # with the real account id already in it.
+          api="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/subdomain"
+          code=$(curl -sS -o sub.json -w '%{http_code}' --max-time 30 -H "Authorization: Bearer $CF_TOKEN" "$api" || echo 000)
+          sub=$(python3 -c "import json;print((json.load(open('sub.json')).get('result') or {}).get('subdomain') or '')" 2>/dev/null || true)
+          say () { echo "$1" >> "$GITHUB_STEP_SUMMARY"; }
+
+          if [ "$code" = "200" ] && [ -n "$sub" ]; then
+            echo "workers.dev subdomain: $sub"
+            say "Deploying to \`runmon-strava.$sub.workers.dev\`"
+            say ""
+            exit 0
+          fi
+
+          if [ "$code" = "200" ]; then
+            say "## Pick a workers.dev subdomain first"
+            say ""
+            say "Your Cloudflare account has not chosen one yet. A first deploy"
+            say "stops to ask for it and this runner has nobody to ask, so it has"
+            say "to be done once by hand, in the dashboard:"
+            say ""
+            say "**https://dash.cloudflare.com/$CF_ACCOUNT/workers-and-pages**"
+            say ""
+            say "That link already has your account id in it. Pick any name; it"
+            say "becomes the worker's address, \`runmon-strava.<name>.workers.dev\`."
+            say "Then re-run this workflow from the Actions tab."
+            say ""
+            say "Nothing was deployed."
+            echo "::error::no workers.dev subdomain on this account"
+            exit 1
+          fi
+
+          if [ "$code" = "401" ] || [ "$code" = "403" ]; then
+            say "## Cloudflare rejected the API token"
+            say ""
+            say "HTTP $code from the Workers API. Either \`CLOUDFLARE_API_TOKEN\` is"
+            say "wrong or expired, or it lacks Workers permissions. Remake it at"
+            say "https://dash.cloudflare.com/profile/api-tokens with the *Edit"
+            say "Cloudflare Workers* template rather than by hand."
+            say ""
+            say "Nothing was deployed."
+            echo "::error::Cloudflare returned $code for the token"
+            exit 1
+          fi
+
+          if [ "$code" = "400" ] || [ "$code" = "404" ]; then
+            say "## That Account ID does not look right"
+            say ""
+            say "Cloudflare returned HTTP $code. \`CLOUDFLARE_ACCOUNT_ID\` is the 32"
+            say "hex characters in the dashboard's own URL, not your email."
+            say ""
+            say "Nothing was deployed."
+            echo "::error::Cloudflare returned $code for that account id"
+            exit 1
+          fi
+
+          # Anything else is a blip, or a token that cannot read this one
+          # endpoint. Not worth blocking a deploy that may well work.
+          echo "::warning::could not check the workers.dev subdomain (HTTP $code); continuing"
+
       - name: Deploy to Cloudflare
         id: deploy
         uses: cloudflare/wrangler-action@v4
@@ -124,9 +191,8 @@ jobs:
               echo ""
               echo "- **No workers.dev subdomain yet.** A brand new Cloudflare"
               echo "  account has not picked one, and this runner cannot answer"
-              echo "  the prompt that asks. Open"
-              echo "  dash.cloudflare.com/?to=/:account/workers/workers-and-pages,"
-              echo "  choose a subdomain, then re-run this workflow."
+              echo "  the prompt that asks. The step before this one normally"
+              echo "  catches that and prints the exact page to fix it on."
               echo "- **The API token is missing a permission.** Make it from the"
               echo "  *Edit Cloudflare Workers* template rather than by hand."
               echo "- **A wrong Account ID.** It is the 32 hex characters in the"
