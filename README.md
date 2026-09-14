@@ -92,9 +92,12 @@ after, restless at two days, sad at three, and asleep from five.
 
 The Puffling — Nimbus's baby — is a squirrel with a charge in its ears, and its
 twelve frames tell the same kind of story the Bamboo Cub's do: it sits, it
-blinks, an acorn drops in, it eats. That art arrived with real alpha and hard
-edges already, so there was no keying to do; the rows still each drew the
-squirrel higher than the last, 16px and then another 33, so every frame is
+blinks, an acorn drops in, it eats. Its sheet has been redrawn once since; the
+replacement came with soft edges, which are hardened on the way in because the
+app renders with `image-rendering: pixelated` and feathering turns to mush. It
+is calibrated to render exactly where the sheet it replaced did — same painted
+area to within 1%, same ground line to the pixel — so nothing downstream moved.
+The rows still each drew the squirrel higher than the last, so every frame is
 pinned to one ground line. Only the squirrel is pinned — the acorn and the
 lightning bolts are meant to move, and one of the bolts is drawn straight
 across a grid line, so the frames are cut by which piece belongs to which cell
