@@ -1234,6 +1234,30 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
       </div>
     </div>
 
+    <!-- Only reached when a broker is configured and the athlete is not linked
+         yet; skipped entirely in the sandbox, where STRAVA_ON is false. Asked
+         before the egg because connecting leaves the page, and losing a chosen
+         egg and a typed name to a redirect is worse than asking first. -->
+    <div class="ob-step" id="ob-strava">
+      <h2 style="font-size:26px;margin-top:14px">Connect Strava</h2>
+      <p class="muted" style="font-size:13px;font-weight:600;line-height:1.55;margin:8px 0 0">
+        Record your runs in Strava exactly as you do now. Runmon reads them and
+        feeds your pet on its own — there is nothing to remember to open.
+      </p>
+      <div class="pet-stage" style="min-height:170px">
+        <div class="pet-halo"></div>
+        <div class="pet-holder egg-crack" id="ob-strava-art"></div>
+      </div>
+      <p class="muted" style="font-size:12px;font-weight:700;line-height:1.6;margin:0">
+        Runmon only ever reads your activities, never posts. Runs from before you
+        connect do not count — your pet starts from the next one.
+      </p>
+      <div class="ob-foot">
+        <button class="btn primary" id="ob-strava-go">Connect Strava</button>
+        <button class="btn ghost" id="ob-strava-skip" style="margin-top:9px">Not now</button>
+      </div>
+    </div>
+
     <div class="ob-step" id="ob-2">
       <h2 style="font-size:26px;margin-top:14px">Pick your egg</h2>
       <p class="muted" style="font-size:13px;font-weight:600;line-height:1.55;margin:8px 0 0">
@@ -3935,11 +3959,16 @@ function showOnboarding(){
   applyTheme(hero);
   paintPet($("#ob-hero"), hero, 0, "okay");
   renderSpeciesPicks();
-  obStep(1);
+  paintPet($("#ob-strava-art"), hero, 0, "okay");
+  obStep("ob-1");
 }
-function obStep(n){
-  $$(".ob-step").forEach((s, i) => s.classList.toggle("on", i === n - 1));
+function obStep(id){
+  $$(".ob-step").forEach(s => s.classList.toggle("on", s.id === id));
   $("#onboard").scrollTop = 0;
+}
+/* The Strava step is worth showing only to someone who could act on it. */
+function obAfterWelcome(){
+  return (STRAVA_ON && !stravaLinked()) ? "ob-strava" : "ob-2";
 }
 function renderSpeciesPicks(){
   $("#species-picks").innerHTML = SPECIES_ORDER.map(id => {
@@ -4535,14 +4564,23 @@ function wire(){
   });
 
   // onboarding
-  $("#ob-go").addEventListener("click", () => obStep(2));
+  $("#ob-go").addEventListener("click", () => obStep(obAfterWelcome()));
+  $("#ob-strava-go").addEventListener("click", () => {
+    // leaves the page for Strava and comes back through /callback; nothing has
+    // been chosen yet, so there is nothing to lose on the way
+    location.href = RUNMON_API + "/connect";
+  });
+  $("#ob-strava-skip").addEventListener("click", () => {
+    obStep("ob-2");
+    toast("You can connect Strava any time in Settings", "", "\u2699\uFE0F");
+  });
   $("#ob-next").addEventListener("click", () => {
     if (!obSpecies) return;
     paintPet($("#ob-egg"), obSpecies, 0, "okay");
     $("#ob-name").placeholder = SPECIES[obSpecies].name;
-    obStep(3);
+    obStep("ob-3");
   });
-  $("#ob-back").addEventListener("click", () => obStep(2));
+  $("#ob-back").addEventListener("click", () => obStep("ob-2"));
   $("#ob-hatch").addEventListener("click", hatch);
   $("#ob-name").addEventListener("keydown", e => { if (e.key === "Enter") hatch(); });
 
