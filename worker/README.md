@@ -19,25 +19,30 @@ runs it for you. Everything below happens in a browser.
 **2. Set up Cloudflare** (free account — Durable Objects are on the free plan,
 and only the SQLite-backed kind this worker uses).
 
-Cloudflare moves its dashboard navigation around, and a new account often lands
-on an "add a site" onboarding screen that hides the product list, so use these
-links rather than hunting for a menu item:
+Cloudflare rearranges its dashboard navigation, and a new account tends to land
+on an "add a site" onboarding screen that hides the product list, so menu
+directions here would only rot. Two steps that don't depend on any label:
 
-- **Pick your workers.dev subdomain** —
-  [dash.cloudflare.com/?to=/:account/workers/workers-and-pages](https://dash.cloudflare.com/?to=/:account/workers/workers-and-pages).
-  (`:account` fills itself in.) If it offers you a subdomain, or a *Change* next
-  to *Your subdomain*, set one. **This is the only thing you must click before
-  deploying**: a first deploy otherwise stops to ask, and a CI runner has nobody
-  to ask. It becomes the worker's address,
-  `runmon-strava.<subdomain>.workers.dev`.
-- **Your Account ID** — read it out of the address bar. Once you are inside an
-  account the URL is `dash.cloudflare.com/<32 hex characters>/…`, and that hex
-  string *is* the Account ID. More reliable than any panel that may get moved.
+- **Your Account ID** — log in at [dash.cloudflare.com](https://dash.cloudflare.com)
+  and read it out of the address bar. Once you are inside an account the URL is
+  `dash.cloudflare.com/<32 hex characters>/…`, and that hex string *is* the
+  Account ID. Keep it; every other page is reachable by pasting it into a URL.
 - **An API token** —
   [dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens)
   → Create Token → the *Edit Cloudflare Workers* template. Don't assemble the
   permissions by hand. Its zone section is fine left on *All zones* even with no
   domain on the account.
+
+Then set the GitHub secrets below and run the workflow. It checks Cloudflare
+before deploying anything, and if the account still needs a **workers.dev
+subdomain** — the one thing that must be clicked by hand, because a first deploy
+stops to ask for it and a CI runner has nobody to ask — the run summary hands
+you the exact page, with your account id already in the link:
+
+    https://dash.cloudflare.com/<your account id>/workers-and-pages
+
+Whatever name you pick there becomes the worker's address,
+`runmon-strava.<name>.workers.dev`. Then re-run the workflow.
 
 Nothing else: no project to create, no payment method, no domain. `wrangler`
 creates the worker and its Durable Object on the first deploy.
