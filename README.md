@@ -21,8 +21,15 @@ the file list above, not by following a link that looks like the app.
 ## Strava
 
 Runmon can take its runs from Strava instead of its own tracker: you run with
-Strava as normal, open Runmon, and the pet has grown. **Settings → Strava →
-Connect**, once, and it keeps itself up to date after that.
+Strava as normal, open Runmon, and the pet has grown. Connect once and it keeps
+itself up to date after that.
+
+New players are asked during onboarding, before they pick an egg — connecting
+leaves the page for Strava's consent screen, and losing a chosen egg and a typed
+name to that redirect is worse than asking first. Declining is fine: the step
+says the offer stands in **Settings → Strava**, which is also where anyone who
+skipped it can connect later. The step is skipped entirely for someone already
+linked, and in the sandbox, which has no broker to connect to.
 
 Only runs recorded *after* you connect count. Your history stays yours — the
 pet starts as an egg and grows from your next run, because a pet that arrives
