@@ -187,17 +187,17 @@ Zephyrite has the first of its own at 18, the same level the Blazewyrm starts.
 | Skill | Form | Learns at | What it does |
 | --- | --- | --- | --- |
 | 🔥 fireball | Cinderling | Level 8 | Sold as the strongest fire you will ever see. Three seconds of winding up, then a cough and some smoke. |
-| ⚡ thunderbolt | Puffling | Level 8 | Guaranteed to leave something scorched. The something is the squirrel. |
+| ⚡ Spark | Puffling | Level 8 | Guaranteed to leave something scorched. The something is the squirrel. |
 | 🔥 Fireball | Blazewyrm | Level 18 | Draws a breath and spits a packed ball of flame |
 | 💥 Flame Stomp | Blazewyrm | Level 22 | Lands hard enough to throw a ring of fire out around it |
 | ☄️ Flying Swoop | Blazewyrm | Level 26 | A low, fast pass trailing fire |
 | 🌩️ Lightning Bolt | Zephyrite | Level 18 | Asks the sky for help. The sky, this time, obliges. |
 
 Both babies' moves are the same joke told twice, which is deliberate: a first
-skill is named for what it was meant to be, and both are lowercase for the same
-reason. The Cinderling coughs smoke;
-the Puffling gathers the whole storm and earths it through itself, and spends
-the last second and a half sitting there singed while the smoke drifts off it.
+skill is named for what the pet thinks it is doing. The Cinderling coughs
+smoke; the Puffling's Spark gathers the whole storm and earths it through
+itself, and spends the last second and a half sitting there singed while the
+smoke drifts off it.
 The Zephyrite's is the same idea grown up and not played for laughs: it
 gathers, the sky answers with an orb, and a bolt comes down. Its charge quickens
 the same way, but the four strike frames grow rather than flicker, so they are
