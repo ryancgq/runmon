@@ -18,6 +18,39 @@ the file list above, not by following a link that looks like the app.
 
 ---
 
+## Strava
+
+Runmon can take its runs from Strava instead of its own tracker: you run with
+Strava as normal, open Runmon, and the pet has grown. **Settings → Strava →
+Connect**, once, and it keeps itself up to date after that.
+
+Only runs recorded *after* you connect count. Your history stays yours — the
+pet starts as an egg and grows from your next run, because a pet that arrives
+at level forty has skipped the part that makes it a pet.
+
+Runs and trail runs feed it. Treadmill runs are opt-in, because their distance
+is whatever the machine said. Rides, walks and hikes are ignored — the pace and
+calorie models would read them as impossibly fast or impossibly slow runs.
+
+Once connected, your pet lives on the server rather than in the browser, keyed
+to your Strava athlete id, so it follows you between devices. **Disconnect**
+revokes Runmon's access at Strava and deletes the pet and its history; there is
+no undo.
+
+This is the only part of Runmon that is not a static file, and it exists for
+one reason: Strava's OAuth needs a client secret, and a page served from
+GitHub Pages cannot keep one. [`worker/`](worker/) is the smallest thing that
+can — about 250 lines, one Durable Object per athlete, deployed free on
+Cloudflare. It stores the save and returns activities; it knows nothing about
+levels. See [`worker/README.md`](worker/README.md) to deploy your own.
+
+`RUNMON_API` at the top of `index.html` points at it. Leave it empty and Strava
+is absent from the app entirely: no panel, no network calls. **The sandbox is
+always in that state**, so it keeps working offline and needs no worker to test
+new artwork against.
+
+---
+
 ## Demo build
 
 **→ https://ryancgq.github.io/runmon/demo.html**

@@ -1,0 +1,26 @@
+# The only piece of Runmon that is not a static file. It exists because Strava's
+# OAuth needs a client secret, and a page served from GitHub Pages cannot keep
+# one. Everything it knows how to do is in src/index.js; it holds no game rules.
+name = "runmon-strava"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+# One Durable Object per athlete. Not a stylistic choice: a DO serialises every
+# read and write for one athlete on a single thread, which makes the two things
+# that would otherwise race - Strava's rotating refresh token, and the
+# read-modify-write of the save - atomic without a line of locking.
+[[durable_objects.bindings]]
+name = "ATHLETE"
+class_name = "Athlete"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Athlete"]
+
+[vars]
+# Public, and fine to commit. The secret half never appears in this repo:
+#   npx wrangler secret put STRAVA_CLIENT_SECRET
+#   npx wrangler secret put SESSION_SECRET        (any long random string)
+STRAVA_CLIENT_ID = "REPLACE_WITH_YOUR_CLIENT_ID"
+APP_ORIGIN = "https://ryancgq.github.io"
+APP_PATH = "/coursera-test/"

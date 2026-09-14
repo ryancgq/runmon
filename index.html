@@ -1127,6 +1127,9 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
         <div><h2>Settings</h2></div>
       </div>
 
+      <div class="section-title" id="strava-title" hidden>Strava</div>
+      <div id="strava-panel" hidden></div>
+
       <div class="section-title">Your pet</div>
       <div class="row">
         <div class="t"><div class="n">Name</div><div class="h" id="set-petname">—</div></div>
@@ -1287,6 +1290,14 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
 const DEMO = /[?&]demo(=|&|$)/.test(location.search);
 
 const SAVE_KEY = DEMO ? "runmon.demo.v1" : "runmon.save.v1";
+
+/* Where the Strava broker lives - see worker/README.md. Empty means the app has
+   no Strava anywhere in it: the Connect panel does not appear and nothing ever
+   reaches for the network. The sandbox is always in that state regardless, so
+   it keeps working on a plane and needs no worker deployed to test new art. */
+const RUNMON_API = "";
+const STRAVA_ON  = !DEMO && !!RUNMON_API;
+const SESSION_KEY = "runmon.strava.session";
 /* Saves written before the app was renamed. Read once, copied to SAVE_KEY, and
    deliberately left in place as a backup — but cleared on reset, or a "new game"
    would come back from the dead on the next load. Never migrated into the demo. */
@@ -1774,6 +1785,9 @@ function loadSave(){
   }
 }
 function persist(){
+  // localStorage stays the offline copy even when the save lives on the server,
+  // so the pet is still there when the link or the network is not
+  if (typeof stravaSchedulePush === "function") stravaSchedulePush();
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }
   catch(e){
     storageOK = false;
@@ -3511,6 +3525,26 @@ function compressPath(segments, maxPoints){
   }).filter(s => s.length > 1);
 }
 
+/* Every run is built here, whoever recorded it: the GPS tracker, the sandbox's
+   shortcut, or Strava. The XP arithmetic lived in two places before a third
+   source would have made three, and a run whose XP depended on where it came
+   from would be a bug waiting to happen. `at` matters because the streak
+   multiplier is judged at the moment of the run, not the moment of import. */
+function makeRun(at, km, sec, extra){
+  const streak = streakIfRunNow(at);
+  const base = baseXpForDistance(km), mult = streakMultiplier(streak);
+  return Object.assign({
+    id: "r" + at.toString(36) + Math.random().toString(36).slice(2, 6),
+    t: at, km, sec,
+    kcal: calories(km, sec, save.settings.weightKg),
+    xp: Math.round(base * mult),
+    xpFlat: Math.round(flatXp(km)),
+    xpEndurance: Math.round(enduranceXp(km)),
+    xpStreakBonus: Math.round(base * mult - base),
+    streak, sim: false, path: []
+  }, extra || {});
+}
+
 function finishRun(){
   const km  = tracker.distanceM / 1000;
   const sec = Math.round(elapsedSec());
@@ -3529,24 +3563,7 @@ function finishRun(){
 
   const now = Date.now();
   const levelBefore = derived.level, stageBefore = derived.stage;
-  const streakDays  = streakIfRunNow(now);
-  const base   = baseXpForDistance(km);
-  const flat   = flatXp(km);
-  const endur  = enduranceXp(km);
-  const mult   = streakMultiplier(streakDays);
-  const total  = Math.round(base * mult);
-
-  const run = {
-    id: "r" + now.toString(36) + Math.random().toString(36).slice(2, 6),
-    t: now, km, sec,
-    kcal: calories(km, sec, save.settings.weightKg),
-    xp: total,
-    xpFlat: Math.round(flat), xpEndurance: Math.round(endur),
-    xpStreakBonus: Math.round(base * mult - base),
-    streak: streakDays,
-    sim: !!wasSim,
-    path: compressPath(tracker.segments, 320)
-  };
+  const run = makeRun(now, km, sec, { sim: !!wasSim, path: compressPath(tracker.segments, 320) });
   save.runs.push(run);
   recompute();
   persist();
@@ -3730,7 +3747,41 @@ function closeSheet(){
 }
 
 /* --- settings ------------------------------------------------------------ */
+function renderStravaPanel(){
+  const title = $("#strava-title"), panel = $("#strava-panel");
+  if (!title || !panel) return;
+  title.hidden = panel.hidden = !STRAVA_ON;
+  if (!STRAVA_ON) return;
+  const when = save.stravaSyncedAt
+    ? new Date(save.stravaSyncedAt).toLocaleString([], { dateStyle:"medium", timeStyle:"short" })
+    : "not yet";
+  const err = stravaLastError
+    ? `<div class="row"><div class="t"><div class="n" style="color:var(--bad)">${stravaLastError}</div></div></div>` : "";
+  panel.innerHTML = stravaLinked()
+    ? `<div class="row">
+         <div class="t"><div class="n">Connected</div>
+           <div class="h">Your runs come from Strava. Last checked: ${when}. Only runs recorded after you connected count.</div></div>
+         <button class="btn ghost" style="width:auto;padding:9px 15px;font-size:13px" id="strava-sync"${stravaBusy ? " disabled" : ""}>${stravaBusy ? "Checking…" : "Check now"}</button>
+       </div>${err}
+       <div class="row tap" id="row-virtual">
+         <div class="t"><div class="n">Count treadmill runs</div>
+           <div class="h">Virtual runs have no GPS and their distance is whatever the machine said.</div></div>
+         <div class="toggle${save.settings.stravaVirtual ? " on" : ""}" id="tg-virtual"><i></i></div>
+       </div>
+       <div class="row">
+         <div class="t"><div class="n">Disconnect</div>
+           <div class="h">Revokes Runmon's access at Strava and deletes your pet from the server. This cannot be undone.</div></div>
+         <button class="btn danger" style="width:auto;padding:9px 15px;font-size:13px" id="strava-off">Disconnect</button>
+       </div>`
+    : `<div class="row">
+         <div class="t"><div class="n">Connect Strava</div>
+           <div class="h">Run with Strava as normal and your pet grows on its own. Runs from before you connect do not count — the pet starts from your next one.</div></div>
+         <button class="btn primary" style="width:auto;padding:9px 15px;font-size:13px" id="strava-on">Connect</button>
+       </div>${err}`;
+}
+
 function renderSettings(){
+  renderStravaPanel();
   $("#set-petname").textContent = save.petName || "—";
   $$("#seg-units button").forEach(b => b.classList.toggle("on", b.dataset.u === save.settings.units));
   $("#set-weight").value = save.settings.weightKg;
@@ -4131,6 +4182,104 @@ function playAnimTest(d, root){
   }
 }
 
+/* --- strava -------------------------------------------------------------- */
+/* The app's whole side of the link. It does three things: hold a session,
+   ask the broker what is new, and turn what comes back into runs. It does not
+   know what a level is - nothing here touches the game rules, because a Strava
+   run and a run you recorded yourself have to be worth exactly the same. */
+let stravaSession = null, stravaBusy = false, stravaLastError = null, savePushTimer = null;
+
+function stravaLoadSession(){
+  if (!STRAVA_ON) return;
+  // the broker hands the session back in the fragment, which never reaches a
+  // server and never lands in a referrer; take it and scrub the address bar
+  const m = /[#&]strava=([^&]+)/.exec(location.hash || "");
+  if (m){
+    const v = decodeURIComponent(m[1]);
+    history.replaceState(null, "", location.pathname + location.search);
+    if (v === "denied" || v === "failed"){
+      stravaLastError = v === "denied" ? "Strava sign-in was cancelled." : "Strava would not complete the sign-in.";
+    } else {
+      try { localStorage.setItem(SESSION_KEY, v); } catch(e){}
+    }
+  }
+  try { stravaSession = localStorage.getItem(SESSION_KEY); } catch(e){ stravaSession = null; }
+}
+const stravaLinked = () => STRAVA_ON && !!stravaSession;
+
+async function stravaCall(path, init){
+  const r = await fetch(RUNMON_API + path, Object.assign({
+    headers: { "Authorization": "Bearer " + stravaSession, "Content-Type": "application/json" }
+  }, init || {}));
+  if (r.status === 401){ stravaForget(); throw new Error("Strava link expired — connect again."); }
+  if (!r.ok) throw new Error("The Strava link is not answering (" + r.status + ").");
+  return r.json();
+}
+function stravaForget(){
+  stravaSession = null;
+  try { localStorage.removeItem(SESSION_KEY); } catch(e){}
+}
+
+/** Pull anything new, turn it into runs, push the save back. */
+async function stravaSync(opts){
+  if (!stravaLinked() || stravaBusy) return;
+  stravaBusy = true; stravaLastError = null;
+  if (opts && opts.loud) renderStravaPanel();
+  try {
+    const res = await stravaCall("/sync", { method:"POST" });
+    // the server's save wins on first contact: it is the one that followed you
+    // here from whatever device you last played on
+    if (res.save && !save.species && res.save.species){
+      save = Object.assign(structuredCloneSafe(DEFAULT_SAVE), res.save);
+      save.settings = Object.assign({}, DEFAULT_SAVE.settings, res.save.settings || {});
+    }
+    const imported = [];
+    const before = { level: derived ? derived.level : 1, stage: derived ? derived.stage : 0 };
+    for (const a of (res.activities || [])){
+      if (!a.km || a.km <= 0 || !a.sec) continue;
+      save.runs.push(makeRun(a.t, a.km, a.sec, { strava: a.id, manual: !!a.manual }));
+      imported.push(a.id);
+    }
+    if (res.error === "reauth"){ stravaForget(); stravaLastError = "Strava needs you to connect again."; }
+    if (imported.length){
+      recompute();
+      // a run that arrived while you were away still gets its celebration
+      pendingLevelUp = derived.level > before.level && !!levelUpArt(save.species, derived.stage, derived.level);
+      pendingLevelFrom = before.level;
+    }
+    save.stravaSyncedAt = Date.now();
+    persist();
+    await stravaPush(imported);
+    renderAll();
+    if (imported.length && currentScreen === "home") playPendingLevelUp();
+    if (opts && opts.loud){
+      toast(imported.length
+        ? `${imported.length} run${imported.length === 1 ? "" : "s"} from Strava`
+        : "Nothing new on Strava", imported.length ? "good" : "", imported.length ? "\u{1F3C3}" : "\u{1F504}");
+    }
+  } catch (err){
+    stravaLastError = err.message || String(err);
+    if (opts && opts.loud) toast(stravaLastError, "bad", "\u26A0\uFE0F");
+  } finally {
+    stravaBusy = false;
+    renderStravaPanel();
+  }
+}
+
+/* The save and the ids go up together, so an activity cannot be marked
+   imported by a save that never arrived. */
+async function stravaPush(imported){
+  if (!stravaLinked()) return;
+  await stravaCall("/save", { method:"PUT",
+    body: JSON.stringify({ save, imported: imported || [] }) });
+}
+/** Called on every persist(); coalesced, because persist() is called a lot. */
+function stravaSchedulePush(){
+  if (!stravaLinked()) return;
+  clearTimeout(savePushTimer);
+  savePushTimer = setTimeout(() => stravaPush([]).catch(()=>{}), 1200);
+}
+
 /* --- import / export ----------------------------------------------------- */
 function exportSave(){
   const blob = new Blob([JSON.stringify(save, null, 2)], { type:"application/json" });
@@ -4297,6 +4446,43 @@ function wire(){
     // a run already under way keeps the speed it started with
     toast(runWarp() > 1 ? `Simulated runs now go ${runWarp()}\u00d7 real time` : "Simulated runs now go at real time", "", "\u23E9");
   });
+  // the Strava panel is re-rendered rather than kept, so its buttons are caught
+  // on the way up instead of bound to elements that will not exist for long
+  document.addEventListener("click", e => {
+    if (!STRAVA_ON) return;
+    if (e.target.closest("#strava-on")){
+      // the broker starts the OAuth dance; the secret never comes near here
+      location.href = RUNMON_API + "/connect";
+      return;
+    }
+    if (e.target.closest("#strava-sync")){ stravaSync({ loud:true }); return; }
+    if (e.target.closest("#row-virtual")){
+      save.settings.stravaVirtual = !save.settings.stravaVirtual;
+      persist(); renderStravaPanel();
+      toast(save.settings.stravaVirtual ? "Treadmill runs will count" : "Treadmill runs will be ignored",
+            "", "\u{1F3C3}");
+      return;
+    }
+    if (e.target.closest("#strava-off")){
+      openSheet({
+        title:"Disconnect Strava?",
+        desc:"Runmon will lose access to your activities, and your pet and its run history will be deleted from the server. There is no undo.",
+        actions:[
+          { label:"Keep it", cls:"ghost", fn: closeSheet },
+          { label:"Disconnect", cls:"danger", fn: async () => {
+              closeSheet();
+              try { await stravaCall("/disconnect", { method:"POST" }); } catch(e){}
+              stravaForget();
+              try { localStorage.removeItem(SAVE_KEY); } catch(e){}
+              save = structuredCloneSafe(DEFAULT_SAVE);
+              obSpecies = null; recompute(); showOnboarding();
+            } }
+        ]
+      });
+      return;
+    }
+  });
+
   $("#row-sim").addEventListener("click", () => {
     save.settings.simulate = !save.settings.simulate; persist(); renderSettings();
     toast(save.settings.simulate ? "Simulated GPS on — runs will be tagged sim" : "Simulated GPS off", "", save.settings.simulate ? "🧪" : "📡");
@@ -4397,17 +4583,7 @@ window.Runmon = {
   /** Add a fake run — handy for previewing later evolution stages. */
   addRun(km, minutes, daysAgo){
     const t = Date.now() - (daysAgo || 0) * 86400000;
-    const sec = Math.round((minutes || km * 6) * 60);
-    const streak = streakIfRunNow(t);
-    const base = baseXpForDistance(km), mult = streakMultiplier(streak);
-    save.runs.push({
-      id: "r" + t.toString(36) + Math.random().toString(36).slice(2,6),
-      t, km, sec, kcal: calories(km, sec, save.settings.weightKg),
-      xp: Math.round(base * mult), xpFlat: Math.round(flatXp(km)),
-      xpEndurance: Math.round(enduranceXp(km)),
-      xpStreakBonus: Math.round(base * mult - base),
-      streak, sim: true, path: []
-    });
+    save.runs.push(makeRun(t, km, Math.round((minutes || km * 6) * 60), { sim: true }));
     persist(); renderAll();
     return derived.level;
   },
@@ -4424,6 +4600,7 @@ window.RunPet = window.Runmon;
 /* --- boot ---------------------------------------------------------------- */
 function boot(){
   wire();
+  stravaLoadSession();
   const has = loadSave();
   // the sandbox exists so mechanics can be tried without going outside, and a
   // save made before this setting existed would have it off
@@ -4434,11 +4611,26 @@ function boot(){
     renderAll();
     go("home");
     $("#screen-home").classList.add("active");
+  } else if (stravaLinked()){
+    // linked but nothing here yet: this is a second device, or a first visit
+    // after connecting. The server has the pet; ask before deciding they are new.
+    recompute();
+    $("#screen-home").classList.add("active");
+    stravaSync().then(() => {
+      if (save.species){ applyTheme(save.species); renderAll(); go("home"); }
+      else showOnboarding();
+    });
   } else {
     recompute();
     showOnboarding();
     $("#screen-home").classList.add("active");
   }
+  // catch up on anything run while the app was closed
+  if (has && stravaLinked()) stravaSync();
+  // and again when you come back to the tab, since that is when you check
+  if (STRAVA_ON) document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && stravaLinked() && Date.now() - (save.stravaSyncedAt || 0) > 60000) stravaSync();
+  });
   // Leaflet may still be downloading when the app boots
   if (!leafletAvailable()){
     window.addEventListener("load", () => {
