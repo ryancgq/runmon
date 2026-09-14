@@ -8,9 +8,10 @@
 # Four repository secrets, set once at
 # Settings -> Secrets and variables -> Actions -> New repository secret:
 #
-#   CLOUDFLARE_API_TOKEN   from dash.cloudflare.com -> My Profile -> API Tokens
-#                          -> Create Token -> "Edit Cloudflare Workers"
-#   CLOUDFLARE_ACCOUNT_ID  from the Workers & Pages page, right-hand column
+#   CLOUDFLARE_API_TOKEN   dash.cloudflare.com/profile/api-tokens -> Create
+#                          Token -> "Edit Cloudflare Workers" template
+#   CLOUDFLARE_ACCOUNT_ID  the 32 hex characters in the dashboard's own URL,
+#                          dash.cloudflare.com/<account id>/...
 #   STRAVA_CLIENT_SECRET   from strava.com/settings/api
 #   SESSION_SECRET         any long random string you invent; it signs login
 #                          sessions and is not from Strava
@@ -59,11 +60,11 @@ jobs:
             for name in $missing; do
               case "$name" in
                 CLOUDFLARE_API_TOKEN)
-                  echo "- \`$name\` - dash.cloudflare.com -> My Profile -> API Tokens"
-                  echo "  -> Create Token -> use the **Edit Cloudflare Workers** template" ;;
+                  echo "- \`$name\` - dash.cloudflare.com/profile/api-tokens ->"
+                  echo "  Create Token -> use the **Edit Cloudflare Workers** template" ;;
                 CLOUDFLARE_ACCOUNT_ID)
-                  echo "- \`$name\` - dash.cloudflare.com -> Workers & Pages, in the"
-                  echo "  right-hand column (a long string of letters and numbers)" ;;
+                  echo "- \`$name\` - the 32 hex characters in the dashboard URL"
+                  echo "  itself: \`dash.cloudflare.com/<account id>/...\`" ;;
                 STRAVA_CLIENT_SECRET)
                   echo "- \`$name\` - strava.com/settings/api, under *Client Secret*" ;;
                 SESSION_SECRET)
@@ -123,11 +124,12 @@ jobs:
               echo ""
               echo "- **No workers.dev subdomain yet.** A brand new Cloudflare"
               echo "  account has not picked one, and this runner cannot answer"
-              echo "  the prompt that asks. Open dash.cloudflare.com -> Workers &"
-              echo "  Pages, choose a subdomain, then re-run this workflow."
+              echo "  the prompt that asks. Open"
+              echo "  dash.cloudflare.com/?to=/:account/workers/workers-and-pages,"
+              echo "  choose a subdomain, then re-run this workflow."
               echo "- **The API token is missing a permission.** Make it from the"
               echo "  *Edit Cloudflare Workers* template rather than by hand."
-              echo "- **A wrong Account ID.** It is the long hex string on the"
-              echo "  Workers & Pages page, not your account's email or name."
+              echo "- **A wrong Account ID.** It is the 32 hex characters in the"
+              echo "  dashboard's own URL, not your email or account name."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
