@@ -17,19 +17,27 @@ runs it for you. Everything below happens in a browser.
 **Client ID** and **Client Secret**. Leave the callback domain for step 5.
 
 **2. Set up Cloudflare** (free account — Durable Objects are on the free plan,
-and only the SQLite-backed kind this worker uses). Open **Workers & Pages** and
-do three things on that one page:
+and only the SQLite-backed kind this worker uses).
 
-- **Pick your workers.dev subdomain** if it asks. This is the only thing you
-  must click before deploying: a first deploy otherwise stops to ask for one,
-  and a CI runner has nobody to ask. It becomes the worker's address,
+Cloudflare moves its dashboard navigation around, and a new account often lands
+on an "add a site" onboarding screen that hides the product list, so use these
+links rather than hunting for a menu item:
+
+- **Pick your workers.dev subdomain** —
+  [dash.cloudflare.com/?to=/:account/workers/workers-and-pages](https://dash.cloudflare.com/?to=/:account/workers/workers-and-pages).
+  (`:account` fills itself in.) If it offers you a subdomain, or a *Change* next
+  to *Your subdomain*, set one. **This is the only thing you must click before
+  deploying**: a first deploy otherwise stops to ask, and a CI runner has nobody
+  to ask. It becomes the worker's address,
   `runmon-strava.<subdomain>.workers.dev`.
-- Copy your **Account ID** from the right-hand column — the long hex string,
-  not your email.
-- Make an **API token**: My Profile → API Tokens → Create Token → the *Edit
-  Cloudflare Workers* template. Don't assemble the permissions by hand. The
-  template's zone section is fine set to *All zones* even with no domain on
-  the account.
+- **Your Account ID** — read it out of the address bar. Once you are inside an
+  account the URL is `dash.cloudflare.com/<32 hex characters>/…`, and that hex
+  string *is* the Account ID. More reliable than any panel that may get moved.
+- **An API token** —
+  [dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens)
+  → Create Token → the *Edit Cloudflare Workers* template. Don't assemble the
+  permissions by hand. Its zone section is fine left on *All zones* even with no
+  domain on the account.
 
 Nothing else: no project to create, no payment method, no domain. `wrangler`
 creates the worker and its Durable Object on the first deploy.
