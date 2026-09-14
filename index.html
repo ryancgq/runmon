@@ -1429,8 +1429,10 @@ const SKILLS = {
         aspect:1.270, scale:1.98, dx:1, dy:-36 } }
   ],
   nimbus: [
-    { id:"thunderbolt", name:"Thunderbolt", ico:"\u26A1", stage:1, level:8,
-      blurb:"Calls down the fury of the storm itself. Stand well back.",
+    // lowercase, like the Cinderling's - a first skill named for what it was
+    // meant to be rather than what it turns out to be
+    { id:"thunderbolt", name:"thunderbolt", ico:"\u26A1", stage:1, level:8,
+      blurb:"Guaranteed to leave something scorched. No promises about what.",
       sprite:{ src:"art/skill-thunderbolt.png", frames:12, fps:3,
         /* Charge, discharge, consequences. The bolts multiply over eight frames
            that quicken as they go, then the two discharge frames alternate so

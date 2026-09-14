@@ -183,13 +183,14 @@ level 15, where the form arrives, and level 30, where the next one does.
 | Skill | Form | Learns at | What it does |
 | --- | --- | --- | --- |
 | 🔥 fireball | Cinderling | Level 8 | Sold as the strongest fire you will ever see. Three seconds of winding up, then a cough and some smoke. |
-| ⚡ Thunderbolt | Puffling | Level 8 | Sold as the fury of the storm. It is — and most of it goes into the squirrel. |
+| ⚡ thunderbolt | Puffling | Level 8 | Guaranteed to leave something scorched. The something is the squirrel. |
 | 🔥 Fireball | Blazewyrm | Level 18 | Draws a breath and spits a packed ball of flame |
 | 💥 Flame Stomp | Blazewyrm | Level 22 | Lands hard enough to throw a ring of fire out around it |
 | ☄️ Flying Swoop | Blazewyrm | Level 26 | A low, fast pass trailing fire |
 
 Both babies' moves are the same joke told twice, which is deliberate: a first
-skill is sold as devastating and then goes wrong. The Cinderling coughs smoke;
+skill is named for what it was meant to be, and both are lowercase for the same
+reason. The Cinderling coughs smoke;
 the Puffling gathers the whole storm and earths it through itself, and spends
 the last second and a half sitting there singed while the smoke drifts off it.
 Its charge frames genuinely progress — the bolts multiply — so unlike the
