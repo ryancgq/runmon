@@ -74,7 +74,7 @@ down through all six moods), or start over and pick a different pet.
 **Test animations** is the one that levels nothing. It opens a panel that does
 not dim the screen, so the pet stays in view above it while you tap through
 every animation the app has: fifteen idles across all three species, the egg's
-three crack phases, six moods, four skills, four level-up celebrations — each
+three crack phases, six moods, four skills, seven level-up celebrations — each
 with its full wind-up, burst and caption — and the confetti, the caption and
 the wind-up on their own. The pet is painted straight onto the stage and the
 celebrations run without a level to spend, so you can watch a Blazewyrm's
@@ -201,6 +201,20 @@ the dragon's feet land on one row and its body on one column — because the
 source cells draw it in a different spot each frame and a pet that wanders
 inside its own box looks like it is hopping about. Anchor on the dragon, not
 on everything opaque: the butterfly is meant to move.
+
+The Puffling's celebration is the one that charges rather than flashes: two
+calm frames, a build through six, a spike-ring on frame 7 held over 8, then four
+frames of sparkles easing back to the pose its idle holds. The beats were read
+off the sheet's own cyan pixel count, which runs about 1,100 at rest, 33,000 on
+the burst and 1,100 again by the last frame — a more honest signal than counting
+frames by eye.
+
+Its rows drift like the rest, 5px and 51px, but the usual body measure fails on
+it: at the burst the lightning washes over the squirrel and a dark-pixel mask
+loses most of it, reporting the pet a dozen pixels higher than it is. Take the
+baseline from the least-lit frame of each row and correct per row, not per
+frame. Per frame would also cancel the crouch the squirrel does before it fires,
+which is animation, not drift.
 
 Anchoring is not only an idle's problem. The packs arrive as 4×4 grids, and
 some of them draw each row a little higher than the last — the Cinderling's
