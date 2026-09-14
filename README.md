@@ -157,12 +157,23 @@ from the nearest solid pixel and the mix ratio becomes the alpha. Flood the
 background in from the border rather than keying every neutral pixel, or the
 white highlight on the shell goes with it.
 
-The egg cracks as it levels. It is the one form whose art changes inside its
+The Static Egg — Nimbus's acorn — followed, as five sheets in the same shape.
+Those arrived with real transparency, so no keying was needed, but their grid
+drifted: the egg climbs 22px and slides 45px left from the first frame to the
+last, and the body swells 6% along the way. Every frame of every phase is
+normalised to one body size and anchored to one point, measuring the body as
+the largest connected blob so the sparkles that come and go cannot drag the
+anchor with them. Left alone the acorn would creep across its own loop and jump
+at every handover between phases.
+
+Eggs crack as they level. They are the one form whose art changes inside its
 own stage — intact at level 1, a first split at 2, a full web at 3 — and the
-crack is the level-up celebration: `ember:0@2` and `ember:0@3` in
+crack is the level-up celebration: `<species>:0@2` and `<species>:0@3` in
 `LEVEL_UP_ART` carry the shell from one phase to the next and end on the frame
 the new idle opens with, so the celebration and the change of art are one
-event. While a level-up is armed the pet is still drawn as it was *before* it,
+event. `EGG_PHASES` is keyed by species, and any species with an entry gets
+this behaviour; the Cinder Egg cracks on frame 9 both times, while the acorn
+splits on 7 and spreads on 10, measured off the sheets rather than assumed. While a level-up is armed the pet is still drawn as it was *before* it,
 or you would come home to an already cracked shell and then watch it crack.
 
 Those clips sit inside the same timing template as every other celebration, but

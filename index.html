@@ -1495,14 +1495,23 @@ function skillsFor(speciesId){ return SKILLS[speciesId] || []; }
    - and the crack itself is the level-up celebration, so what the clip ends on
    is what the idle takes over with. Every phase is packed to one silhouette
    size and one position, so none of those handovers moves the shell. */
-const EGG_PHASES = [
-  { from:1, src:"art/ember-egg.png" },
-  { from:2, src:"art/ember-egg-cracked.png" },
-  { from:3, src:"art/ember-egg-breaking.png" }
-];
-function eggPhaseSrc(level){
-  let src = EGG_PHASES[0].src;
-  for (const p of EGG_PHASES) if (level >= p.from) src = p.src;
+const EGG_PHASES = {
+  ember: [
+    { from:1, src:"art/ember-egg.png" },
+    { from:2, src:"art/ember-egg-cracked.png" },
+    { from:3, src:"art/ember-egg-breaking.png" }
+  ],
+  nimbus: [
+    { from:1, src:"art/nimbus-egg.png" },
+    { from:2, src:"art/nimbus-egg-cracked.png" },
+    { from:3, src:"art/nimbus-egg-breaking.png" }
+  ]
+};
+function eggPhaseSrc(species, level){
+  const phases = EGG_PHASES[species];
+  if (!phases) return null;
+  let src = phases[0].src;
+  for (const p of phases) if (level >= p.from) src = p.src;
   return src;
 }
 
@@ -1522,6 +1531,15 @@ const LEVEL_UP_ART = {
     cap:{ top:12, right:45 } }),
   "ember:0@3": levelUpClip({ src:"art/ember-egg-crack-2.png", frames:12,
     gather:2, burst:9, aspect:0.871, scale:0.71, dx:0, dy:-0.9,
+    cap:{ top:12, right:45 } }),
+  // The Nimbus acorn splits on its own schedule: the first crack arrives on
+  // frame 7 of 12, the spread on frame 10. Measured off the sheets rather than
+  // copied from the Cinder Egg, which cracks on 9 both times.
+  "nimbus:0@2": levelUpClip({ src:"art/nimbus-egg-crack-1.png", frames:12,
+    gather:2, burst:7, aspect:1.074, scale:0.909, dx:1.05, dy:4.45,
+    cap:{ top:12, right:45 } }),
+  "nimbus:0@3": levelUpClip({ src:"art/nimbus-egg-crack-2.png", frames:12,
+    gather:2, burst:10, aspect:1.074, scale:0.909, dx:1.05, dy:4.45,
     cap:{ top:12, right:45 } }),
   // this one scowls and shuts its eyes for four frames before any gold shows,
   // so its build is shorter in frames and each of them holds longer. `cap`
@@ -2527,6 +2545,15 @@ const DEFAULT_SPRITES = {
     // 12-frame loop; frame 6 is a hop, its shadow keeping the ground line
     frames:12, rows:1, fps:2, aspect:1.268, scale:1.2
   },
+  "nimbus:0": {
+    // The Storm Acorn, and the src the level swaps - see EGG_PHASES. Packed the
+    // same way as the Cinder Egg: its grid drifted up 22px and left 45px across
+    // the sheet, so every frame of every phase is normalised to one body size
+    // and anchored to one point. The body is the largest blob, so the sparkles
+    // that come and go cannot drag the anchor with them.
+    src:"art/nimbus-egg.png",
+    frames:12, rows:1, fps:2, aspect:1.074, scale:0.909, dx:1.05, dy:4.45
+  },
   "nimbus:1": {
     src:"art/nimbus-puffling.png",
     // 12-frame loop: sits, blinks, an acorn drops in, and it eats. The pack's
@@ -2558,11 +2585,11 @@ function spriteConfig(species, stage){
   if (own !== undefined) return own;            // a pack you supplied is yours
   const cfg = DEFAULT_SPRITES[key] || null;
   // the egg is the one shipped sheet that changes inside its own stage
-  if (cfg && key === "ember:0"){
+  if (cfg && stage === 0 && EGG_PHASES[species]){
     const now = (typeof derived === "object" && derived) ? derived.level : 1;
     const lv = (previewPet && previewPet.level != null) ? previewPet.level
              : pendingLevelUp ? pendingLevelFrom : now;
-    return { ...cfg, src: eggPhaseSrc(lv) };
+    return { ...cfg, src: eggPhaseSrc(species, lv) };
   }
   return cfg;
 }
@@ -2571,7 +2598,7 @@ function spriteConfig(species, stage){
    already has one will happily go on showing the old drawing. Bump this and
    every cache along the way fetches the new file. Only the sheets that ship
    with the app are stamped; a sheet you point at yourself is used verbatim. */
-const ART_VERSION = "10";
+const ART_VERSION = "11";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
 }
@@ -4117,8 +4144,12 @@ function openAnimationTester(){
         <div class="pet-holder" data-tiny="${id}:${i}"></div>
         <div class="nm">${st.name}</div>
       </button>`).join("")}</div>`).join("");
-  const eggs = EGG_PHASES.map((ph, i) =>
-    animTestChip("egg", EGG_NAMES[i] || `Phase ${i + 1}`, `data-lv="${ph.from}"`)).join("");
+  // one group per species that has an egg, rather than the Cinder Egg's alone
+  const eggs = Object.keys(EGG_PHASES).map(sp => `
+    <div class="fj-label">${SPECIES[sp].stages[0].name} phases</div>
+    <div class="anim-chips">${EGG_PHASES[sp].map((ph, i) =>
+      animTestChip("egg", EGG_NAMES[i] || `Phase ${i + 1}`,
+                   `data-sp="${sp}" data-lv="${ph.from}"`)).join("")}</div>`).join("");
   const moods = Object.values(MOODS).map(m =>
     animTestChip("mood", `<span class="em">${m.emoji}</span>${m.label}`, `data-mood="${m.key}"`)).join("");
   const skills = SPECIES_ORDER.flatMap(id => skillsFor(id).map(sk =>
@@ -4136,7 +4167,7 @@ function openAnimationTester(){
     desc: "Plays on the pet above — nothing here touches your own. Celebrations run their full wind-up, burst and caption.",
     body: `<div class="anim-now" id="anim-now">Showing your own pet</div>
       ${idles}
-      <div class="fj-label">Cinder Egg phases</div><div class="anim-chips">${eggs}</div>
+      ${eggs}
       <div class="fj-label">Mood</div><div class="anim-chips">${moods}</div>
       <div class="fj-label">Skills</div><div class="anim-chips">${skills}</div>
       <div class="fj-label">Level-up celebrations</div><div class="anim-chips">${celebs}</div>
@@ -4172,7 +4203,7 @@ function playAnimTest(d, root){
   if (root) $$("[data-anim]", root).forEach(b => b.classList.remove("on"));
   switch (d.anim){
     case "idle":  show(d.sp, +d.st); break;
-    case "egg":   show("ember", 0, +d.lv); break;
+    case "egg":   show(d.sp, 0, +d.lv); break;
     case "mood": {
       const at = previewPet || { id: derived.species.id, stage: derived.stage };
       previewPet = { ...at, mood: d.mood };
