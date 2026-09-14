@@ -1295,7 +1295,7 @@ const SAVE_KEY = DEMO ? "runmon.demo.v1" : "runmon.save.v1";
    no Strava anywhere in it: the Connect panel does not appear and nothing ever
    reaches for the network. The sandbox is always in that state regardless, so
    it keeps working on a plane and needs no worker deployed to test new art. */
-const RUNMON_API = "";
+const RUNMON_API = "https://runmon-strava.runmon-gq.workers.dev";
 const STRAVA_ON  = !DEMO && !!RUNMON_API;
 const SESSION_KEY = "runmon.strava.session";
 /* Saves written before the app was renamed. Read once, copied to SAVE_KEY, and
