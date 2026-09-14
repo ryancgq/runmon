@@ -16,10 +16,23 @@ runs it for you. Everything below happens in a browser.
 **1. Make a Strava API application** at strava.com/settings/api. Note the
 **Client ID** and **Client Secret**. Leave the callback domain for step 5.
 
-**2. Get two things from Cloudflare** (free account):
-- an **API token**: My Profile → API Tokens → Create Token → *Edit Cloudflare
-  Workers* template
-- your **Account ID**: on the Workers & Pages page, right-hand column
+**2. Set up Cloudflare** (free account — Durable Objects are on the free plan,
+and only the SQLite-backed kind this worker uses). Open **Workers & Pages** and
+do three things on that one page:
+
+- **Pick your workers.dev subdomain** if it asks. This is the only thing you
+  must click before deploying: a first deploy otherwise stops to ask for one,
+  and a CI runner has nobody to ask. It becomes the worker's address,
+  `runmon-strava.<subdomain>.workers.dev`.
+- Copy your **Account ID** from the right-hand column — the long hex string,
+  not your email.
+- Make an **API token**: My Profile → API Tokens → Create Token → the *Edit
+  Cloudflare Workers* template. Don't assemble the permissions by hand. The
+  template's zone section is fine set to *All zones* even with no domain on
+  the account.
+
+Nothing else: no project to create, no payment method, no domain. `wrangler`
+creates the worker and its Durable Object on the first deploy.
 
 **3. Put four secrets in GitHub**, at Settings → Secrets and variables →
 Actions → New repository secret:
