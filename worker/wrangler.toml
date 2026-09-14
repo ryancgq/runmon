@@ -23,4 +23,4 @@ new_sqlite_classes = ["Athlete"]
 #   npx wrangler secret put SESSION_SECRET        (any long random string)
 STRAVA_CLIENT_ID = "REPLACE_WITH_YOUR_CLIENT_ID"
 APP_ORIGIN = "https://ryancgq.github.io"
-APP_PATH = "/coursera-test/"
+APP_PATH = "/runmon/"
