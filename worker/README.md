@@ -7,24 +7,50 @@ It is not a game server. It stores the save and hands back activities; the
 browser remains the only thing that knows what a level is, so the sandbox runs
 identical game code with no worker deployed at all.
 
-## Deploying it
+## Deploying it from a browser — no terminal, works on a phone
 
-You need a free Cloudflare account and a Strava API application
-(https://www.strava.com/settings/api).
+`wrangler` is a Node command-line tool and there is no Node on iOS, so
+[`.github/workflows/deploy-worker.yml`](../.github/workflows/deploy-worker.yml)
+runs it for you. Everything below happens in a browser.
+
+**1. Make a Strava API application** at strava.com/settings/api. Note the
+**Client ID** and **Client Secret**. Leave the callback domain for step 5.
+
+**2. Get two things from Cloudflare** (free account):
+- an **API token**: My Profile → API Tokens → Create Token → *Edit Cloudflare
+  Workers* template
+- your **Account ID**: on the Workers & Pages page, right-hand column
+
+**3. Put four secrets in GitHub**, at Settings → Secrets and variables →
+Actions → New repository secret:
+
+| Name | Value |
+| --- | --- |
+| `CLOUDFLARE_API_TOKEN` | from step 2 |
+| `CLOUDFLARE_ACCOUNT_ID` | from step 2 |
+| `STRAVA_CLIENT_SECRET` | from step 1 |
+| `SESSION_SECRET` | any long random string you invent |
+
+The Strava secret goes **here and nowhere else** — never in a file, never in a
+chat. GitHub encrypts these and does not show them again.
+
+**4. Put your Client ID in `wrangler.toml`** (line 24). It is public and fine to
+commit. Committing it triggers the deploy; the Actions tab then shows the
+worker's URL in the run summary.
+
+**5. Back to Strava**, set the **Authorization Callback Domain** to that URL's
+host only — `runmon-strava.<you>.workers.dev`, no scheme, no path.
+
+**6. Put the full URL in `RUNMON_API`** at the top of `index.html`, with
+`https://` and no trailing slash.
+
+## Or from a terminal, if you have one
 
     cd worker
     npx wrangler login
-    npx wrangler secret put STRAVA_CLIENT_SECRET   # from your Strava app
-    npx wrangler secret put SESSION_SECRET         # any long random string
+    npx wrangler secret put STRAVA_CLIENT_SECRET
+    npx wrangler secret put SESSION_SECRET
     npx wrangler deploy
-
-Put your Strava **Client ID** in `wrangler.toml` (it is public; the secret is
-not, and must never be committed or pasted into a chat). Deploy prints a URL
-like `https://runmon-strava.<you>.workers.dev` — then:
-
-1. Set that host as the **Authorization Callback Domain** on your Strava app
-   (domain only: `runmon-strava.<you>.workers.dev`, no scheme, no path).
-2. Put the full URL in `RUNMON_API` in `index.html`.
 
 ## What it stores
 

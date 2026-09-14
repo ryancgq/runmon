@@ -1,0 +1,74 @@
+# Deploys the Strava broker, so you never need a terminal to do it.
+#
+# wrangler is a Node command-line tool and there is no Node on iOS, which would
+# otherwise make the worker undeployable from a phone. GitHub has Node, so it
+# runs wrangler on your behalf: you edit files and set secrets in the browser,
+# and this pushes the result to Cloudflare.
+#
+# Four repository secrets, set once at
+# Settings -> Secrets and variables -> Actions -> New repository secret:
+#
+#   CLOUDFLARE_API_TOKEN   from dash.cloudflare.com -> My Profile -> API Tokens
+#                          -> Create Token -> "Edit Cloudflare Workers"
+#   CLOUDFLARE_ACCOUNT_ID  from the Workers & Pages page, right-hand column
+#   STRAVA_CLIENT_SECRET   from strava.com/settings/api
+#   SESSION_SECRET         any long random string you invent; it signs login
+#                          sessions and is not from Strava
+#
+# None of them are ever visible to anyone, including in this file, the logs, or
+# to me. Changing SESSION_SECRET later signs everybody out, which is the point.
+
+name: Deploy the Strava broker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "worker/**"
+      - ".github/workflows/deploy-worker.yml"
+  workflow_dispatch:          # lets you run it by hand from the Actions tab
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Cloudflare
+        id: deploy
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: worker
+          # each name here is pushed to the worker with `wrangler secret put`,
+          # taking its value from the env block below
+          secrets: |
+            STRAVA_CLIENT_SECRET
+            SESSION_SECRET
+        env:
+          STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+
+      - name: Tell me the URL
+        if: always()
+        run: |
+          {
+            echo "## Strava broker deployed"
+            echo ""
+            URL="${{ steps.deploy.outputs.deployment-url }}"
+            if [ -n "$URL" ]; then
+              echo "**Worker URL:** \`$URL\`"
+              echo ""
+              echo "Two things left, both in the browser:"
+              echo ""
+              echo "1. **Strava** -> strava.com/settings/api -> *Authorization Callback Domain*"
+              echo "   -> \`$(echo "$URL" | sed -e 's|^https\?://||' -e 's|/.*$||')\`"
+              echo "   (host only - no https://, no trailing slash)"
+              echo "2. **index.html** line 1298 -> \`const RUNMON_API = \"$URL\";\`"
+              echo "   (full URL, no trailing slash)"
+            else
+              echo "No URL was reported - check the deploy step's log above for it,"
+              echo "or for why it failed."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
