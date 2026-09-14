@@ -29,9 +29,20 @@ directions here would only rot. Two steps that don't depend on any label:
   Account ID. Keep it; every other page is reachable by pasting it into a URL.
 - **An API token** —
   [dash.cloudflare.com/profile/api-tokens](https://dash.cloudflare.com/profile/api-tokens)
-  → Create Token → the *Edit Cloudflare Workers* template. Don't assemble the
-  permissions by hand. Its zone section is fine left on *All zones* even with no
-  domain on the account.
+  → Create Token → the *Edit Cloudflare Workers* template. Change none of the
+  permissions; the template already grants the Workers Scripts edit that carries
+  the Durable Object migration. Three fields underneath are worth a look though:
+  - *Zone Resources* — the template has a zone-level row, so the form may want a
+    value even with no domain on the account. *All zones from an account* is
+    fine.
+  - *Client IP Address Filtering* — **leave empty**. The caller is a GitHub
+    Actions runner, not your own machine. Restricting it here fails every deploy
+    with a 403 that reads like a missing permission.
+  - *TTL* — leave unset. A short-lived token works today and breaks the next
+    deploy with no obvious cause.
+
+  Copy the token on the final screen; Cloudflare shows it once. Losing it costs
+  nothing — delete it and make another.
 
 Then set the GitHub secrets below and run the workflow. It checks Cloudflare
 before deploying anything, and if the account still needs a **workers.dev
