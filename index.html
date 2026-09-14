@@ -1449,7 +1449,7 @@ const SKILLS = {
            the way the Puffling's does; the strike is four frames that grow, so
            they are held rather than cycled, and the last one longest. */
         durations:[380, 340, 300, 260, 230, 200, 180, 160, 150, 170, 260, 460],
-        aspect:1.061, scale:1.376, dx:5.6, dy:-28.5 } }
+        aspect:1.061, scale:1.376, dx:5.6, dy:-25.2 } }
   ]
 };
 function skillsFor(speciesId){ return SKILLS[speciesId] || []; }
@@ -2496,12 +2496,12 @@ const DEFAULT_SPRITES = {
     // rows each draw the squirrel higher than the last, so every frame is
     // pinned to one ground line - only the squirrel, since the acorn and the
     // bolts are meant to move.
-    frames:12, rows:1, fps:2, aspect:0.997, scale:1.04, dy:-7
+    frames:12, rows:1, fps:2, aspect:1.031, scale:1.068, dx:3, dy:-9.7
   },
   "nimbus:2": {
     src:"art/nimbus-zephyrite.png",
     // 12-frame loop: the charge crackles around it and it blinks through it
-    frames:12, rows:1, fps:2, aspect:1.199, scale:1.2, dx:0.9, dy:-15.1
+    frames:12, rows:1, fps:2, aspect:1.199, scale:1.2, dx:0.9, dy:-11.3
   },
   "verdant:1": {
     src:"art/panda-cub.png",
@@ -2534,7 +2534,7 @@ function spriteConfig(species, stage){
    already has one will happily go on showing the old drawing. Bump this and
    every cache along the way fetches the new file. Only the sheets that ship
    with the app are stamped; a sheet you point at yourself is used verbatim. */
-const ART_VERSION = "9";
+const ART_VERSION = "10";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
 }
