@@ -11,7 +11,10 @@
 #   CLOUDFLARE_API_TOKEN   dash.cloudflare.com/profile/api-tokens -> Create
 #                          Token -> "Edit Cloudflare Workers" template
 #   CLOUDFLARE_ACCOUNT_ID  the 32 hex characters in the dashboard's own URL,
-#                          dash.cloudflare.com/<account id>/...
+#                          dash.cloudflare.com/<account id>/... Better set as a
+#                          repository *variable* than a secret: it is an
+#                          identifier, not a credential, and as a secret GitHub
+#                          redacts it from the links this workflow prints.
 #   STRAVA_CLIENT_SECRET   from strava.com/settings/api
 #   SESSION_SECRET         any long random string you invent; it signs login
 #                          sessions and is not from Strava
@@ -38,7 +41,11 @@ jobs:
       - name: Check the four secrets are set
         env:
           CF_TOKEN:   ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_ACCOUNT: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # the same value again, but only when it is a variable - GitHub
+          # redacts secrets from summaries, so a link built from the secret
+          # comes out as *** and is useless to click.
+          CF_ACCOUNT_SHOWABLE: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           STRAVA:     ${{ secrets.STRAVA_CLIENT_SECRET }}
           SESSION:    ${{ secrets.SESSION_SECRET }}
         run: |
@@ -82,7 +89,11 @@ jobs:
       - name: Check Cloudflare is ready
         env:
           CF_TOKEN:   ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_ACCOUNT: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # the same value again, but only when it is a variable - GitHub
+          # redacts secrets from summaries, so a link built from the secret
+          # comes out as *** and is useless to click.
+          CF_ACCOUNT_SHOWABLE: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           # Cloudflare is unreachable from where this workflow was written, so
           # every dashboard path in it would be a guess - and two guesses have
@@ -151,12 +162,24 @@ jobs:
             say ""
             say "Open this, while signed in to Cloudflare:"
             say ""
-            say "**https://dash.cloudflare.com/$CF_ACCOUNT/workers/workers-and-pages**"
+            if [ -n "$CF_ACCOUNT_SHOWABLE" ]; then
+              say "**https://dash.cloudflare.com/$CF_ACCOUNT_SHOWABLE/workers/workers-and-pages**"
+            else
+              say "    https://dash.cloudflare.com/<your account id>/workers/workers-and-pages"
+              say ""
+              say "Paste your own account id in - GitHub redacts secrets from this"
+              say "summary, so a link built here would read \`***\` where the id"
+              say "belongs. Storing the id as a repository *variable* instead of a"
+              say "secret (Settings -> Secrets and variables -> Actions ->"
+              say "**Variables**, same name) makes this link clickable next time;"
+              say "an account id is an identifier, not a credential, and grants"
+              say "nothing without the token."
+            fi
             say ""
             say "That path is Cloudflare's own, quoted in the message above, with"
-            say "your account id substituted for \`:account\` - the substitution is"
-            say "why this link works when the \`?to=/:account/...\` form does not"
-            say "resolve. Note the \`/workers/\` segment; without it you get a 404."
+            say "your account id in place of \`:account\` - the substitution is why"
+            say "it works when the \`?to=/:account/...\` form does not resolve. Note"
+            say "the \`/workers/\` segment; without it you get a 404."
             say ""
             say "You do not have to choose anything there. Cloudflare creates the"
             say "subdomain the first time that page is opened. Then re-run this"
@@ -178,7 +201,7 @@ jobs:
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
           # each name here is pushed to the worker with `wrangler secret put`,
           # taking its value from the env block below
