@@ -91,6 +91,10 @@ jobs:
           api="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/subdomain"
           code=$(curl -sS -o sub.json -w '%{http_code}' --max-time 30 -H "Authorization: Bearer $CF_TOKEN" "$api" || echo 000)
           sub=$(python3 -c "import json;print((json.load(open('sub.json')).get('result') or {}).get('subdomain') or '')" 2>/dev/null || true)
+          # Cloudflare's own error text beats anything I can guess from a status
+          # code, so carry it into the summary verbatim.
+          cferr=$(python3 -c "import json;e=(json.load(open('sub.json')).get('errors') or [{}])[0];print('%s %s' % (e.get('code',''), e.get('message','')))" 2>/dev/null || true)
+          cfcode=$(python3 -c "import json;print((json.load(open('sub.json')).get('errors') or [{}])[0].get('code',''))" 2>/dev/null || true)
           say () { echo "$1" >> "$GITHUB_STEP_SUMMARY"; }
 
           if [ "$code" = "200" ] && [ -n "$sub" ]; then
@@ -100,7 +104,9 @@ jobs:
             exit 0
           fi
 
-          if [ "$code" = "200" ]; then
+          # A brand new account answers 404 here: the subdomain resource does
+          # not exist yet. That is the common case, not a bad account id.
+          if [ "$code" = "200" ] || [ "$code" = "404" ]; then
             say "## Pick a workers.dev subdomain first"
             say ""
             say "Your Cloudflare account has not chosen one yet. A first deploy"
@@ -112,9 +118,18 @@ jobs:
             say "That link already has your account id in it. Pick any name; it"
             say "becomes the worker's address, \`runmon-strava.<name>.workers.dev\`."
             say "Then re-run this workflow from the Actions tab."
+            if [ -n "$cferr" ]; then
+              say ""
+              say "Cloudflare said: \`$cferr\`"
+              say ""
+              say "If that page shows you *already have* a subdomain, then this"
+              say "is the other thing a 404 can mean and \`CLOUDFLARE_ACCOUNT_ID\`"
+              say "is wrong - it is the 32 hex characters in the dashboard's own"
+              say "URL, nothing else."
+            fi
             say ""
             say "Nothing was deployed."
-            echo "::error::no workers.dev subdomain on this account"
+            echo "::error::no workers.dev subdomain (HTTP $code, $cferr)"
             exit 1
           fi
 
@@ -125,17 +140,19 @@ jobs:
             say "wrong or expired, or it lacks Workers permissions. Remake it at"
             say "https://dash.cloudflare.com/profile/api-tokens with the *Edit"
             say "Cloudflare Workers* template rather than by hand."
+            [ -n "$cferr" ] && say "" && say "Cloudflare said: \`$cferr\`"
             say ""
             say "Nothing was deployed."
             echo "::error::Cloudflare returned $code for the token"
             exit 1
           fi
 
-          if [ "$code" = "400" ] || [ "$code" = "404" ]; then
+          if [ "$code" = "400" ]; then
             say "## That Account ID does not look right"
             say ""
             say "Cloudflare returned HTTP $code. \`CLOUDFLARE_ACCOUNT_ID\` is the 32"
             say "hex characters in the dashboard's own URL, not your email."
+            [ -n "$cferr" ] && say "" && say "Cloudflare said: \`$cferr\`"
             say ""
             say "Nothing was deployed."
             echo "::error::Cloudflare returned $code for that account id"
