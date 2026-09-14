@@ -159,12 +159,16 @@ white highlight on the shell goes with it.
 
 The Static Egg — Nimbus's acorn — followed, as five sheets in the same shape.
 Those arrived with real transparency, so no keying was needed, but their grid
-drifted: the egg climbs 22px and slides 45px left from the first frame to the
-last, and the body swells 6% along the way. Every frame of every phase is
-normalised to one body size and anchored to one point, measuring the body as
-the largest connected blob so the sparkles that come and go cannot drag the
-anchor with them. Left alone the acorn would creep across its own loop and jump
-at every handover between phases.
+drifted: across the sixty frames the egg's baseline moves 23px, its centre 48px,
+and the body swells 6%. Every frame of every phase is normalised to one body
+size and anchored to one point, measuring the body as the largest connected blob
+so the sparkles that come and go cannot drag the anchor with them. Left alone
+the acorn would creep across its own loop and jump at every handover between
+phases; after packing the three drifts are 2px, 2px and 4px.
+
+The two transition sheets hold each crack state for two or three frames rather
+than drawing twelve distinct ones — the sparkles change underneath, the shell
+does not. That is why their burst frames fall where they do.
 
 Eggs crack as they level. They are the one form whose art changes inside its
 own stage — intact at level 1, a first split at 2, a full web at 3 — and the
