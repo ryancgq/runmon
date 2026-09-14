@@ -50,7 +50,7 @@ kilometres and a level-15 pet. The pace it records is deliberately inhuman;
 real runs are never sped up.
 
 Pets with pixel art so far are **Ember** (egg, baby and teen), **Verdant** (baby)
-and **Nimbus** (baby).
+and **Nimbus** (baby and teen).
 Everything else is still placeholder vector art.
 
 Under the hood the demo is `index.html?demo=1` — the same file, one flag, no
@@ -177,8 +177,9 @@ use them.
 
 A form is not the end of a stage, it is the start of one: a pet keeps learning
 inside the form it grew into. The Cinderling and the Puffling have one move
-each, both at level 8, and the Blazewyrm learns all three of its own between
-level 15, where the form arrives, and level 30, where the next one does.
+each, both at level 8; the Blazewyrm learns all three of its own between level
+15, where the form arrives, and level 30, where the next one does; and the
+Zephyrite has the first of its own at 18, the same level the Blazewyrm starts.
 
 | Skill | Form | Learns at | What it does |
 | --- | --- | --- | --- |
@@ -187,12 +188,18 @@ level 15, where the form arrives, and level 30, where the next one does.
 | 🔥 Fireball | Blazewyrm | Level 18 | Draws a breath and spits a packed ball of flame |
 | 💥 Flame Stomp | Blazewyrm | Level 22 | Lands hard enough to throw a ring of fire out around it |
 | ☄️ Flying Swoop | Blazewyrm | Level 26 | A low, fast pass trailing fire |
+| 🌩️ Lightning Bolt | Zephyrite | Level 18 | Asks the sky for help. The sky, this time, obliges. |
 
 Both babies' moves are the same joke told twice, which is deliberate: a first
 skill is named for what it was meant to be, and both are lowercase for the same
 reason. The Cinderling coughs smoke;
 the Puffling gathers the whole storm and earths it through itself, and spends
 the last second and a half sitting there singed while the smoke drifts off it.
+The Zephyrite's is the same idea grown up and not played for laughs: it
+gathers, the sky answers with an orb, and a bolt comes down. Its charge quickens
+the same way, but the four strike frames grow rather than flicker, so they are
+held instead of cycled and the last one holds longest.
+
 Its charge frames genuinely progress — the bolts multiply — so unlike the
 Cinderling's they are not cycled, just slowed and then quickened, from 400ms a
 frame down to 170. What is cycled is the discharge, two frames alternating so
