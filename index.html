@@ -1536,10 +1536,10 @@ const LEVEL_UP_ART = {
   // frame 7 of 12, the spread on frame 10. Measured off the sheets rather than
   // copied from the Cinder Egg, which cracks on 9 both times.
   "nimbus:0@2": levelUpClip({ src:"art/nimbus-egg-crack-1.png", frames:12,
-    gather:2, burst:7, aspect:1.074, scale:0.909, dx:1.05, dy:4.45,
+    gather:2, burst:7, aspect:1.097, scale:0.832, dx:1.40, dy:-1.49,
     cap:{ top:12, right:45 } }),
   "nimbus:0@3": levelUpClip({ src:"art/nimbus-egg-crack-2.png", frames:12,
-    gather:2, burst:10, aspect:1.074, scale:0.909, dx:1.05, dy:4.45,
+    gather:2, burst:10, aspect:1.097, scale:0.832, dx:1.40, dy:-1.49,
     cap:{ top:12, right:45 } }),
   // this one scowls and shuts its eyes for four frames before any gold shows,
   // so its build is shorter in frames and each of them holds longer. `cap`
@@ -2552,7 +2552,7 @@ const DEFAULT_SPRITES = {
     // and anchored to one point. The body is the largest blob, so the sparkles
     // that come and go cannot drag the anchor with them.
     src:"art/nimbus-egg.png",
-    frames:12, rows:1, fps:2, aspect:1.074, scale:0.909, dx:1.05, dy:4.45
+    frames:12, rows:1, fps:2, aspect:1.097, scale:0.832, dx:1.40, dy:-1.49
   },
   "nimbus:1": {
     src:"art/nimbus-puffling.png",
@@ -2598,7 +2598,7 @@ function spriteConfig(species, stage){
    already has one will happily go on showing the old drawing. Bump this and
    every cache along the way fetches the new file. Only the sheets that ship
    with the app are stamped; a sheet you point at yourself is used verbatim. */
-const ART_VERSION = "11";
+const ART_VERSION = "12";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
 }
