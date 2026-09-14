@@ -21,6 +21,6 @@ new_sqlite_classes = ["Athlete"]
 # Public, and fine to commit. The secret half never appears in this repo:
 #   npx wrangler secret put STRAVA_CLIENT_SECRET
 #   npx wrangler secret put SESSION_SECRET        (any long random string)
-STRAVA_CLIENT_ID = "REPLACE_WITH_YOUR_CLIENT_ID"
+STRAVA_CLIENT_ID = "279235"
 APP_ORIGIN = "https://ryancgq.github.io"
 APP_PATH = "/runmon/"
