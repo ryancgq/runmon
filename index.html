@@ -1441,7 +1441,15 @@ const SKILLS = {
         order:    [0, 1, 2, 3, 4, 5, 6, 7,  8, 9, 8, 9,  10, 11, 10, 11],
         durations:[400, 380, 350, 320, 290, 250, 210, 170,
                    100, 100, 90, 90,  300, 300, 340, 420],
-        aspect:1.082, scale:1.071, dx:7, dy:-13.6 } }
+        aspect:1.082, scale:1.071, dx:7, dy:-13.6 } },
+    { id:"lightning-bolt", name:"Lightning Bolt", ico:"\u{1F329}\uFE0F", stage:2, level:18,
+      blurb:"Asks the sky for help. The sky, this time, obliges.",
+      sprite:{ src:"art/skill-lightning-bolt.png", frames:12, fps:3,
+        /* It gathers, the sky answers, and the bolt lands. The charge quickens
+           the way the Puffling's does; the strike is four frames that grow, so
+           they are held rather than cycled, and the last one longest. */
+        durations:[380, 340, 300, 260, 230, 200, 180, 160, 150, 170, 260, 460],
+        aspect:1.061, scale:1.376, dx:5.6, dy:-28.5 } }
   ]
 };
 function skillsFor(speciesId){ return SKILLS[speciesId] || []; }
@@ -2489,6 +2497,11 @@ const DEFAULT_SPRITES = {
     // pinned to one ground line - only the squirrel, since the acorn and the
     // bolts are meant to move.
     frames:12, rows:1, fps:2, aspect:0.997, scale:1.04, dy:-7
+  },
+  "nimbus:2": {
+    src:"art/nimbus-zephyrite.png",
+    // 12-frame loop: the charge crackles around it and it blinks through it
+    frames:12, rows:1, fps:2, aspect:1.199, scale:1.2, dx:0.9, dy:-15.1
   },
   "verdant:1": {
     src:"art/panda-cub.png",
