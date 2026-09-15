@@ -50,6 +50,13 @@ is, which is what makes an egg show both of its cracks and a hatch show the
 hatch. Tapping the pet skips the rest; it finishes whatever is mid-flight rather
 than cutting a frame, then jumps to the true state.
 
+Nobody has to ask it to check. It syncs when the app opens, when you come back
+to the tab, and when you open the pet — each throttled to once a minute so
+walking between screens does not hammer Strava. **Check now** in Settings is
+only there for impatience. What it cannot do is update while the app is shut:
+there are no webhooks and no push, so a run is picked up the next time the app
+is looked at, and the catch-up is then replayed rather than applied silently.
+
 Only runs recorded *after* you connect count. Your history stays yours — the
 pet starts as an egg and grows from your next run, because a pet that arrives
 at level forty has skipped the part that makes it a pet.

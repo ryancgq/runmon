@@ -3302,6 +3302,9 @@ function go(name){
   if (name === "evolve")  { renderEvolve(); }
   if (name === "home")    {
     renderHome();
+    // Opening the pet is the same intent as tapping Check now, so treat it that
+    // way. Same one-a-minute throttle as coming back to the tab.
+    if (stravaLinked() && !replaying && Date.now() - (save.stravaSyncedAt || 0) > 60000) stravaSync();
     if (pendingReplay.length){
       const queued = pendingReplay; pendingReplay = [];
       replayStravaRuns(queued);
