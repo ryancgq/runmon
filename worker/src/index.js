@@ -237,8 +237,24 @@ export class Athlete {
     // connectedAt matters more than it looks: the window is on an activity's
     // START time, not when it was uploaded, so a run begun before the link was
     // made never appears however recently it landed on Strava.
-    return this.ok({ save, activities,
-                     seen: { since: raw.length, fresh: fresh.length, kinds, connectedAt } });
+    const seen = { since: raw.length, fresh: fresh.length, kinds, connectedAt };
+
+    // An empty window has two very different causes that look identical from
+    // the app: nothing has been run since connecting, or Strava is showing us
+    // nothing at all because the athlete's activities are private - the
+    // activity:read scope cannot see "Only You". One call without the window
+    // separates them. Counts and a date only; nothing is read or imported.
+    if (raw.length === 0){
+      const probe = new URL(API(this.env) + "/athlete/activities");
+      probe.searchParams.set("per_page", "5");
+      const pr = await fetch(probe, { headers:{ Authorization:`Bearer ${token}` } });
+      if (pr.ok){
+        const recent = await pr.json();
+        seen.anyAtAll = recent.length;
+        if (recent.length) seen.latestStart = Date.parse(recent[0].start_date) || null;
+      }
+    }
+    return this.ok({ save, activities, seen });
   }
 
   /** The client says what it stored and what it managed to import, together, so

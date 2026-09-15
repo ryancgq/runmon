@@ -4394,8 +4394,18 @@ function stravaWhyEmpty(){
   const when = stravaSeen.connectedAt
     ? new Date(stravaSeen.connectedAt).toLocaleString([], { dateStyle:"medium", timeStyle:"short" })
     : null;
-  if (stravaSeen.since === 0)
+  if (stravaSeen.since === 0){
+    // The window being empty has two very different causes; the broker probes
+    // without it precisely so this message can tell them apart.
+    if (stravaSeen.anyAtAll === 0)
+      return "Strava is showing Runmon no activities at all. That usually means yours are set to “Only You” — Runmon asks for the read scope, which cannot see private activities. Make a run visible to Followers or Everyone, or ask for the wider permission.";
+    if (stravaSeen.latestStart){
+      const last = new Date(stravaSeen.latestStart)
+        .toLocaleString([], { dateStyle:"medium", timeStyle:"short" });
+      return `Your latest Strava activity started ${last}, before you connected${when ? " on " + when : ""}. The cut-off is when a run started, not when it was uploaded.`;
+    }
     return `Strava has nothing recorded since you connected${when ? " on " + when : ""}. The cut-off is when a run started, not when it was uploaded.`;
+  }
   if (stravaSeen.fresh === 0)
     return `All ${stravaSeen.since} activities since you connected have already been counted.`;
   if (!counted.length && names.length && names.every(t => t === "VirtualRun"))
