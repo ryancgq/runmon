@@ -74,7 +74,7 @@ down through all six moods), or start over and pick a different pet.
 **Test animations** is the one that levels nothing. It opens a panel that does
 not dim the screen, so the pet stays in view above it while you tap through
 every animation the app has: fifteen idles across all three species, the egg's
-three crack phases, six moods, four skills, seven level-up celebrations — each
+three crack phases, six moods, four skills, eight level-up celebrations — each
 with its full wind-up, burst and caption — and the confetti, the caption and
 the wind-up on their own. The pet is painted straight onto the stage and the
 celebrations run without a level to spend, so you can watch a Blazewyrm's
@@ -225,6 +225,22 @@ loses most of it, reporting the pet a dozen pixels higher than it is. Take the
 baseline from the least-lit frame of each row and correct per row, not per
 frame. Per frame would also cancel the crouch the squirrel does before it fires,
 which is animation, not drift.
+
+The Zephyrite's celebration works the same way as the Puffling's and needed
+the same care, with one number different: its effect pixels - cyan aura and
+orange bolts together - rest near nothing, build from frame 3, and peak on frame
+8 rather than 7, so its flash is told to land a frame later rather than
+inheriting the baby's timing. Its rows drift 20px and 33px, and again the burst
+frames read low because the aura washes over the squirrel's outline, so each
+row's baseline comes from its least-lit frame. Frames 1 and 12 were 33px apart
+and now share a ground line exactly.
+
+Fitting it against its idle is where the measuring went wrong twice. The total
+bounding box compares effects rather than the pet - the celebration's first
+frame carries bigger lightning than the idle's - and the largest dark blob in
+the source art turned out to be the squirrel merged with a bolt's outline, which
+put the scale out by 16%. The white face and chest is the landmark that works:
+no bolt or aura shares it, and it is the same feature in both sheets.
 
 Anchoring is not only an idle's problem. The packs arrive as 4×4 grids, and
 some of them draw each row a little higher than the last — the Cinderling's
