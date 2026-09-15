@@ -1570,7 +1570,13 @@ const LEVEL_UP_ART = {
   // back to the idle's own pose. Measured off the sheet's cyan pixel count,
   // which runs 1.1k at rest, 33k on the burst and 1.1k again by frame 12.
   "nimbus:1": levelUpClip({ src:"art/levelup-puffling.png", frames:12,
-    gather:2, burst:7, aspect:1.075, scale:1.053, dx:-0.85, dy:-7.25 })
+    gather:2, burst:7, aspect:1.075, scale:1.053, dx:-0.85, dy:-7.25 }),
+  // The Zephyrite discharges a frame later than the Puffling does - its cyan
+  // and orange effect pixels rest near nothing, build from frame 3, and peak on
+  // 8 rather than 7 - so the flash is told to land there rather than inheriting
+  // the baby's timing.
+  "nimbus:2": levelUpClip({ src:"art/levelup-zephyrite.png", frames:12,
+    gather:2, burst:8, aspect:1.031, scale:1.054, dx:-1.35, dy:-6.25 })
 };
 /* Keyed by form, and by level where a form celebrates differently at different
    levels - which so far is the egg, whose two crack clips belong to levels 2
@@ -2617,7 +2623,7 @@ function spriteConfig(species, stage){
    already has one will happily go on showing the old drawing. Bump this and
    every cache along the way fetches the new file. Only the sheets that ship
    with the app are stamped; a sheet you point at yourself is used verbatim. */
-const ART_VERSION = "14";
+const ART_VERSION = "15";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
 }
