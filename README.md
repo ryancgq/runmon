@@ -31,6 +31,23 @@ says the offer stands in **Settings → Strava**, which is also where anyone who
 skipped it can connect later. The step is skipped entirely for someone already
 linked, and in the sandbox, which has no broker to connect to.
 
+A catch-up is replayed rather than applied. A week of running used to land in
+one jump: the pet was simply whatever the total made it, so an egg that should
+have cracked twice and hatched arrived already hatched and none of it was seen.
+Now every run is stored and uploaded first, and then the pet is walked forward
+through them one at a time — each run's own XP, then whichever celebrations that
+run earned.
+
+The save is never the thing being animated. `recompute()` takes a cursor, so the
+displayed state is derived from the runs up to a point while `save.runs` stays
+whole; leaving half way through, or locking the phone, loses nothing and the
+next render simply shows the real total. Levels are not celebrated one per
+level, either — a run big enough to cross four of them inside one form would
+play the same clip four times — but every *distinct* celebration along the path
+is, which is what makes an egg show both of its cracks and a hatch show the
+hatch. Tapping the pet skips the rest; it finishes whatever is mid-flight rather
+than cutting a frame, then jumps to the true state.
+
 Only runs recorded *after* you connect count. Your history stays yours — the
 pet starts as an egg and grows from your next run, because a pet that arrives
 at level forty has skipped the part that makes it a pet.

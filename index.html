@@ -1863,8 +1863,16 @@ function persist(){
 }
 
 /** Recompute every derived value from the raw run log. */
+/* A Strava catch-up stores and uploads every run it fetched before a single
+   frame plays, then walks the pet forward one run at a time so the level-ups
+   happen on screen instead of being collapsed into the total. This is the only
+   thing that needs to know: the save stays whole, and the derived state is
+   taken from the runs up to the cursor. null means all of them. */
+let replayCursor = null;
+
 function recompute(){
-  const runs = save.runs.slice().sort((a,b)=>a.t-b.t);
+  const all = save.runs.slice().sort((a,b)=>a.t-b.t);
+  const runs = replayCursor === null ? all : all.slice(0, replayCursor);
   let totalKm = 0, totalXp = 0, totalSec = 0;
   for (const r of runs){ totalKm += r.km; totalXp += r.xp; totalSec += r.sec; }
 
@@ -2969,6 +2977,71 @@ function runCelebration(art, opts){
   }, 260);
   return true;
 }
+/* Walk the pet through runs that arrived while the app was shut.
+   ------------------------------------------------------------------------
+   Everything is already saved and uploaded by the time this runs, so leaving
+   half way loses nothing - the cursor only decides what is drawn. Levels are
+   not celebrated one per level: a run big enough to cross four of them inside
+   one form would otherwise play the same clip four times. What plays is every
+   distinct celebration the path crosses, which is what makes the egg show both
+   of its cracks and a hatch show the hatch. */
+let replaying = false, replaySkipped = false;
+const wait = ms => new Promise(r => setTimeout(r, ms));
+
+function celebrationsBetween(fromLevel, toLevel){
+  const out = [];
+  for (let lv = fromLevel + 1; lv <= toLevel; lv++){
+    const stage = stageForLevel(lv);
+    const art = levelUpArt(save.species, stage, lv);
+    if (art && (!out.length || out[out.length - 1].art !== art)) out.push({ art, lv, stage });
+  }
+  return out;
+}
+
+async function playCelebration(art, fromLevel, stage){
+  // the wind-up plays over the form as it was before the level, the same way a
+  // run finished in the app does
+  previewPet = { id: save.species, stage, mood: derived.mood.key, level: fromLevel };
+  renderHome();
+  await wait(60);
+  charging = false; skillPlaying = null;
+  runCelebration(art);
+  await wait(260 + LEVEL_UP_CHARGE_MS + clipDurationMs(art) + 240);
+  previewPet = null;
+}
+
+async function replayStravaRuns(count){
+  if (replaying || count <= 0) return;
+  const all = save.runs.slice().sort((a, b) => a.t - b.t);
+  const first = all.length - count;
+  if (first < 0) return;
+
+  replaying = true; replaySkipped = false;
+  toast("Tap the pet to skip", "", "\u23ED\uFE0F");
+
+  try {
+    for (let i = first; i < all.length && !replaySkipped; i++){
+      if (currentScreen !== "home"){ replaySkipped = true; break; }   // walked away
+      const run = all[i];
+      replayCursor = i;  recompute();                 // the pet as it was
+      const before = derived.level;
+      replayCursor = i + 1; recompute();              // and after this run
+      const after = derived.level;
+      renderHome();
+      toast(`+${nf(run.xp)} XP \u00b7 ${U.distStr(run.km, 1)}${U.label}`, "good", "\u{1F3C3}");
+      await wait(900);
+      if (replaySkipped) break;
+      for (const c of celebrationsBetween(before, after)){
+        await playCelebration(c.art, c.lv - 1, c.stage);
+        if (replaySkipped) break;
+      }
+    }
+  } finally {
+    replaying = false; replayCursor = null; previewPet = null;
+    recompute(); renderAll();
+  }
+}
+
 function playPendingLevelUp(){
   if (!pendingLevelUp || charging) return;
   const art = levelUpArt(save.species, derived.stage, derived.level);
@@ -4341,17 +4414,14 @@ async function stravaSync(opts){
       imported.push(a.id);
     }
     if (res.error === "reauth"){ stravaForget(); stravaLastError = "Strava needs you to connect again."; }
-    if (imported.length){
-      recompute();
-      // a run that arrived while you were away still gets its celebration
-      pendingLevelUp = derived.level > before.level && !!levelUpArt(save.species, derived.stage, derived.level);
-      pendingLevelFrom = before.level;
-    }
+    if (imported.length) recompute();
     save.stravaSyncedAt = Date.now();
     persist();
-    await stravaPush(imported);
+    await stravaPush(imported);          // stored and uploaded before anything plays
     renderAll();
-    if (imported.length && currentScreen === "home") playPendingLevelUp();
+    // Walk the pet through them one at a time. Collapsing a week of running into
+    // one jump was the whole complaint: the egg would arrive already hatched.
+    if (imported.length && currentScreen === "home") replayStravaRuns(imported.length);
     if (opts && opts.loud){
       toast(imported.length
         ? `${imported.length} run${imported.length === 1 ? "" : "s"} from Strava`
@@ -4548,6 +4618,10 @@ function wire(){
   });
   // the Strava panel is re-rendered rather than kept, so its buttons are caught
   // on the way up instead of bound to elements that will not exist for long
+  // a catch-up can be a dozen celebrations long; let it be cut short
+  $("#pet-stage").addEventListener("click", () => {
+    if (replaying) replaySkipped = true;
+  });
   document.addEventListener("click", e => {
     if (!STRAVA_ON) return;
     if (e.target.closest("#strava-on")){
