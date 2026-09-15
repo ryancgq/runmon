@@ -205,7 +205,10 @@ export class Athlete {
 
     const url = new URL(API(this.env) + "/athlete/activities");
     url.searchParams.set("after", Math.floor(connectedAt / 1000));
-    url.searchParams.set("per_page", "100");
+    // Strava returns newest first, so a new run is always inside this window;
+    // the cap only bites if someone logs more than this between two app opens.
+    // 200 is the endpoint's maximum, and costs the same one request as 100.
+    url.searchParams.set("per_page", "200");
     const r = await fetch(url, { headers:{ Authorization:`Bearer ${token}` } });
     if (!r.ok) return this.ok({ save, activities: [], error:`strava ${r.status}` });
 
