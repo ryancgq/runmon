@@ -771,13 +771,14 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
    block the text would only ever sample the middle of the ramp */
 /* The wordmark used to string all three species' accents together - ember's
    orange, verdant's green, nimbus's blue - which read as a generic rainbow and
-   matched no theme in particular, least of all the one on screen. It wears the
-   active species' accent pair now, the same gradient the primary button does.
-   The solid colour is a fallback: without background-clip the transparent fill
+   matched no theme in particular, least of all the one on screen. It now takes
+   the same treatment as the run distance on the summary screen: white at the
+   top washing into the active species' colour at the base. The solid colour is
+   a fallback, not decoration: without background-clip the transparent fill
    would leave the app's own name invisible. */
 .ob-logo h1{display:inline-block;font-size:40px;letter-spacing:.5px;
-  color:var(--accent);
-  background:linear-gradient(135deg,var(--accent),var(--accent-2));
+  color:var(--text);
+  background:linear-gradient(180deg,#fff,rgba(var(--glow),1));
   -webkit-background-clip:text;background-clip:text}
 @supports ((-webkit-background-clip:text) or (background-clip:text)){
   .ob-logo h1{color:transparent}
