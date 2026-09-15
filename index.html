@@ -1561,7 +1561,12 @@ const LEVEL_UP_ART = {
   // 8 rather than 7 - so the flash is told to land there rather than inheriting
   // the baby's timing.
   "nimbus:2": levelUpClip({ src:"art/levelup-zephyrite.png", frames:12,
-    gather:2, burst:8, aspect:1.031, scale:1.054, dx:-1.35, dy:-6.25 })
+    gather:2, burst:8, aspect:1.031, scale:1.054, dx:-1.35, dy:-6.25 }),
+  // Verdant's first celebration. Two calm frames, leaves gathering through six,
+  // a green bloom on 8 held over 9, then sparkles settling back. Read off the
+  // sheet's green pixels, which sit at 40 at rest and 45,858 on the burst.
+  "verdant:1": levelUpClip({ src:"art/levelup-bamboo-cub.png", frames:12,
+    gather:2, burst:8, aspect:1.028, scale:1.274, dx:4.9, dy:-2.8 })
 };
 /* Keyed by form, and by level where a form celebrates differently at different
    levels - which so far is the egg, whose two crack clips belong to levels 2
@@ -2572,8 +2577,11 @@ const DEFAULT_SPRITES = {
   },
   "verdant:1": {
     src:"art/verdant-bamboo-cub.png",
-    // 12-frame loop: bamboo arrives, cub eats, cub is content
-    frames:12, rows:1, fps:2, aspect:1.157, scale:1.0
+    // 12-frame loop: bamboo drops in, the cub catches it, the cub eats. Its
+    // rows sit 41px and 78px high in the pack, so each frame is pinned to the
+    // ground line of its row's least-occluded frame - the bamboo is meant to
+    // move, the cub is not.
+    frames:12, rows:1, fps:2, aspect:0.900, scale:0.986, dx:3.5, dy:-16.8
   }
 };
 /* What the animation tester is showing instead of your own pet: a form, a mood
@@ -2603,7 +2611,7 @@ function spriteConfig(species, stage){
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
 const BUILD_ID = "2026-09-15 bfdf6b0";
-const ART_VERSION = "15";
+const ART_VERSION = "16";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
 }
