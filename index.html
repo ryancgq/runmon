@@ -3921,12 +3921,32 @@ function renderStravaPanel(){
     : "not yet";
   const err = stravaLastError
     ? `<div class="row"><div class="t"><div class="n" style="color:var(--bad)">${stravaLastError}</div></div></div>` : "";
+  // When a check finds nothing, say what Strava did return. Without this an
+  // empty result is indistinguishable from a broken link.
+  let why = "";
+  if (!stravaLastError && stravaSeen){
+    const k = stravaSeen.kinds || {};
+    const names = Object.keys(k);
+    const ok = countedTypes();
+    const counted = names.filter(t => ok.includes(t));
+    const onlyTreadmill = !counted.length && names.length && names.every(t => t === "VirtualRun");
+    why = stravaSeen.since === 0
+      ? "Strava has no activities recorded since you connected. Only runs recorded after that count."
+      : stravaSeen.fresh === 0
+        ? `All ${stravaSeen.since} activities since you connected have already been counted.`
+        : onlyTreadmill
+          ? `Strava has ${k.VirtualRun} treadmill run${k.VirtualRun === 1 ? "" : "s"} waiting. Switch on \u201cCount treadmill runs\u201d below and check again.`
+          : counted.length === 0
+            ? `Strava returned ${names.map(t => `${k[t]} \u00d7 ${t}`).join(", ")} \u2014 none of a type that counts. Runs and trail runs always do; treadmill runs need the toggle below.`
+            : `${stravaSeen.fresh} new: ${names.map(t => `${k[t]} \u00d7 ${t}`).join(", ")}.`;
+    why = `<div class="row"><div class="t"><div class="h">${why}</div></div></div>`;
+  }
   panel.innerHTML = stravaLinked()
     ? `<div class="row">
          <div class="t"><div class="n">Connected</div>
            <div class="h">Your runs come from Strava. Last checked: ${when}. Only runs recorded after you connected count.</div></div>
          <button class="btn ghost" style="width:auto;padding:9px 15px;font-size:13px" id="strava-sync"${stravaBusy ? " disabled" : ""}>${stravaBusy ? "Checking…" : "Check now"}</button>
-       </div>${err}
+       </div>${err}${why}
        <div class="row tap" id="row-virtual">
          <div class="t"><div class="n">Count treadmill runs</div>
            <div class="h">Virtual runs have no GPS and their distance is whatever the machine said.</div></div>
@@ -4361,6 +4381,12 @@ function playAnimTest(d, root){
    know what a level is - nothing here touches the game rules, because a Strava
    run and a run you recorded yourself have to be worth exactly the same. */
 let stravaSession = null, stravaBusy = false, stravaLastError = null, savePushTimer = null;
+/* What the last check actually found, so "nothing new" can say why. */
+let stravaSeen = null;
+/* Mirrors ALWAYS + OPT_IN in the worker; only used to word the panel. The
+   treadmill type is conditional there too, so asking about it has to be. */
+const countedTypes = () =>
+  ["Run", "TrailRun"].concat(save.settings.stravaVirtual ? ["VirtualRun"] : []);
 
 function stravaLoadSession(){
   if (!STRAVA_ON) return;
@@ -4413,7 +4439,19 @@ async function stravaSync(opts){
       save.runs.push(makeRun(a.t, a.km, a.sec, { strava: a.id, manual: !!a.manual }));
       imported.push(a.id);
     }
-    if (res.error === "reauth"){ stravaForget(); stravaLastError = "Strava needs you to connect again."; }
+    if (res.error === "reauth"){
+      stravaForget(); stravaLastError = "Strava needs you to connect again.";
+    } else if (res.error){
+      // anything else the broker got from Strava - a rate limit, a refused
+      // token. Saying nothing here made a failure look exactly like a quiet day.
+      const code = String(res.error).replace(/^strava /, "");
+      stravaLastError = code === "429"
+        ? "Strava is rate limiting us. Try again in fifteen minutes."
+        : code === "401" || code === "403"
+          ? "Strava refused the request (" + code + "). Reconnect in Settings."
+          : "Strava answered with an error (" + code + ").";
+    }
+    stravaSeen = res.seen || null;
     if (imported.length) recompute();
     save.stravaSyncedAt = Date.now();
     persist();
