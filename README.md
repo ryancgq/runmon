@@ -159,7 +159,7 @@ import if you want to move a save or keep a backup.
 | **Summary** | Route trace, run stats, a full XP breakdown, animated bar fill, and any level up or evolution |
 | **Evolve** | Lifetime stats, the five-stage evolution tree for all three species, and 20 badges |
 | **History** | Every run by month, with route thumbnails; tap one to reopen its summary or delete it |
-| **Settings** | Units, body weight, simulated GPS, sprite packs, export/import, new game |
+| **Settings** | Strava, units, body weight, simulated GPS, new game |
 
 ## The pets
 
@@ -438,47 +438,14 @@ needs re-exporting to loop a stretch of itself.
 canvas, baseline, frame order, palette and file limits, with the Cinderling as
 the worked example. Read it before drawing anything.
 
-### Swapping in your own art
+### The art is fixed
 
-Any species and stage can be replaced with a horizontal sprite sheet, from
-**Settings → Sprite packs** (pick a file, set frames, FPS and scale, watch the
-live preview) or from the console:
-
-```js
-Runmon.setSprite("ember", 2, {
-  src: "art/blazewyrm.png",     // URL, relative path or data: URI
-  frames: 6,                    // frames laid out left to right
-  fps: 8,
-  moods: { sad: 1, asleep: 2 }  // optional: one sheet row per mood
-});
-
-Runmon.clearSprite("ember", 2); // back to the vector art
-Runmon.listSprites();
-```
-
-A registered sheet replaces the built-in pet everywhere — home, evolution tree,
-summary, species picker — and is saved with the rest of your game. Nothing else
-needs changing. If the image cannot be fetched, the pet quietly falls back to
-vector art rather than showing an empty box.
-
-**Sheet layout.** Frames run left to right. Add `moods` and the sheet becomes a
-grid: one row per mood, `frames` columns wide. A 6-row sheet ordered
-`elated, happy, okay, bored, sad, asleep` gives the pet a distinct animation per
-mood:
-
-| key | what it does |
-| --- | --- |
-| `frames` | columns in the sheet; each is one animation frame |
-| `rows` | rows in the sheet (defaults to what `moods` implies) |
-| `moods` | mood name to row index |
-| `fps` | playback speed |
-| `moodFps` | per-mood speed override, e.g. slow breathing while asleep |
-| `aspect` | frame width / height, if the frames are not square |
-| `scale` | grow or shrink the pet within its slot |
-
-Frames must be evenly sized with no gutters between them. There is a script-free
-way to check yours: register it, then watch the live preview in the editor — if
-you see two half-pets, the frame width is off.
+Every pet is a sheet in `DEFAULT_SPRITES`, keyed `"species:stage"`, and there is
+no way for a player to substitute their own. The settings panel that allowed it,
+its console methods and the per-device `save.sprites` override are all gone: in
+a game people play against each other, everyone should be looking at the same
+creature. Adding or changing art means editing `DEFAULT_SPRITES` and shipping
+it, which is what `ART-SPEC.md` describes.
 
 ## How XP works
 

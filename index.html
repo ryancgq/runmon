@@ -1174,11 +1174,6 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
         <div class="toggle on" id="tg-wake"><i></i></div>
       </div>
 
-      <div class="section-title">Artwork</div>
-      <div class="row tap" id="row-sprites">
-        <div class="t"><div class="n">Sprite packs</div><div class="h" id="sprite-summary">Using the built-in vector pets</div></div>
-        <svg viewBox="0 0 24 24" style="width:17px;height:17px;fill:none;stroke:var(--muted);stroke-width:2.2;stroke-linecap:round"><path d="M9 18l6-6-6-6"/></svg>
-      </div>
 
       <div class="section-title">Data</div>
       <button class="btn danger" id="btn-reset" style="margin-top:6px">
@@ -1297,7 +1292,6 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
   <div class="toasts" id="toasts"></div>
 </div>
 
-<input type="file" id="file-sprite" accept="image/*" class="hide">
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
@@ -1807,7 +1801,6 @@ const DEFAULT_SAVE = {
   badges: {},           // id -> timestamp first earned
   seenStage: 0,         // highest evolution stage already celebrated
   settings: { units:"km", weightKg:70, simulate:DEMO, simSpeed:DEMO ? 10 : 1, wakeLock:true },
-  sprites: {}           // "species:stage" -> sprite config
 };
 
 let save = structuredCloneSafe(DEFAULT_SAVE);
@@ -1835,7 +1828,6 @@ function loadSave(){
     save.settings = Object.assign({}, DEFAULT_SAVE.settings, parsed.settings || {});
     save.runs = Array.isArray(parsed.runs) ? parsed.runs : [];
     save.badges = parsed.badges || {};
-    save.sprites = parsed.sprites || {};
     return !!save.species;
   } catch(e){
     console.warn("Save file was corrupt, starting fresh.", e);
@@ -1963,9 +1955,9 @@ const U = {
    Every pet is inline SVG on a 200x200 canvas, animated with the CSS classes
    declared in the stylesheet (.p-flick, .p-wag, .p-float ...).
 
-   Swapping in your own sprite sheets later: see SpriteKit at the bottom of
-   this section. If a sprite is registered for "<species>:<stage>" it replaces
-   the vector art everywhere in the app, no other changes needed.
+   Where a sheet exists for "<species>:<stage>" in DEFAULT_SPRITES, at the
+   bottom of this section, it replaces the vector art everywhere in the app.
+   Those sheets ship with the game and are the only art it will use.
    ------------------------------------------------------------------------- */
 
 let _uidN = 0;
@@ -2521,28 +2513,15 @@ PET_ART.nimbus = [
 ];
 
 /* ---------------------------------------------------------------------------
-   SpriteKit — drop-in replacement art
+   Sprite art
    ---------------------------------------------------------------------------
-   Register a horizontal sprite sheet for any species/stage and it is used in
-   place of the vector pet everywhere (home, evolution tree, summary, picker).
-
-     Runmon.setSprite("ember", 2, {
-       src: "art/blazewyrm.png",  // URL, relative path or data: URI
-       frames: 6,                 // frames laid out left to right
-       fps: 8,                    // playback speed
-       moods: { sad: 1, asleep: 2 }   // optional: row index per mood
-     });
-
-   Rows are optional. With `moods`, the sheet is a grid: every row is one mood
-   and `frames` columns wide. Without it a single row is used for every mood.
-   Runmon.clearSprite(species, stage) puts the vector art back, and
-   Runmon.listSprites() shows what is registered. Everything is saved to
-   localStorage with the rest of the game.
+   Every pet is a horizontal sheet registered in DEFAULT_SPRITES below, keyed
+   "species:stage". Players cannot substitute their own: the sheets that ship
+   with the app are the only art there is, so everyone sees the same pet.
    ------------------------------------------------------------------------- */
 function spriteKey(species, stage){ return species + ":" + stage; }
 
-/* Art that ships with the app. A key present in save.sprites wins; an explicit
-   null there means "use the vector pet instead of this default". */
+/* The art, in full. A stage with no entry here falls back to the vector pet. */
 const DEFAULT_SPRITES = {
   "ember:0": {
     // The Cinder Egg, and the src the level swaps - see EGG_PHASES. Its twelve
@@ -2605,8 +2584,6 @@ let previewPet = null;
 
 function spriteConfig(species, stage){
   const key = spriteKey(species, stage);
-  const own = save.sprites[key];
-  if (own !== undefined) return own;            // a pack you supplied is yours
   const cfg = DEFAULT_SPRITES[key] || null;
   // the egg is the one shipped sheet that changes inside its own stage
   if (cfg && stage === 0 && EGG_PHASES[species]){
@@ -4024,10 +4001,6 @@ function renderSettings(){
       `<button data-w="${v}" class="${v === w ? "on" : ""}">${v}\u00d7</button>`).join("");
   }
   $("#tg-wake").classList.toggle("on", !!save.settings.wakeLock);
-  const n = Object.values(save.sprites).filter(Boolean).length;
-  $("#sprite-summary").textContent = n
-    ? `${n} custom sprite${n === 1 ? "" : "s"} registered — tap to manage`
-    : "Built-in art — tap to add your own sheets";
   $("#storage-note").textContent = storageOK ? "" : "⚠️ localStorage is unavailable — progress will not survive a reload.";
   // This promised "no account, no server, no tracking" unconditionally, which
   // stopped being true the moment a pet could live on the broker.
@@ -4039,120 +4012,6 @@ function renderSettings(){
   $("#build-stamp").textContent = "build " + BUILD_ID;
 }
 
-function openSpriteSheetManager(){
-  const rows = [];
-  for (const id of SPECIES_ORDER){
-    for (let k = 0; k < 5; k++){
-      const key = spriteKey(id, k);
-      const own = save.sprites[key];              // object = custom, null = forced vector
-      const def = DEFAULT_SPRITES[key];
-      const cfg = spriteConfig(id, k);
-      const label = own ? `custom · ${own.frames || 1} frames`
-                  : own === null ? "vector — built-in art switched off"
-                  : def ? `built-in pixel art · ${def.frames} frames`
-                  : "built-in vector";
-      const alt = own !== undefined
-        ? `<button class="btn ghost" style="width:auto;padding:8px 10px;font-size:12px" data-sprite-default="${key}" title="Back to the shipped art">↺</button>`
-        : def ? `<button class="btn ghost" style="width:auto;padding:8px 10px;font-size:12px;color:var(--danger)" data-sprite-vector="${key}" title="Use the vector pet instead">✕</button>`
-        : "";
-      rows.push(`<div class="row" style="margin-bottom:7px;padding:10px 12px">
-        <div class="pet-holder tiny" data-sprite-prev="${key}"></div>
-        <div class="t"><div class="n" style="font-size:13px">${SPECIES[id].name} · ${SPECIES[id].stages[k].name}</div>
-          <div class="h">${label}</div></div>
-        <button class="btn ghost" style="width:auto;padding:8px 12px;font-size:12px" data-sprite-set="${key}">${cfg ? "Replace" : "Add"}</button>
-        ${alt}
-      </div>`);
-    }
-  }
-  openSheet({
-    title:"Sprite packs",
-    desc:`Replace any pet with your own horizontal sprite sheet. Frames run left to right; add a <span class="mono">moods</span> map if your sheet has one row per mood. Everything else in the app keeps working — the sheet simply takes the place of the vector art.<br><br>You can also do this from the console: <span class="mono">Runmon.setSprite("ember", 2, {src, frames, fps})</span>`,
-    body: rows.join(""),
-    actions:[{ label:"Done", cls:"primary", fn: closeSheet }],
-    onOpen: root => {
-      $$("[data-sprite-prev]", root).forEach(el => {
-        const [s, k] = el.dataset.spritePrev.split(":");
-        paintPet(el, s, +k, "okay");
-      });
-    }
-  });
-}
-
-function openSpriteEditor(key){
-  const [species, stageStr] = key.split(":");
-  const stage = +stageStr;
-  const cur = save.sprites[key] || DEFAULT_SPRITES[key] || { src:"", frames:4, fps:8 };
-  openSheet({
-    title:`${SPECIES[species].name} · ${SPECIES[species].stages[stage].name}`,
-    desc:"Pick a PNG or GIF sprite sheet from this device, or paste a URL. The image is stored with your save file.",
-    body:`
-      <button class="btn ghost" id="sprite-file" style="margin-bottom:11px">Choose an image file…</button>
-      <label class="fl" for="sprite-src">Image URL or data URI</label>
-      <input class="inp" id="sprite-src" placeholder="art/blazewyrm.png" value="${(cur.src || "").startsWith("data:") ? "" : (cur.src || "")}">
-      <div style="display:flex;gap:10px;margin-top:11px">
-        <div style="flex:1"><label class="fl" for="sprite-frames">Frames</label>
-          <input class="inp" id="sprite-frames" type="number" min="1" max="60" value="${cur.frames || 4}"></div>
-        <div style="flex:1"><label class="fl" for="sprite-fps">FPS</label>
-          <input class="inp" id="sprite-fps" type="number" min="1" max="60" value="${cur.fps || 8}"></div>
-        <div style="flex:1"><label class="fl" for="sprite-scale">Scale</label>
-          <input class="inp" id="sprite-scale" type="number" min="0.4" max="3" step="0.02" value="${cur.scale || 1}"></div>
-      </div>
-      <label class="fl" style="margin-top:11px" for="sprite-moods">Mood rows (optional JSON)</label>
-      <textarea class="inp" id="sprite-moods" placeholder='{"happy":0,"sad":1,"asleep":2}'>${cur.moods ? JSON.stringify(cur.moods) : ""}</textarea>
-      <div class="center" style="margin-top:12px">
-        <div class="pet-holder mini" id="sprite-preview" style="margin:0 auto"></div>
-        <div class="muted" style="font-size:11px;font-weight:700;margin-top:4px">live preview</div>
-      </div>`,
-    actions:[
-      { label:"Cancel", cls:"ghost", fn: () => { openSpriteSheetManager(); } },
-      { label:"Save sprite", cls:"primary", fn: () => {
-          const src = ($("#sprite-src").value || "").trim() || pendingSpriteData || cur.src;
-          if (!src){ toast("Give it an image first", "bad", "🖼️"); return; }
-          let moods = null;
-          const raw = ($("#sprite-moods").value || "").trim();
-          if (raw){ try { moods = JSON.parse(raw); } catch(e){ toast("Mood rows must be valid JSON", "bad", "⚠️"); return; } }
-          save.sprites[key] = {
-            src, frames: Math.max(1, +$("#sprite-frames").value || 1),
-            fps: Math.max(1, +$("#sprite-fps").value || 8),
-            scale: Math.max(.4, Math.min(3, +$("#sprite-scale").value || 1))
-          };
-          if (moods) save.sprites[key].moods = moods;
-          if (cur.moodFps && src === cur.src) save.sprites[key].moodFps = cur.moodFps;
-          if (cur.aspect  && src === cur.src) save.sprites[key].aspect  = cur.aspect;
-          pendingSpriteData = null;
-          persist(); renderAll();
-          toast("Sprite saved", "good", "🎨");
-          openSpriteSheetManager();
-        } }
-    ],
-    onOpen: root => {
-      const preview = () => {
-        const src = ($("#sprite-src").value || "").trim() || pendingSpriteData;
-        if (!src){ paintPet($("#sprite-preview"), species, stage, "okay"); return; }
-        let moods = null;
-        try { moods = JSON.parse(($("#sprite-moods").value || "").trim() || "null"); } catch(e){}
-        $("#sprite-preview").innerHTML = spriteHTML({
-          src,
-          frames: Math.max(1, +$("#sprite-frames").value || 1),
-          fps: Math.max(1, +$("#sprite-fps").value || 8),
-          scale: Math.max(.4, Math.min(3, +$("#sprite-scale").value || 1)),
-          aspect: cur.aspect, moods: moods || undefined
-        }, "okay");
-      };
-      preview();
-      ["sprite-src","sprite-frames","sprite-fps","sprite-scale","sprite-moods"].forEach(id => $("#"+id, root).addEventListener("input", preview));
-      $("#sprite-file", root).addEventListener("click", () => {
-        pendingPreviewFn = preview;
-        $("#file-sprite").click();
-      });
-    }
-  });
-}
-let pendingSpriteData = null, pendingPreviewFn = null;
-</script>
-
-<script>
-"use strict";
 /* ---------------------------------------------------------------------------
    8. ONBOARDING + EVENTS + BOOT
    ------------------------------------------------------------------------- */
@@ -4615,12 +4474,6 @@ function wire(){
     const act = e.target.closest("[data-sheet-act]");
     if (act){ const a = sheetActions[+act.dataset.sheetAct]; if (a && a.fn) a.fn(); return; }
 
-    const sSet = e.target.closest("[data-sprite-set]");
-    if (sSet){ pendingSpriteData = null; openSpriteEditor(sSet.dataset.spriteSet); return; }
-    const sVec = e.target.closest("[data-sprite-vector]");
-    if (sVec){ save.sprites[sVec.dataset.spriteVector] = null; persist(); renderAll(); openSpriteSheetManager(); toast("Using the vector pet", "", "🧹"); return; }
-    const sDef = e.target.closest("[data-sprite-default]");
-    if (sDef){ delete save.sprites[sDef.dataset.spriteDefault]; persist(); renderAll(); openSpriteSheetManager(); toast("Back to the shipped art", "", "↺"); return; }
 
     if (e.target === $("#sheet-wrap")) closeSheet();
   });
@@ -4771,20 +4624,6 @@ function wire(){
   $("#row-keepawake").addEventListener("click", () => {
     save.settings.wakeLock = !save.settings.wakeLock; persist(); renderSettings();
   });
-  $("#row-sprites").addEventListener("click", openSpriteSheetManager);
-  $("#file-sprite").addEventListener("change", e => {
-    const f = e.target.files[0]; if (!f) return;
-    const rd = new FileReader();
-    rd.onload = () => {
-      pendingSpriteData = rd.result;
-      const srcInput = $("#sprite-src");
-      if (srcInput) srcInput.placeholder = "using the file you picked";
-      if (pendingPreviewFn) pendingPreviewFn();
-      toast("Image loaded — set frames, then save", "good", "🖼️");
-    };
-    rd.readAsDataURL(f);
-    e.target.value = "";
-  });
   $("#btn-reset").addEventListener("click", () => {
     openSheet({
       title:"Start a new game?",
@@ -4842,26 +4681,6 @@ function wire(){
 /* --- public hooks (console-friendly) ------------------------------------- */
 window.Runmon = {
   get state(){ return { save, derived }; },
-  setSprite(species, stage, cfg){
-    if (!SPECIES[species]) throw new Error("Unknown species: " + species);
-    if (!(stage >= 0 && stage <= 4)) throw new Error("Stage must be 0-4");
-    if (!cfg || !cfg.src) throw new Error("cfg.src is required");
-    save.sprites[spriteKey(species, stage)] = {
-      src: cfg.src, frames: Math.max(1, cfg.frames || 1), fps: Math.max(1, cfg.fps || 8),
-      ...(cfg.moods ? { moods: cfg.moods } : {}), ...(cfg.rows ? { rows: cfg.rows } : {})
-    };
-    persist(); renderAll();
-    return save.sprites[spriteKey(species, stage)];
-  },
-  /** Drop a custom sheet. Pass useVector:true to also switch off shipped art. */
-  clearSprite(species, stage, useVector){
-    const key = spriteKey(species, stage);
-    if (useVector && DEFAULT_SPRITES[key]) save.sprites[key] = null;
-    else delete save.sprites[key];
-    persist(); renderAll();
-  },
-  listSprites(){ return structuredCloneSafe(save.sprites); },
-  /** Add a fake run — handy for previewing later evolution stages. */
   addRun(km, minutes, daysAgo){
     const t = Date.now() - (daysAgo || 0) * 86400000;
     save.runs.push(makeRun(t, km, Math.round((minutes || km * 6) * 60), { sim: true }));

@@ -139,20 +139,23 @@ growing things, Nimbus as weather.
 
 ## 8. Wiring one in
 
-Drop the file in `art/` and register it:
+Drop the file in `art/` and add an entry to `DEFAULT_SPRITES` in `index.html`,
+keyed `"species:stage"`:
 
 ```js
-Runmon.setSprite("verdant", 1, {
+"verdant:1": {
   src: "art/verdant-sproutling.png",
-  frames: 12,
-  fps: 2,
+  frames: 12, rows: 1, fps: 2,
   aspect: 1.333,   // frame width / height
   scale: 1.2       // display tuning; nudge until it sits well
-});
+},
 ```
 
-Or use **Settings → Sprite packs**, which has a live preview. Two frames of a
-pet side by side in that preview means the frame width is wrong.
+Then bump `ART_VERSION`, or every browser that already has a file of that name
+will go on showing the old drawing.
+
+Two frames of a pet side by side on screen means `aspect` is wrong: the frame
+width does not divide the sheet evenly.
 
 To make a sheet mood-reactive instead of one continuous loop, it needs six rows
 of two frames rather than one row of twelve — the same art, re-laid.
