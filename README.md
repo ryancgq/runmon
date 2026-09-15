@@ -285,6 +285,26 @@ the source art turned out to be the squirrel merged with a bolt's outline, which
 put the scale out by 16%. The white face and chest is the landmark that works:
 no bolt or aura shares it, and it is the same feature in both sheets.
 
+The Bamboo Cub's celebration needed something else again. Its green bloom is
+drawn on two frames of twelve, and walked straight through the template those
+two got 165ms between them while the 960ms settle landed on a frame that is
+just the panda back at rest: the biggest moment in the sheet was over before
+you could see it. The fix is not new artwork but an `order`, the frame list a
+clip can name instead of counting 1..12 — here it cycles the two bloom frames
+across the flash and most of the settle, so the aura churns for 666ms and then
+dissipates. They are genuinely different drawings, rays pointing elsewhere in
+each, so cycling them reads as sustained energy where holding one would read as
+a freeze. The clip still runs to the same 2,250ms as every other celebration
+and the confetti still goes off on 810ms.
+
+An `order` turns up a second problem worth naming, because it applies to every
+clip with its own timing. A keyframes rule that stops at its last frame has no
+100% stop, so the browser writes one from the element's own style — which is
+frame 1 — and a finished clip snapped back there for the moment before its
+teardown. Barely visible on a celebration, plainly wrong on an egg, whose first
+frame is the shell still whole. The generated rule now ends on an explicit stop
+holding the last frame.
+
 Anchoring is not only an idle's problem. The packs arrive as 4×4 grids, and
 some of them draw each row a little higher than the last — the Cinderling's
 fireball climbs 43px over its sixteen frames, the Blazewyrm's celebration

@@ -1399,10 +1399,11 @@ function beatRamp(n, total, ratio){
   return out;
 }
 
-/* Cut a sheet's frames to the template. `gather` is the first frame with
-   something happening in it, `burst` the frame the flash breaks on - two
+/* Cut a sheet's frames to the template. `gather` is the first beat with
+   something happening in it, `burst` the beat the flash breaks on - two
    numbers instead of sixteen, and every celebration lands on the same beat. */
-function levelUpBeats(frames, gather, burst){
+function levelUpBeats(beats, gather, burst){
+  const frames = beats;
   const T = LEVEL_UP_TIMING;
   gather = Math.max(0, Math.min(gather, burst));
   // the lead holds at a steady pace; whatever it leaves over is the build, so
@@ -1515,7 +1516,11 @@ function eggPhaseSrc(species, level){
 
 /** A celebration timed by the template above: mark the two frames, not all 16. */
 function levelUpClip(cfg){
-  return { ...cfg, durations: levelUpBeats(cfg.frames, cfg.gather, cfg.burst) };
+  // a clip that names its frames in `order` is paced by its beats, not by the
+  // sheet's width - the same count clipBeats() works out further down, spelled
+  // again here because that lives in a later script block than this table
+  const beats = cfg.order ? cfg.order.length : cfg.frames;
+  return { ...cfg, durations: levelUpBeats(beats, cfg.gather, cfg.burst) };
 }
 const LEVEL_UP_ART = {
   // The egg does not flash gold - it splits. Its two clips carry the shell from
@@ -1563,10 +1568,16 @@ const LEVEL_UP_ART = {
   "nimbus:2": levelUpClip({ src:"art/levelup-zephyrite.png", frames:12,
     gather:2, burst:8, aspect:1.031, scale:1.054, dx:-1.35, dy:-6.25 }),
   // Verdant's first celebration. Two calm frames, leaves gathering through six,
-  // a green bloom on 8 held over 9, then sparkles settling back. Read off the
+  // a green bloom that breaks on 7, then sparkles settling back. Read off the
   // sheet's green pixels, which sit at 40 at rest and 45,858 on the burst.
+  // Frames 7 and 8 are the bloom and they are different drawings of it - the
+  // rays point elsewhere in each - so the aura is held by cycling the two
+  // rather than by stopping on one, which would read as a freeze. Walked
+  // straight through, the bloom got 165ms and the 960ms settle landed on 10,
+  // which is the pet back at rest: the burst was over before you saw it.
   "verdant:1": levelUpClip({ src:"art/levelup-bamboo-cub.png", frames:12,
-    gather:2, burst:8, aspect:1.028, scale:1.274, dx:4.9, dy:-2.8 })
+    order:[0,1,2,3,4,5,6, 7,8, 7,8,7, 9,10, 11],
+    gather:2, burst:7, aspect:1.028, scale:1.274, dx:4.9, dy:-2.8 })
 };
 /* Keyed by form, and by level where a form celebrates differently at different
    levels - which so far is the egg, whose two crack clips belong to levels 2
@@ -2610,7 +2621,7 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-15 bfdf6b0";
+const BUILD_ID = "2026-09-15 d914d90";
 const ART_VERSION = "16";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -2682,8 +2693,14 @@ function clipAnimationName(cfg){
     const frame = order ? order[k] : k;
     return `${pct}%{transform:translateX(-${(frame * 100 / frames).toFixed(4)}%)}`;
   }).join("");
+  // and a stop on 100%, holding the last frame. Without one the browser writes
+  // that stop itself out of the element's own style, which is translateX(0) -
+  // so a clip that ran its course snapped back to frame 1 and sat there for
+  // the moment before the teardown. On a celebration that is the pet twitching
+  // as it lands; on the egg's crack it is the shell briefly whole again.
+  const lastFrame = order ? order[order.length - 1] : d.length - 1;
   const el = document.createElement("style");
-  el.textContent = `@keyframes ${name}{${stops}}`;
+  el.textContent = `@keyframes ${name}{${stops}100%{transform:translateX(-${(lastFrame * 100 / frames).toFixed(4)}%)}}`;
   document.head.appendChild(el);
   clipKeyframes[name] = true;
   return name;
