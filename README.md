@@ -158,13 +158,15 @@ background in from the border rather than keying every neutral pixel, or the
 white highlight on the shell goes with it.
 
 The Static Egg — Nimbus's acorn — followed, as five sheets in the same shape.
-Those arrived with real transparency, so no keying was needed, but their grid
-drifted: across the sixty frames the egg's baseline moves 23px, its centre 48px,
-and the body swells 6%. Every frame of every phase is normalised to one body
-size and anchored to one point, measuring the body as the largest connected blob
-so the sparkles that come and go cannot drag the anchor with them. Left alone
-the acorn would creep across its own loop and jump at every handover between
-phases; after packing the three drifts are 2px, 2px and 4px.
+Those arrived with real transparency, so no keying was needed. The three idles
+were later redrawn and barely drift at all — 2px of baseline, 8px of centre and
+no swell whatever, against 23px, 48px and 6% in the sheets they replaced — but
+the two transitions are still the earlier art and still drift, so all five are
+packed together in one pass: one body size, one anchor, one frame. Packing the
+idles alone would have left them a different shape from the transitions and the
+egg would jump at every handover. The body is measured as the largest connected
+blob, so the sparkles that come and go cannot drag the anchor with them. After
+packing, the drift across all sixty frames is 1px, 1px and 2px.
 
 The two transition sheets hold each crack state for two or three frames rather
 than drawing twelve distinct ones — the sparkles change underneath, the shell
