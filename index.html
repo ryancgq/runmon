@@ -3925,26 +3925,8 @@ function renderStravaPanel(){
     : "not yet";
   const err = stravaLastError
     ? `<div class="row"><div class="t"><div class="n" style="color:var(--bad)">${stravaLastError}</div></div></div>` : "";
-  // When a check finds nothing, say what Strava did return. Without this an
-  // empty result is indistinguishable from a broken link.
-  let why = "";
-  if (!stravaLastError && stravaSeen){
-    const k = stravaSeen.kinds || {};
-    const names = Object.keys(k);
-    const ok = countedTypes();
-    const counted = names.filter(t => ok.includes(t));
-    const onlyTreadmill = !counted.length && names.length && names.every(t => t === "VirtualRun");
-    why = stravaSeen.since === 0
-      ? "Strava has no activities recorded since you connected. Only runs recorded after that count."
-      : stravaSeen.fresh === 0
-        ? `All ${stravaSeen.since} activities since you connected have already been counted.`
-        : onlyTreadmill
-          ? `Strava has ${k.VirtualRun} treadmill run${k.VirtualRun === 1 ? "" : "s"} waiting. Switch on \u201cCount treadmill runs\u201d below and check again.`
-          : counted.length === 0
-            ? `Strava returned ${names.map(t => `${k[t]} \u00d7 ${t}`).join(", ")} \u2014 none of a type that counts. Runs and trail runs always do; treadmill runs need the toggle below.`
-            : `${stravaSeen.fresh} new: ${names.map(t => `${k[t]} \u00d7 ${t}`).join(", ")}.`;
-    why = `<div class="row"><div class="t"><div class="h">${why}</div></div></div>`;
-  }
+  const why = (!stravaLastError && stravaWhyEmpty())
+    ? `<div class="row"><div class="t"><div class="h">${stravaWhyEmpty()}</div></div></div>` : "";
   panel.innerHTML = stravaLinked()
     ? `<div class="row">
          <div class="t"><div class="n">Connected</div>
@@ -4395,10 +4377,33 @@ function playAnimTest(d, root){
 let stravaSession = null, stravaBusy = false, stravaLastError = null, savePushTimer = null;
 /* What the last check actually found, so "nothing new" can say why. */
 let stravaSeen = null;
-/* Mirrors ALWAYS + OPT_IN in the worker; only used to word the panel. The
+/* Mirrors ALWAYS + OPT_IN in the worker; only used to word the message. The
    treadmill type is conditional there too, so asking about it has to be. */
 const countedTypes = () =>
   ["Run", "TrailRun"].concat(save.settings.stravaVirtual ? ["VirtualRun"] : []);
+
+/* Why the last check came back empty, in one sentence, or "" if it did not.
+   Written once and used by both the toast and the settings panel, so the two
+   cannot tell the athlete different things. */
+function stravaWhyEmpty(){
+  if (!stravaSeen) return "";
+  const k = stravaSeen.kinds || {};
+  const names = Object.keys(k);
+  const ok = countedTypes();
+  const counted = names.filter(t => ok.includes(t));
+  const when = stravaSeen.connectedAt
+    ? new Date(stravaSeen.connectedAt).toLocaleString([], { dateStyle:"medium", timeStyle:"short" })
+    : null;
+  if (stravaSeen.since === 0)
+    return `Strava has nothing recorded since you connected${when ? " on " + when : ""}. The cut-off is when a run started, not when it was uploaded.`;
+  if (stravaSeen.fresh === 0)
+    return `All ${stravaSeen.since} activities since you connected have already been counted.`;
+  if (!counted.length && names.length && names.every(t => t === "VirtualRun"))
+    return `Strava has ${k.VirtualRun} treadmill run${k.VirtualRun === 1 ? "" : "s"} waiting. Switch on “Count treadmill runs” and check again.`;
+  if (!counted.length)
+    return `Strava returned ${names.map(t => `${k[t]} × ${t}`).join(", ")} — none of a type that counts.`;
+  return "";
+}
 
 function stravaLoadSession(){
   if (!STRAVA_ON) return;
@@ -4473,9 +4478,13 @@ async function stravaSync(opts){
     // one jump was the whole complaint: the egg would arrive already hatched.
     if (imported.length && currentScreen === "home") replayStravaRuns(imported.length);
     if (opts && opts.loud){
-      toast(imported.length
-        ? `${imported.length} run${imported.length === 1 ? "" : "s"} from Strava`
-        : "Nothing new on Strava", imported.length ? "good" : "", imported.length ? "\u{1F3C3}" : "\u{1F504}");
+      if (imported.length){
+        toast(`${imported.length} run${imported.length === 1 ? "" : "s"} from Strava`, "good", "\u{1F3C3}");
+      } else {
+        // "Nothing new on Strava" told the athlete nothing and sent them looking
+        // for a settings panel they had no reason to open. Say why here.
+        toast(stravaWhyEmpty() || "Nothing new on Strava", "", "\u{1F504}");
+      }
     }
   } catch (err){
     stravaLastError = err.message || String(err);
