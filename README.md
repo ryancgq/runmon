@@ -182,6 +182,14 @@ this behaviour; the Cinder Egg cracks on frame 9 both times, while the acorn
 splits on 7 and spreads on 10, measured off the sheets rather than assumed. While a level-up is armed the pet is still drawn as it was *before* it,
 or you would come home to an already cracked shell and then watch it crack.
 
+A celebration's sheet is not the sheet the pet is already wearing, and a CSS
+background does not start loading until something paints it — which for a
+celebration is the instant the clip takes over from the idle. So the first play
+of any celebration left a hole where the pet should be, and every play after it
+was fine, because by then the file was cached. The wind-up is a second and a
+half of cover doing nothing, so the fetch starts there instead. Throttled to
+120 KB/s the pet used to vanish for about a second; now it does not dip at all.
+
 Those clips sit inside the same timing template as every other celebration, but
 the egg's decisive crack lands on frame 9 of 12, leaving no frames for a
 settle. That time goes to the final hold instead — the shell sits there split

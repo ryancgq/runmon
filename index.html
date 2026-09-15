@@ -2612,6 +2612,20 @@ function assetURL(src){
 /* If a sheet cannot be fetched (offline, moved, typo) fall back to the vector
    pet rather than showing an empty box. */
 const spriteBroken = Object.create(null);
+/* A sheet is a CSS background, and a CSS background only starts loading when
+   it is first painted - which for a celebration is the instant the clip takes
+   over from the idle. That left a hole where the pet should be on the first
+   play of each sheet and none on the rest, once it was cached. Start the fetch
+   when the wind-up starts instead, which hands it the whole charge. decode()
+   waits for the pixels rather than just the bytes; browsers without it still
+   get the fetch. */
+function preloadSprite(src){
+  if (!src) return Promise.resolve();
+  const img = new Image();
+  img.src = assetURL(src);
+  return img.decode ? img.decode().catch(() => {}) : Promise.resolve();
+}
+
 function probeSprite(src){
   if (src in spriteBroken) return;
   spriteBroken[src] = false;
@@ -2909,6 +2923,7 @@ function runCelebration(art, opts){
   opts = opts || {};
   const wanted = opts.wanted || (() => true);
   if (!art || charging) return false;
+  preloadSprite(art.src);          // the charge is 1.5s of cover for the fetch
   // let the screen settle first, or the wind-up starts behind the transition
   setTimeout(() => {
     if (!wanted() || currentScreen !== "home") return;
