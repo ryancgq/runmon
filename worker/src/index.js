@@ -234,8 +234,11 @@ export class Athlete {
       .sort((x, y) => x.t - y.t);
 
     await s.put("lastSync", Date.now());
+    // connectedAt matters more than it looks: the window is on an activity's
+    // START time, not when it was uploaded, so a run begun before the link was
+    // made never appears however recently it landed on Strava.
     return this.ok({ save, activities,
-                     seen: { since: raw.length, fresh: fresh.length, kinds } });
+                     seen: { since: raw.length, fresh: fresh.length, kinds, connectedAt } });
   }
 
   /** The client says what it stored and what it managed to import, together, so
