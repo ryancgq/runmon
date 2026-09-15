@@ -769,7 +769,19 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
    all four colours rather than just the middle of the ramp */
 /* inline-block so the gradient box is the wordmark itself; as a full-width
    block the text would only ever sample the middle of the ramp */
-.ob-logo h1{display:inline-block;font-size:40px;letter-spacing:.5px;background:linear-gradient(96deg,#ff6b35 3%,#ffd23f 33%,#4ade80 65%,#7cd4fd 97%);-webkit-background-clip:text;background-clip:text;color:transparent}
+/* The wordmark used to string all three species' accents together - ember's
+   orange, verdant's green, nimbus's blue - which read as a generic rainbow and
+   matched no theme in particular, least of all the one on screen. It wears the
+   active species' accent pair now, the same gradient the primary button does.
+   The solid colour is a fallback: without background-clip the transparent fill
+   would leave the app's own name invisible. */
+.ob-logo h1{display:inline-block;font-size:40px;letter-spacing:.5px;
+  color:var(--accent);
+  background:linear-gradient(135deg,var(--accent),var(--accent-2));
+  -webkit-background-clip:text;background-clip:text}
+@supports ((-webkit-background-clip:text) or (background-clip:text)){
+  .ob-logo h1{color:transparent}
+}
 .ob-logo p{font-size:13px;color:var(--muted);font-weight:700;margin:9px 0 0;line-height:1.55}
 .pick-grid{display:flex;flex-direction:column;gap:11px;margin:18px 0}
 .pick{
