@@ -1181,14 +1181,6 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
       </div>
 
       <div class="section-title">Data</div>
-      <div class="row tap" id="row-export">
-        <div class="t"><div class="n">Export save file</div><div class="h">Download every run, your pet and its XP as JSON</div></div>
-        <svg viewBox="0 0 24 24" style="width:17px;height:17px;fill:none;stroke:var(--muted);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
-      </div>
-      <div class="row tap" id="row-import">
-        <div class="t"><div class="n">Import save file</div><div class="h">Restore from a previously exported JSON file</div></div>
-        <svg viewBox="0 0 24 24" style="width:17px;height:17px;fill:none;stroke:var(--muted);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
-      </div>
       <button class="btn danger" id="btn-reset" style="margin-top:6px">
         <svg viewBox="0 0 24 24"><path d="M3 2v6h6"/><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1L3 8"/></svg>
         New game — reset everything
@@ -1305,7 +1297,6 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
   <div class="toasts" id="toasts"></div>
 </div>
 
-<input type="file" id="file-import" accept="application/json,.json" class="hide">
 <input type="file" id="file-sprite" accept="image/*" class="hide">
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
@@ -4589,29 +4580,6 @@ function stravaSchedulePush(){
   savePushTimer = setTimeout(() => stravaPush([]).catch(()=>{}), 1200);
 }
 
-/* --- import / export ----------------------------------------------------- */
-function exportSave(){
-  const blob = new Blob([JSON.stringify(save, null, 2)], { type:"application/json" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `runmon-${dayKey(Date.now())}.json`;
-  document.body.appendChild(a); a.click();
-  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
-  toast("Save file downloaded", "good", "💾");
-}
-function importSave(text){
-  let data;
-  try { data = JSON.parse(text); } catch(e){ toast("That file is not valid JSON", "bad", "⚠️"); return; }
-  if (!data || !data.species || !Array.isArray(data.runs)){ toast("That does not look like a Runmon save", "bad", "⚠️"); return; }
-  save = Object.assign(structuredCloneSafe(DEFAULT_SAVE), data);
-  save.settings = Object.assign({}, DEFAULT_SAVE.settings, data.settings || {});
-  persist(); renderAll();
-  $("#onboard").classList.remove("show");
-  $("#tabbar").classList.remove("hidden"); $("#fab").classList.remove("hidden");
-  go("home");
-  toast(`Restored ${save.runs.length} runs`, "good", "📥");
-}
-
 /* --- events -------------------------------------------------------------- */
 function wire(){
   // navigation
@@ -4804,15 +4772,6 @@ function wire(){
     save.settings.wakeLock = !save.settings.wakeLock; persist(); renderSettings();
   });
   $("#row-sprites").addEventListener("click", openSpriteSheetManager);
-  $("#row-export").addEventListener("click", exportSave);
-  $("#row-import").addEventListener("click", () => $("#file-import").click());
-  $("#file-import").addEventListener("change", e => {
-    const f = e.target.files[0]; if (!f) return;
-    const rd = new FileReader();
-    rd.onload = () => importSave(rd.result);
-    rd.readAsText(f);
-    e.target.value = "";
-  });
   $("#file-sprite").addEventListener("change", e => {
     const f = e.target.files[0]; if (!f) return;
     const rd = new FileReader();
