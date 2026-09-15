@@ -212,8 +212,16 @@ export class Athlete {
     const r = await fetch(url, { headers:{ Authorization:`Bearer ${token}` } });
     if (!r.ok) return this.ok({ save, activities: [], error:`strava ${r.status}` });
 
-    const activities = (await r.json())
-      .filter(a => want.has(a.type) && !imported.has(String(a.id)) && a.distance > 0)
+    // Counts, not activities: enough for the athlete to see why a sync came back
+    // empty - nothing recorded since connecting, nothing of a type that counts,
+    // or everything already taken - without anyone having to read a log.
+    const raw = await r.json();
+    const fresh = raw.filter(a => !imported.has(String(a.id)));
+    const kinds = {};
+    for (const a of fresh) kinds[a.type] = (kinds[a.type] || 0) + 1;
+
+    const activities = fresh
+      .filter(a => want.has(a.type) && a.distance > 0)
       .map(a => ({
         id: String(a.id),
         t: Date.parse(a.start_date),
@@ -226,7 +234,8 @@ export class Athlete {
       .sort((x, y) => x.t - y.t);
 
     await s.put("lastSync", Date.now());
-    return this.ok({ save, activities });
+    return this.ok({ save, activities,
+                     seen: { since: raw.length, fresh: fresh.length, kinds } });
   }
 
   /** The client says what it stored and what it managed to import, together, so
