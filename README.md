@@ -40,6 +40,14 @@ Now every run is stored and uploaded first, and then the pet is walked forward
 through them one at a time — each run's own XP, then whichever celebrations that
 run earned.
 
+Within a run the earning comes before the reward: the bar runs up to the top of
+the level it is on, the celebration plays over a full bar and the form the pet
+still is, and only then does the bar reset and carry on with what the run had
+left over. Getting that order right meant stopping two other things repainting
+mid-walk — `renderHome()` draws the bar, the level badge and the pet together
+from `derived`, which during a replay is already the finished total, and a
+clip's own teardown does the same when it ends.
+
 The save is never the thing being animated. `recompute()` takes a cursor, so the
 displayed state is derived from the runs up to a point while `save.runs` stays
 whole; leaving half way through, or locking the phone, loses nothing and the
