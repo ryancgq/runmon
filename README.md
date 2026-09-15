@@ -31,7 +31,9 @@ says the offer stands in **Settings → Strava**, which is also where anyone who
 skipped it can connect later. The step is skipped entirely for someone already
 linked, and in the sandbox, which has no broker to connect to.
 
-A catch-up is replayed rather than applied. A week of running used to land in
+A catch-up is replayed rather than applied, whenever the pet screen is next
+reached — "Check now" lives in Settings, so a sync practically never finishes
+where the pet is, and a replay that only fired on the spot never fired at all. A week of running used to land in
 one jump: the pet was simply whatever the total made it, so an egg that should
 have cracked twice and hatched arrived already hatched and none of it was seen.
 Now every run is stored and uploaded first, and then the pet is walked forward

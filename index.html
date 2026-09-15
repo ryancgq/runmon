@@ -2990,6 +2990,10 @@ function runCelebration(art, opts){
    distinct celebration the path crosses, which is what makes the egg show both
    of its cracks and a hatch show the hatch. */
 let replaying = false, replaySkipped = false;
+/* Runs waiting to be walked through. "Check now" lives in Settings, so a sync
+   almost never finishes on the pet screen; without this the whole catch-up was
+   applied silently and the pet was simply older when you came back. */
+let pendingReplay = [];
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
 function celebrationsBetween(fromLevel, toLevel){
@@ -3014,17 +3018,22 @@ async function playCelebration(art, fromLevel, stage){
   previewPet = null;
 }
 
-async function replayStravaRuns(count){
-  if (replaying || count <= 0) return;
+async function replayStravaRuns(ids){
+  if (replaying || !ids || !ids.length) return;
+  const wanted = new Set(ids);
   const all = save.runs.slice().sort((a, b) => a.t - b.t);
-  const first = all.length - count;
-  if (first < 0) return;
+  // by id rather than by position: an imported run can be older than one
+  // already recorded, and "the last few" would then walk the wrong ones
+  const steps = [];
+  all.forEach((r, i) => { if (wanted.has(r.id)) steps.push(i); });
+  if (!steps.length) return;
 
   replaying = true; replaySkipped = false;
   toast("Tap the pet to skip", "", "\u23ED\uFE0F");
 
   try {
-    for (let i = first; i < all.length && !replaySkipped; i++){
+    for (const i of steps){
+      if (replaySkipped) break;
       if (currentScreen !== "home"){ replaySkipped = true; break; }   // walked away
       const run = all[i];
       replayCursor = i;  recompute();                 // the pet as it was
@@ -3291,7 +3300,13 @@ function go(name){
 
   if (name === "history") { renderHistory(); }
   if (name === "evolve")  { renderEvolve(); }
-  if (name === "home")    { renderHome(); playPendingLevelUp(); }
+  if (name === "home")    {
+    renderHome();
+    if (pendingReplay.length){
+      const queued = pendingReplay; pendingReplay = [];
+      replayStravaRuns(queued);
+    } else playPendingLevelUp();
+  }
   if (name === "track")   { onTrackScreenShown(); }
 }
 </script>
@@ -4459,12 +4474,13 @@ async function stravaSync(opts){
       save = Object.assign(structuredCloneSafe(DEFAULT_SAVE), res.save);
       save.settings = Object.assign({}, DEFAULT_SAVE.settings, res.save.settings || {});
     }
-    const imported = [];
-    const before = { level: derived ? derived.level : 1, stage: derived ? derived.stage : 0 };
+    const imported = [], newIds = [];
     for (const a of (res.activities || [])){
       if (!a.km || a.km <= 0 || !a.sec) continue;
-      save.runs.push(makeRun(a.t, a.km, a.sec, { strava: a.id, manual: !!a.manual }));
-      imported.push(a.id);
+      const run = makeRun(a.t, a.km, a.sec, { strava: a.id, manual: !!a.manual });
+      save.runs.push(run);
+      imported.push(a.id);      // for the broker, so it is not fetched again
+      newIds.push(run.id);      // for the replay, which walks our own runs
     }
     if (res.error === "reauth"){
       stravaForget(); stravaLastError = "Strava needs you to connect again.";
@@ -4486,7 +4502,10 @@ async function stravaSync(opts){
     renderAll();
     // Walk the pet through them one at a time. Collapsing a week of running into
     // one jump was the whole complaint: the egg would arrive already hatched.
-    if (imported.length && currentScreen === "home") replayStravaRuns(imported.length);
+    if (newIds.length){
+      if (currentScreen === "home") replayStravaRuns(newIds);
+      else pendingReplay = pendingReplay.concat(newIds);   // played on arrival
+    }
     if (opts && opts.loud){
       if (imported.length){
         toast(`${imported.length} run${imported.length === 1 ? "" : "s"} from Strava`, "good", "\u{1F3C3}");
