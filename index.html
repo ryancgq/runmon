@@ -1195,9 +1195,9 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
       </button>
 
       <p class="muted center" style="font-size:11px;font-weight:700;line-height:1.7;margin-top:22px">
-        Runmon stores everything on this device in <span class="mono">localStorage</span>.<br>
-        No account, no server, no tracking.<br>
-        <span id="storage-note" class="mono"></span>
+        <span id="storage-where"></span><br>
+        <span id="storage-note" class="mono"></span><br>
+        <span id="build-stamp" class="mono"></span>
       </p>
       <div class="screen-pad"></div>
     </section>
@@ -2631,6 +2631,10 @@ function spriteConfig(species, stage){
    already has one will happily go on showing the old drawing. Bump this and
    every cache along the way fetches the new file. Only the sheets that ship
    with the app are stamped; a sheet you point at yourself is used verbatim. */
+/* Stamped into Settings so a device can say which build it is running. GitHub
+   Pages caches index.html and offers no way to set headers on it, so a missing
+   feature and a stale page look the same without this. */
+const BUILD_ID = "2026-09-15 bfdf6b0";
 const ART_VERSION = "15";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -3986,6 +3990,14 @@ function renderSettings(){
     ? `${n} custom sprite${n === 1 ? "" : "s"} registered — tap to manage`
     : "Built-in art — tap to add your own sheets";
   $("#storage-note").textContent = storageOK ? "" : "⚠️ localStorage is unavailable — progress will not survive a reload.";
+  // This promised "no account, no server, no tracking" unconditionally, which
+  // stopped being true the moment a pet could live on the broker.
+  $("#storage-where").innerHTML = stravaLinked()
+    ? "Your pet lives on the server, keyed to your Strava athlete id, with a copy kept on this device. Disconnecting deletes the server copy."
+    : 'Runmon stores everything on this device in <span class="mono">localStorage</span>.<br>No account, no server, no tracking.';
+  // Which build this device actually has. Without it, "the new thing is missing"
+  // and "the page is cached" look identical, which has cost real debugging time.
+  $("#build-stamp").textContent = "build " + BUILD_ID;
 }
 
 function openSpriteSheetManager(){
