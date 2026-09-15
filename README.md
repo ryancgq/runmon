@@ -65,6 +65,15 @@ only there for impatience. What it cannot do is update while the app is shut:
 there are no webhooks and no push, so a run is picked up the next time the app
 is looked at, and the catch-up is then replayed rather than applied silently.
 
+Deleting or editing an activity on Strava after it has been counted changes
+nothing here, and that is deliberate rather than an oversight: a run's XP is
+worked out once at import and stored on the run, the imported list is never
+pruned, and no sync removes anything. A pet does not de-evolve because someone
+tidied their feed. The cost is that a re-upload of the same run arrives with a
+fresh activity id and counts twice, and that manual Strava entries count in
+full — both known, both left alone, because this is a game played among people
+who know each other.
+
 Only runs recorded *after* you connect count. Your history stays yours — the
 pet starts as an egg and grows from your next run, because a pet that arrives
 at level forty has skipped the part that makes it a pet.
