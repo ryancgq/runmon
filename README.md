@@ -70,6 +70,17 @@ while `replaying` is set, and both callers that start a walk — `go("home")` an
 the tail of a sync — now start it *before* they render, rather than painting
 the total first and asking the walk to undo it.
 
+Holding the display back has to start when the runs *land*, not when the walk
+does. Between those two moments the app pushes to the broker — a network call —
+and `derived` is already the finished total, so anything that repaints in the
+gap draws it: coming back to the tab does exactly that, and coming back to the
+tab is when a sync runs. The level would go up on its own and the walk would
+then open by taking it back down, which is the report that a pet already on 14
+dropped to 13 and climbed back. So the cursor is set the moment the runs are
+imported, before the recompute. `derived` reports the pet as it was from then
+on, and every repaint in the window draws the right thing without knowing
+anything about walks.
+
 The opening frame of a walk is also marked as a position rather than a
 movement. Wherever the bar happened to be, that first value is where the pet
 actually was, so it snaps to it; animating into it is what fills the bar back

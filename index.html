@@ -2555,7 +2555,7 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-16 0ec55af";
+const BUILD_ID = "2026-09-16 baa81ab";
 const ART_VERSION = "20";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -3010,15 +3010,28 @@ async function playCelebration(art, fromLevel, stage){
   previewPet = null;
 }
 
+/* Where a walk over these runs would begin: the position of the earliest of
+   them in the log. Set `replayCursor` to it and `derived` reports the pet as it
+   was before them, which is what every repaint between a sync landing and its
+   walk starting needs to draw. Without that the finished total goes up the
+   moment the runs are imported, and the walk has to open by taking the level
+   backwards - "I was already at 14, it went back to 13". */
+function replayStartIndex(ids){
+  const wanted = new Set(ids || []);
+  const all = save.runs.slice().sort((a, b) => a.t - b.t);
+  for (let i = 0; i < all.length; i++) if (wanted.has(all[i].id)) return i;
+  return null;
+}
+
 async function replayStravaRuns(ids){
-  if (replaying || !ids || !ids.length) return;
+  if (replaying || !ids || !ids.length){ replayCursor = null; return; }
   const wanted = new Set(ids);
   const all = save.runs.slice().sort((a, b) => a.t - b.t);
   // by id rather than by position: an imported run can be older than one
   // already recorded, and "the last few" would then walk the wrong ones
   const steps = [];
   all.forEach((r, i) => { if (wanted.has(r.id)) steps.push(i); });
-  if (!steps.length) return;
+  if (!steps.length){ replayCursor = null; recompute(); renderAll(); return; }
 
   replaying = true; replaySkipped = false;
   toast("Tap the pet to skip", "", "\u23ED\uFE0F");
@@ -4412,6 +4425,11 @@ async function stravaSync(opts){
           : "Strava answered with an error (" + code + ").";
     }
     stravaSeen = res.seen || null;
+    // Before the recompute, so `derived` never reports the finished total while
+    // a walk is coming. The gap this closes is real and easy to hit: pushing to
+    // the broker is a network call, and coming back to the tab - which repaints
+    // the pet screen - is exactly when a sync runs.
+    if (newIds.length && currentScreen === "home") replayCursor = replayStartIndex(newIds);
     if (imported.length) recompute();
     save.stravaSyncedAt = Date.now();
     persist();
