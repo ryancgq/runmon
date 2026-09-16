@@ -55,7 +55,9 @@ frame than an earlier one.
 
 ## 3. Frames, order and timing
 
-Twelve frames, 500 ms each: a six-second loop at 2 fps.
+Twelve frames, 500 ms each: a six-second loop at 2 fps. A sheet may be paced
+slower where the form calls for it — Verdant's Panda runs at 1.25 fps — but
+draw for 2 unless told otherwise.
 
 Order them as **six pairs**, two frames per mood:
 

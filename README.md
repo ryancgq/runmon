@@ -424,7 +424,9 @@ The Cinderling and the Blazewyrm (Ember, stages 2 and 3) ship as pixel art in
 [`art/ember-blazewyrm.png`](art/ember-blazewyrm.png) — 12-frame loops at 2 fps
 — and Verdant's stages 2 and 3 in
 [`art/verdant-bamboo-cub.png`](art/verdant-bamboo-cub.png) and
-[`art/verdant-panda.png`](art/verdant-panda.png). The Verdant egg
+[`art/verdant-panda.png`](art/verdant-panda.png) — that last one running at
+1.25 fps rather than 2, a 9.6-second turn instead of six, because a form whose
+whole joke is that it sleeps through everything should not bustle. The Verdant egg
 ships as five: three phases,
 [`art/verdant-egg.png`](art/verdant-egg.png),
 [`-cracked`](art/verdant-egg-cracked.png) and

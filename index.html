@@ -2639,7 +2639,11 @@ const DEFAULT_SPRITES = {
     // the whole sheet clips a paw. Anchored per row, like every other idle: the
     // rows step 16px and 59px up the sheet and 17px sideways, while inside a
     // row the frames disagree by 5 to 8px, which is the cub rolling over.
-    frames:12, rows:1, fps:2, aspect:1.168, scale:1.2, dx:3.75, dy:-14.7
+    // and slower than every other idle on purpose: 1.25fps against their 2, so
+    // a turn of the loop takes 9.6s rather than 6. The pet is described as
+    // asleep most of the time and its own sheet spends four frames snoring;
+    // half a second a frame had it bustling.
+    frames:12, rows:1, fps:1.25, aspect:1.168, scale:1.2, dx:3.75, dy:-14.7
   },
   "nimbus:2": {
     src:"art/nimbus-zephyrite.png",
@@ -2686,7 +2690,7 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-16 14a1a5a";
+const BUILD_ID = "2026-09-16 e82a52a";
 const ART_VERSION = "20";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
