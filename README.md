@@ -183,6 +183,14 @@ are unknown. On the Evolution screen's locked rows, the filter that flattens a
 form to a shape turns it into a white `?` ringed in white, which is a better
 answer there than the grey blob a drawn pet becomes.
 
+Their descriptions are gone with the art, for the same reason: a line about
+antlers heavy with leaves is a promise the drawing then has to keep, and no
+drawing exists to keep it. Both places that print one — the Evolution row and
+the summary's evolution reveal — leave the line out entirely when a form has
+none, so the row closes up rather than holding an empty gap. The names are
+still there, because a row needs something in the name slot and `???` is what
+that slot already says while the form is locked.
+
 Your choice sets the app's accent colour. The pet's expression and idle
 animation follow how recently you ran: elated the day you run, happy the day
 after, restless at two days, sad at three, and asleep from five.

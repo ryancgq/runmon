@@ -1656,8 +1656,10 @@ const SPECIES = {
       { name:"Cinder Egg",  desc:"A speckled shell, warm to the touch. Something in there is impatient." },
       { name:"Cinderling",  desc:"All head, tiny wings, permanently overheating. Hiccups sparks." },
       { name:"Blazewyrm",   desc:"Wings that finally work and a temper that mostly does not." },
-      { name:"Pyrelord",    desc:"A proper drake. The air above it shimmers when you come home from a run." },
-      { name:"Infernarch",  desc:"Crowned in living fire. It only bows to people who keep showing up." }
+      // no art, so nothing is claimed about these two - see mystery() and the
+      // placeholder it draws. A description is a promise the drawing has to keep.
+      { name:"Pyrelord",    desc:"" },
+      { name:"Infernarch",  desc:"" }
     ]
   },
   verdant: {
@@ -1669,8 +1671,8 @@ const SPECIES = {
       { name:"Leaf Bud",    desc:"Layer on layer of leaf, wrapped tight. It sheds one every so often." },
       { name:"Bamboo Cub",  desc:"Round, hungry, and entirely bamboo-motivated. Will drop everything for a fresh stalk." },
       { name:"Panda",       desc:"Fully grown and fully asleep. The running was always going to be your half of this arrangement." },
-      { name:"Thicketmane", desc:"Antlers heavy with leaves. Small flowers open when your streak is alive." },
-      { name:"Grovewarden", desc:"An entire season walking around in one body. The forest leans towards it." }
+      { name:"Thicketmane", desc:"" },
+      { name:"Grovewarden", desc:"" }
     ]
   },
   nimbus: {
@@ -1682,8 +1684,8 @@ const SPECIES = {
       { name:"Static Egg",  desc:"A cloud wrapped tightly around something that keeps zapping it." },
       { name:"Puffling",    desc:"A static-charged squirrel, ears crackling. Mostly interested in acorns." },
       { name:"Zephyrite",   desc:"Bolt-shaped wings and far too much energy for its size." },
-      { name:"Tempestor",   desc:"A rolling storm front with a face. Your hair stands up nearby." },
-      { name:"Thunderarch", desc:"A crowned stormhead orbited by its own lightning. Weather happens around it." }
+      { name:"Tempestor",   desc:"" },
+      { name:"Thunderarch", desc:"" }
     ]
   }
 };
@@ -2542,7 +2544,7 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-16 91f3bc5";
+const BUILD_ID = "2026-09-16 4f428d2";
 const ART_VERSION = "20";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -3193,7 +3195,8 @@ function renderEvolve(){
         <div class="info">
           <div class="nm">${unlocked || !mine ? st.name : "???"}</div>
           <div class="rq">${k === 0 ? "Starting form" : `Unlocks at level ${req}`}${current ? " · current" : ""}</div>
-          <div class="ds">${unlocked || !mine ? st.desc : "Keep running to reveal this form."}</div>
+          ${(unlocked || !mine) && !st.desc ? ""
+            : `<div class="ds">${unlocked || !mine ? st.desc : "Keep running to reveal this form."}</div>`}
         </div>
         <div class="stagenum">${k + 1}/5</div>
       </div>`;
@@ -3843,7 +3846,8 @@ function showSummary(run, opts){
           <div class="arrow"><svg viewBox="0 0 24 24" style="width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></div>
           <div class="pet-holder mood-elated new" id="evo-new"></div>
         </div>
-        <p style="margin-top:10px">${sp.stages[ctx.afterStage].desc}</p>` : ""}
+        ${sp.stages[ctx.afterStage].desc
+            ? `<p style="margin-top:10px">${sp.stages[ctx.afterStage].desc}</p>` : ""}` : ""}
     </div>`;
     if (evolved){
       paintPet($("#evo-old", lu), sp.id, ctx.beforeStage, "happy");
