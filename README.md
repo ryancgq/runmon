@@ -717,21 +717,29 @@ run are worth more than earlier ones. The rate climbs continuously from ×1.0 to
 
 **Streaks.** +10% for each consecutive day you run, capped at +50%.
 
-**Levels.** Level 1→2 costs 200 XP and every level costs more than the last.
-The growth factor starts at ×1.5 and eases off as levels climb — a flat ×1.5
-forever would put level 50 near 2.8×10¹⁰ XP, about a hundred million
-kilometres, making the final form unreachable and levels 30–50 dead content.
+**Levels.** Every level costs more than the last. The growth factor starts at
+×1.5 and eases off as levels climb — a flat ×1.5 forever would put level 50
+near 2.8×10¹⁰ XP, about a hundred million kilometres, making the final form
+unreachable and levels 30–50 dead content.
+
+Levels 1–4 then cost double what that curve says, so level 1→2 is 400 XP
+rather than 200. Without it the egg hatched after ~13 km, two or three runs,
+and the first evolution went past before the pet meant anything. The extra
+applies only below level 5, so leaving level 5 is cheaper than leaving level 4
+— the egg is deliberately a gate, and hatching opens the throttle.
+
 The curve as tuned:
 
 | Form | Level | Total XP | Roughly |
 | --- | --- | --- | --- |
-| Baby | 5 | 1,517 | ~13 km |
-| Teen | 15 | 20,017 | ~175 km |
-| Adult | 30 | 80,489 | ~700 km |
-| Final | 50 | 175,228 | ~1,500 km |
+| Baby | 5 | 3,033 | ~27 km |
+| Teen | 15 | 21,533 | ~191 km |
+| Adult | 30 | 82,005 | ~729 km |
+| Final | 50 | 176,744 | ~1,571 km |
 
-`LEVEL_BASE` and `LEVEL_DECAY` near the top of the file control this, and
-`Runmon.xpTable()` prints the whole curve in the console.
+`LEVEL_BASE`, `LEVEL_DECAY`, `EARLY_UNTIL` and `EARLY_MULT` near the top of the
+file control this, and `Runmon.xpTable()` prints the whole curve in the
+console.
 
 ## How tracking works
 
