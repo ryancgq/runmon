@@ -2630,6 +2630,17 @@ const DEFAULT_SPRITES = {
     // bolts are meant to move.
     frames:12, rows:1, fps:2, aspect:1.031, scale:1.068, dx:3, dy:-9.7
   },
+  "verdant:2": {
+    src:"art/verdant-fernkin.png",
+    // 12-frame loop: the cub plays, waves, rolls, and dozes off with a z, a zz
+    // and a zzz. Cutting it needed the rows found first and then each row's own
+    // columns - two frames in the top row all but touch, so the gap between
+    // those columns is there in some rows and not others, and one split across
+    // the whole sheet clips a paw. Anchored per row, like every other idle: the
+    // rows step 16px and 59px up the sheet and 17px sideways, while inside a
+    // row the frames disagree by 5 to 8px, which is the cub rolling over.
+    frames:12, rows:1, fps:2, aspect:1.168, scale:1.2, dx:3.75, dy:-14.7
+  },
   "nimbus:2": {
     src:"art/nimbus-zephyrite.png",
     // 12-frame loop: the charge crackles around it and it blinks through it
@@ -2675,7 +2686,7 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-16 54fc8b4";
+const BUILD_ID = "2026-09-16 ea0e64b";
 const ART_VERSION = "20";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;

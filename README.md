@@ -384,6 +384,23 @@ teardown. Barely visible on a celebration, plainly wrong on an egg, whose first
 frame is the shell still whole. The generated rule now ends on an explicit stop
 holding the last frame.
 
+Cutting a sheet into frames is not always a grid either, and the stage-3
+panda is where that showed. Two frames in its top row all but touch, so the
+gap between those two columns exists in some rows and not in others: one
+column split across the whole sheet clips a paw off the third frame. Rows
+first, then each row's **own** columns, and every frame comes out whole. The
+row bands still come from the sheet as a whole, since those are cleanly
+separated.
+
+Its anchoring went the other way from the Green Gale's. The rows step — 16px
+and 59px up the sheet against an even grid, and about 17px sideways — while
+inside a row the frames disagree by 5 to 8px, which is the cub rolling over
+and lying down to sleep. That is the signature the rule is written for, so the
+rows are corrected and what moves inside a row is left exactly as drawn. It
+leaves this idle wandering more than the others do — 13% of the frame against
+the Bamboo Cub's 9% — and that residue is pose: arms up on one frame, curled
+on its side two frames later.
+
 Anchoring is not only an idle's problem. The packs arrive as 4×4 grids, and
 some of them draw each row a little higher than the last — the Cinderling's
 fireball climbs 43px over its sixteen frames, the Blazewyrm's celebration
@@ -405,8 +422,9 @@ file, with `aspect:1.447, fps:2, scale:1.2` and no `dx`/`dy`, to return to it.
 The Cinderling and the Blazewyrm (Ember, stages 2 and 3) ship as pixel art in
 [`art/ember-cinderling.png`](art/ember-cinderling.png) and
 [`art/ember-blazewyrm.png`](art/ember-blazewyrm.png) — 12-frame loops at 2 fps
-— and the Bamboo Cub (Verdant, stage 2) in
-[`art/verdant-bamboo-cub.png`](art/verdant-bamboo-cub.png). The Verdant egg
+— and Verdant's stages 2 and 3 in
+[`art/verdant-bamboo-cub.png`](art/verdant-bamboo-cub.png) and
+[`art/verdant-fernkin.png`](art/verdant-fernkin.png). The Verdant egg
 ships as five: three phases,
 [`art/verdant-egg.png`](art/verdant-egg.png),
 [`-cracked`](art/verdant-egg-cracked.png) and
