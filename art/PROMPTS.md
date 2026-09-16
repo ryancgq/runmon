@@ -106,9 +106,9 @@ Mossy greens, warm bark browns, pale glowing yellow-green light.
 
 | Form | Subject line | Size in frame |
 | --- | --- | --- |
-| 1 · Seedpod | `SUBJECT: a dormant seed pod wrapped in moss, faint green light leaking from the seams, a single small sprout at its top` | fills ~55% |
+| 1 · Leaf Bud | *done* — `art/verdant-egg.png`, `-cracked`, `-breaking`, plus `-crack-1` and `-crack-2` (a leaf bud that peels rather than cracks, so the three phases run largest to smallest) | fills ~55% |
 | 2 · Bamboo Cub | *done* — `art/verdant-bamboo-cub.png` (a panda cub; the rest of this line is still moss spirits) | ~70% |
-| 3 · Fernkin | `SUBJECT: a young forest spirit with small twig antlers, a moss cloak over its shoulders, glowing eyes, a single fern frond behind one ear` | ~80% |
+| 3 · Panda | *done* — `art/verdant-panda.png` (a bigger panda, matching the cub; the two lines below are still the moss-spirit idea) | ~80% |
 | 4 · Thicketmane | `SUBJECT: a forest guardian with broad antlers heavy with leaves, a thick moss mantle, small flowers opening along the antlers, a glowing rune on its chest` | ~90% |
 | 5 · Grovewarden | `SUBJECT: an ancient forest warden, a crown of antlers in blossom, moss robes, a bright green heartlight in its chest, leaves drifting around it` | ~95% |
 

@@ -55,7 +55,9 @@ frame than an earlier one.
 
 ## 3. Frames, order and timing
 
-Twelve frames, 500 ms each: a six-second loop at 2 fps.
+Twelve frames, 500 ms each: a six-second loop at 2 fps. A sheet may be paced
+slower where the form calls for it — Verdant's Panda runs at 1.25 fps — but
+draw for 2 unless told otherwise.
 
 Order them as **six pairs**, two frames per mood:
 
@@ -109,15 +111,22 @@ final one, unlocking at levels 1, 5, 15, 30 and 50.
 
 | # | Ember — fire | Verdant — forest | Nimbus — storm |
 | --- | --- | --- | --- |
-| 1 | **Cinder Egg** ✅ | Seedpod | **Static Egg** ✅ |
+| 1 | **Cinder Egg** ✅ | **Leaf Bud** ✅ | **Static Egg** ✅ |
 | 2 | **Cinderling** ✅ | **Bamboo Cub** ✅ | **Puffling** ✅ |
-| 3 | **Blazewyrm** ✅ | Fernkin | **Zephyrite** ✅ |
-| 4 | Pyrelord | Thicketmane | Tempestor |
-| 5 | Infernarch | Grovewarden | Thunderarch |
+| 3 | **Blazewyrm** ✅ | **Panda** ✅ | **Zephyrite** ✅ |
+| 4 | Pyrelord ⏳ | Thicketmane ⏳ | Tempestor ⏳ |
+| 5 | Infernarch ⏳ | Grovewarden ⏳ | Thunderarch ⏳ |
 
-Verdant's baby form is a panda cub, while its other four forms are moss
-spirits. Either supply panda art for the rest of that line, or replace the cub
-later — the species currently reads as two ideas.
+⏳ means the form shows a placeholder — an aura, a ring of motes and a `?` in
+the species' colour. It draws no body and no outline on purpose: a silhouette
+would be a guess the real art then has to honour. Supplying a sheet for one of
+these replaces it; nothing else has to change.
+
+Verdant's first three forms are now pandas, while its last two are still
+written as moss spirits. Supply panda art for those two as well, or rewrite
+them — the species reads as two ideas until one of those happens. Their names
+still describe the moss-spirit idea too, where the first three have been
+renamed to match what they are.
 
 Egg forms need far less than twelve frames — a pulse, a wobble, a crack. Four
 frames is plenty; supply what the form needs and say how many. The Cinder Egg

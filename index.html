@@ -43,6 +43,12 @@
   --r-md:16px;
   --r-sm:11px;
   --ease:cubic-bezier(.22,.9,.24,1);
+  /* The XP bar gets its own curve. The house ease is a hard ease-out - 76% of
+     the distance inside the first quarter of the time - which is why the bar
+     read as instant however long its duration got. This one is near enough to
+     linear to watch (26% / 55% / 83% at the quarters) with the last sixth of
+     the travel spread over the final quarter as a landing. */
+  --xp-ease:cubic-bezier(.4,.4,.8,1);
   --safe-b:env(safe-area-inset-bottom, 0px);
   --safe-t:env(safe-area-inset-top, 0px);
 }
@@ -193,7 +199,7 @@ body::before{
   border-radius:999px;overflow:hidden;
   background:linear-gradient(90deg,var(--accent),var(--accent-2));
   box-shadow:0 0 16px rgba(var(--glow),.85);
-  transition:width 1.1s var(--ease);
+  transition:width var(--xp-ms,3s) var(--xp-ease);
 }
 .xpbar .fill::after{
   content:"";position:absolute;inset:0;border-radius:999px;
@@ -336,6 +342,10 @@ body::before{
 .p-spark{animation:sparkle 1.9s ease-in-out infinite}
 @keyframes sparkle{0%,100%{opacity:.15;transform:scale(.7)}45%{opacity:1;transform:scale(1.15)}}
 .p-pulse{animation:corePulse 2.1s ease-in-out infinite;transform-origin:center}
+/* the ring of motes on an undrawn form - slow enough to read as drifting
+   rather than as something loading */
+.p-spin{animation:mystSpin 16s linear infinite;transform-origin:center}
+@keyframes mystSpin{to{transform:rotate(360deg)}}
 @keyframes corePulse{0%,100%{opacity:.55;transform:scale(.94)}50%{opacity:1;transform:scale(1.08)}}
 .p-orbit{animation:orbit 7s linear infinite;transform-origin:100px 105px}
 @keyframes orbit{to{transform:rotate(360deg)}}
@@ -693,6 +703,32 @@ body::before{
 .run-item .xp small{display:block;font-size:8.5px;color:var(--muted);letter-spacing:1px;font-family:"Nunito";font-weight:800}
 .month-head{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:1.3px;text-transform:uppercase;margin:18px 0 9px}
 
+/* friends */
+.friend{
+  display:flex;align-items:center;gap:13px;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);
+  padding:11px 13px;margin-bottom:9px;transition:.16s var(--ease);width:100%;text-align:left;
+}
+.friend:active{transform:scale(.985)}
+.friend .pet-holder{width:60px;height:60px;flex:0 0 60px}
+.friend .pet-holder svg{filter:none}
+.friend .who{flex:1;min-width:0}
+.friend .who .n{font-size:14.5px;font-weight:800;display:flex;align-items:center;gap:7px}
+.friend .who .h{font-size:11.5px;color:var(--muted);font-weight:700;margin-top:3px}
+.friend .who .s{font-size:11px;color:var(--muted);font-weight:700;margin-top:5px;letter-spacing:.2px}
+.friend .go{color:var(--muted);flex:0 0 auto}
+.friend .go svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.code-box{
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:27px;font-weight:800;letter-spacing:4px;color:var(--accent);
+  background:var(--bg-2);border:1px dashed rgba(var(--glow),.45);
+  border-radius:var(--r-md);padding:15px 10px;margin:2px 0 12px;
+}
+.code-box.pending{font-size:14px;letter-spacing:.4px;color:var(--muted);border-style:solid}
+.addrow{display:flex;gap:9px}
+.addrow .inp{flex:1;text-transform:uppercase;letter-spacing:3px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.addrow .btn{width:auto;padding:0 18px;flex:0 0 auto}
 .empty-state{text-align:center;padding:46px 22px;color:var(--muted)}
 .empty-state .ico{font-size:44px;margin-bottom:12px;opacity:.65}
 .empty-state h3{font-size:18px;color:var(--text);margin-bottom:7px}
@@ -988,6 +1024,7 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
 
       <div class="section-title">Recent runs</div>
       <div id="home-recent"></div>
+      <button class="btn ghost" id="home-seeall" hidden style="margin-top:2px">See all runs</button>
 
       <div class="screen-pad"></div>
     </section>
@@ -1123,11 +1160,27 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
     <!-- ===================== HISTORY ===================== -->
     <section class="screen" id="screen-history">
       <div class="hdr">
+        <button class="iconbtn" data-nav="home" aria-label="Back">
+          <svg viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+        </button>
         <div><h2>History</h2><div class="sub" id="hist-sub">No runs yet</div></div>
         <div class="hdr-spacer"></div>
         <div class="chip" id="hist-total">0 km</div>
       </div>
       <div id="hist-list"></div>
+      <div class="screen-pad"></div>
+    </section>
+
+    <!-- ===================== FRIENDS ===================== -->
+    <section class="screen" id="screen-friends">
+      <div class="hdr">
+        <div><h2>Friends</h2><div class="sub" id="friends-sub">See how everyone's pet is doing</div></div>
+        <div class="hdr-spacer"></div>
+        <button class="iconbtn" id="friends-refresh" aria-label="Refresh">
+          <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+        </button>
+      </div>
+      <div id="friends-body"></div>
       <div class="screen-pad"></div>
     </section>
 
@@ -1148,6 +1201,10 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
         <div class="t"><div class="n">Name</div><div class="h" id="set-petname">—</div></div>
         <button class="btn ghost" style="width:auto;padding:9px 15px;font-size:13px" id="set-rename">Rename</button>
       </div>
+      <div class="row tap" id="row-xpanim">
+        <div class="t"><div class="n">Animate the XP bar</div><div class="h">Runs the bar up to what you earned instead of jumping to it. Off, a catch-up of several runs also stops waiting on it.</div></div>
+        <div class="toggle on" id="tg-xpanim"><i></i></div>
+      </div>
 
       <div class="section-title">Units &amp; body</div>
       <div class="row">
@@ -1161,10 +1218,6 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
       </div>
 
       <div class="section-title">Tracking</div>
-      <div class="row tap" id="row-sim">
-        <div class="t"><div class="n">Simulated GPS</div><div class="h">Fakes a route so you can try the app indoors or on a desktop. Runs are tagged as simulated.</div></div>
-        <div class="toggle" id="tg-sim"><i></i></div>
-      </div>
       <div class="row stack" id="row-simspeed" hidden>
         <div class="t"><div class="n">Simulated run speed</div><div class="h" id="simspeed-help"></div></div>
         <div class="seg" id="seg-simspeed"></div>
@@ -1199,8 +1252,8 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
       <svg viewBox="0 0 24 24"><path d="M12 3v6"/><circle cx="12" cy="12" r="3"/><path d="M12 15v6"/><path d="M5 8l3 2"/><path d="M19 8l-3 2"/><path d="M5 17l3-2"/><path d="M19 17l-3-2"/></svg><span>Evolve</span>
     </button>
     <button class="tab spacer" disabled></button>
-    <button class="tab" data-nav="history">
-      <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3.5 2"/></svg><span>History</span>
+    <button class="tab" data-nav="friends">
+      <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.4"/><path d="M3 20v-1.2c0-2.4 2.7-3.8 6-3.8s6 1.4 6 3.8V20"/><path d="M16.5 5.6a3.4 3.4 0 0 1 0 6.3"/><path d="M18.5 14.6c1.7.5 2.9 1.6 2.9 3.2V20"/></svg><span>Friends</span>
     </button>
     <button class="tab" data-nav="settings">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M4 12h2M18 12h2M12 4v2M12 18v2M6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M17.7 6.3l-1.4 1.4M7.7 16.3l-1.4 1.4"/></svg><span>Settings</span>
@@ -1399,10 +1452,11 @@ function beatRamp(n, total, ratio){
   return out;
 }
 
-/* Cut a sheet's frames to the template. `gather` is the first frame with
-   something happening in it, `burst` the frame the flash breaks on - two
+/* Cut a sheet's frames to the template. `gather` is the first beat with
+   something happening in it, `burst` the beat the flash breaks on - two
    numbers instead of sixteen, and every celebration lands on the same beat. */
-function levelUpBeats(frames, gather, burst){
+function levelUpBeats(beats, gather, burst){
+  const frames = beats;
   const T = LEVEL_UP_TIMING;
   gather = Math.max(0, Math.min(gather, burst));
   // the lead holds at a steady pace; whatever it leaves over is the build, so
@@ -1482,6 +1536,26 @@ const SKILLS = {
            they are held rather than cycled, and the last one longest. */
         durations:[380, 340, 300, 260, 230, 200, 180, 160, 150, 170, 260, 460],
         aspect:1.061, scale:1.376, dx:5.6, dy:-25.2 } }
+  ],
+  verdant: [
+    // also named for what the panda thinks it is doing
+    { id:"green-gale", name:"Green Gale", ico:"\u{1F343}", stage:1, level:8,
+      blurb:"Gathers the forest's strength and lets it go in one mighty gust. Stand upwind.",
+      sprite:{ src:"art/skill-fart.png", frames:12, fps:3,
+        /* Brace, gather, and the wrong end opens. Six charge frames quicken
+           the way the Puffling's do, to a ring of green at its widest - and
+           then frame 7, which draws nothing at all but the cub straining.
+           That stop is the joke, so it is the clip's longest hold outright
+           and the only beat with no effect on screen. What follows is the
+           punchline and is paced like one: 1.66 seconds over three frames,
+           more than the whole charge, because a fart that goes past in a
+           tenth of a second is a fart nobody saw. The last two alternate so
+           the cub glances about while it hangs there rather than lying
+           perfectly still through the shame. */
+        order:    [0, 1, 2, 3, 4, 5,  6,   7,   8,   9,  10, 11, 10, 11],
+        durations:[340, 310, 280, 250, 220, 190,  600,  560, 480, 620,
+                   240, 240, 300, 360],
+        aspect:1.348, scale:0.986, dx:1.9, dy:-0.5 } }
   ]
 };
 function skillsFor(speciesId){ return SKILLS[speciesId] || []; }
@@ -1503,6 +1577,11 @@ const EGG_PHASES = {
     { from:1, src:"art/nimbus-egg.png" },
     { from:2, src:"art/nimbus-egg-cracked.png" },
     { from:3, src:"art/nimbus-egg-breaking.png" }
+  ],
+  verdant: [
+    { from:1, src:"art/verdant-egg.png" },
+    { from:2, src:"art/verdant-egg-cracked.png" },
+    { from:3, src:"art/verdant-egg-breaking.png" }
   ]
 };
 function eggPhaseSrc(species, level){
@@ -1515,7 +1594,11 @@ function eggPhaseSrc(species, level){
 
 /** A celebration timed by the template above: mark the two frames, not all 16. */
 function levelUpClip(cfg){
-  return { ...cfg, durations: levelUpBeats(cfg.frames, cfg.gather, cfg.burst) };
+  // a clip that names its frames in `order` is paced by its beats, not by the
+  // sheet's width - the same count clipBeats() works out further down, spelled
+  // again here because that lives in a later script block than this table
+  const beats = cfg.order ? cfg.order.length : cfg.frames;
+  return { ...cfg, durations: levelUpBeats(beats, cfg.gather, cfg.burst) };
 }
 const LEVEL_UP_ART = {
   // The egg does not flash gold - it splits. Its two clips carry the shell from
@@ -1538,6 +1621,19 @@ const LEVEL_UP_ART = {
     cap:{ top:12, right:45 } }),
   "nimbus:0@3": levelUpClip({ src:"art/nimbus-egg-crack-2.png", frames:12,
     gather:2, burst:10, aspect:1.194, scale:0.932, dx:0.00, dy:-2.19,
+    cap:{ top:12, right:45 } }),
+  // The Leaf Bud does not crack, it sheds: the outer leaves open over four
+  // frames and then let go, on frame 6 the first time and frame 5 the second,
+  // counted off the sheets by where two loose blobs first appear beside the
+  // bud. Each transition ends on the frame its new phase opens with - the
+  // clip and the change of art are the same event - which took a scale ramp
+  // in the pack, because these sheets shrink the bud harder than the phases
+  // they join do. See the packing notes in the README.
+  "verdant:0@2": levelUpClip({ src:"art/verdant-egg-crack-1.png", frames:12,
+    gather:1, burst:5, aspect:1.339, scale:1.048, dx:1.05, dy:-3.75,
+    cap:{ top:12, right:45 } }),
+  "verdant:0@3": levelUpClip({ src:"art/verdant-egg-crack-2.png", frames:12,
+    gather:1, burst:4, aspect:1.339, scale:1.048, dx:1.05, dy:-3.75,
     cap:{ top:12, right:45 } }),
   // this one scowls and shuts its eyes for four frames before any gold shows,
   // so its build is shorter in frames and each of them holds longer. `cap`
@@ -1563,10 +1659,16 @@ const LEVEL_UP_ART = {
   "nimbus:2": levelUpClip({ src:"art/levelup-zephyrite.png", frames:12,
     gather:2, burst:8, aspect:1.031, scale:1.054, dx:-1.35, dy:-6.25 }),
   // Verdant's first celebration. Two calm frames, leaves gathering through six,
-  // a green bloom on 8 held over 9, then sparkles settling back. Read off the
+  // a green bloom that breaks on 7, then sparkles settling back. Read off the
   // sheet's green pixels, which sit at 40 at rest and 45,858 on the burst.
+  // Frames 7 and 8 are the bloom and they are different drawings of it - the
+  // rays point elsewhere in each - so the aura is held by cycling the two
+  // rather than by stopping on one, which would read as a freeze. Walked
+  // straight through, the bloom got 165ms and the 960ms settle landed on 10,
+  // which is the pet back at rest: the burst was over before you saw it.
   "verdant:1": levelUpClip({ src:"art/levelup-bamboo-cub.png", frames:12,
-    gather:2, burst:8, aspect:1.028, scale:1.274, dx:4.9, dy:-2.8 })
+    order:[0,1,2,3,4,5,6, 7,8, 7,8,7, 9,10, 11],
+    gather:2, burst:7, aspect:1.028, scale:1.274, dx:4.9, dy:-2.8 })
 };
 /* Keyed by form, and by level where a form celebrates differently at different
    levels - which so far is the egg, whose two crack clips belong to levels 2
@@ -1603,8 +1705,10 @@ const SPECIES = {
       { name:"Cinder Egg",  desc:"A speckled shell, warm to the touch. Something in there is impatient." },
       { name:"Cinderling",  desc:"All head, tiny wings, permanently overheating. Hiccups sparks." },
       { name:"Blazewyrm",   desc:"Wings that finally work and a temper that mostly does not." },
-      { name:"Pyrelord",    desc:"A proper drake. The air above it shimmers when you come home from a run." },
-      { name:"Infernarch",  desc:"Crowned in living fire. It only bows to people who keep showing up." }
+      // no art, so nothing is claimed about these two - see mystery() and the
+      // placeholder it draws. A description is a promise the drawing has to keep.
+      { name:"Pyrelord",    desc:"" },
+      { name:"Infernarch",  desc:"" }
     ]
   },
   verdant: {
@@ -1613,11 +1717,11 @@ const SPECIES = {
     blurb:"A quiet spirit of moss and old wood. Grows steadily, forgives slowly, glows when you are consistent.",
     theme:{ accent:"#4ade80", accent2:"#bef264", ink:"#05230f", glow:"74,222,128" },
     stages:[
-      { name:"Seedpod",     desc:"A dormant pod wrapped in moss. Faint green light leaks from the seams." },
+      { name:"Leaf Bud",    desc:"Layer on layer of leaf, wrapped tight. It sheds one every so often." },
       { name:"Bamboo Cub",  desc:"Round, hungry, and entirely bamboo-motivated. Will drop everything for a fresh stalk." },
-      { name:"Fernkin",     desc:"Twig antlers, a moss cloak, and the beginnings of a serious opinion about mornings." },
-      { name:"Thicketmane", desc:"Antlers heavy with leaves. Small flowers open when your streak is alive." },
-      { name:"Grovewarden", desc:"An entire season walking around in one body. The forest leans towards it." }
+      { name:"Panda",       desc:"Fully grown and fully asleep. The running was always going to be your half of this arrangement." },
+      { name:"Thicketmane", desc:"" },
+      { name:"Grovewarden", desc:"" }
     ]
   },
   nimbus: {
@@ -1629,8 +1733,8 @@ const SPECIES = {
       { name:"Static Egg",  desc:"A cloud wrapped tightly around something that keeps zapping it." },
       { name:"Puffling",    desc:"A static-charged squirrel, ears crackling. Mostly interested in acorns." },
       { name:"Zephyrite",   desc:"Bolt-shaped wings and far too much energy for its size." },
-      { name:"Tempestor",   desc:"A rolling storm front with a face. Your hair stands up nearby." },
-      { name:"Thunderarch", desc:"A crowned stormhead orbited by its own lightning. Weather happens around it." }
+      { name:"Tempestor",   desc:"" },
+      { name:"Thunderarch", desc:"" }
     ]
   }
 };
@@ -1805,7 +1909,11 @@ const DEFAULT_SAVE = {
   runs: [],
   badges: {},           // id -> timestamp first earned
   seenStage: 0,         // highest evolution stage already celebrated
-  settings: { units:"km", weightKg:70, simulate:DEMO, simSpeed:DEMO ? 10 : 1, wakeLock:true },
+  settings: { units:"km", weightKg:70, simulate:DEMO, simSpeed:DEMO ? 10 : 1, wakeLock:true,
+              xpAnim:true },
+  // [{ code, card, addedAt }] - the card is the last one the broker gave us, so
+  // a list still draws itself with no connection and refreshes when there is one
+  friends: [],
 };
 
 let save = structuredCloneSafe(DEFAULT_SAVE);
@@ -1854,13 +1962,21 @@ function persist(){
 /* A Strava catch-up stores and uploads every run it fetched before a single
    frame plays, then walks the pet forward one run at a time so the level-ups
    happen on screen instead of being collapsed into the total. This is the only
-   thing that needs to know: the save stays whole, and the derived state is
-   taken from the runs up to the cursor. null means all of them. */
-let replayCursor = null;
+   thing that needs to know: the save stays whole, and the runs the walk has not
+   reached yet are held out of the derived state. null means hold nothing.
+   
+   Held by id, not by a position in the log. A prefix looks equivalent and is
+   not: an imported run can be older than one already recorded - Strava dates a
+   run when it started, and the app dates its own when they are saved - and then
+   "the runs before this one" quietly drops every run after it as well. That is
+   what put a pet on 15 back to 14, walked it to 15 replaying an evolution it
+   had already had, and then jumped to 16 with no fill at all. The walk was
+   replaying the new run's POSITION rather than its XP. */
+let heldRuns = null;
 
 function recompute(){
   const all = save.runs.slice().sort((a,b)=>a.t-b.t);
-  const runs = replayCursor === null ? all : all.slice(0, replayCursor);
+  const runs = heldRuns ? all.filter(r => !heldRuns.has(r.id)) : all;
   let totalKm = 0, totalXp = 0, totalSec = 0;
   for (const r of runs){ totalKm += r.km; totalXp += r.xp; totalSec += r.sec; }
 
@@ -2078,6 +2194,38 @@ const sparkle = (x,y,s,fill,delay) =>
   `<g transform="translate(${x} ${y}) scale(${s})"><path class="p-spark" style="animation-delay:${delay||0}s"
      d="M0 -9 Q1.6 -1.6 9 0 Q1.6 1.6 0 9 Q-1.6 1.6 -9 0 Q-1.6 -1.6 0 -9 Z" fill="${fill}"/></g>`;
 
+/* Stages 4 and 5 are not drawn yet, and nothing here guesses at what they
+   will be: no body, no outline, not even a shape to be wrong about. What the
+   placeholder draws instead is the species' own light, gathered and not yet
+   become anything - an aura, a ring of motes going slowly round, and a "?"
+   sitting in the middle of it. The two stages differ in size and in how many
+   motes they carry, so the progression still reads while both are unknown.
+   On the Evolution screen's locked rows the flatten-to-a-shape filter turns
+   this into a white "?" ringed in white, which is exactly the right reading. */
+const mystery = ({ accent, big }) => (c) => {
+  const i = c.id, r = big ? 78 : 68, fs = big ? 128 : 112;
+  return `
+  <defs>
+    <radialGradient id="ma${i}" cx="50%" cy="50%">
+      <stop offset="0" stop-color="${accent}" stop-opacity="${big ? ".34" : ".24"}"/>
+      <stop offset=".6" stop-color="${accent}" stop-opacity="${big ? ".12" : ".08"}"/>
+      <stop offset="1" stop-color="${accent}" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <g class="pet-anim">
+    <circle cx="100" cy="100" r="98" fill="url(#ma${i})" class="p-pulse"/>
+    <circle cx="100" cy="100" r="${r - 12}" fill="${accent}" fill-opacity=".06"/>
+    <circle cx="100" cy="100" r="${r}" fill="none" stroke="${accent}" stroke-opacity=".55"
+      stroke-width="4" stroke-linecap="round" stroke-dasharray="0.1 ${big ? 17 : 19}"
+      class="p-spin"/>
+    <text x="100" y="${100 + Math.round(fs * 0.35)}" text-anchor="middle" class="p-pulse"
+      font-family="Fredoka One, sans-serif" font-size="${fs}"
+      fill="${accent}" fill-opacity=".95">?</text>
+    ${sparkle(22,62,.5,accent,0)}${sparkle(180,134,.45,accent,1.1)}
+    ${big ? sparkle(40,178,.42,accent,1.9) + sparkle(162,24,.38,accent,2.6) : ""}
+  </g>`;
+};
+
 const zzz = (x,y) =>
   `<g opacity=".9" fill="#c9d2e6" font-family="Fredoka One, sans-serif">
      <text class="p-zzz" x="${x}" y="${y}" font-size="15">z</text>
@@ -2172,82 +2320,10 @@ PET_ART.ember = [
     ${c.mood === "asleep" ? zzz(150,44) : ""}
   </g>`; },
 
-/* 3 — Pyrelord */ (c) => { const i = c.id; return `
-  <defs>
-    <radialGradient id="bd${i}" cx="34%" cy="22%"><stop offset="0" stop-color="#ff8235"/><stop offset="1" stop-color="#b32a0f"/></radialGradient>
-    <linearGradient id="bl${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffdf9e"/><stop offset="1" stop-color="#ff9a45"/></linearGradient>
-    <linearGradient id="wg${i}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8c42"/><stop offset="1" stop-color="#8f1d08"/></linearGradient>
-    <radialGradient id="cr${i}"><stop offset="0" stop-color="#fff4c4"/><stop offset="1" stop-color="#ff6b1f" stop-opacity="0"/></radialGradient>
-  </defs>
-  <g class="pet-anim">
-    <g class="p-flap" style="transform-origin:100px 110px">
-      <path d="M72 106 C34 74 8 84 2 112 C22 106 30 116 24 134 C48 142 68 128 76 116 Z" fill="url(#wg${i})"/>
-      <path d="M72 106 C46 90 28 96 16 116 M72 112 C50 112 34 122 26 138" stroke="#6d1505" stroke-width="2.2" fill="none" opacity=".55"/>
-    </g>
-    <g class="p-flap" style="transform-origin:100px 110px;animation-delay:.16s">
-      <path d="M128 106 C166 74 192 84 198 112 C178 106 170 116 176 134 C152 142 132 128 124 116 Z" fill="url(#wg${i})"/>
-      <path d="M128 106 C154 90 172 96 184 116 M128 112 C150 112 166 122 174 138" stroke="#6d1505" stroke-width="2.2" fill="none" opacity=".55"/>
-    </g>
-    <g class="p-wag" style="transform-origin:120px 158px">
-      <path d="M118 160 C146 168 168 156 176 136" stroke="#b32a0f" stroke-width="13" fill="none" stroke-linecap="round"/>
-      ${flame(178,134,.8,"#ff8c42","#ffe08a")}
-    </g>
-    <ellipse cx="80" cy="180" rx="16" ry="9" fill="#8f1d08"/><ellipse cx="120" cy="180" rx="16" ry="9" fill="#8f1d08"/>
-    <path d="M68 178 l-1 6 M76 179 l0 6 M84 178 l1 6 M108 178 l-1 6 M116 179 l0 6 M124 178 l1 6" stroke="#ffdf9e" stroke-width="3.2" stroke-linecap="round"/>
-    <ellipse cx="100" cy="142" rx="37" ry="40" fill="url(#bd${i})"/>
-    <ellipse cx="100" cy="148" rx="24" ry="29" fill="url(#bl${i})"/>
-    <circle cx="100" cy="140" r="24" fill="url(#cr${i})" class="p-pulse"/>
-    <circle cx="100" cy="140" r="9" fill="#fff2bd" class="p-pulse"/>
-    <path d="M100 84 C88 96 88 108 100 112 C112 108 112 96 100 84 Z" fill="url(#bd${i})"/>
-    <path d="M86 92 l-6 -16 l12 7 Z M100 82 l-6 -18 l12 7 Z M114 92 l6 -16 l-12 7 Z" fill="#ffb04a"/>
-    <circle cx="100" cy="62" r="31" fill="url(#bd${i})"/>
-    <path d="M100 62 C118 62 128 70 128 78 C128 86 116 90 100 90 C84 90 72 86 72 78 C72 70 82 62 100 62 Z" fill="url(#bl${i})" opacity=".9"/>
-    <path d="M74 36 C64 16 78 12 88 30 Z" fill="#ffdf9e"/><path d="M126 36 C136 16 122 12 112 30 Z" fill="#ffdf9e"/>
-    ${flame(80,28,.4,"#ff8c42","#ffe08a")}${flame(120,28,.4,"#ff8c42","#ffe08a")}
-    ${face({ y:64, s:.86, mood:c.mood, ink:"#3d0f06", spread:16 })}
-    <circle cx="92" cy="82" r="2.2" fill="#3d0f06" opacity=".7"/><circle cx="108" cy="82" r="2.2" fill="#3d0f06" opacity=".7"/>
-    ${c.mood === "asleep" ? zzz(154,34) : ""}
-  </g>`; },
-
-/* 4 — Infernarch */ (c) => { const i = c.id; return `
-  <defs>
-    <radialGradient id="bd${i}" cx="34%" cy="20%"><stop offset="0" stop-color="#ffa14b"/><stop offset=".6" stop-color="#f0501c"/><stop offset="1" stop-color="#8f1d08"/></radialGradient>
-    <linearGradient id="bl${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff0c2"/><stop offset="1" stop-color="#ffa145"/></linearGradient>
-    <linearGradient id="wg${i}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffb347"/><stop offset=".55" stop-color="#f04f1c"/><stop offset="1" stop-color="#6d1505"/></linearGradient>
-    <radialGradient id="cr${i}"><stop offset="0" stop-color="#fffbe0"/><stop offset=".5" stop-color="#ffd23f"/><stop offset="1" stop-color="#ff6b1f" stop-opacity="0"/></radialGradient>
-  </defs>
-  <g class="pet-anim">
-    <circle cx="100" cy="100" r="86" fill="none" stroke="url(#wg${i})" stroke-width="1.6" opacity=".35" stroke-dasharray="5 11"/>
-    <g class="p-orbit">${flame(100,26,.34,"#ffd23f","#fffbe0","")}</g>
-    <g class="p-orbit-r" style="animation-delay:-3s">${flame(100,20,.28,"#ff8c42","#ffe08a","")}</g>
-    <g class="p-flap" style="transform-origin:100px 104px">
-      <path d="M70 100 C28 62 -2 74 -4 108 C20 100 30 112 22 134 C52 144 66 124 74 110 Z" fill="url(#wg${i})"/>
-      <path d="M70 100 C40 82 18 88 6 112 M70 106 C44 106 26 118 20 138" stroke="#5c1104" stroke-width="2.2" fill="none" opacity=".55"/>
-    </g>
-    <g class="p-flap" style="transform-origin:100px 104px;animation-delay:.15s">
-      <path d="M130 100 C172 62 202 74 204 108 C180 100 170 112 178 134 C148 144 134 124 126 110 Z" fill="url(#wg${i})"/>
-      <path d="M130 100 C160 82 182 88 194 112 M130 106 C156 106 174 118 180 138" stroke="#5c1104" stroke-width="2.2" fill="none" opacity=".55"/>
-    </g>
-    <g class="p-wag" style="transform-origin:118px 160px">
-      <path d="M116 162 C148 174 176 160 184 136" stroke="#b32a0f" stroke-width="14" fill="none" stroke-linecap="round"/>
-      ${flame(186,132,1,"#ff8c42","#ffe08a")}
-    </g>
-    <ellipse cx="78" cy="182" rx="17" ry="9" fill="#8f1d08"/><ellipse cx="122" cy="182" rx="17" ry="9" fill="#8f1d08"/>
-    <path d="M66 180 l-1 6 M74 181 l0 7 M82 180 l1 6 M106 180 l-1 6 M114 181 l0 7 M122 180 l1 6" stroke="#fff0c2" stroke-width="3.4" stroke-linecap="round"/>
-    <ellipse cx="100" cy="142" rx="39" ry="40" fill="url(#bd${i})"/>
-    <ellipse cx="100" cy="148" rx="25" ry="29" fill="url(#bl${i})"/>
-    <circle cx="100" cy="138" r="30" fill="url(#cr${i})" class="p-pulse"/>
-    <circle cx="100" cy="138" r="11" fill="#fffbe0" class="p-pulse"/>
-    <path d="M100 82 C86 96 86 108 100 112 C114 108 114 96 100 82 Z" fill="url(#bd${i})"/>
-    <circle cx="100" cy="58" r="32" fill="url(#bd${i})"/>
-    <path d="M100 58 C119 58 130 67 130 76 C130 85 117 89 100 89 C83 89 70 85 70 76 C70 67 81 58 100 58 Z" fill="url(#bl${i})" opacity=".92"/>
-    <path d="M70 34 C56 10 74 4 86 26 Z" fill="#fff0c2"/><path d="M130 34 C144 10 126 4 114 26 Z" fill="#fff0c2"/>
-    <path d="M88 30 l-4 -12 M100 26 l0 -14 M112 30 l4 -12" stroke="#ffd23f" stroke-width="3" stroke-linecap="round" opacity=".85"/>
-    ${flame(74,24,.5,"#ffd23f","#fffbe0")}${flame(100,16,.6,"#ff8c42","#ffe08a")}${flame(126,24,.5,"#ffd23f","#fffbe0")}
-    ${face({ y:60, s:.84, mood:c.mood, ink:"#360d05", spread:16 })}
-    ${sparkle(40,72,.8,"#ffd23f",0)}${sparkle(162,90,.7,"#ff8c42",.7)}${sparkle(52,150,.6,"#ffd23f",1.3)}
-    ${c.mood === "asleep" ? zzz(158,30) : ""}
-  </g>`; }
+/* 3, 4 — not drawn yet. The vector pair that used to sit here did not
+   belong beside the pixel art, so both stages wear the placeholder. */
+mystery({ accent:"#ff6b35" }),
+mystery({ accent:"#ff6b35", big:true })
 ];
 </script>
 
@@ -2255,7 +2331,7 @@ PET_ART.ember = [
 "use strict";
 /* --- VERDANT: forest spirit ---------------------------------------------- */
 PET_ART.verdant = [
-/* 0 — Seedpod */ (c) => { const i = c.id; return `
+/* 0 — Leaf Bud */ (c) => { const i = c.id; return `
   <defs>
     <radialGradient id="sh${i}" cx="34%" cy="26%"><stop offset="0" stop-color="#6b7f52"/><stop offset="1" stop-color="#22301f"/></radialGradient>
     <linearGradient id="gl${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9f99d"/><stop offset="1" stop-color="#4ade80"/></linearGradient>
@@ -2278,7 +2354,7 @@ PET_ART.verdant = [
     ${c.mood === "asleep" ? zzz(152,62) : ""}
   </g>`; },
 
-/* 1 — Sproutling */ (c) => { const i = c.id; return `
+/* 1 — Bamboo Cub */ (c) => { const i = c.id; return `
   <defs>
     <radialGradient id="bd${i}" cx="36%" cy="26%"><stop offset="0" stop-color="#bbf7d0"/><stop offset="1" stop-color="#4ade80"/></radialGradient>
     <filter id="gb${i}" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2.6"/></filter>
@@ -2305,7 +2381,7 @@ PET_ART.verdant = [
     ${c.mood === "asleep" ? zzz(150,84) : ""}
   </g>`; },
 
-/* 2 — Fernkin */ (c) => { const i = c.id; return `
+/* 2 — Panda */ (c) => { const i = c.id; return `
   <defs>
     <radialGradient id="bd${i}" cx="36%" cy="24%"><stop offset="0" stop-color="#a7f3c8"/><stop offset="1" stop-color="#37a35f"/></radialGradient>
     <linearGradient id="ck${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4ade80"/><stop offset="1" stop-color="#166534"/></linearGradient>
@@ -2330,75 +2406,10 @@ PET_ART.verdant = [
     ${c.mood === "asleep" ? zzz(150,60) : ""}
   </g>`; },
 
-/* 3 — Thicketmane */ (c) => { const i = c.id; return `
-  <defs>
-    <radialGradient id="bd${i}" cx="36%" cy="22%"><stop offset="0" stop-color="#b6f5d0"/><stop offset="1" stop-color="#2b8f52"/></radialGradient>
-    <linearGradient id="ck${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3fbc6e"/><stop offset="1" stop-color="#0f3d21"/></linearGradient>
-    <radialGradient id="au${i}"><stop offset="0" stop-color="#d9f99d" stop-opacity=".55"/><stop offset="1" stop-color="#4ade80" stop-opacity="0"/></radialGradient>
-  </defs>
-  <g class="pet-anim">
-    <circle cx="100" cy="104" r="82" fill="url(#au${i})" class="p-pulse"/>
-    <g class="p-sway" style="transform-origin:76px 56px">
-      <path d="M76 58 C62 44 66 26 52 14" stroke="#8b6b3f" stroke-width="6" fill="none" stroke-linecap="round"/>
-      <path d="M68 44 l-18 -8 M72 52 l-18 0 M62 30 l-14 -12" stroke="#8b6b3f" stroke-width="4.2" stroke-linecap="round"/>
-      ${leaf(50,14,-24,.38,"#4ade80","#14532d")}${leaf(50,36,-78,.3,"#86efac","#14532d")}${leaf(48,18,-56,.26,"#bef264","#14532d")}
-    </g>
-    <g class="p-sway" style="transform-origin:124px 56px;animation-delay:.5s">
-      <path d="M124 58 C138 44 134 26 148 14" stroke="#8b6b3f" stroke-width="6" fill="none" stroke-linecap="round"/>
-      <path d="M132 44 l18 -8 M128 52 l18 0 M138 30 l14 -12" stroke="#8b6b3f" stroke-width="4.2" stroke-linecap="round"/>
-      ${leaf(150,14,24,.38,"#4ade80","#14532d")}${leaf(150,36,78,.3,"#86efac","#14532d")}${leaf(152,18,56,.26,"#bef264","#14532d")}
-    </g>
-    <ellipse cx="82" cy="180" rx="16" ry="9" fill="#1f6b3d"/><ellipse cx="118" cy="180" rx="16" ry="9" fill="#1f6b3d"/>
-    <path d="M100 100 C64 100 50 128 52 166 C52 176 148 176 148 166 C150 128 136 100 100 100 Z" fill="url(#ck${i})"/>
-    <path d="M66 126 q34 12 68 0 M60 144 q40 14 80 0 M58 160 q42 12 84 0" stroke="#0a2a16" stroke-width="2.2" fill="none" opacity=".45"/>
-    <circle cx="100" cy="132" r="13" fill="#bef264" class="p-pulse" opacity=".85"/>
-    <path d="M100 120 l4 8 h-8 Z M100 144 l4 -8 h-8 Z" fill="#0f3d21" opacity=".5"/>
-    <circle cx="100" cy="82" r="38" fill="url(#bd${i})"/>
-    <path d="M62 82 q38 -34 76 0 q-38 -16 -76 0 Z" fill="#2b8f52" opacity=".4"/>
-    <circle cx="72" cy="52" r="6" fill="#f9a8d4"/><circle cx="72" cy="52" r="2.4" fill="#fde68a"/>
-    <circle cx="130" cy="58" r="5" fill="#fbcfe8"/><circle cx="130" cy="58" r="2" fill="#fde68a"/>
-    ${face({ y:86, s:.9, mood:c.mood, ink:"#0a2a16", glow:c.mood === "asleep" ? null : "#0f3d21", spread:17 })}
-    ${sparkle(38,118,.6,"#bef264",0)}${sparkle(164,136,.55,"#d9f99d",.8)}${sparkle(52,64,.45,"#4ade80",1.5)}
-    ${c.mood === "asleep" ? zzz(154,56) : ""}
-  </g>`; },
-
-/* 4 — Grovewarden */ (c) => { const i = c.id; return `
-  <defs>
-    <radialGradient id="bd${i}" cx="36%" cy="20%"><stop offset="0" stop-color="#ccffe0"/><stop offset="1" stop-color="#1f7a45"/></radialGradient>
-    <linearGradient id="ck${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#48d47f"/><stop offset=".6" stop-color="#166534"/><stop offset="1" stop-color="#08260f"/></linearGradient>
-    <radialGradient id="au${i}"><stop offset="0" stop-color="#d9f99d" stop-opacity=".6"/><stop offset="1" stop-color="#4ade80" stop-opacity="0"/></radialGradient>
-  </defs>
-  <g class="pet-anim">
-    <circle cx="100" cy="102" r="94" fill="url(#au${i})" class="p-pulse"/>
-    <circle cx="100" cy="105" r="84" fill="none" stroke="#4ade80" stroke-width="1.4" opacity=".3" stroke-dasharray="4 12"/>
-    <g class="p-orbit">${leaf(100,26,150,.3,"#86efac","#14532d")}</g>
-    <g class="p-orbit" style="animation-delay:-2.4s">${leaf(100,22,190,.26,"#bef264","#14532d")}</g>
-    <g class="p-orbit-r" style="animation-delay:-4s">${leaf(100,30,120,.24,"#4ade80","#14532d")}</g>
-    <g class="p-sway" style="transform-origin:74px 54px">
-      <path d="M74 56 C56 40 62 20 44 6" stroke="#7d5f36" stroke-width="7" fill="none" stroke-linecap="round"/>
-      <path d="M66 40 l-22 -8 M70 50 l-22 2 M56 22 l-18 -14 M62 30 l-20 -2" stroke="#7d5f36" stroke-width="4.6" stroke-linecap="round"/>
-      ${leaf(42,6,-22,.4,"#4ade80","#14532d")}${leaf(40,34,-84,.32,"#86efac","#14532d")}${leaf(40,10,-58,.28,"#bef264","#14532d")}
-      <circle cx="52" cy="28" r="6.5" fill="#f9a8d4"/><circle cx="52" cy="28" r="2.6" fill="#fde68a"/>
-    </g>
-    <g class="p-sway" style="transform-origin:126px 54px;animation-delay:.5s">
-      <path d="M126 56 C144 40 138 20 156 6" stroke="#7d5f36" stroke-width="7" fill="none" stroke-linecap="round"/>
-      <path d="M134 40 l22 -8 M130 50 l22 2 M144 22 l18 -14 M138 30 l20 -2" stroke="#7d5f36" stroke-width="4.6" stroke-linecap="round"/>
-      ${leaf(158,6,22,.4,"#4ade80","#14532d")}${leaf(160,34,84,.32,"#86efac","#14532d")}${leaf(160,10,58,.28,"#bef264","#14532d")}
-      <circle cx="148" cy="28" r="6" fill="#fbcfe8"/><circle cx="148" cy="28" r="2.4" fill="#fde68a"/>
-    </g>
-    <ellipse cx="80" cy="182" rx="17" ry="9" fill="#155e33"/><ellipse cx="120" cy="182" rx="17" ry="9" fill="#155e33"/>
-    <path d="M100 96 C60 96 44 126 46 168 C46 178 154 178 154 168 C156 126 140 96 100 96 Z" fill="url(#ck${i})"/>
-    <path d="M62 122 q38 14 76 0 M54 142 q46 16 92 0 M52 160 q48 14 96 0" stroke="#061c0d" stroke-width="2.4" fill="none" opacity=".45"/>
-    <circle cx="100" cy="130" r="17" fill="#d9f99d" class="p-pulse"/>
-    <circle cx="100" cy="130" r="8" fill="#ffffff" opacity=".85" class="p-pulse"/>
-    <path d="M100 108 l5 10 h-10 Z M100 152 l5 -10 h-10 Z M78 130 l10 5 v-10 Z M122 130 l-10 5 v-10 Z" fill="#08260f" opacity=".45"/>
-    <circle cx="100" cy="78" r="39" fill="url(#bd${i})"/>
-    <path d="M61 78 q39 -36 78 0 q-39 -16 -78 0 Z" fill="#1f7a45" opacity=".42"/>
-    <path d="M100 39 q-8 -10 0 -18 q8 8 0 18 Z" fill="#bef264"/>
-    ${face({ y:82, s:.88, mood:c.mood, ink:"#061c0d", glow:c.mood === "asleep" ? null : "#0a2a16", spread:17 })}
-    ${sparkle(32,110,.7,"#bef264",0)}${sparkle(170,128,.6,"#d9f99d",.7)}${sparkle(46,158,.5,"#4ade80",1.4)}${sparkle(158,72,.5,"#bef264",2)}
-    ${c.mood === "asleep" ? zzz(158,52) : ""}
-  </g>`; }
+/* 3, 4 — not drawn yet. The vector pair that used to sit here did not
+   belong beside the pixel art, so both stages wear the placeholder. */
+mystery({ accent:"#4ade80" }),
+mystery({ accent:"#4ade80", big:true })
 ];
 </script>
 
@@ -2464,57 +2475,10 @@ PET_ART.nimbus = [
     ${c.mood === "asleep" ? zzz(154,74) : ""}
   </g></g>`; },
 
-/* 3 — Tempestor */ (c) => { const i = c.id; return `
-  <defs>
-    <radialGradient id="bd${i}" cx="36%" cy="22%"><stop offset="0" stop-color="#f4f9ff"/><stop offset="1" stop-color="#7e9fc4"/></radialGradient>
-    <radialGradient id="dk${i}" cx="40%" cy="20%"><stop offset="0" stop-color="#8fb0d4"/><stop offset="1" stop-color="#43607f"/></radialGradient>
-    <linearGradient id="wg${i}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fde047"/><stop offset="1" stop-color="#ea9e0b"/></linearGradient>
-    <filter id="gb${i}" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2.6"/></filter>
-  </defs>
-  <g class="pet-anim"><g class="p-float">
-    <circle cx="100" cy="108" r="80" fill="none" stroke="#7cd4fd" stroke-width="1.6" opacity=".32" stroke-dasharray="5 10"/>
-    <g class="p-flap" style="transform-origin:64px 104px"><path d="M66 100 L12 76 L40 100 L4 116 L60 122 Z" fill="url(#wg${i})"/></g>
-    <g class="p-flap" style="transform-origin:136px 104px;animation-delay:.18s"><path d="M134 100 L188 76 L160 100 L196 116 L140 122 Z" fill="url(#wg${i})"/></g>
-    <g class="p-wag" style="transform-origin:134px 156px">${bolt(158,156,1.4,"#fde047",24)}</g>
-    ${cloud(100,72,92,44,"url(#dk"+i+")")}
-    ${cloud(100,124,110,78,"url(#bd"+i+")")}
-    <ellipse cx="100" cy="140" rx="34" ry="20" fill="#eaf4ff" opacity=".7"/>
-    <circle cx="100" cy="140" r="11" fill="#fde047" class="p-pulse"/>
-    ${cloud(60,160,46,26,"#a9c6e3",'opacity=".92"')}${cloud(142,162,44,24,"#a9c6e3",'opacity=".92"')}
-    ${face({ y:114, s:.94, mood:c.mood, ink:"#122740", glow:c.mood === "asleep" ? null : "#0f2c47", spread:18, blurId:"gb"+i })}
-    ${bolt(72,58,.5,"#fde047",-16,"p-spark")}${bolt(128,54,.46,"#fde047",14,"p-spark")}
-    ${sparkle(32,102,.65,"#7cd4fd",0)}${sparkle(170,116,.55,"#fde047",.8)}
-    ${c.mood === "asleep" ? zzz(158,64) : ""}
-  </g></g>`; },
-
-/* 4 — Thunderarch */ (c) => { const i = c.id; return `
-  <defs>
-    <radialGradient id="bd${i}" cx="36%" cy="20%"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#6d92bb"/></radialGradient>
-    <radialGradient id="dk${i}" cx="40%" cy="18%"><stop offset="0" stop-color="#7b9dc2"/><stop offset="1" stop-color="#2d465f"/></radialGradient>
-    <linearGradient id="wg${i}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fef08a"/><stop offset="1" stop-color="#e08c05"/></linearGradient>
-    <radialGradient id="au${i}"><stop offset="0" stop-color="#7cd4fd" stop-opacity=".5"/><stop offset="1" stop-color="#7cd4fd" stop-opacity="0"/></radialGradient>
-    <filter id="gb${i}" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2.6"/></filter>
-  </defs>
-  <g class="pet-anim"><g class="p-float">
-    <circle cx="100" cy="104" r="94" fill="url(#au${i})" class="p-pulse"/>
-    <circle cx="100" cy="105" r="86" fill="none" stroke="#fde047" stroke-width="1.5" opacity=".35" stroke-dasharray="3 13"/>
-    <g class="p-orbit">${bolt(100,22,.5,"#fde047",0)}</g>
-    <g class="p-orbit" style="animation-delay:-2.3s">${bolt(100,20,.4,"#7cd4fd",0)}</g>
-    <g class="p-orbit-r" style="animation-delay:-5s">${bolt(100,26,.36,"#fde047",0)}</g>
-    <g class="p-flap" style="transform-origin:60px 100px"><path d="M62 96 L2 66 L34 96 L-6 114 L56 120 Z" fill="url(#wg${i})"/></g>
-    <g class="p-flap" style="transform-origin:140px 100px;animation-delay:.16s"><path d="M138 96 L198 66 L166 96 L206 114 L144 120 Z" fill="url(#wg${i})"/></g>
-    <g class="p-wag" style="transform-origin:136px 158px">${bolt(164,158,1.6,"#fde047",26)}</g>
-    ${cloud(100,60,96,46,"url(#dk"+i+")")}
-    <path d="M74 44 l6 -20 l8 14 l10 -22 l9 22 l9 -14 l6 20 Z" fill="#fde047" opacity=".95"/>
-    ${cloud(100,124,116,82,"url(#bd"+i+")")}
-    <ellipse cx="100" cy="142" rx="36" ry="22" fill="#f2f8ff" opacity=".72"/>
-    <circle cx="100" cy="140" r="18" fill="#fde047" class="p-pulse"/>
-    <circle cx="100" cy="140" r="8" fill="#fffbe0" class="p-pulse"/>
-    ${cloud(56,162,48,28,"#93b5d8",'opacity=".92"')}${cloud(146,164,46,26,"#93b5d8",'opacity=".92"')}
-    ${face({ y:112, s:.92, mood:c.mood, ink:"#0c1e33", glow:c.mood === "asleep" ? null : "#0a1b2e", spread:18, blurId:"gb"+i })}
-    ${sparkle(26,106,.7,"#7cd4fd",0)}${sparkle(176,120,.6,"#fde047",.7)}${sparkle(44,164,.5,"#7cd4fd",1.4)}
-    ${c.mood === "asleep" ? zzz(162,52) : ""}
-  </g></g>`; }
+/* 3, 4 — not drawn yet. The vector pair that used to sit here did not
+   belong beside the pixel art, so both stages wear the placeholder. */
+mystery({ accent:"#7cd4fd" }),
+mystery({ accent:"#7cd4fd", big:true })
 ];
 
 /* ---------------------------------------------------------------------------
@@ -2562,6 +2526,17 @@ const DEFAULT_SPRITES = {
     src:"art/nimbus-egg.png",
     frames:12, rows:1, fps:2, aspect:1.194, scale:0.932, dx:0.00, dy:-2.19
   },
+  "verdant:0": {
+    // The Leaf Bud, and the src the level swaps - see EGG_PHASES. Packed like
+    // the other two eggs, in one pass across all three phases so they share a
+    // frame, a ground line and a centre. Unlike them it is NOT normalised to
+    // one body size: the other eggs crack, this one peels - 310px tall at
+    // level 1 and 226px at level 3, a layer of leaf shed each time - and that
+    // shrinking is the art saying something is coming. The bud is the largest
+    // blob, so the leaves drifting off it cannot drag the anchor around.
+    src:"art/verdant-egg.png",
+    frames:12, rows:1, fps:2, aspect:1.339, scale:1.048, dx:1.05, dy:-3.75
+  },
   "nimbus:1": {
     src:"art/nimbus-puffling.png",
     // 12-frame loop: sits, blinks, an acorn drops in, and it eats. The pack's
@@ -2569,6 +2544,21 @@ const DEFAULT_SPRITES = {
     // pinned to one ground line - only the squirrel, since the acorn and the
     // bolts are meant to move.
     frames:12, rows:1, fps:2, aspect:1.031, scale:1.068, dx:3, dy:-9.7
+  },
+  "verdant:2": {
+    src:"art/verdant-panda.png",
+    // 12-frame loop: the cub plays, waves, rolls, and dozes off with a z, a zz
+    // and a zzz. Cutting it needed the rows found first and then each row's own
+    // columns - two frames in the top row all but touch, so the gap between
+    // those columns is there in some rows and not others, and one split across
+    // the whole sheet clips a paw. Anchored per row, like every other idle: the
+    // rows step 16px and 59px up the sheet and 17px sideways, while inside a
+    // row the frames disagree by 5 to 8px, which is the cub rolling over.
+    // and slower than every other idle on purpose: 1.25fps against their 2, so
+    // a turn of the loop takes 9.6s rather than 6. The pet is described as
+    // asleep most of the time and its own sheet spends four frames snoring;
+    // half a second a frame had it bustling.
+    frames:12, rows:1, fps:1.25, aspect:1.168, scale:1.2, dx:3.75, dy:-14.7
   },
   "nimbus:2": {
     src:"art/nimbus-zephyrite.png",
@@ -2581,7 +2571,12 @@ const DEFAULT_SPRITES = {
     // rows sit 41px and 78px high in the pack, so each frame is pinned to the
     // ground line of its row's least-occluded frame - the bamboo is meant to
     // move, the cub is not.
-    frames:12, rows:1, fps:2, aspect:0.900, scale:0.986, dx:3.5, dy:-16.8
+    // The cub is drawn chunkier here than on its skill sheet - rounder cheeks,
+    // a bigger eye - so at a matched silhouette it still read as the larger
+    // animal when the two swapped on the same spot. Taken down 4% to sit with
+    // the skill; dx and dy move with it so the ground line does not, which is
+    // what every other sheet was fitted against.
+    frames:12, rows:1, fps:2, aspect:0.900, scale:0.947, dx:3.3, dy:-14.2
   }
 };
 /* What the animation tester is showing instead of your own pet: a form, a mood
@@ -2610,8 +2605,8 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-15 bfdf6b0";
-const ART_VERSION = "16";
+const BUILD_ID = "2026-09-16 f2540d9";
+const ART_VERSION = "20";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
 }
@@ -2682,8 +2677,14 @@ function clipAnimationName(cfg){
     const frame = order ? order[k] : k;
     return `${pct}%{transform:translateX(-${(frame * 100 / frames).toFixed(4)}%)}`;
   }).join("");
+  // and a stop on 100%, holding the last frame. Without one the browser writes
+  // that stop itself out of the element's own style, which is translateX(0) -
+  // so a clip that ran its course snapped back to frame 1 and sat there for
+  // the moment before the teardown. On a celebration that is the pet twitching
+  // as it lands; on the egg's crack it is the shell briefly whole again.
+  const lastFrame = order ? order[order.length - 1] : d.length - 1;
   const el = document.createElement("style");
-  el.textContent = `@keyframes ${name}{${stops}}`;
+  el.textContent = `@keyframes ${name}{${stops}100%{transform:translateX(-${(lastFrame * 100 / frames).toFixed(4)}%)}}`;
   document.head.appendChild(el);
   clipKeyframes[name] = true;
   return name;
@@ -2870,6 +2871,7 @@ function playClip(cfg, tag){
   if (!holder || skillPlaying || !cfg || spriteBroken[cfg.src]) return false;
   probeSprite(cfg.src);
   skillPlaying = tag;
+  holder.classList.remove("egg-crack");     // the clip does its own moving
   holder.innerHTML = spriteHTML(cfg, "okay", true);
   renderSkillChips();
   clearTimeout(skillTimer);
@@ -2975,20 +2977,54 @@ let replaying = false, replaySkipped = false;
 let pendingReplay = [];
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
-const BAR_MS = 1150;                 // the bar's own transition is 1.1s
+/* How long the XP bar takes to travel, in ms, and how long the replay waits on
+   it. One number for both: the CSS transition reads it from --xp-ms, which
+   applyXpAnim() writes, so the bar can never finish after the wait that is
+   meant to cover it. Switched off, the bar jumps and the wait shrinks to just
+   enough for the paint to land - without that floor a level-up clip would
+   start in the same frame as the bar reaching the boundary. */
+const BAR_MS = 3000, BAR_MS_OFF = 140;
+function barMs(){ return save.settings.xpAnim === false ? BAR_MS_OFF : BAR_MS; }
+function applyXpAnim(){
+  document.documentElement.style.setProperty(
+    "--xp-ms", (save.settings.xpAnim === false ? 0 : BAR_MS) + "ms");
+}
 
 /* The XP row alone. renderHome() paints the bar, the level badge and the pet
    together, which is what made all three jump to the post-run state before the
    celebration had played. During a replay the bar has to be able to run up to a
    level boundary while the pet is still the form it was. */
-function paintXp(level, into, need){
+function paintXp(level, into, need, snap){
   $("#home-level").textContent = level;
   $("#home-xpnow").textContent = nf(Math.round(into));
   $("#home-xpneed").textContent = need === Infinity ? "MAX" : nf(need);
   $("#home-xpleft").textContent = need === Infinity ? "Max level"
     : `${nf(Math.max(0, need - into))} XP to Lv ${level + 1}`;
   const pct = need === Infinity ? 1 : Math.max(0, Math.min(1, into / need));
-  requestAnimationFrame(() => { $("#home-xpfill").style.width = (pct * 100).toFixed(2) + "%"; });
+  const el = $("#home-xpfill");
+  requestAnimationFrame(() => {
+    const target = +(pct * 100).toFixed(2);
+    // Only earning is worth animating. A bar that has to travel BACKWARDS -
+    // the walk starting from before the run it is about to replay, or a level
+    // boundary resetting to empty - jumps instead, because three seconds of
+    // XP draining away reads as losing it. This was the whole of the "the pet
+    // reverts to a previous level" bug: the drop was not a jump, it was a
+    // 300ms slide down the bar with the old level number under it.
+    //
+    // `snap` says the same thing about a value that happens to be higher: the
+    // opening frame of a walk is where the pet WAS, a position rather than a
+    // movement, and animating into it fills the bar up to XP that was already
+    // earned before the new run's is added at all.
+    const now = parseFloat(el.style.width) || 0;
+    if (snap || target < now - 0.5){
+      el.style.transition = "none";
+      el.style.width = target + "%";
+      void el.offsetWidth;                 // commit before the transition returns
+      el.style.transition = "";
+    } else {
+      el.style.width = target + "%";
+    }
+  });
 }
 
 /* Hold the pet at a given form while the bar moves underneath it. */
@@ -3016,7 +3052,7 @@ async function playCelebration(art, fromLevel, stage){
   // renderHome paints the XP row from `derived`, which during a replay is
   // already the post-run total - that put the new level on screen before its
   // own celebration. Hold the bar full at the boundary it just reached.
-  paintXp(fromLevel, xpToNext(fromLevel), xpToNext(fromLevel));
+  paintXp(fromLevel, xpToNext(fromLevel), xpToNext(fromLevel), true);
   await wait(60);
   charging = false; skillPlaying = null;
   runCelebration(art);
@@ -3024,33 +3060,43 @@ async function playCelebration(art, fromLevel, stage){
   previewPet = null;
 }
 
+/* The runs a walk over `ids` would hold back - all of them, so that `derived`
+   reports the pet exactly as it was before this catch-up. Set the moment the
+   runs are imported, because everything between that and the walk starting -
+   the push to the broker, a repaint from coming back to the tab - would
+   otherwise draw the finished total, and the walk could then only open by
+   taking the level backwards. */
+function heldSetFor(ids){
+  const wanted = new Set(ids || []);
+  const held = new Set();
+  for (const r of save.runs) if (wanted.has(r.id)) held.add(r.id);
+  return held.size ? held : null;
+}
+
 async function replayStravaRuns(ids){
-  if (replaying || !ids || !ids.length) return;
-  const wanted = new Set(ids);
-  const all = save.runs.slice().sort((a, b) => a.t - b.t);
-  // by id rather than by position: an imported run can be older than one
-  // already recorded, and "the last few" would then walk the wrong ones
-  const steps = [];
-  all.forEach((r, i) => { if (wanted.has(r.id)) steps.push(i); });
-  if (!steps.length) return;
+  if (replaying) return;
+  const held = heldSetFor(ids);
+  if (!held){ heldRuns = null; recompute(); renderAll(); return; }
+  // chronological, so a week of runs is walked in the order they were run
+  const queue = save.runs.slice().sort((a, b) => a.t - b.t).filter(r => held.has(r.id));
 
   replaying = true; replaySkipped = false;
+  heldRuns = held;                                  // the pet as it was, all of them out
   toast("Tap the pet to skip", "", "\u23ED\uFE0F");
 
   try {
-    for (const i of steps){
+    for (const run of queue){
       if (replaySkipped) break;
       if (currentScreen !== "home"){ replaySkipped = true; break; }   // walked away
-      const run = all[i];
-      replayCursor = i;  recompute();                 // the pet and bar as they were
+      recompute();                                    // the pet and bar as they were
       const before = derived.level;
       holdPetAt(before);
-      paintXp(before, derived.into, derived.need);
+      paintXp(before, derived.into, derived.need, true);   // a starting point, not a gain
       toast(`+${nf(run.xp)} XP \u00b7 ${U.distStr(run.km, 1)}${U.label}`, "good", "\u{1F3C3}");
       await wait(420);
       if (replaySkipped) break;
 
-      replayCursor = i + 1; recompute();              // and after this run
+      heldRuns.delete(run.id); recompute();           // and after this run
       const after = { level: derived.level, into: derived.into, need: derived.need };
 
       // The earning comes before the reward: run the bar to the top of the level
@@ -3059,7 +3105,7 @@ async function replayStravaRuns(ids){
       for (let lv = before; lv < after.level && !replaySkipped; lv++){
         holdPetAt(lv);
         paintXp(lv, xpToNext(lv), xpToNext(lv));      // fill to the boundary
-        await wait(BAR_MS);
+        await wait(barMs());
         if (replaySkipped) break;
         const stage = stageForLevel(lv + 1);
         const art = levelUpArt(save.species, stage, lv + 1);
@@ -3071,10 +3117,10 @@ async function replayStravaRuns(ids){
       if (replaySkipped) break;
       paintXp(after.level, after.into, after.need);   // whatever the run left over
       previewPet = null; renderHome();
-      await wait(BAR_MS);
+      await wait(barMs());
     }
   } finally {
-    replaying = false; replayCursor = null; previewPet = null;
+    replaying = false; heldRuns = null; previewPet = null;
     recompute(); renderAll();
   }
 }
@@ -3102,6 +3148,12 @@ function renderHome(){
   const d = derived, sp = d.species;
   const shown = previewPet || { id: sp.id, stage: d.stage, mood: d.mood.key };
   if (!skillPlaying) paintPet($("#home-pet"), shown.id, shown.stage, shown.mood);
+  // An egg rocks here the way it does through onboarding - the same shake on
+  // the same holder - so the form you are waiting on behaves alike in both
+  // places. It comes off the moment the shell hatches, and playClip takes it
+  // off for the length of a celebration: the crack clips have their own motion
+  // and do not want a rotation on top of it.
+  $("#home-pet").classList.toggle("egg-crack", shown.stage === 0 && !skillPlaying);
   $("#pet-stage").classList.toggle("has-sprite", !!$("#home-pet .sprite-view"));
   renderSkillChips();
   $("#pet-name-txt").textContent = save.petName || sp.name;
@@ -3114,11 +3166,18 @@ function renderHome(){
     ? (d.gapDays === 0 ? "You already ran today — nice." : d.gapDays === 1 ? "You ran yesterday. Keep it rolling." : `${d.gapDays} days since your last run`)
     : "Let's log your first run";
 
-  $("#home-level").textContent = d.level;
-  $("#home-xpnow").textContent = nf(Math.round(d.into));
-  $("#home-xpneed").textContent = d.need === Infinity ? "MAX" : nf(d.need);
-  $("#home-xpleft").textContent = d.need === Infinity ? "Max level" : `${nf(Math.max(0, d.need - d.into))} XP to Lv ${d.level + 1}`;
-  requestAnimationFrame(() => { $("#home-xpfill").style.width = (d.pct * 100).toFixed(2) + "%"; });
+  // through paintXp rather than beside it: this used to paint the row itself,
+  // which meant the no-going-backwards rule lived in only one of the two
+  // places that move the bar.
+  //
+  // And not at all while a walk is running. `derived` is the finished total the
+  // walk exists to reveal, and every renderHome() during one - the pet being
+  // held at its old form, a clip tearing down, a sync repainting behind it -
+  // wrote that total to the bar. The walk's own next value then arrived as a
+  // rise from it, so a bar already at 73% dropped to 30% and climbed back to
+  // 73% before the new run's XP was added at all. The walk paints the row
+  // itself, with paintXp, at each step it wants shown.
+  if (!replaying) paintXp(d.level, d.into, d.need);
 
   const nextEvo = EVO_LEVELS.find(l => l > d.level);
   $("#home-nextevo").textContent = nextEvo ? `Next form at Lv ${nextEvo}` : "Final form reached";
@@ -3179,6 +3238,7 @@ function paintThumbs(scope){
 function renderRecent(){
   const list = derived.runs.slice(-3).reverse();
   const el = $("#home-recent");
+  renderSeeAll();
   if (!list.length){
     el.innerHTML = `<div class="card center" style="color:var(--muted);font-size:13px;font-weight:700;line-height:1.6">
       No runs logged yet.<br>Tap the runner button to start one.</div>`;
@@ -3186,6 +3246,15 @@ function renderRecent(){
   }
   el.innerHTML = list.map(runItemHTML).join("");
   paintThumbs(el);
+}
+/* The full log is a screen rather than a tab now. It is only worth offering
+   once there is more of it than the three shown above. */
+function renderSeeAll(){
+  const btn = $("#home-seeall");
+  if (!btn) return;
+  const n = derived.runs.length;
+  btn.hidden = n <= 3;
+  btn.textContent = `See all ${n} runs`;
 }
 
 /* --- history ------------------------------------------------------------- */
@@ -3248,7 +3317,8 @@ function renderEvolve(){
         <div class="info">
           <div class="nm">${unlocked || !mine ? st.name : "???"}</div>
           <div class="rq">${k === 0 ? "Starting form" : `Unlocks at level ${req}`}${current ? " · current" : ""}</div>
-          <div class="ds">${unlocked || !mine ? st.desc : "Keep running to reveal this form."}</div>
+          ${(unlocked || !mine) && !st.desc ? ""
+            : `<div class="ds">${unlocked || !mine ? st.desc : "Keep running to reveal this form."}</div>`}
         </div>
         <div class="stagenum">${k + 1}/5</div>
       </div>`;
@@ -3297,6 +3367,7 @@ function renderAll(){
   renderHome();
   renderHistory();
   renderEvolve();
+  renderFriends();
   renderSettings();
   persist();
 }
@@ -3316,7 +3387,10 @@ function go(name){
   to.scrollTop = 0;
   currentScreen = name;
 
-  $$(".tab[data-nav]").forEach(t => t.classList.toggle("on", t.dataset.nav === name));
+  // History lost its tab and now hangs off Recent runs, so the Pet tab stays lit
+  // while you are in it - a screen with no tab highlighted reads as being lost.
+  const lit = name === "history" ? "home" : name;
+  $$(".tab[data-nav]").forEach(t => t.classList.toggle("on", t.dataset.nav === lit));
   const chromeless = name === "track" || name === "summary";
   $("#tabbar").classList.toggle("hidden", chromeless);
   $("#fab").classList.toggle("hidden", chromeless);
@@ -3324,15 +3398,22 @@ function go(name){
 
   if (name === "history") { renderHistory(); }
   if (name === "evolve")  { renderEvolve(); }
+  if (name === "friends") { openFriendsTab(); }
   if (name === "home")    {
-    renderHome();
-    // Opening the pet is the same intent as tapping Check now, so treat it that
-    // way. Same one-a-minute throttle as coming back to the tab.
-    if (stravaLinked() && !replaying && Date.now() - (save.stravaSyncedAt || 0) > 60000) stravaSync();
+    // A queued walk goes first and paints its own opening frame - the state
+    // before the runs it is about to replay. renderHome() ahead of it would put
+    // the finished total on the bar for a frame, which is the one thing the
+    // walk is there to avoid. It sets `replaying` synchronously if it takes
+    // over, so anything that did not is drawn normally.
     if (pendingReplay.length){
       const queued = pendingReplay; pendingReplay = [];
       replayStravaRuns(queued);
-    } else playPendingLevelUp();
+    }
+    if (!replaying) renderHome();
+    // Opening the pet is the same intent as tapping Check now, so treat it that
+    // way. Same one-a-minute throttle as coming back to the tab.
+    if (stravaLinked() && !replaying && Date.now() - (save.stravaSyncedAt || 0) > 60000) stravaSync();
+    if (!replaying) playPendingLevelUp();
   }
   if (name === "track")   { onTrackScreenShown(); }
 }
@@ -3442,17 +3523,6 @@ function looksLikeMobile(){
 function isNoLocationProvider(err){
   return /api key|network location|provider|403|not available|failed to (query|determine)/i.test(String(err && err.message || ""));
 }
-/** Drop straight into the simulator, mid-run if need be. */
-function switchToSim(){
-  save.settings.simulate = true;
-  persist(); renderSettings();
-  stopGeo();
-  banner(null);
-  if (tracker.active && !tracker.simId) startSim();
-  else setGps("good", "Simulated GPS ready");
-  toast("Simulated GPS on", "good", "\u{1F9EA}");
-}
-
 /* --- position handling --------------------------------------------------- */
 function acceptPosition(lat, lng, accuracy, tsMs){
   tracker.lastFixAt = Date.now();
@@ -3600,8 +3670,7 @@ function startGeo(){
     p => acceptPosition(p.coords.latitude, p.coords.longitude, p.coords.accuracy || 999, p.timestamp),
     err => {
       if (err.code === 1){
-        banner("Location permission was denied. Allow location for this site in your browser settings, then start the run again.",
-               null, { label:"Use Simulated GPS instead", fn: switchToSim });
+        banner("Location permission was denied. Allow location for this site in your browser settings, then start the run again.");
         setGps("off", "Permission denied");
         if (tracker.active) abortRun();
       } else if (err.code === 2){
@@ -3609,8 +3678,10 @@ function startGeo(){
         // instead, and Chromium builds without a Google API key get a 403 back.
         // That is not something the user can fix by walking outside.
         if (isNoLocationProvider(err) || !looksLikeMobile()){
-          banner("This browser cannot work out where you are. Desktop browsers have no GPS chip and fall back to a network location service — which some builds (Chromium, Brave, several Linux packages) ship without the key that service needs. <b>Open this page on a phone</b> for real tracking, or try the app right here with a fake route.",
-                 "warn", { label:"Use Simulated GPS", fn: switchToSim });
+          // The sandbox is where a fake route lives now, and it keeps its own save,
+          // so nothing invented on a desktop can land in a real pet's history.
+          banner("This browser cannot work out where you are. Desktop browsers have no GPS chip and fall back to a network location service — which some builds (Chromium, Brave, several Linux packages) ship without the key that service needs. <b>Open this page on a phone</b> for real tracking, or try the sandbox, which runs for you.",
+                 "warn", { label:"Open the sandbox", fn: () => { location.href = "demo.html"; } });
           setGps("off", "No location provider");
           if (tracker.active) abortRun();
         } else {
@@ -3898,7 +3969,8 @@ function showSummary(run, opts){
           <div class="arrow"><svg viewBox="0 0 24 24" style="width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></div>
           <div class="pet-holder mood-elated new" id="evo-new"></div>
         </div>
-        <p style="margin-top:10px">${sp.stages[ctx.afterStage].desc}</p>` : ""}
+        ${sp.stages[ctx.afterStage].desc
+            ? `<p style="margin-top:10px">${sp.stages[ctx.afterStage].desc}</p>` : ""}` : ""}
     </div>`;
     if (evolved){
       paintPet($("#evo-old", lu), sp.id, ctx.beforeStage, "happy");
@@ -3956,6 +4028,272 @@ function closeSheet(){
   if (done) done();
 }
 
+/* --- friends -------------------------------------------------------------
+   A friend is a code you were given and chose to keep. The list lives in the
+   save - so it follows the pet between devices - and each entry carries the
+   last card the broker handed back, which is what lets the screen draw itself
+   with no connection at all and simply look older than it is.
+
+   Following, not a mutual handshake: adding someone needs nothing from them.
+   That is the right shape for showing each other pets. A Battle will need
+   consent, and that is the point at which this grows an invitation. */
+let myFriendCode = null, friendsBusy = false, friendsNote = null;
+
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const friendList = () => Array.isArray(save.friends) ? save.friends : (save.friends = []);
+const prettyCode = c => c ? c.slice(0, 3) + "\u2011" + c.slice(3) : "";
+function cleanCode(raw){
+  const up = String(raw || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return up.length === 6 && [...up].every(c => CODE_ALPHABET.includes(c)) ? up : null;
+}
+
+/* The broker is older than the app whenever a deploy has not run yet. A 404 on
+   a friends route means exactly that, and saying so beats "not answering". */
+function friendsFail(err){
+  const m = String(err && err.message || err);
+  return /\(404\)/.test(m) ? "The server has not been updated with Friends yet." : m;
+}
+
+async function loadMyCode(){
+  if (myFriendCode || !stravaLinked()) return myFriendCode;
+  const r = await stravaCall("/friends/me");
+  myFriendCode = r.code || null;
+  return myFriendCode;
+}
+
+/** Refresh every friend's card in one round trip. Cards are cached in the save,
+    so a failure here leaves the list drawn rather than empty. */
+async function refreshFriends(){
+  const list = friendList();
+  if (!stravaLinked() || !list.length) return;
+  const r = await stravaCall("/friends/cards", { method:"POST",
+    body: JSON.stringify({ codes: list.map(f => f.code) }) });
+  let changed = false;
+  for (const f of list){
+    const card = safeCard(r.cards && r.cards[f.code]);
+    if (card){ f.card = card; changed = true; }
+  }
+  if (changed){ persist(); }
+}
+
+async function addFriendByCode(raw){
+  const code = cleanCode(raw);
+  if (!code) return toast("That is not a six-character code", "warn", "\u26A0\uFE0F");
+  if (friendList().some(f => f.code === code))
+    return toast("They are already on your list", "", "\u{1F44B}");
+  friendsBusy = true; renderFriends();
+  try {
+    const r = await stravaCall("/friends/lookup?code=" + encodeURIComponent(code));
+    if (r.error){ toast(r.error, "warn", "\u26A0\uFE0F"); return; }
+    const card = safeCard(r.card);
+    if (!card){ toast("That code has no pet on it", "warn", "\u26A0\uFE0F"); return; }
+    friendList().push({ code, card, addedAt: Date.now() });
+    persist();
+    toast(`${card.pet} added`, "good", "\u{1F91D}");
+    const input = $("#friend-code-in"); if (input) input.value = "";
+  } catch (err){
+    toast(friendsFail(err), "warn", "\u26A0\uFE0F");
+  } finally {
+    friendsBusy = false; renderFriends();
+  }
+}
+
+function removeFriend(code){
+  save.friends = friendList().filter(f => f.code !== code);
+  persist(); renderFriends();
+}
+
+/* A card is data from somebody else's device, so nothing reads a field of it
+   without going through here first. The names and numbers are escaped where
+   they are drawn; this is about the two fields that get used as lookups, where
+   an unknown species would take petMarkup() down rather than look odd. */
+function safeCard(c){
+  if (!c || typeof c !== "object") return null;
+  const species = SPECIES[c.species] ? c.species : "ember";
+  const n = (v, lo, hi) => Math.max(lo, Math.min(hi, Number(v) || 0));
+  return {
+    pet: String(c.pet || "Their pet").slice(0, 24),
+    species,
+    stage: n(c.stage, 0, 4),
+    form: String(c.form || SPECIES[species].stages[n(c.stage, 0, 4)].name).slice(0, 24),
+    level: n(c.level, 1, 999),
+    km: n(c.km, 0, 1e7),
+    weekKm: n(c.weekKm, 0, 1e7),
+    runs: n(c.runs, 0, 1e6),
+    streak: n(c.streak, 0, 1e5),
+    best: n(c.best, 0, 1e5),
+    lastRun: c.lastRun && Number(c.lastRun) > 0 ? Number(c.lastRun) : null
+  };
+}
+
+/** One friend, as a row. The pet is drawn with the same art the pet screen
+    uses, so a friend's Panda is the Panda. */
+function friendRowHTML(f){
+  const c = safeCard(f.card);
+  if (!c) return `<button class="friend" data-friend="${f.code}">
+      <div class="pet-holder mood-okay"></div>
+      <div class="who"><div class="n">${prettyCode(f.code)}</div>
+        <div class="h">Waiting for their first pet</div></div>
+      <span class="go"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+    </button>`;
+  const ago = c.lastRun ? relDay(c.lastRun) : "no runs yet";
+  return `<button class="friend" data-friend="${f.code}">
+      <div class="pet-holder mood-okay" data-friend-art="${f.code}"></div>
+      <div class="who">
+        <div class="n">${esc(c.pet)} <span class="chip">LV ${c.level}</span></div>
+        <div class="h">${esc(c.form)} \u00b7 Stage ${c.stage + 1} of 5</div>
+        <div class="s">${U.distStr(c.km, c.km >= 100 ? 0 : 1)} ${U.label} \u00b7 ${c.runs} run${c.runs === 1 ? "" : "s"} \u00b7 ${ago}</div>
+      </div>
+      <span class="go"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+    </button>`;
+}
+
+/** "3 days ago" for a card, which only ever carries the one timestamp. */
+function relDay(ts){
+  const days = Math.floor((Date.now() - ts) / 86400000);
+  if (days <= 0) return "ran today";
+  if (days === 1) return "ran yesterday";
+  if (days < 7) return `ran ${days} days ago`;
+  return "last ran " + new Date(ts).toLocaleDateString(undefined, { day:"numeric", month:"short" });
+}
+/** The same gap as relDay, but sized for a stat tile rather than a sentence. */
+function shortAgo(ts){
+  const days = Math.floor((Date.now() - ts) / 86400000);
+  if (days <= 0) return "Today";
+  if (days === 1) return "1d";
+  if (days < 100) return days + "d";
+  return new Date(ts).toLocaleDateString(undefined, { month:"short", year:"2-digit" });
+}
+const esc = t => String(t == null ? "" : t)
+  .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
+function renderFriends(){
+  const body = $("#friends-body"), sub = $("#friends-sub");
+  if (!body) return;
+  const list = friendList();
+
+  if (!stravaLinked()){
+    // The sandbox has no athlete and no broker, so there is nothing for a code
+    // to be tied to. Pointing it at Settings would send it somewhere that hides
+    // Strava entirely, which is worse than saying so.
+    sub.textContent = DEMO ? "Not in the sandbox" : "Needs the Strava link";
+    body.innerHTML = DEMO
+      ? `<div class="empty-state"><div class="ico">\u{1F9EA}</div>
+          <h3>Friends are not in the sandbox</h3>
+          <p>A friend code belongs to a real athlete on the server, and the sandbox
+             has neither. Everything else here works without one.</p></div>`
+      : `<div class="empty-state"><div class="ico">\u{1F91D}</div>
+          <h3>Friends need your Strava link</h3>
+          <p>Your friend code is tied to your Strava athlete, which is what lets another
+             Runmon find your pet. Connect in Settings and your code appears here.</p>
+          <button class="btn primary" data-nav="settings" style="max-width:260px;margin:0 auto">Open Settings</button></div>`;
+    return;
+  }
+
+  sub.textContent = list.length
+    ? `${list.length} friend${list.length === 1 ? "" : "s"}`
+    : "See how everyone's pet is doing";
+
+  const code = myFriendCode
+    ? `<div class="code-box">${prettyCode(myFriendCode)}</div>`
+    : `<div class="code-box pending">${friendsNote || "Getting your code\u2026"}</div>`;
+
+  body.innerHTML = `
+    <div class="section-title">Your code</div>
+    ${code}
+    <div class="addrow" style="margin-bottom:4px">
+      <button class="btn ghost" id="friend-share" ${myFriendCode ? "" : "disabled"}
+        style="flex:1">Share my code</button>
+    </div>
+    <p class="muted" style="font-size:11.5px;font-weight:700;line-height:1.6;margin:10px 2px 0">
+      Give this to someone and they can follow your pet. It shows your pet, your
+      level and your totals \u2014 never your runs or where you ran them.</p>
+
+    <div class="section-title">Add a friend</div>
+    <div class="addrow">
+      <input class="inp" id="friend-code-in" maxlength="7" placeholder="ABC123"
+        autocapitalize="characters" autocomplete="off" spellcheck="false" inputmode="text">
+      <button class="btn primary" id="friend-add" ${friendsBusy ? "disabled" : ""}>${friendsBusy ? "\u2026" : "Add"}</button>
+    </div>
+
+    <div class="section-title">Following</div>
+    ${list.length ? list.map(friendRowHTML).join("") : `
+      <div class="empty-state" style="padding:30px 18px">
+        <div class="ico">\u{1F440}</div><h3>Nobody yet</h3>
+        <p>Swap codes with someone who runs. Their pet turns up here, and their
+           level moves when they do.</p></div>`}`;
+
+  // the pets, painted after the markup exists
+  for (const f of list){
+    if (!f.card) continue;
+    const el = body.querySelector(`[data-friend-art="${f.code}"]`);
+    if (el) paintPet(el, f.card.species, f.card.stage, "okay");
+  }
+}
+
+/* Share sheet where there is one, clipboard where there is not, and the code on
+   screen either way - it is six characters, and reading it out loud works. */
+async function shareMyCode(){
+  if (!myFriendCode) return;
+  const text = `Follow my Runmon pet \u2014 my friend code is ${prettyCode(myFriendCode)}`;
+  try {
+    if (navigator.share){ await navigator.share({ text }); return; }
+    await navigator.clipboard.writeText(myFriendCode);
+    toast("Code copied", "good", "\u{1F4CB}");
+  } catch (err){ /* dismissed a share sheet, or no clipboard permission */ }
+}
+
+/* Draw from the save first so the tab is never blank, then go and freshen it.
+   Neither call is allowed to take the screen down with it: a list drawn from
+   yesterday's cards is worth more than an error page. */
+async function openFriendsTab(){
+  renderFriends();
+  if (!stravaLinked()) return;
+  try {
+    await loadMyCode();
+    friendsNote = null;
+  } catch (err){
+    friendsNote = friendsFail(err);
+  }
+  renderFriends();
+  try { await refreshFriends(); } catch (err){ /* the cached cards still stand */ }
+  renderFriends();
+}
+
+/** A friend's profile. Their pet big, their numbers under it. */
+function openFriend(code){
+  const f = friendList().find(x => x.code === code);
+  if (!f) return;
+  const c = safeCard(f.card);
+  openSheet({
+    title: c ? esc(c.pet) : prettyCode(code),
+    desc: c ? `${esc(c.form)} \u00b7 Level ${c.level} \u00b7 ${prettyCode(code)}` : prettyCode(code),
+    body: c ? `
+      <div class="pet-stage" style="min-height:170px;margin:4px 0 14px">
+        <div class="pet-halo"></div>
+        <div class="pet-holder mood-okay" id="friend-big"></div>
+      </div>
+      <div class="stat-grid">
+        <div class="stat"><div class="v">${c.streak}</div><div class="k">Day streak</div></div>
+        <div class="stat"><div class="v">${U.distStr(c.weekKm != null ? c.weekKm : 0, 1)}<small>${U.label}</small></div><div class="k">This week</div></div>
+        <div class="stat"><div class="v">${U.distStr(c.km, c.km >= 100 ? 0 : 1)}<small>${U.label}</small></div><div class="k">Lifetime</div></div>
+      </div>
+      <div class="stat-grid" style="margin-top:9px">
+        <div class="stat"><div class="v">${c.runs}</div><div class="k">Runs</div></div>
+        <div class="stat"><div class="v">${c.best}</div><div class="k">Best streak</div></div>
+        <div class="stat"><div class="v">${c.lastRun ? shortAgo(c.lastRun) : "\u2014"}</div><div class="k">Last run</div></div>
+      </div>
+      <p class="muted" style="font-size:11px;font-weight:700;text-align:center;margin:14px 0 0">
+        Battle is not built yet \u2014 this is where it will live.</p>`
+      : `<p class="desc">No pet on this code yet.</p>`,
+    onOpen: () => { if (c) paintPet($("#friend-big"), c.species, c.stage, "okay"); },
+    actions: [
+      { label:"Done", cls:"ghost", fn: closeSheet },
+      { label:"Remove", cls:"danger", fn: () => { closeSheet(); removeFriend(code); } }
+    ]
+  });
+}
+
 /* --- settings ------------------------------------------------------------ */
 function renderStravaPanel(){
   const title = $("#strava-title"), panel = $("#strava-panel");
@@ -3998,9 +4336,7 @@ function renderSettings(){
   $$("#seg-units button").forEach(b => b.classList.toggle("on", b.dataset.u === save.settings.units));
   $("#set-weight").value = save.settings.weightKg;
   $("#set-weight-u").textContent = "kg";
-  $("#tg-sim").classList.toggle("on", !!save.settings.simulate);
   if (DEMO){
-    $("#row-sim").hidden = true;
     $("#row-simspeed").hidden = false;
     const w = runWarp();
     $("#simspeed-help").innerHTML =
@@ -4009,6 +4345,7 @@ function renderSettings(){
       `<button data-w="${v}" class="${v === w ? "on" : ""}">${v}\u00d7</button>`).join("");
   }
   $("#tg-wake").classList.toggle("on", !!save.settings.wakeLock);
+  $("#tg-xpanim").classList.toggle("on", save.settings.xpAnim !== false);
   $("#storage-note").textContent = storageOK ? "" : "⚠️ localStorage is unavailable — progress will not survive a reload.";
   // This promised "no account, no server, no tracking" unconditionally, which
   // stopped being true the moment a pet could live on the broker.
@@ -4404,17 +4741,25 @@ async function stravaSync(opts){
           : "Strava answered with an error (" + code + ").";
     }
     stravaSeen = res.seen || null;
+    // Before the recompute, so `derived` never reports the finished total while
+    // a walk is coming. The gap this closes is real and easy to hit: pushing to
+    // the broker is a network call, and coming back to the tab - which repaints
+    // the pet screen - is exactly when a sync runs.
+    if (newIds.length && currentScreen === "home") heldRuns = heldSetFor(newIds);
     if (imported.length) recompute();
     save.stravaSyncedAt = Date.now();
     persist();
     await stravaPush(imported);          // stored and uploaded before anything plays
-    renderAll();
     // Walk the pet through them one at a time. Collapsing a week of running into
     // one jump was the whole complaint: the egg would arrive already hatched.
+    // This goes BEFORE renderAll for the same reason go("home") does: renderAll
+    // paints the finished total, and the walk's opening frame would then read
+    // as a gain from it rather than as where the pet actually was.
     if (newIds.length){
       if (currentScreen === "home") replayStravaRuns(newIds);
       else pendingReplay = pendingReplay.concat(newIds);   // played on arrival
     }
+    renderAll();
     if (opts && opts.loud){
       if (imported.length){
         toast(`${imported.length} run${imported.length === 1 ? "" : "s"} from Strava`, "good", "\u{1F3C3}");
@@ -4435,10 +4780,41 @@ async function stravaSync(opts){
 
 /* The save and the ids go up together, so an activity cannot be marked
    imported by a save that never arrived. */
+/* What a friend is allowed to see: the pet and the totals behind it, and
+   nothing else. No runs, no routes, no dates beyond the last one, nothing from
+   Strava. The app builds it rather than the broker because the XP curve and the
+   form names live here, and working them out twice is how they drift apart. */
+function publicCard(){
+  // A walk in progress holds `derived` at a frame partway through the catch-up.
+  // The card is about the pet as it really is, so it is taken from the whole
+  // log and the hold is put straight back.
+  const held = heldRuns;
+  if (held){ heldRuns = null; recompute(); }
+  const d = derived, sp = d.species;
+  const weekStart = startOfWeek();
+  const card = {
+    v: 1,
+    pet: save.petName || sp.name,
+    species: sp.id,
+    stage: d.stage,
+    form: sp.stages[d.stage].name,
+    level: d.level,
+    km: Math.round(d.totalKm * 10) / 10,
+    weekKm: Math.round(d.runs.filter(r => r.t >= weekStart).reduce((a, r) => a + r.km, 0) * 10) / 10,
+    runs: d.runs.length,
+    streak: d.streak,
+    best: d.bestStreak,
+    lastRun: d.lastRunTs || null,
+    at: Date.now()
+  };
+  if (held){ heldRuns = held; recompute(); }
+  return card;
+}
+
 async function stravaPush(imported){
   if (!stravaLinked()) return;
   await stravaCall("/save", { method:"PUT",
-    body: JSON.stringify({ save, imported: imported || [] }) });
+    body: JSON.stringify({ save, imported: imported || [], card: publicCard() }) });
 }
 /** Called on every persist(); coalesced, because persist() is called a lot. */
 function stravaSchedulePush(){
@@ -4625,12 +5001,25 @@ function wire(){
     }
   });
 
-  $("#row-sim").addEventListener("click", () => {
-    save.settings.simulate = !save.settings.simulate; persist(); renderSettings();
-    toast(save.settings.simulate ? "Simulated GPS on — runs will be tagged sim" : "Simulated GPS off", "", save.settings.simulate ? "🧪" : "📡");
-  });
   $("#row-keepawake").addEventListener("click", () => {
     save.settings.wakeLock = !save.settings.wakeLock; persist(); renderSettings();
+  });
+  /* --- friends --- */
+  $("#home-seeall").addEventListener("click", () => go("history"));
+  $("#friends-refresh").addEventListener("click", () => { myFriendCode = null; openFriendsTab(); });
+  $("#friends-body").addEventListener("click", e => {
+    const row = e.target.closest("[data-friend]");
+    if (row) return openFriend(row.dataset.friend);
+    if (e.target.closest("#friend-add")) return addFriendByCode($("#friend-code-in").value);
+    if (e.target.closest("#friend-share")) return shareMyCode();
+  });
+  $("#friends-body").addEventListener("keydown", e => {
+    if (e.key === "Enter" && e.target.id === "friend-code-in") addFriendByCode(e.target.value);
+  });
+
+  $("#row-xpanim").addEventListener("click", () => {
+    save.settings.xpAnim = save.settings.xpAnim === false;
+    applyXpAnim(); persist(); renderSettings();
   });
   $("#btn-reset").addEventListener("click", () => {
     openSheet({
@@ -4712,7 +5101,11 @@ function boot(){
   const has = loadSave();
   // the sandbox exists so mechanics can be tried without going outside, and a
   // save made before this setting existed would have it off
-  if (DEMO) save.settings.simulate = true;
+  // The sandbox is the only place a fake route is drawn now. A save from before
+  // the setting was removed could still be carrying it switched on, and with
+  // nothing left to switch it off that would be a locked door.
+  save.settings.simulate = DEMO;
+  applyXpAnim();
   if (has){
     recompute();
     applyTheme(save.species);

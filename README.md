@@ -48,8 +48,71 @@ mid-walk — `renderHome()` draws the bar, the level badge and the pet together
 from `derived`, which during a replay is already the finished total, and a
 clip's own teardown does the same when it ends.
 
-The save is never the thing being animated. `recompute()` takes a cursor, so the
-displayed state is derived from the runs up to a point while `save.runs` stays
+The bar takes three seconds to travel, on a curve of its own. Length alone did
+not fix this: the house easing is a hard ease-out that covers 76% of the
+distance inside the first quarter of the time, so the bar arrived almost at
+once however long its duration got, and doubling 1.1s to 2s only moved the
+arrival from 275ms to 500ms. `--xp-ease` is near enough to linear to watch —
+27%, 56% and 84% at the quarters, measured on the real bar — with the last
+sixth of the travel spread over the final quarter as a landing. **Animate the
+XP bar** in Settings turns the whole thing off for anyone who would rather not
+wait.
+
+The walk owns the bar for as long as it runs, and that turned out to be the
+whole of a second report — a bar already at 73% dropping to 30% and climbing
+back to 73% before the new run's XP was added at all. `renderHome()` paints the
+XP row from `derived`, which during a walk is the finished total the walk
+exists to reveal, and it gets called constantly in the middle of one: the pet
+being held at its old form, a clip tearing down, a sync repainting behind it.
+Each of those wrote the finished total to the bar, and the walk's own next
+value then arrived as a *rise* from it. So `renderHome()` leaves the row alone
+while `replaying` is set, and both callers that start a walk — `go("home")` and
+the tail of a sync — now start it *before* they render, rather than painting
+the total first and asking the walk to undo it.
+
+Which runs to hold back is a *set*, not a position in the log. A prefix looks
+equivalent and is not: Strava dates a run when it started, the app dates its own
+when they are saved, so an imported run lands in the middle of the log as often
+as at the end — and "the runs before this one" then quietly drops every run
+*after* it too. A pet on 15 went back to 14, walked to 15 replaying an evolution
+it had already had, and jumped to 16 with no fill at all, because the walk was
+replaying the new run's position instead of its XP. Held by id, "before" means
+the pet exactly as it was, whatever order the runs arrived in, and the walk
+always lands on the real total.
+
+Holding the display back has to start when the runs *land*, not when the walk
+does. Between those two moments the app pushes to the broker — a network call —
+and `derived` is already the finished total, so anything that repaints in the
+gap draws it: coming back to the tab does exactly that, and coming back to the
+tab is when a sync runs. The level would go up on its own and the walk would
+then open by taking it back down, which is the report that a pet already on 14
+dropped to 13 and climbed back. So the cursor is set the moment the runs are
+imported, before the recompute. `derived` reports the pet as it was from then
+on, and every repaint in the window draws the right thing without knowing
+anything about walks.
+
+The opening frame of a walk is also marked as a position rather than a
+movement. Wherever the bar happened to be, that first value is where the pet
+actually was, so it snaps to it; animating into it is what fills the bar back
+up to XP that was already earned.
+
+The bar also never travels backwards. It has two reasons to go down — the walk
+starting from before the run it is about to replay, and a level boundary
+resetting to empty — and both used to be animated like everything else, which
+is what "the pet reverts to a previous level" was: not a jump but a 300ms slide
+back down the bar with the old level number sitting under it. A decrease now
+snaps within the frame. `renderHome()` goes through `paintXp()` to get there
+rather than painting the row itself, so there is one place that moves the bar
+and the rule cannot be sidestepped from the other. One number drives both halves: the CSS
+transition reads its duration from `--xp-ms`, which `applyXpAnim()` writes, so
+the bar can never still be moving when the wait that is meant to cover it ends.
+Switched off the bar jumps, and the wait shrinks to 140ms — not to zero, because
+a level-up clip starting in the same frame the bar reaches the boundary reads as
+one event rather than two.
+
+The save is never the thing being animated. `recompute()` holds runs back by id,
+so the displayed state is derived from everything except the ones the walk has
+not reached while `save.runs` stays
 whole; leaving half way through, or locking the phone, loses nothing and the
 next render simply shows the real total. Levels are not celebrated one per
 level, either — a run big enough to cross four of them inside one form would
@@ -142,9 +205,14 @@ second copy to keep in sync. `demo.html` is just a small launcher page.
 ## Trying it out
 
 Open the page on a phone and allow location access when it asks. If you are on
-a desktop, or indoors without a GPS fix, turn on **Simulated GPS** in Settings
-— it fakes a plausible route so you can walk through the whole flow. Runs
-recorded that way are tagged `sim` in your history.
+a desktop, or indoors without a GPS fix, open [the
+sandbox](https://ryancgq.github.io/runmon/demo.html) instead — it runs for you
+and walks through the whole flow without a GPS fix.
+
+A fake route used to be a switch in Settings, which put invented runs into a
+real pet's history and left the app with two ways of meaning "a run". The
+sandbox already did the same job better, keeps its own save, and says what it
+is on every screen, so it is the only place a route is invented now.
 
 Nothing is uploaded anywhere. Your pet, runs, XP and settings live in this
 browser's `localStorage`, on this device only. Settings has JSON export and
@@ -158,16 +226,71 @@ import if you want to move a save or keep a backup.
 | **Run** | Live map, distance, duration, average pace, calories, pause/resume and hold-to-finish |
 | **Summary** | Route trace, run stats, a full XP breakdown, animated bar fill, and any level up or evolution |
 | **Evolve** | Lifetime stats, the five-stage evolution tree for all three species, and 20 badges |
-| **History** | Every run by month, with route thumbnails; tap one to reopen its summary or delete it |
-| **Settings** | Strava, units, body weight, simulated GPS, new game |
+| **Friends** | Your friend code, adding someone by theirs, and everyone's pet with their level and totals |
+| **History** | Every run by month, with route thumbnails; reached from **See all runs** under Recent runs |
+| **Settings** | Strava, units, body weight, XP bar animation, new game |
+
+History gave up its tab to Friends. Four tabs and a run button is as many as the
+bar holds, and of the two, the one you open daily is the one with other people
+in it — a full run log is something you go looking for, so it hangs off Recent
+runs on the Pet screen instead and keeps the Pet tab lit while you are in it.
+
+## Friends
+
+A friend code is six characters from an alphabet with no I, O, 0 or 1 in it,
+minted once per athlete and kept. Codes are random rather than derived from
+anything: a Strava athlete id is on the end of every profile URL, and a code
+that could be turned back into one would hand out more than its holder meant to
+share. The code is claimed in a directory object named after the code itself,
+which is how a stranger's code finds their pet while nobody can walk the other
+direction.
+
+Adding someone needs nothing from them — it is following, not a handshake, which
+is the right shape for showing each other pets. A Battle will need consent, and
+that is the point at which this grows an invitation rather than before it.
+
+What a friend can see is a **card**: the pet, its form and level, lifetime and
+weekly distance, run count, streak, best streak, and the date of the last run.
+Never a run, never a route, nothing from Strava. The app builds its own card and
+sends it with each save rather than the broker deriving one, because the XP
+curve and the form names live in the app and working them out twice is how they
+drift apart.
+
+Cards are cached in the save, so the tab draws itself before the network answers
+and simply looks older than it is if the network never does. Everything arriving
+from another device goes through one function on the way in: an unknown species
+or a stage of 99 would otherwise take the pet renderer down, and a pet named
+`<img src=x onerror=…>` is drawn as those characters rather than as an image.
 
 ## The pets
 
-Three species, five stages each, all drawn as inline SVG and animated in CSS.
+Three species, five stages each. The first three stages of each are pixel art
+now; the last two are waiting on theirs.
 
 - **Ember** (fire) — Cinder Egg → Cinderling → Blazewyrm → Pyrelord → Infernarch
-- **Verdant** (forest) — Seedpod → Sproutling → Fernkin → Thicketmane → Grovewarden
+- **Verdant** (forest) — Leaf Bud → Bamboo Cub → Panda → Thicketmane → Grovewarden
 - **Nimbus** (storm) — Static Egg → Puffling → Zephyrite → Tempestor → Thunderarch
+
+Stages 4 and 5 draw a placeholder rather than the vector forms they used to.
+Those forms were fine beside other vectors and wrong beside the pixel art that
+replaced their earlier stages — a pet that changed medium halfway up its own
+tree. What stands there instead deliberately claims nothing: no body, no
+outline, not even a shape to be wrong about, since none of that art exists yet
+and a silhouette is a guess that the real drawing then has to honour. It draws
+the species' own light instead — an aura, a ring of motes turning once every
+sixteen seconds, and a `?` in the middle — and the two stages differ in size
+and in how many motes they carry, so the progression still reads while both
+are unknown. On the Evolution screen's locked rows, the filter that flattens a
+form to a shape turns it into a white `?` ringed in white, which is a better
+answer there than the grey blob a drawn pet becomes.
+
+Their descriptions are gone with the art, for the same reason: a line about
+antlers heavy with leaves is a promise the drawing then has to keep, and no
+drawing exists to keep it. Both places that print one — the Evolution row and
+the summary's evolution reveal — leave the line out entirely when a form has
+none, so the row closes up rather than holding an empty gap. The names are
+still there, because a row needs something in the name slot and `???` is what
+that slot already says while the form is locked.
 
 Your choice sets the app's accent colour. The pet's expression and idle
 animation follow how recently you ran: elated the day you run, happy the day
@@ -215,15 +338,47 @@ The two transition sheets hold each crack state for two or three frames rather
 than drawing twelve distinct ones — the sparkles change underneath, the shell
 does not. That is why their burst frames fall where they do.
 
+An egg rocks while you wait on it — the same 1.6s shake onboarding gives it,
+on the same holder, so the form behaves alike in both places. It comes off the
+moment the shell hatches, and off again for the length of a celebration: the
+crack clips have their own motion and do not want a rotation on top of it. The
+wind-up needs no such handling, since the shiver it puts on the holder simply
+replaces the shake for its second and a half.
+
 Eggs crack as they level. They are the one form whose art changes inside its
 own stage — intact at level 1, a first split at 2, a full web at 3 — and the
 crack is the level-up celebration: `<species>:0@2` and `<species>:0@3` in
 `LEVEL_UP_ART` carry the shell from one phase to the next and end on the frame
 the new idle opens with, so the celebration and the change of art are one
 event. `EGG_PHASES` is keyed by species, and any species with an entry gets
-this behaviour; the Cinder Egg cracks on frame 9 both times, while the acorn
-splits on 7 and spreads on 10, measured off the sheets rather than assumed. While a level-up is armed the pet is still drawn as it was *before* it,
+this behaviour; the Cinder Egg cracks on frame 9 both times, the acorn splits
+on 7 and spreads on 10, and the Leaf Bud lets its leaves go on 6 and then on 5
+— measured off the sheets rather than assumed, here by watching for the frame
+where two loose blobs first appear beside the bud. While a level-up is armed the pet is still drawn as it was *before* it,
 or you would come home to an already cracked shell and then watch it crack.
+
+The Verdant egg is the exception that proves what the packing is for. It does
+not crack — it peels, a full bud at level 1 down to a tight pale core at 3,
+310px tall in the pack and then 226px, a layer of leaf gone each time. So its
+three phases are packed in one pass like the other two eggs, sharing a frame,
+a ground line to a pixel and a centre to about one, but they are deliberately
+*not* normalised to a common body size the way the shell phases are.
+Normalising is right when the art is the same object changing state and wrong
+when the change of size **is** the state. All three sit on the same ground
+line, so the bud shrinks down onto it rather than drifting.
+
+Its two transitions then raise a problem the other eggs never had. Each one
+shrinks its bud harder than the two phases it joins differ — about 17% against
+the phases' 10% — so no single scale can make both of its ends match. The ends
+really are the same drawings as the idle frames, which is how you can tell:
+registered against them they sit at 0.95 to 0.98 IoU, and they ask for 0.977
+at the first frame and 1.068 at the last (0.990 and 1.092 for the second
+transition). One factor would leave a visible step at one end, or a smaller one
+at both. So each transition carries a scale **ramp** across its twelve frames
+instead. Both handovers then land exactly — measured on the pet screen, the
+clip's last frame and the idle that replaces it differ by 0.4% in area and not
+at all in ground line — and the correction works out at 0.8% a frame, spread
+under leaves flying off the bud.
 
 A celebration's sheet is not the sheet the pet is already wearing, and a CSS
 background does not start loading until something paints it — which for a
@@ -285,6 +440,90 @@ the source art turned out to be the squirrel merged with a bolt's outline, which
 put the scale out by 16%. The white face and chest is the landmark that works:
 no bolt or aura shares it, and it is the same feature in both sheets.
 
+The Bamboo Cub's celebration needed something else again. Its green bloom is
+drawn on two frames of twelve, and walked straight through the template those
+two got 165ms between them while the 960ms settle landed on a frame that is
+just the panda back at rest: the biggest moment in the sheet was over before
+you could see it. The fix is not new artwork but an `order`, the frame list a
+clip can name instead of counting 1..12 — here it cycles the two bloom frames
+across the flash and most of the settle, so the aura churns for 666ms and then
+dissipates. They are genuinely different drawings, rays pointing elsewhere in
+each, so cycling them reads as sustained energy where holding one would read as
+a freeze. The clip still runs to the same 2,250ms as every other celebration
+and the confetti still goes off on 810ms.
+
+The cub's skill sheet needed one thing none of the others did. Its twelve
+frames arrive as a 4x3 grid, and the top row's paws run six pixels past the
+line an even split of the sheet's height would draw. Cut there, those six rows
+of black were not lost - they landed at the top of every frame in the row
+below, and played back as two small dark crescents hanging in mid-air above
+the panda while it charged. The fix is to cut on the sheet's own rows: the
+bands of actual content, found by looking for the empty rows between them,
+which here sit 77 to 99 pixels deep and leave no doubt where one row ends.
+Column boundaries did fall where an even split puts them, checked the same
+way. Worth doing for every sheet from now on - an even split is an assumption,
+and this one had been quietly wrong.
+
+The same sheet then needed the anchoring taken a step further than any before
+it. The other packs correct a drift that is regular - each row drawn a little
+higher than the last - and one ground line per row is enough to answer it.
+This one drifts about ten pixels left per column as well, and underneath both
+it simply does not draw the cub in the same place twice: 55 source pixels
+between the leftmost frame and the rightmost, which on the pet screen was the
+cub hopping some 26 pixels about the stage while it charged. So every frame is
+anchored on its own here. The floor fixes y, because the cub is planted in all
+twelve frames and its lowest pixel is the ground line, and the body's centre
+of mass fixes x. The head alone and the paws alone were measured too; the
+whole body scored best, taking frame-to-frame overlap from 0.77 to 0.86. What
+is left on screen is a pixel of wander and no bob at all: the cub's ground
+line lands on the same row in all fourteen beats of the clip.
+
+That sheet also arrived keyed on blue rather than with an alpha channel of
+its own, which the earlier ones had. Keying it is the same three steps as
+anywhere: take the key colour from the sheet's own border rather than assuming
+`#0000FF`, since this one sits at (0, 8, 253) and wanders a few values either
+side; keep only the blue that reaches the border, so a gap between two paws
+stays a gap but nothing inside the cub is cut away; and solve the edge pixels
+for how much of each is cub and how much is key, then clamp any blue left in
+them back down. Nothing in this art is meant to be bluer than it is red or
+green, which is what makes that last step safe.
+
+Matching two sheets by their silhouettes turns out not to be enough. The idle
+and the skill measured within a percent of each other - registered against one
+another at every combination of resting poses, the best fit sat at 0.99 to
+1.03 - and the cub still read as the larger animal on the pet screen, where
+the two swap on the same spot a second apart. The drawings differ where the
+eye looks: rounder cheeks and a bigger eye on the idle sheet. So the idle is
+taken down 4% against a judgement rather than a measurement, and its dx and dy
+move with the scale so the ground line stays exactly where it was, which is
+what the skill and the celebration were both fitted against. The celebration
+is now the outlier at around 14% larger than the two of them.
+
+An `order` turns up a second problem worth naming, because it applies to every
+clip with its own timing. A keyframes rule that stops at its last frame has no
+100% stop, so the browser writes one from the element's own style — which is
+frame 1 — and a finished clip snapped back there for the moment before its
+teardown. Barely visible on a celebration, plainly wrong on an egg, whose first
+frame is the shell still whole. The generated rule now ends on an explicit stop
+holding the last frame.
+
+Cutting a sheet into frames is not always a grid either, and the stage-3
+panda is where that showed. Two frames in its top row all but touch, so the
+gap between those two columns exists in some rows and not in others: one
+column split across the whole sheet clips a paw off the third frame. Rows
+first, then each row's **own** columns, and every frame comes out whole. The
+row bands still come from the sheet as a whole, since those are cleanly
+separated.
+
+Its anchoring went the other way from the Green Gale's. The rows step — 16px
+and 59px up the sheet against an even grid, and about 17px sideways — while
+inside a row the frames disagree by 5 to 8px, which is the cub rolling over
+and lying down to sleep. That is the signature the rule is written for, so the
+rows are corrected and what moves inside a row is left exactly as drawn. It
+leaves this idle wandering more than the others do — 13% of the frame against
+the Bamboo Cub's 9% — and that residue is pose: arms up on one frame, curled
+on its side two frames later.
+
 Anchoring is not only an idle's problem. The packs arrive as 4×4 grids, and
 some of them draw each row a little higher than the last — the Cinderling's
 fireball climbs 43px over its sixteen frames, the Blazewyrm's celebration
@@ -306,8 +545,17 @@ file, with `aspect:1.447, fps:2, scale:1.2` and no `dx`/`dy`, to return to it.
 The Cinderling and the Blazewyrm (Ember, stages 2 and 3) ship as pixel art in
 [`art/ember-cinderling.png`](art/ember-cinderling.png) and
 [`art/ember-blazewyrm.png`](art/ember-blazewyrm.png) — 12-frame loops at 2 fps
-— and the Bamboo Cub (Verdant, stage 2) in
-[`art/verdant-bamboo-cub.png`](art/verdant-bamboo-cub.png). The rest are inline SVG.
+— and Verdant's stages 2 and 3 in
+[`art/verdant-bamboo-cub.png`](art/verdant-bamboo-cub.png) and
+[`art/verdant-panda.png`](art/verdant-panda.png) — that last one running at
+1.25 fps rather than 2, a 9.6-second turn instead of six, because a form whose
+whole joke is that it sleeps through everything should not bustle. The Verdant egg
+ships as five: three phases,
+[`art/verdant-egg.png`](art/verdant-egg.png),
+[`-cracked`](art/verdant-egg-cracked.png) and
+[`-breaking`](art/verdant-egg-breaking.png), and the two transitions between
+them in [`-crack-1`](art/verdant-egg-crack-1.png) and
+[`-crack-2`](art/verdant-egg-crack-2.png). The rest are inline SVG.
 
 Note that this pet plays one continuous loop rather than a per-mood animation,
 so its face cycles through every expression regardless of how recently you ran.
@@ -317,25 +565,38 @@ use them.
 ## Skills
 
 A form is not the end of a stage, it is the start of one: a pet keeps learning
-inside the form it grew into. The Cinderling and the Puffling have one move
-each, both at level 8; the Blazewyrm learns all three of its own between level
-15, where the form arrives, and level 30, where the next one does; and the
-Zephyrite has the first of its own at 18, the same level the Blazewyrm starts.
+inside the form it grew into. The Cinderling, the Puffling and the Bamboo Cub
+have one move each, all at level 8; the Blazewyrm learns all three of its own
+between level 15, where the form arrives, and level 30, where the next one
+does; and the Zephyrite has the first of its own at 18, the same level the
+Blazewyrm starts.
 
 | Skill | Form | Learns at | What it does |
 | --- | --- | --- | --- |
 | 🔥 fireball | Cinderling | Level 8 | Sold as the strongest fire you will ever see. Three seconds of winding up, then a cough and some smoke. |
 | ⚡ Spark | Puffling | Level 8 | Guaranteed to leave something scorched. The something is the squirrel. |
+| 🍃 Green Gale | Bamboo Cub | Level 8 | The forest's strength, gathered and released. Out of the wrong end. |
 | 🔥 Fireball | Blazewyrm | Level 18 | Draws a breath and spits a packed ball of flame |
 | 💥 Flame Stomp | Blazewyrm | Level 22 | Lands hard enough to throw a ring of fire out around it |
 | ☄️ Flying Swoop | Blazewyrm | Level 26 | A low, fast pass trailing fire |
 | 🌩️ Lightning Bolt | Zephyrite | Level 18 | Asks the sky for help. The sky, this time, obliges. |
 
-Both babies' moves are the same joke told twice, which is deliberate: a first
-skill is named for what the pet thinks it is doing. The Cinderling coughs
-smoke; the Puffling's Spark gathers the whole storm and earths it through
-itself, and spends the last second and a half sitting there singed while the
-smoke drifts off it.
+All three babies' moves are the same joke told three times, which is
+deliberate: a first skill is named for what the pet thinks it is doing. The
+Cinderling coughs smoke; the Puffling's Spark gathers the whole storm and
+earths it through itself, and spends the last second and a half sitting there
+singed while the smoke drifts off it; the Bamboo Cub braces, pulls a whole
+orbiting ring of green in around itself over six quickening frames, and opens
+the wrong end. Its timing is built around the beat rather than the build. The
+ring reaches its widest and then frame 7 draws nothing at all — no orbs, no
+trails, only the cub straining — and that stop gets the longest hold in the
+clip, 600ms, the one beat with no effect on screen anywhere. The joke is the
+pause, not the puff. What follows is the punchline and is paced like one:
+1.66 seconds over three frames, more than the whole charge takes, because a
+fart that goes past in a tenth of a second is a fart nobody saw. The cub
+spends the last second and a half lying flat, glancing left and right — the
+two flattened frames alternate, so it is checking whether anyone saw rather
+than lying perfectly still.
 The Zephyrite's is the same idea grown up and not played for laughs: it
 gathers, the sky answers with an orb, and a bolt comes down. Its charge quickens
 the same way, but the four strike frames grow rather than flicker, so they are
