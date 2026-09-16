@@ -48,6 +48,15 @@ mid-walk — `renderHome()` draws the bar, the level badge and the pet together
 from `derived`, which during a replay is already the finished total, and a
 clip's own teardown does the same when it ends.
 
+The bar takes two seconds to travel, which is slow enough to watch rather than
+to notice afterwards, and **Animate the XP bar** in Settings turns it off for
+anyone who would rather not wait. One number drives both halves: the CSS
+transition reads its duration from `--xp-ms`, which `applyXpAnim()` writes, so
+the bar can never still be moving when the wait that is meant to cover it ends.
+Switched off the bar jumps, and the wait shrinks to 140ms — not to zero, because
+a level-up clip starting in the same frame the bar reaches the boundary reads as
+one event rather than two.
+
 The save is never the thing being animated. `recompute()` takes a cursor, so the
 displayed state is derived from the runs up to a point while `save.runs` stays
 whole; leaving half way through, or locking the phone, loses nothing and the
