@@ -1489,19 +1489,20 @@ const SKILLS = {
     { id:"green-gale", name:"Green Gale", ico:"\u{1F343}", stage:1, level:8,
       blurb:"Gathers the forest's strength and lets it go in one mighty gust. Stand upwind.",
       sprite:{ src:"art/skill-fart.png", frames:12, fps:3,
-        /* Brace, gather, and the wrong end opens. The seven charge frames
-           quicken the way the Puffling's do, then everything stops: the
-           release is one drawing held long enough to be a beat, because the
-           joke is the pause, not the puff. The cloud then gets the clip's
-           longest holds - 1.8 seconds across three frames, more than the
-           whole charge - because a fart that goes past in a tenth of a
-           second is a fart nobody saw. The last two alternate so the cub
-           glances about while it hangs there rather than lying perfectly
-           still through the shame. */
-        order:    [0, 1, 2, 3, 4, 5, 6,  7,   8,   9,  10, 11, 10, 11],
-        durations:[340, 310, 280, 250, 225, 195, 165,  700,  480, 620,
-                   280, 280, 340, 420],
-        aspect:1.351, scale:0.992, dx:2.2, dy:-1.1 } }
+        /* Brace, gather, and the wrong end opens. Six charge frames quicken
+           the way the Puffling's do, to a ring of green at its widest - and
+           then frame 7, which draws nothing at all but the cub straining.
+           That stop is the joke, so it is the clip's longest hold outright
+           and the only beat with no effect on screen. What follows is the
+           punchline and is paced like one: 1.66 seconds over three frames,
+           more than the whole charge, because a fart that goes past in a
+           tenth of a second is a fart nobody saw. The last two alternate so
+           the cub glances about while it hangs there rather than lying
+           perfectly still through the shame. */
+        order:    [0, 1, 2, 3, 4, 5,  6,   7,   8,   9,  10, 11, 10, 11],
+        durations:[340, 310, 280, 250, 220, 190,  600,  560, 480, 620,
+                   240, 240, 300, 360],
+        aspect:1.348, scale:0.986, dx:1.9, dy:-0.5 } }
   ]
 };
 function skillsFor(speciesId){ return SKILLS[speciesId] || []; }
@@ -2640,8 +2641,8 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-16 7072299";
-const ART_VERSION = "17";
+const BUILD_ID = "2026-09-16 cc94335";
+const ART_VERSION = "18";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
 }

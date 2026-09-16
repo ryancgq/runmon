@@ -320,8 +320,18 @@ anchored on its own here. The floor fixes y, because the cub is planted in all
 twelve frames and its lowest pixel is the ground line, and the body's centre
 of mass fixes x. The head alone and the paws alone were measured too; the
 whole body scored best, taking frame-to-frame overlap from 0.77 to 0.86. What
-is left on screen is 3.5px of wander and 1px of bob, and that residue is the
-cub turning its head, which is drawn.
+is left on screen is a pixel of wander and no bob at all: the cub's ground
+line lands on the same row in all fourteen beats of the clip.
+
+That sheet also arrived keyed on blue rather than with an alpha channel of
+its own, which the earlier ones had. Keying it is the same three steps as
+anywhere: take the key colour from the sheet's own border rather than assuming
+`#0000FF`, since this one sits at (0, 8, 253) and wanders a few values either
+side; keep only the blue that reaches the border, so a gap between two paws
+stays a gap but nothing inside the cub is cut away; and solve the edge pixels
+for how much of each is cub and how much is key, then clamp any blue left in
+them back down. Nothing in this art is meant to be bluer than it is red or
+green, which is what makes that last step safe.
 
 An `order` turns up a second problem worth naming, because it applies to every
 clip with its own timing. A keyframes rule that stops at its last frame has no
@@ -384,16 +394,17 @@ deliberate: a first skill is named for what the pet thinks it is doing. The
 Cinderling coughs smoke; the Puffling's Spark gathers the whole storm and
 earths it through itself, and spends the last second and a half sitting there
 singed while the smoke drifts off it; the Bamboo Cub braces, pulls a whole
-orbiting ring of green in around itself over seven quickening frames, and
-opens the wrong end. Its timing is built around the beat rather than the
-build: everything stops on the release, one drawing held for 700ms, because
-the joke is the pause and not the puff. The cloud then takes the clip's three
-longest holds, 1.8 seconds between them — more than the whole charge, and it
-needs to be: at the 1,040ms it first ran to, the thing the whole skill is
-about went past before you could register it. The cub spends the last second
-and a half lying flat, glancing left and right — the two flattened frames
-alternate, so it is checking whether anyone saw rather than lying perfectly
-still.
+orbiting ring of green in around itself over six quickening frames, and opens
+the wrong end. Its timing is built around the beat rather than the build. The
+ring reaches its widest and then frame 7 draws nothing at all — no orbs, no
+trails, only the cub straining — and that stop gets the longest hold in the
+clip, 600ms, the one beat with no effect on screen anywhere. The joke is the
+pause, not the puff. What follows is the punchline and is paced like one:
+1.66 seconds over three frames, more than the whole charge takes, because a
+fart that goes past in a tenth of a second is a fart nobody saw. The cub
+spends the last second and a half lying flat, glancing left and right — the
+two flattened frames alternate, so it is checking whether anyone saw rather
+than lying perfectly still.
 The Zephyrite's is the same idea grown up and not played for laughs: it
 gathers, the sky answers with an orb, and a bolt comes down. Its charge quickens
 the same way, but the four strike frames grow rather than flicker, so they are
