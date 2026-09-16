@@ -111,15 +111,15 @@ final one, unlocking at levels 1, 5, 15, 30 and 50.
 | --- | --- | --- | --- |
 | 1 | **Cinder Egg** ✅ | **Leaf Bud** ✅ | **Static Egg** ✅ |
 | 2 | **Cinderling** ✅ | **Bamboo Cub** ✅ | **Puffling** ✅ |
-| 3 | **Blazewyrm** ✅ | **Fernkin** ✅ | **Zephyrite** ✅ |
+| 3 | **Blazewyrm** ✅ | **Panda** ✅ | **Zephyrite** ✅ |
 | 4 | Pyrelord | Thicketmane | Tempestor |
 | 5 | Infernarch | Grovewarden | Thunderarch |
 
 Verdant's first three forms are now pandas, while its last two are still
 written as moss spirits. Supply panda art for those two as well, or rewrite
-them — the species reads as two ideas until one of those happens. The names
-lag the art the same way: Fernkin is still described as a forest spirit in
-twig antlers.
+them — the species reads as two ideas until one of those happens. Their names
+still describe the moss-spirit idea too, where the first three have been
+renamed to match what they are.
 
 Egg forms need far less than twelve frames — a pulse, a wobble, a crack. Four
 frames is plenty; supply what the form needs and say how many. The Cinder Egg

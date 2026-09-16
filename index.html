@@ -1664,7 +1664,7 @@ const SPECIES = {
     stages:[
       { name:"Leaf Bud",    desc:"Layer on layer of leaf, wrapped tight. It sheds one every so often." },
       { name:"Bamboo Cub",  desc:"Round, hungry, and entirely bamboo-motivated. Will drop everything for a fresh stalk." },
-      { name:"Fernkin",     desc:"Twig antlers, a moss cloak, and the beginnings of a serious opinion about mornings." },
+      { name:"Panda",       desc:"Fully grown and fully asleep. The running was always going to be your half of this arrangement." },
       { name:"Thicketmane", desc:"Antlers heavy with leaves. Small flowers open when your streak is alive." },
       { name:"Grovewarden", desc:"An entire season walking around in one body. The forest leans towards it." }
     ]
@@ -2354,7 +2354,7 @@ PET_ART.verdant = [
     ${c.mood === "asleep" ? zzz(150,84) : ""}
   </g>`; },
 
-/* 2 — Fernkin */ (c) => { const i = c.id; return `
+/* 2 — Panda */ (c) => { const i = c.id; return `
   <defs>
     <radialGradient id="bd${i}" cx="36%" cy="24%"><stop offset="0" stop-color="#a7f3c8"/><stop offset="1" stop-color="#37a35f"/></radialGradient>
     <linearGradient id="ck${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4ade80"/><stop offset="1" stop-color="#166534"/></linearGradient>
@@ -2631,7 +2631,7 @@ const DEFAULT_SPRITES = {
     frames:12, rows:1, fps:2, aspect:1.031, scale:1.068, dx:3, dy:-9.7
   },
   "verdant:2": {
-    src:"art/verdant-fernkin.png",
+    src:"art/verdant-panda.png",
     // 12-frame loop: the cub plays, waves, rolls, and dozes off with a z, a zz
     // and a zzz. Cutting it needed the rows found first and then each row's own
     // columns - two frames in the top row all but touch, so the gap between
@@ -2686,7 +2686,7 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-16 ea0e64b";
+const BUILD_ID = "2026-09-16 14a1a5a";
 const ART_VERSION = "20";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;

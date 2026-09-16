@@ -166,7 +166,7 @@ import if you want to move a save or keep a backup.
 Three species, five stages each, all drawn as inline SVG and animated in CSS.
 
 - **Ember** (fire) — Cinder Egg → Cinderling → Blazewyrm → Pyrelord → Infernarch
-- **Verdant** (forest) — Leaf Bud → Bamboo Cub → Fernkin → Thicketmane → Grovewarden
+- **Verdant** (forest) — Leaf Bud → Bamboo Cub → Panda → Thicketmane → Grovewarden
 - **Nimbus** (storm) — Static Egg → Puffling → Zephyrite → Tempestor → Thunderarch
 
 Your choice sets the app's accent colour. The pet's expression and idle
@@ -424,7 +424,7 @@ The Cinderling and the Blazewyrm (Ember, stages 2 and 3) ship as pixel art in
 [`art/ember-blazewyrm.png`](art/ember-blazewyrm.png) — 12-frame loops at 2 fps
 — and Verdant's stages 2 and 3 in
 [`art/verdant-bamboo-cub.png`](art/verdant-bamboo-cub.png) and
-[`art/verdant-fernkin.png`](art/verdant-fernkin.png). The Verdant egg
+[`art/verdant-panda.png`](art/verdant-panda.png). The Verdant egg
 ships as five: three phases,
 [`art/verdant-egg.png`](art/verdant-egg.png),
 [`-cracked`](art/verdant-egg-cracked.png) and
