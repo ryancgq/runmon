@@ -70,6 +70,16 @@ while `replaying` is set, and both callers that start a walk — `go("home")` an
 the tail of a sync — now start it *before* they render, rather than painting
 the total first and asking the walk to undo it.
 
+Which runs to hold back is a *set*, not a position in the log. A prefix looks
+equivalent and is not: Strava dates a run when it started, the app dates its own
+when they are saved, so an imported run lands in the middle of the log as often
+as at the end — and "the runs before this one" then quietly drops every run
+*after* it too. A pet on 15 went back to 14, walked to 15 replaying an evolution
+it had already had, and jumped to 16 with no fill at all, because the walk was
+replaying the new run's position instead of its XP. Held by id, "before" means
+the pet exactly as it was, whatever order the runs arrived in, and the walk
+always lands on the real total.
+
 Holding the display back has to start when the runs *land*, not when the walk
 does. Between those two moments the app pushes to the broker — a network call —
 and `derived` is already the finished total, so anything that repaints in the
@@ -100,8 +110,9 @@ Switched off the bar jumps, and the wait shrinks to 140ms — not to zero, becau
 a level-up clip starting in the same frame the bar reaches the boundary reads as
 one event rather than two.
 
-The save is never the thing being animated. `recompute()` takes a cursor, so the
-displayed state is derived from the runs up to a point while `save.runs` stays
+The save is never the thing being animated. `recompute()` holds runs back by id,
+so the displayed state is derived from everything except the ones the walk has
+not reached while `save.runs` stays
 whole; leaving half way through, or locking the phone, loses nothing and the
 next render simply shows the real total. Levels are not celebrated one per
 level, either — a run big enough to cross four of them inside one form would

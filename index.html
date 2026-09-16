@@ -1920,13 +1920,21 @@ function persist(){
 /* A Strava catch-up stores and uploads every run it fetched before a single
    frame plays, then walks the pet forward one run at a time so the level-ups
    happen on screen instead of being collapsed into the total. This is the only
-   thing that needs to know: the save stays whole, and the derived state is
-   taken from the runs up to the cursor. null means all of them. */
-let replayCursor = null;
+   thing that needs to know: the save stays whole, and the runs the walk has not
+   reached yet are held out of the derived state. null means hold nothing.
+   
+   Held by id, not by a position in the log. A prefix looks equivalent and is
+   not: an imported run can be older than one already recorded - Strava dates a
+   run when it started, and the app dates its own when they are saved - and then
+   "the runs before this one" quietly drops every run after it as well. That is
+   what put a pet on 15 back to 14, walked it to 15 replaying an evolution it
+   had already had, and then jumped to 16 with no fill at all. The walk was
+   replaying the new run's POSITION rather than its XP. */
+let heldRuns = null;
 
 function recompute(){
   const all = save.runs.slice().sort((a,b)=>a.t-b.t);
-  const runs = replayCursor === null ? all : all.slice(0, replayCursor);
+  const runs = heldRuns ? all.filter(r => !heldRuns.has(r.id)) : all;
   let totalKm = 0, totalXp = 0, totalSec = 0;
   for (const r of runs){ totalKm += r.km; totalXp += r.xp; totalSec += r.sec; }
 
@@ -2555,7 +2563,7 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-16 baa81ab";
+const BUILD_ID = "2026-09-16 8762562";
 const ART_VERSION = "20";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -3010,38 +3018,35 @@ async function playCelebration(art, fromLevel, stage){
   previewPet = null;
 }
 
-/* Where a walk over these runs would begin: the position of the earliest of
-   them in the log. Set `replayCursor` to it and `derived` reports the pet as it
-   was before them, which is what every repaint between a sync landing and its
-   walk starting needs to draw. Without that the finished total goes up the
-   moment the runs are imported, and the walk has to open by taking the level
-   backwards - "I was already at 14, it went back to 13". */
-function replayStartIndex(ids){
+/* The runs a walk over `ids` would hold back - all of them, so that `derived`
+   reports the pet exactly as it was before this catch-up. Set the moment the
+   runs are imported, because everything between that and the walk starting -
+   the push to the broker, a repaint from coming back to the tab - would
+   otherwise draw the finished total, and the walk could then only open by
+   taking the level backwards. */
+function heldSetFor(ids){
   const wanted = new Set(ids || []);
-  const all = save.runs.slice().sort((a, b) => a.t - b.t);
-  for (let i = 0; i < all.length; i++) if (wanted.has(all[i].id)) return i;
-  return null;
+  const held = new Set();
+  for (const r of save.runs) if (wanted.has(r.id)) held.add(r.id);
+  return held.size ? held : null;
 }
 
 async function replayStravaRuns(ids){
-  if (replaying || !ids || !ids.length){ replayCursor = null; return; }
-  const wanted = new Set(ids);
-  const all = save.runs.slice().sort((a, b) => a.t - b.t);
-  // by id rather than by position: an imported run can be older than one
-  // already recorded, and "the last few" would then walk the wrong ones
-  const steps = [];
-  all.forEach((r, i) => { if (wanted.has(r.id)) steps.push(i); });
-  if (!steps.length){ replayCursor = null; recompute(); renderAll(); return; }
+  if (replaying) return;
+  const held = heldSetFor(ids);
+  if (!held){ heldRuns = null; recompute(); renderAll(); return; }
+  // chronological, so a week of runs is walked in the order they were run
+  const queue = save.runs.slice().sort((a, b) => a.t - b.t).filter(r => held.has(r.id));
 
   replaying = true; replaySkipped = false;
+  heldRuns = held;                                  // the pet as it was, all of them out
   toast("Tap the pet to skip", "", "\u23ED\uFE0F");
 
   try {
-    for (const i of steps){
+    for (const run of queue){
       if (replaySkipped) break;
       if (currentScreen !== "home"){ replaySkipped = true; break; }   // walked away
-      const run = all[i];
-      replayCursor = i;  recompute();                 // the pet and bar as they were
+      recompute();                                    // the pet and bar as they were
       const before = derived.level;
       holdPetAt(before);
       paintXp(before, derived.into, derived.need, true);   // a starting point, not a gain
@@ -3049,7 +3054,7 @@ async function replayStravaRuns(ids){
       await wait(420);
       if (replaySkipped) break;
 
-      replayCursor = i + 1; recompute();              // and after this run
+      heldRuns.delete(run.id); recompute();           // and after this run
       const after = { level: derived.level, into: derived.into, need: derived.need };
 
       // The earning comes before the reward: run the bar to the top of the level
@@ -3073,7 +3078,7 @@ async function replayStravaRuns(ids){
       await wait(barMs());
     }
   } finally {
-    replaying = false; replayCursor = null; previewPet = null;
+    replaying = false; heldRuns = null; previewPet = null;
     recompute(); renderAll();
   }
 }
@@ -4429,7 +4434,7 @@ async function stravaSync(opts){
     // a walk is coming. The gap this closes is real and easy to hit: pushing to
     // the broker is a network call, and coming back to the tab - which repaints
     // the pet screen - is exactly when a sync runs.
-    if (newIds.length && currentScreen === "home") replayCursor = replayStartIndex(newIds);
+    if (newIds.length && currentScreen === "home") heldRuns = heldSetFor(newIds);
     if (imported.length) recompute();
     save.stravaSyncedAt = Date.now();
     persist();
