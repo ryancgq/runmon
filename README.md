@@ -166,7 +166,7 @@ import if you want to move a save or keep a backup.
 Three species, five stages each, all drawn as inline SVG and animated in CSS.
 
 - **Ember** (fire) — Cinder Egg → Cinderling → Blazewyrm → Pyrelord → Infernarch
-- **Verdant** (forest) — Seedpod → Sproutling → Fernkin → Thicketmane → Grovewarden
+- **Verdant** (forest) — Leaf Bud → Bamboo Cub → Fernkin → Thicketmane → Grovewarden
 - **Nimbus** (storm) — Static Egg → Puffling → Zephyrite → Tempestor → Thunderarch
 
 Your choice sets the app's accent colour. The pet's expression and idle
@@ -226,14 +226,14 @@ splits on 7 and spreads on 10, measured off the sheets rather than assumed. Whil
 or you would come home to an already cracked shell and then watch it crack.
 
 The Verdant egg is the exception that proves what the packing is for. It does
-not crack — it swells, a tight bud at level 1 and an open one at 3, 226px tall
-and then 310px in the pack. So its three phases are packed in one pass like
-the other two eggs, sharing a frame, a ground line to a pixel and a centre to
-about one, but they are deliberately *not* normalised to a common body size
-the way the shell phases are. Normalising is right when the art is the same
-object changing state and wrong when the change of size **is** the state. All
-three grow from the same ground line, so the bud swells upward rather than
-drifting.
+not crack — it peels, a full bud at level 1 down to a tight pale core at 3,
+310px tall in the pack and then 226px, a layer of leaf gone each time. So its
+three phases are packed in one pass like the other two eggs, sharing a frame,
+a ground line to a pixel and a centre to about one, but they are deliberately
+*not* normalised to a common body size the way the shell phases are.
+Normalising is right when the art is the same object changing state and wrong
+when the change of size **is** the state. All three sit on the same ground
+line, so the bud shrinks down onto it rather than drifting.
 
 A celebration's sheet is not the sheet the pet is already wearing, and a CSS
 background does not start loading until something paints it — which for a

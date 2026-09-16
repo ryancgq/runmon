@@ -1649,7 +1649,7 @@ const SPECIES = {
     blurb:"A quiet spirit of moss and old wood. Grows steadily, forgives slowly, glows when you are consistent.",
     theme:{ accent:"#4ade80", accent2:"#bef264", ink:"#05230f", glow:"74,222,128" },
     stages:[
-      { name:"Seedpod",     desc:"A dormant pod wrapped in moss. Faint green light leaks from the seams." },
+      { name:"Leaf Bud",    desc:"Layer on layer of leaf, wrapped tight. It sheds one every so often, and whatever is inside gets closer." },
       { name:"Bamboo Cub",  desc:"Round, hungry, and entirely bamboo-motivated. Will drop everything for a fresh stalk." },
       { name:"Fernkin",     desc:"Twig antlers, a moss cloak, and the beginnings of a serious opinion about mornings." },
       { name:"Thicketmane", desc:"Antlers heavy with leaves. Small flowers open when your streak is alive." },
@@ -2291,7 +2291,7 @@ PET_ART.ember = [
 "use strict";
 /* --- VERDANT: forest spirit ---------------------------------------------- */
 PET_ART.verdant = [
-/* 0 — Seedpod */ (c) => { const i = c.id; return `
+/* 0 — Leaf Bud */ (c) => { const i = c.id; return `
   <defs>
     <radialGradient id="sh${i}" cx="34%" cy="26%"><stop offset="0" stop-color="#6b7f52"/><stop offset="1" stop-color="#22301f"/></radialGradient>
     <linearGradient id="gl${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9f99d"/><stop offset="1" stop-color="#4ade80"/></linearGradient>
@@ -2599,13 +2599,13 @@ const DEFAULT_SPRITES = {
     frames:12, rows:1, fps:2, aspect:1.194, scale:0.932, dx:0.00, dy:-2.19
   },
   "verdant:0": {
-    // The Sprout, and the src the level swaps - see EGG_PHASES. Packed like the
-    // other two eggs, in one pass across all three phases so they share a frame,
-    // a ground line and a centre. Unlike them it is NOT normalised to one body
-    // size: the other eggs crack, this one swells - 226px tall at level 1 and
-    // 310px at level 3 - and that growth is the art saying something is coming.
-    // The bud is the largest blob, so the leaves drifting off it cannot drag
-    // the anchor around.
+    // The Leaf Bud, and the src the level swaps - see EGG_PHASES. Packed like
+    // the other two eggs, in one pass across all three phases so they share a
+    // frame, a ground line and a centre. Unlike them it is NOT normalised to
+    // one body size: the other eggs crack, this one peels - 310px tall at
+    // level 1 and 226px at level 3, a layer of leaf shed each time - and that
+    // shrinking is the art saying something is coming. The bud is the largest
+    // blob, so the leaves drifting off it cannot drag the anchor around.
     src:"art/verdant-egg.png",
     frames:12, rows:1, fps:2, aspect:1.310, scale:0.93, dx:0, dy:2.3
   },
@@ -2662,8 +2662,8 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-16 200d91c";
-const ART_VERSION = "18";
+const BUILD_ID = "2026-09-16 8ff951d";
+const ART_VERSION = "19";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
 }
