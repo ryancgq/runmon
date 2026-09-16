@@ -1008,8 +1008,8 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
         </div>
         <div class="xpbar lg"><div class="fill" id="home-xpfill"></div></div>
         <div class="xp-meta">
-          <span><b id="home-xpnow">0</b> / <span id="home-xpneed">200</span> XP</span>
-          <span id="home-xpleft">200 XP to Lv 2</span>
+          <span><b id="home-xpnow">0</b> / <span id="home-xpneed">400</span> XP</span>
+          <span id="home-xpleft">400 XP to Lv 2</span>
         </div>
       </div>
 
@@ -1398,11 +1398,19 @@ const ENDURANCE_CAP_KM = 20;     // multiplier tops out at x2.0 at 20 km
 
      factor(n) = 1 + 0.5 * LEVEL_DECAY^(n-1)
 
-   n=1 gives exactly x1.5, and it relaxes towards ~x1.02 near level 50. Early
-   levels match the brief and the final form lands at ~1,500 lifetime km.     */
+   n=1 gives exactly x1.5, and it relaxes towards ~x1.02 near level 50. The
+   final form lands at ~1,500 lifetime km.
+
+   The egg is the exception. Four levels at the base curve hatched it after
+   about 13 km - two or three runs - which is before anybody has really begun,
+   so every level below EARLY_UNTIL costs EARLY_MULT times what the curve says.
+   It is applied on top rather than folded into LEVEL_BASE because only the egg
+   is being slowed: raising the base would drag all 99 levels with it.        */
 const LEVEL_BASE  = 200;
 const LEVEL_DECAY = 0.86;
 const MAX_LEVEL   = 99;
+const EARLY_UNTIL = 5;           // levels below this one cost extra to leave
+const EARLY_MULT  = 2;           // ...this much extra
 
 const STREAK_BONUS_STEP = 0.10;  // +10% for a 2-day streak
 const STREAK_BONUS_MAX  = 0.50;  // capped at +50%
@@ -1827,6 +1835,7 @@ function xpToNext(level){
   if (_reqCache[level] != null) return _reqCache[level];
   let req = LEVEL_BASE;
   for (let n = 1; n < level; n++) req *= 1 + 0.5 * Math.pow(LEVEL_DECAY, n - 1);
+  if (level < EARLY_UNTIL) req *= EARLY_MULT;
   _reqCache[level] = Math.round(req);
   return _reqCache[level];
 }
