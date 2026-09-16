@@ -163,11 +163,25 @@ import if you want to move a save or keep a backup.
 
 ## The pets
 
-Three species, five stages each, all drawn as inline SVG and animated in CSS.
+Three species, five stages each. The first three stages of each are pixel art
+now; the last two are waiting on theirs.
 
 - **Ember** (fire) — Cinder Egg → Cinderling → Blazewyrm → Pyrelord → Infernarch
 - **Verdant** (forest) — Leaf Bud → Bamboo Cub → Panda → Thicketmane → Grovewarden
 - **Nimbus** (storm) — Static Egg → Puffling → Zephyrite → Tempestor → Thunderarch
+
+Stages 4 and 5 draw a placeholder rather than the vector forms they used to.
+Those forms were fine beside other vectors and wrong beside the pixel art that
+replaced their earlier stages — a pet that changed medium halfway up its own
+tree. What stands there instead deliberately claims nothing: no body, no
+outline, not even a shape to be wrong about, since none of that art exists yet
+and a silhouette is a guess that the real drawing then has to honour. It draws
+the species' own light instead — an aura, a ring of motes turning once every
+sixteen seconds, and a `?` in the middle — and the two stages differ in size
+and in how many motes they carry, so the progression still reads while both
+are unknown. On the Evolution screen's locked rows, the filter that flattens a
+form to a shape turns it into a white `?` ringed in white, which is a better
+answer there than the grey blob a drawn pet becomes.
 
 Your choice sets the app's accent colour. The pet's expression and idle
 animation follow how recently you ran: elated the day you run, happy the day

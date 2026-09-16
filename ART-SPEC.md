@@ -114,8 +114,13 @@ final one, unlocking at levels 1, 5, 15, 30 and 50.
 | 1 | **Cinder Egg** ✅ | **Leaf Bud** ✅ | **Static Egg** ✅ |
 | 2 | **Cinderling** ✅ | **Bamboo Cub** ✅ | **Puffling** ✅ |
 | 3 | **Blazewyrm** ✅ | **Panda** ✅ | **Zephyrite** ✅ |
-| 4 | Pyrelord | Thicketmane | Tempestor |
-| 5 | Infernarch | Grovewarden | Thunderarch |
+| 4 | Pyrelord ⏳ | Thicketmane ⏳ | Tempestor ⏳ |
+| 5 | Infernarch ⏳ | Grovewarden ⏳ | Thunderarch ⏳ |
+
+⏳ means the form shows a placeholder — an aura, a ring of motes and a `?` in
+the species' colour. It draws no body and no outline on purpose: a silhouette
+would be a guess the real art then has to honour. Supplying a sheet for one of
+these replaces it; nothing else has to change.
 
 Verdant's first three forms are now pandas, while its last two are still
 written as moss spirits. Supply panda art for those two as well, or rewrite
