@@ -48,9 +48,24 @@ mid-walk — `renderHome()` draws the bar, the level badge and the pet together
 from `derived`, which during a replay is already the finished total, and a
 clip's own teardown does the same when it ends.
 
-The bar takes two seconds to travel, which is slow enough to watch rather than
-to notice afterwards, and **Animate the XP bar** in Settings turns it off for
-anyone who would rather not wait. One number drives both halves: the CSS
+The bar takes three seconds to travel, on a curve of its own. Length alone did
+not fix this: the house easing is a hard ease-out that covers 76% of the
+distance inside the first quarter of the time, so the bar arrived almost at
+once however long its duration got, and doubling 1.1s to 2s only moved the
+arrival from 275ms to 500ms. `--xp-ease` is near enough to linear to watch —
+27%, 56% and 84% at the quarters, measured on the real bar — with the last
+sixth of the travel spread over the final quarter as a landing. **Animate the
+XP bar** in Settings turns the whole thing off for anyone who would rather not
+wait.
+
+The bar also never travels backwards. It has two reasons to go down — the walk
+starting from before the run it is about to replay, and a level boundary
+resetting to empty — and both used to be animated like everything else, which
+is what "the pet reverts to a previous level" was: not a jump but a 300ms slide
+back down the bar with the old level number sitting under it. A decrease now
+snaps within the frame. `renderHome()` goes through `paintXp()` to get there
+rather than painting the row itself, so there is one place that moves the bar
+and the rule cannot be sidestepped from the other. One number drives both halves: the CSS
 transition reads its duration from `--xp-ms`, which `applyXpAnim()` writes, so
 the bar can never still be moving when the wait that is meant to cover it ends.
 Switched off the bar jumps, and the wait shrinks to 140ms — not to zero, because
