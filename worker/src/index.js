@@ -67,6 +67,30 @@ const appURL = env => (env.APP_ORIGIN || "") + (env.APP_PATH || "/");
 async function athleteStub(env, id){
   return env.ATHLETE.get(env.ATHLETE.idFromName(String(id)));
 }
+
+/* No I, O, 0 or 1: a code gets read off one screen and typed into another, and
+   those are the four that get it wrong. */
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const normaliseCode = raw => {
+  // Spaces, dashes and case are the athlete's business, not ours. Anything
+  // outside the alphabet is simply not a code: no lookalike remapping, because
+  // the four characters people confuse are the four this alphabet leaves out.
+  const up = String(raw || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return up.length === 6 && [...up].every(c => CODE_ALPHABET.includes(c)) ? up : null;
+};
+/* The directory lives in the same namespace, under names that cannot collide
+   with an athlete id because of the prefix. A second Durable Object class would
+   need a migration to deploy, and this needs none. */
+const codeStub = (env, code) => env.ATHLETE.get(env.ATHLETE.idFromName("code:" + code));
+async function claimCode(env, code, athleteId){
+  await codeStub(env, code).fetch("https://do/dir-set", { method:"POST",
+    body: JSON.stringify({ athleteId }) });
+}
+async function lookupCode(env, code){
+  const r = await codeStub(env, code).fetch("https://do/dir-get");
+  const { athleteId } = await r.json();
+  return athleteId || null;
+}
 /** Every authenticated route is the same three lines, so they live here. */
 async function withAthlete(request, env, fn){
   const id = await readSession(env, (request.headers.get("Authorization") || "").replace(/^Bearer /, ""));
@@ -137,6 +161,56 @@ export default {
       if (path === "/disconnect" && request.method === "POST")
         return withAthlete(request, env, stub => stub.fetch("https://do/wipe", { method:"POST" }));
 
+      /* --- friends ---------------------------------------------------------
+         A friend code is a random six characters, not anything derived from the
+         athlete id: the id is on the end of every Strava profile URL, and a code
+         that can be turned back into one would hand out more than its holder
+         meant to share. The code is claimed in a directory object named after
+         the code itself, which is how a stranger's code finds their pet without
+         anybody being able to enumerate the other direction. */
+      if (path === "/friends/me")
+        return withAthlete(request, env, async (stub, id) => {
+          const r = await stub.fetch("https://do/code", { method:"POST",
+            body: JSON.stringify({ athleteId: id }) });
+          const { code, card } = await r.json();
+          if (code) await claimCode(env, code, id);
+          return json(env, { code, card });
+        });
+
+      if (path === "/friends/lookup")
+        return withAthlete(request, env, async (stub, me) => {
+          // 200 with an `error` for anything about the code itself. An HTTP
+          // status is about the request reaching us, and the app leans on that
+          // distinction: a real 404 means this broker predates Friends.
+          const code = normaliseCode(url.searchParams.get("code") || "");
+          if (!code) return json(env, { error:"That is not a valid code." });
+          const owner = await lookupCode(env, code);
+          if (!owner) return json(env, { error:"No pet has that code." });
+          if (String(owner) === String(me)) return json(env, { error:"That is your own code." });
+          const theirs = await athleteStub(env, owner);
+          const r = await theirs.fetch("https://do/card");
+          const { card } = await r.json();
+          if (!card) return json(env, { error:"They have not hatched a pet yet." });
+          return json(env, { code, card });
+        });
+
+      // One round trip for a whole friends list. Codes only - a card carries a
+      // pet and totals, never runs, routes or anything about the athlete.
+      if (path === "/friends/cards" && request.method === "POST")
+        return withAthlete(request, env, async () => {
+          const body = await request.json().catch(() => ({}));
+          const codes = [...new Set((body.codes || []).map(normaliseCode).filter(Boolean))].slice(0, 60);
+          const cards = {};
+          await Promise.all(codes.map(async code => {
+            const owner = await lookupCode(env, code);
+            if (!owner) return;
+            const r = await (await athleteStub(env, owner)).fetch("https://do/card");
+            const { card } = await r.json();
+            if (card) cards[code] = card;
+          }));
+          return json(env, { cards });
+        });
+
       return json(env, { error:"no such endpoint" }, 404);
     } catch (err){
       return json(env, { error: String(err && err.message || err) }, 500);
@@ -154,6 +228,16 @@ export class Athlete {
     if (path === "/sync")  return this.sync();
     if (path === "/save")  return this.commit(await request.json());
     if (path === "/wipe")  return this.wipe();
+    if (path === "/code")  return this.code(await request.json());
+    if (path === "/card")  return this.ok({ card: await this.state.storage.get("card") || null });
+    // the same class standing in as a directory entry, keyed by a friend code
+    if (path === "/dir-set"){
+      const { athleteId } = await request.json();
+      await this.state.storage.put("owner", String(athleteId));
+      return this.ok({ ok: true });
+    }
+    if (path === "/dir-get")
+      return this.ok({ athleteId: await this.state.storage.get("owner") || null });
     return new Response("no", { status: 404 });
   }
 
@@ -257,13 +341,29 @@ export class Athlete {
     return this.ok({ save, activities, seen });
   }
 
+  /** This athlete's friend code, minted once and kept. */
+  async code(){
+    const s = this.state.storage;
+    let code = await s.get("friendCode");
+    if (!code){
+      const bytes = crypto.getRandomValues(new Uint8Array(6));
+      code = [...bytes].map(b => CODE_ALPHABET[b % CODE_ALPHABET.length]).join("");
+      await s.put("friendCode", code);
+    }
+    return this.ok({ code, card: await s.get("card") || null });
+  }
+
   /** The client says what it stored and what it managed to import, together, so
-      an activity cannot be marked imported by a save that never landed. */
-  async commit({ save, imported }){
+      an activity cannot be marked imported by a save that never landed. Its
+      public card rides along: the app knows the XP curve and the form names, and
+      working them out again here would be the same rules written twice. */
+  async commit({ save, imported, card }){
     const s = this.state.storage;
     const seen = new Set(await s.get("imported") || []);
     for (const id of imported || []) seen.add(String(id));
-    await s.put({ save, imported: [...seen] });
+    const write = { save, imported: [...seen] };
+    if (card) write.card = card;
+    await s.put(write);
     return this.ok({ saved: true });
   }
 

@@ -221,8 +221,41 @@ import if you want to move a save or keep a backup.
 | **Run** | Live map, distance, duration, average pace, calories, pause/resume and hold-to-finish |
 | **Summary** | Route trace, run stats, a full XP breakdown, animated bar fill, and any level up or evolution |
 | **Evolve** | Lifetime stats, the five-stage evolution tree for all three species, and 20 badges |
-| **History** | Every run by month, with route thumbnails; tap one to reopen its summary or delete it |
-| **Settings** | Strava, units, body weight, simulated GPS, new game |
+| **Friends** | Your friend code, adding someone by theirs, and everyone's pet with their level and totals |
+| **History** | Every run by month, with route thumbnails; reached from **See all runs** under Recent runs |
+| **Settings** | Strava, units, body weight, simulated GPS, XP bar animation, new game |
+
+History gave up its tab to Friends. Four tabs and a run button is as many as the
+bar holds, and of the two, the one you open daily is the one with other people
+in it — a full run log is something you go looking for, so it hangs off Recent
+runs on the Pet screen instead and keeps the Pet tab lit while you are in it.
+
+## Friends
+
+A friend code is six characters from an alphabet with no I, O, 0 or 1 in it,
+minted once per athlete and kept. Codes are random rather than derived from
+anything: a Strava athlete id is on the end of every profile URL, and a code
+that could be turned back into one would hand out more than its holder meant to
+share. The code is claimed in a directory object named after the code itself,
+which is how a stranger's code finds their pet while nobody can walk the other
+direction.
+
+Adding someone needs nothing from them — it is following, not a handshake, which
+is the right shape for showing each other pets. A Battle will need consent, and
+that is the point at which this grows an invitation rather than before it.
+
+What a friend can see is a **card**: the pet, its form and level, lifetime and
+weekly distance, run count, streak, best streak, and the date of the last run.
+Never a run, never a route, nothing from Strava. The app builds its own card and
+sends it with each save rather than the broker deriving one, because the XP
+curve and the form names live in the app and working them out twice is how they
+drift apart.
+
+Cards are cached in the save, so the tab draws itself before the network answers
+and simply looks older than it is if the network never does. Everything arriving
+from another device goes through one function on the way in: an unknown species
+or a stage of 99 would otherwise take the pet renderer down, and a pet named
+`<img src=x onerror=…>` is drawn as those characters rather than as an image.
 
 ## The pets
 

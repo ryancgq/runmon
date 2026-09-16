@@ -703,6 +703,32 @@ body::before{
 .run-item .xp small{display:block;font-size:8.5px;color:var(--muted);letter-spacing:1px;font-family:"Nunito";font-weight:800}
 .month-head{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:1.3px;text-transform:uppercase;margin:18px 0 9px}
 
+/* friends */
+.friend{
+  display:flex;align-items:center;gap:13px;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);
+  padding:11px 13px;margin-bottom:9px;transition:.16s var(--ease);width:100%;text-align:left;
+}
+.friend:active{transform:scale(.985)}
+.friend .pet-holder{width:60px;height:60px;flex:0 0 60px}
+.friend .pet-holder svg{filter:none}
+.friend .who{flex:1;min-width:0}
+.friend .who .n{font-size:14.5px;font-weight:800;display:flex;align-items:center;gap:7px}
+.friend .who .h{font-size:11.5px;color:var(--muted);font-weight:700;margin-top:3px}
+.friend .who .s{font-size:11px;color:var(--muted);font-weight:700;margin-top:5px;letter-spacing:.2px}
+.friend .go{color:var(--muted);flex:0 0 auto}
+.friend .go svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.code-box{
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:27px;font-weight:800;letter-spacing:4px;color:var(--accent);
+  background:var(--bg-2);border:1px dashed rgba(var(--glow),.45);
+  border-radius:var(--r-md);padding:15px 10px;margin:2px 0 12px;
+}
+.code-box.pending{font-size:14px;letter-spacing:.4px;color:var(--muted);border-style:solid}
+.addrow{display:flex;gap:9px}
+.addrow .inp{flex:1;text-transform:uppercase;letter-spacing:3px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.addrow .btn{width:auto;padding:0 18px;flex:0 0 auto}
 .empty-state{text-align:center;padding:46px 22px;color:var(--muted)}
 .empty-state .ico{font-size:44px;margin-bottom:12px;opacity:.65}
 .empty-state h3{font-size:18px;color:var(--text);margin-bottom:7px}
@@ -998,6 +1024,7 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
 
       <div class="section-title">Recent runs</div>
       <div id="home-recent"></div>
+      <button class="btn ghost" id="home-seeall" hidden style="margin-top:2px">See all runs</button>
 
       <div class="screen-pad"></div>
     </section>
@@ -1133,11 +1160,27 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
     <!-- ===================== HISTORY ===================== -->
     <section class="screen" id="screen-history">
       <div class="hdr">
+        <button class="iconbtn" data-nav="home" aria-label="Back">
+          <svg viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+        </button>
         <div><h2>History</h2><div class="sub" id="hist-sub">No runs yet</div></div>
         <div class="hdr-spacer"></div>
         <div class="chip" id="hist-total">0 km</div>
       </div>
       <div id="hist-list"></div>
+      <div class="screen-pad"></div>
+    </section>
+
+    <!-- ===================== FRIENDS ===================== -->
+    <section class="screen" id="screen-friends">
+      <div class="hdr">
+        <div><h2>Friends</h2><div class="sub" id="friends-sub">See how everyone's pet is doing</div></div>
+        <div class="hdr-spacer"></div>
+        <button class="iconbtn" id="friends-refresh" aria-label="Refresh">
+          <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+        </button>
+      </div>
+      <div id="friends-body"></div>
       <div class="screen-pad"></div>
     </section>
 
@@ -1213,8 +1256,8 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
       <svg viewBox="0 0 24 24"><path d="M12 3v6"/><circle cx="12" cy="12" r="3"/><path d="M12 15v6"/><path d="M5 8l3 2"/><path d="M19 8l-3 2"/><path d="M5 17l3-2"/><path d="M19 17l-3-2"/></svg><span>Evolve</span>
     </button>
     <button class="tab spacer" disabled></button>
-    <button class="tab" data-nav="history">
-      <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3.5 2"/></svg><span>History</span>
+    <button class="tab" data-nav="friends">
+      <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.4"/><path d="M3 20v-1.2c0-2.4 2.7-3.8 6-3.8s6 1.4 6 3.8V20"/><path d="M16.5 5.6a3.4 3.4 0 0 1 0 6.3"/><path d="M18.5 14.6c1.7.5 2.9 1.6 2.9 3.2V20"/></svg><span>Friends</span>
     </button>
     <button class="tab" data-nav="settings">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M4 12h2M18 12h2M12 4v2M12 18v2M6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M17.7 6.3l-1.4 1.4M7.7 16.3l-1.4 1.4"/></svg><span>Settings</span>
@@ -1872,6 +1915,9 @@ const DEFAULT_SAVE = {
   seenStage: 0,         // highest evolution stage already celebrated
   settings: { units:"km", weightKg:70, simulate:DEMO, simSpeed:DEMO ? 10 : 1, wakeLock:true,
               xpAnim:true },
+  // [{ code, card, addedAt }] - the card is the last one the broker gave us, so
+  // a list still draws itself with no connection and refreshes when there is one
+  friends: [],
 };
 
 let save = structuredCloneSafe(DEFAULT_SAVE);
@@ -2563,7 +2609,7 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-16 8762562";
+const BUILD_ID = "2026-09-16 b6cb1a6";
 const ART_VERSION = "20";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -3196,6 +3242,7 @@ function paintThumbs(scope){
 function renderRecent(){
   const list = derived.runs.slice(-3).reverse();
   const el = $("#home-recent");
+  renderSeeAll();
   if (!list.length){
     el.innerHTML = `<div class="card center" style="color:var(--muted);font-size:13px;font-weight:700;line-height:1.6">
       No runs logged yet.<br>Tap the runner button to start one.</div>`;
@@ -3203,6 +3250,15 @@ function renderRecent(){
   }
   el.innerHTML = list.map(runItemHTML).join("");
   paintThumbs(el);
+}
+/* The full log is a screen rather than a tab now. It is only worth offering
+   once there is more of it than the three shown above. */
+function renderSeeAll(){
+  const btn = $("#home-seeall");
+  if (!btn) return;
+  const n = derived.runs.length;
+  btn.hidden = n <= 3;
+  btn.textContent = `See all ${n} runs`;
 }
 
 /* --- history ------------------------------------------------------------- */
@@ -3315,6 +3371,7 @@ function renderAll(){
   renderHome();
   renderHistory();
   renderEvolve();
+  renderFriends();
   renderSettings();
   persist();
 }
@@ -3334,7 +3391,10 @@ function go(name){
   to.scrollTop = 0;
   currentScreen = name;
 
-  $$(".tab[data-nav]").forEach(t => t.classList.toggle("on", t.dataset.nav === name));
+  // History lost its tab and now hangs off Recent runs, so the Pet tab stays lit
+  // while you are in it - a screen with no tab highlighted reads as being lost.
+  const lit = name === "history" ? "home" : name;
+  $$(".tab[data-nav]").forEach(t => t.classList.toggle("on", t.dataset.nav === lit));
   const chromeless = name === "track" || name === "summary";
   $("#tabbar").classList.toggle("hidden", chromeless);
   $("#fab").classList.toggle("hidden", chromeless);
@@ -3342,6 +3402,7 @@ function go(name){
 
   if (name === "history") { renderHistory(); }
   if (name === "evolve")  { renderEvolve(); }
+  if (name === "friends") { openFriendsTab(); }
   if (name === "home")    {
     // A queued walk goes first and paints its own opening frame - the state
     // before the runs it is about to replay. renderHome() ahead of it would put
@@ -3981,6 +4042,272 @@ function closeSheet(){
   if (done) done();
 }
 
+/* --- friends -------------------------------------------------------------
+   A friend is a code you were given and chose to keep. The list lives in the
+   save - so it follows the pet between devices - and each entry carries the
+   last card the broker handed back, which is what lets the screen draw itself
+   with no connection at all and simply look older than it is.
+
+   Following, not a mutual handshake: adding someone needs nothing from them.
+   That is the right shape for showing each other pets. A Battle will need
+   consent, and that is the point at which this grows an invitation. */
+let myFriendCode = null, friendsBusy = false, friendsNote = null;
+
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const friendList = () => Array.isArray(save.friends) ? save.friends : (save.friends = []);
+const prettyCode = c => c ? c.slice(0, 3) + "\u2011" + c.slice(3) : "";
+function cleanCode(raw){
+  const up = String(raw || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return up.length === 6 && [...up].every(c => CODE_ALPHABET.includes(c)) ? up : null;
+}
+
+/* The broker is older than the app whenever a deploy has not run yet. A 404 on
+   a friends route means exactly that, and saying so beats "not answering". */
+function friendsFail(err){
+  const m = String(err && err.message || err);
+  return /\(404\)/.test(m) ? "The server has not been updated with Friends yet." : m;
+}
+
+async function loadMyCode(){
+  if (myFriendCode || !stravaLinked()) return myFriendCode;
+  const r = await stravaCall("/friends/me");
+  myFriendCode = r.code || null;
+  return myFriendCode;
+}
+
+/** Refresh every friend's card in one round trip. Cards are cached in the save,
+    so a failure here leaves the list drawn rather than empty. */
+async function refreshFriends(){
+  const list = friendList();
+  if (!stravaLinked() || !list.length) return;
+  const r = await stravaCall("/friends/cards", { method:"POST",
+    body: JSON.stringify({ codes: list.map(f => f.code) }) });
+  let changed = false;
+  for (const f of list){
+    const card = safeCard(r.cards && r.cards[f.code]);
+    if (card){ f.card = card; changed = true; }
+  }
+  if (changed){ persist(); }
+}
+
+async function addFriendByCode(raw){
+  const code = cleanCode(raw);
+  if (!code) return toast("That is not a six-character code", "warn", "\u26A0\uFE0F");
+  if (friendList().some(f => f.code === code))
+    return toast("They are already on your list", "", "\u{1F44B}");
+  friendsBusy = true; renderFriends();
+  try {
+    const r = await stravaCall("/friends/lookup?code=" + encodeURIComponent(code));
+    if (r.error){ toast(r.error, "warn", "\u26A0\uFE0F"); return; }
+    const card = safeCard(r.card);
+    if (!card){ toast("That code has no pet on it", "warn", "\u26A0\uFE0F"); return; }
+    friendList().push({ code, card, addedAt: Date.now() });
+    persist();
+    toast(`${card.pet} added`, "good", "\u{1F91D}");
+    const input = $("#friend-code-in"); if (input) input.value = "";
+  } catch (err){
+    toast(friendsFail(err), "warn", "\u26A0\uFE0F");
+  } finally {
+    friendsBusy = false; renderFriends();
+  }
+}
+
+function removeFriend(code){
+  save.friends = friendList().filter(f => f.code !== code);
+  persist(); renderFriends();
+}
+
+/* A card is data from somebody else's device, so nothing reads a field of it
+   without going through here first. The names and numbers are escaped where
+   they are drawn; this is about the two fields that get used as lookups, where
+   an unknown species would take petMarkup() down rather than look odd. */
+function safeCard(c){
+  if (!c || typeof c !== "object") return null;
+  const species = SPECIES[c.species] ? c.species : "ember";
+  const n = (v, lo, hi) => Math.max(lo, Math.min(hi, Number(v) || 0));
+  return {
+    pet: String(c.pet || "Their pet").slice(0, 24),
+    species,
+    stage: n(c.stage, 0, 4),
+    form: String(c.form || SPECIES[species].stages[n(c.stage, 0, 4)].name).slice(0, 24),
+    level: n(c.level, 1, 999),
+    km: n(c.km, 0, 1e7),
+    weekKm: n(c.weekKm, 0, 1e7),
+    runs: n(c.runs, 0, 1e6),
+    streak: n(c.streak, 0, 1e5),
+    best: n(c.best, 0, 1e5),
+    lastRun: c.lastRun && Number(c.lastRun) > 0 ? Number(c.lastRun) : null
+  };
+}
+
+/** One friend, as a row. The pet is drawn with the same art the pet screen
+    uses, so a friend's Panda is the Panda. */
+function friendRowHTML(f){
+  const c = safeCard(f.card);
+  if (!c) return `<button class="friend" data-friend="${f.code}">
+      <div class="pet-holder mood-okay"></div>
+      <div class="who"><div class="n">${prettyCode(f.code)}</div>
+        <div class="h">Waiting for their first pet</div></div>
+      <span class="go"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+    </button>`;
+  const ago = c.lastRun ? relDay(c.lastRun) : "no runs yet";
+  return `<button class="friend" data-friend="${f.code}">
+      <div class="pet-holder mood-okay" data-friend-art="${f.code}"></div>
+      <div class="who">
+        <div class="n">${esc(c.pet)} <span class="chip">LV ${c.level}</span></div>
+        <div class="h">${esc(c.form)} \u00b7 Stage ${c.stage + 1} of 5</div>
+        <div class="s">${U.distStr(c.km, c.km >= 100 ? 0 : 1)} ${U.label} \u00b7 ${c.runs} run${c.runs === 1 ? "" : "s"} \u00b7 ${ago}</div>
+      </div>
+      <span class="go"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
+    </button>`;
+}
+
+/** "3 days ago" for a card, which only ever carries the one timestamp. */
+function relDay(ts){
+  const days = Math.floor((Date.now() - ts) / 86400000);
+  if (days <= 0) return "ran today";
+  if (days === 1) return "ran yesterday";
+  if (days < 7) return `ran ${days} days ago`;
+  return "last ran " + new Date(ts).toLocaleDateString(undefined, { day:"numeric", month:"short" });
+}
+/** The same gap as relDay, but sized for a stat tile rather than a sentence. */
+function shortAgo(ts){
+  const days = Math.floor((Date.now() - ts) / 86400000);
+  if (days <= 0) return "Today";
+  if (days === 1) return "1d";
+  if (days < 100) return days + "d";
+  return new Date(ts).toLocaleDateString(undefined, { month:"short", year:"2-digit" });
+}
+const esc = t => String(t == null ? "" : t)
+  .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
+function renderFriends(){
+  const body = $("#friends-body"), sub = $("#friends-sub");
+  if (!body) return;
+  const list = friendList();
+
+  if (!stravaLinked()){
+    // The sandbox has no athlete and no broker, so there is nothing for a code
+    // to be tied to. Pointing it at Settings would send it somewhere that hides
+    // Strava entirely, which is worse than saying so.
+    sub.textContent = DEMO ? "Not in the sandbox" : "Needs the Strava link";
+    body.innerHTML = DEMO
+      ? `<div class="empty-state"><div class="ico">\u{1F9EA}</div>
+          <h3>Friends are not in the sandbox</h3>
+          <p>A friend code belongs to a real athlete on the server, and the sandbox
+             has neither. Everything else here works without one.</p></div>`
+      : `<div class="empty-state"><div class="ico">\u{1F91D}</div>
+          <h3>Friends need your Strava link</h3>
+          <p>Your friend code is tied to your Strava athlete, which is what lets another
+             Runmon find your pet. Connect in Settings and your code appears here.</p>
+          <button class="btn primary" data-nav="settings" style="max-width:260px;margin:0 auto">Open Settings</button></div>`;
+    return;
+  }
+
+  sub.textContent = list.length
+    ? `${list.length} friend${list.length === 1 ? "" : "s"}`
+    : "See how everyone's pet is doing";
+
+  const code = myFriendCode
+    ? `<div class="code-box">${prettyCode(myFriendCode)}</div>`
+    : `<div class="code-box pending">${friendsNote || "Getting your code\u2026"}</div>`;
+
+  body.innerHTML = `
+    <div class="section-title">Your code</div>
+    ${code}
+    <div class="addrow" style="margin-bottom:4px">
+      <button class="btn ghost" id="friend-share" ${myFriendCode ? "" : "disabled"}
+        style="flex:1">Share my code</button>
+    </div>
+    <p class="muted" style="font-size:11.5px;font-weight:700;line-height:1.6;margin:10px 2px 0">
+      Give this to someone and they can follow your pet. It shows your pet, your
+      level and your totals \u2014 never your runs or where you ran them.</p>
+
+    <div class="section-title">Add a friend</div>
+    <div class="addrow">
+      <input class="inp" id="friend-code-in" maxlength="7" placeholder="ABC123"
+        autocapitalize="characters" autocomplete="off" spellcheck="false" inputmode="text">
+      <button class="btn primary" id="friend-add" ${friendsBusy ? "disabled" : ""}>${friendsBusy ? "\u2026" : "Add"}</button>
+    </div>
+
+    <div class="section-title">Following</div>
+    ${list.length ? list.map(friendRowHTML).join("") : `
+      <div class="empty-state" style="padding:30px 18px">
+        <div class="ico">\u{1F440}</div><h3>Nobody yet</h3>
+        <p>Swap codes with someone who runs. Their pet turns up here, and their
+           level moves when they do.</p></div>`}`;
+
+  // the pets, painted after the markup exists
+  for (const f of list){
+    if (!f.card) continue;
+    const el = body.querySelector(`[data-friend-art="${f.code}"]`);
+    if (el) paintPet(el, f.card.species, f.card.stage, "okay");
+  }
+}
+
+/* Share sheet where there is one, clipboard where there is not, and the code on
+   screen either way - it is six characters, and reading it out loud works. */
+async function shareMyCode(){
+  if (!myFriendCode) return;
+  const text = `Follow my Runmon pet \u2014 my friend code is ${prettyCode(myFriendCode)}`;
+  try {
+    if (navigator.share){ await navigator.share({ text }); return; }
+    await navigator.clipboard.writeText(myFriendCode);
+    toast("Code copied", "good", "\u{1F4CB}");
+  } catch (err){ /* dismissed a share sheet, or no clipboard permission */ }
+}
+
+/* Draw from the save first so the tab is never blank, then go and freshen it.
+   Neither call is allowed to take the screen down with it: a list drawn from
+   yesterday's cards is worth more than an error page. */
+async function openFriendsTab(){
+  renderFriends();
+  if (!stravaLinked()) return;
+  try {
+    await loadMyCode();
+    friendsNote = null;
+  } catch (err){
+    friendsNote = friendsFail(err);
+  }
+  renderFriends();
+  try { await refreshFriends(); } catch (err){ /* the cached cards still stand */ }
+  renderFriends();
+}
+
+/** A friend's profile. Their pet big, their numbers under it. */
+function openFriend(code){
+  const f = friendList().find(x => x.code === code);
+  if (!f) return;
+  const c = safeCard(f.card);
+  openSheet({
+    title: c ? esc(c.pet) : prettyCode(code),
+    desc: c ? `${esc(c.form)} \u00b7 Level ${c.level} \u00b7 ${prettyCode(code)}` : prettyCode(code),
+    body: c ? `
+      <div class="pet-stage" style="min-height:170px;margin:4px 0 14px">
+        <div class="pet-halo"></div>
+        <div class="pet-holder mood-okay" id="friend-big"></div>
+      </div>
+      <div class="stat-grid">
+        <div class="stat"><div class="v">${c.streak}</div><div class="k">Day streak</div></div>
+        <div class="stat"><div class="v">${U.distStr(c.weekKm != null ? c.weekKm : 0, 1)}<small>${U.label}</small></div><div class="k">This week</div></div>
+        <div class="stat"><div class="v">${U.distStr(c.km, c.km >= 100 ? 0 : 1)}<small>${U.label}</small></div><div class="k">Lifetime</div></div>
+      </div>
+      <div class="stat-grid" style="margin-top:9px">
+        <div class="stat"><div class="v">${c.runs}</div><div class="k">Runs</div></div>
+        <div class="stat"><div class="v">${c.best}</div><div class="k">Best streak</div></div>
+        <div class="stat"><div class="v">${c.lastRun ? shortAgo(c.lastRun) : "\u2014"}</div><div class="k">Last run</div></div>
+      </div>
+      <p class="muted" style="font-size:11px;font-weight:700;text-align:center;margin:14px 0 0">
+        Battle is not built yet \u2014 this is where it will live.</p>`
+      : `<p class="desc">No pet on this code yet.</p>`,
+    onOpen: () => { if (c) paintPet($("#friend-big"), c.species, c.stage, "okay"); },
+    actions: [
+      { label:"Done", cls:"ghost", fn: closeSheet },
+      { label:"Remove", cls:"danger", fn: () => { closeSheet(); removeFriend(code); } }
+    ]
+  });
+}
+
 /* --- settings ------------------------------------------------------------ */
 function renderStravaPanel(){
   const title = $("#strava-title"), panel = $("#strava-panel");
@@ -4469,10 +4796,41 @@ async function stravaSync(opts){
 
 /* The save and the ids go up together, so an activity cannot be marked
    imported by a save that never arrived. */
+/* What a friend is allowed to see: the pet and the totals behind it, and
+   nothing else. No runs, no routes, no dates beyond the last one, nothing from
+   Strava. The app builds it rather than the broker because the XP curve and the
+   form names live here, and working them out twice is how they drift apart. */
+function publicCard(){
+  // A walk in progress holds `derived` at a frame partway through the catch-up.
+  // The card is about the pet as it really is, so it is taken from the whole
+  // log and the hold is put straight back.
+  const held = heldRuns;
+  if (held){ heldRuns = null; recompute(); }
+  const d = derived, sp = d.species;
+  const weekStart = startOfWeek();
+  const card = {
+    v: 1,
+    pet: save.petName || sp.name,
+    species: sp.id,
+    stage: d.stage,
+    form: sp.stages[d.stage].name,
+    level: d.level,
+    km: Math.round(d.totalKm * 10) / 10,
+    weekKm: Math.round(d.runs.filter(r => r.t >= weekStart).reduce((a, r) => a + r.km, 0) * 10) / 10,
+    runs: d.runs.length,
+    streak: d.streak,
+    best: d.bestStreak,
+    lastRun: d.lastRunTs || null,
+    at: Date.now()
+  };
+  if (held){ heldRuns = held; recompute(); }
+  return card;
+}
+
 async function stravaPush(imported){
   if (!stravaLinked()) return;
   await stravaCall("/save", { method:"PUT",
-    body: JSON.stringify({ save, imported: imported || [] }) });
+    body: JSON.stringify({ save, imported: imported || [], card: publicCard() }) });
 }
 /** Called on every persist(); coalesced, because persist() is called a lot. */
 function stravaSchedulePush(){
@@ -4666,6 +5024,19 @@ function wire(){
   $("#row-keepawake").addEventListener("click", () => {
     save.settings.wakeLock = !save.settings.wakeLock; persist(); renderSettings();
   });
+  /* --- friends --- */
+  $("#home-seeall").addEventListener("click", () => go("history"));
+  $("#friends-refresh").addEventListener("click", () => { myFriendCode = null; openFriendsTab(); });
+  $("#friends-body").addEventListener("click", e => {
+    const row = e.target.closest("[data-friend]");
+    if (row) return openFriend(row.dataset.friend);
+    if (e.target.closest("#friend-add")) return addFriendByCode($("#friend-code-in").value);
+    if (e.target.closest("#friend-share")) return shareMyCode();
+  });
+  $("#friends-body").addEventListener("keydown", e => {
+    if (e.key === "Enter" && e.target.id === "friend-code-in") addFriendByCode(e.target.value);
+  });
+
   $("#row-xpanim").addEventListener("click", () => {
     save.settings.xpAnim = save.settings.xpAnim === false;
     applyXpAnim(); persist(); renderSettings();
