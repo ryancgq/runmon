@@ -58,6 +58,23 @@ sixth of the travel spread over the final quarter as a landing. **Animate the
 XP bar** in Settings turns the whole thing off for anyone who would rather not
 wait.
 
+The walk owns the bar for as long as it runs, and that turned out to be the
+whole of a second report — a bar already at 73% dropping to 30% and climbing
+back to 73% before the new run's XP was added at all. `renderHome()` paints the
+XP row from `derived`, which during a walk is the finished total the walk
+exists to reveal, and it gets called constantly in the middle of one: the pet
+being held at its old form, a clip tearing down, a sync repainting behind it.
+Each of those wrote the finished total to the bar, and the walk's own next
+value then arrived as a *rise* from it. So `renderHome()` leaves the row alone
+while `replaying` is set, and both callers that start a walk — `go("home")` and
+the tail of a sync — now start it *before* they render, rather than painting
+the total first and asking the walk to undo it.
+
+The opening frame of a walk is also marked as a position rather than a
+movement. Wherever the bar happened to be, that first value is where the pet
+actually was, so it snaps to it; animating into it is what fills the bar back
+up to XP that was already earned.
+
 The bar also never travels backwards. It has two reasons to go down — the walk
 starting from before the run it is about to replay, and a level boundary
 resetting to empty — and both used to be animated like everything else, which

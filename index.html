@@ -2555,7 +2555,7 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-16 c52e4e7";
+const BUILD_ID = "2026-09-16 0ec55af";
 const ART_VERSION = "20";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -2944,7 +2944,7 @@ function applyXpAnim(){
    together, which is what made all three jump to the post-run state before the
    celebration had played. During a replay the bar has to be able to run up to a
    level boundary while the pet is still the form it was. */
-function paintXp(level, into, need){
+function paintXp(level, into, need, snap){
   $("#home-level").textContent = level;
   $("#home-xpnow").textContent = nf(Math.round(into));
   $("#home-xpneed").textContent = need === Infinity ? "MAX" : nf(need);
@@ -2960,8 +2960,13 @@ function paintXp(level, into, need){
     // XP draining away reads as losing it. This was the whole of the "the pet
     // reverts to a previous level" bug: the drop was not a jump, it was a
     // 300ms slide down the bar with the old level number under it.
+    //
+    // `snap` says the same thing about a value that happens to be higher: the
+    // opening frame of a walk is where the pet WAS, a position rather than a
+    // movement, and animating into it fills the bar up to XP that was already
+    // earned before the new run's is added at all.
     const now = parseFloat(el.style.width) || 0;
-    if (target < now - 0.5){
+    if (snap || target < now - 0.5){
       el.style.transition = "none";
       el.style.width = target + "%";
       void el.offsetWidth;                 // commit before the transition returns
@@ -2997,7 +3002,7 @@ async function playCelebration(art, fromLevel, stage){
   // renderHome paints the XP row from `derived`, which during a replay is
   // already the post-run total - that put the new level on screen before its
   // own celebration. Hold the bar full at the boundary it just reached.
-  paintXp(fromLevel, xpToNext(fromLevel), xpToNext(fromLevel));
+  paintXp(fromLevel, xpToNext(fromLevel), xpToNext(fromLevel), true);
   await wait(60);
   charging = false; skillPlaying = null;
   runCelebration(art);
@@ -3026,7 +3031,7 @@ async function replayStravaRuns(ids){
       replayCursor = i;  recompute();                 // the pet and bar as they were
       const before = derived.level;
       holdPetAt(before);
-      paintXp(before, derived.into, derived.need);
+      paintXp(before, derived.into, derived.need, true);   // a starting point, not a gain
       toast(`+${nf(run.xp)} XP \u00b7 ${U.distStr(run.km, 1)}${U.label}`, "good", "\u{1F3C3}");
       await wait(420);
       if (replaySkipped) break;
@@ -3103,8 +3108,16 @@ function renderHome(){
 
   // through paintXp rather than beside it: this used to paint the row itself,
   // which meant the no-going-backwards rule lived in only one of the two
-  // places that move the bar
-  paintXp(d.level, d.into, d.need);
+  // places that move the bar.
+  //
+  // And not at all while a walk is running. `derived` is the finished total the
+  // walk exists to reveal, and every renderHome() during one - the pet being
+  // held at its old form, a clip tearing down, a sync repainting behind it -
+  // wrote that total to the bar. The walk's own next value then arrived as a
+  // rise from it, so a bar already at 73% dropped to 30% and climbed back to
+  // 73% before the new run's XP was added at all. The walk paints the row
+  // itself, with paintXp, at each step it wants shown.
+  if (!replaying) paintXp(d.level, d.into, d.need);
 
   const nextEvo = EVO_LEVELS.find(l => l > d.level);
   $("#home-nextevo").textContent = nextEvo ? `Next form at Lv ${nextEvo}` : "Final form reached";
@@ -3312,14 +3325,20 @@ function go(name){
   if (name === "history") { renderHistory(); }
   if (name === "evolve")  { renderEvolve(); }
   if (name === "home")    {
-    renderHome();
-    // Opening the pet is the same intent as tapping Check now, so treat it that
-    // way. Same one-a-minute throttle as coming back to the tab.
-    if (stravaLinked() && !replaying && Date.now() - (save.stravaSyncedAt || 0) > 60000) stravaSync();
+    // A queued walk goes first and paints its own opening frame - the state
+    // before the runs it is about to replay. renderHome() ahead of it would put
+    // the finished total on the bar for a frame, which is the one thing the
+    // walk is there to avoid. It sets `replaying` synchronously if it takes
+    // over, so anything that did not is drawn normally.
     if (pendingReplay.length){
       const queued = pendingReplay; pendingReplay = [];
       replayStravaRuns(queued);
-    } else playPendingLevelUp();
+    }
+    if (!replaying) renderHome();
+    // Opening the pet is the same intent as tapping Check now, so treat it that
+    // way. Same one-a-minute throttle as coming back to the tab.
+    if (stravaLinked() && !replaying && Date.now() - (save.stravaSyncedAt || 0) > 60000) stravaSync();
+    if (!replaying) playPendingLevelUp();
   }
   if (name === "track")   { onTrackScreenShown(); }
 }
@@ -4397,13 +4416,16 @@ async function stravaSync(opts){
     save.stravaSyncedAt = Date.now();
     persist();
     await stravaPush(imported);          // stored and uploaded before anything plays
-    renderAll();
     // Walk the pet through them one at a time. Collapsing a week of running into
     // one jump was the whole complaint: the egg would arrive already hatched.
+    // This goes BEFORE renderAll for the same reason go("home") does: renderAll
+    // paints the finished total, and the walk's opening frame would then read
+    // as a gain from it rather than as where the pet actually was.
     if (newIds.length){
       if (currentScreen === "home") replayStravaRuns(newIds);
       else pendingReplay = pendingReplay.concat(newIds);   // played on arrival
     }
+    renderAll();
     if (opts && opts.loud){
       if (imported.length){
         toast(`${imported.length} run${imported.length === 1 ? "" : "s"} from Strava`, "good", "\u{1F3C3}");
