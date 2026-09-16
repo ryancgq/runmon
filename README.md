@@ -333,6 +333,17 @@ for how much of each is cub and how much is key, then clamp any blue left in
 them back down. Nothing in this art is meant to be bluer than it is red or
 green, which is what makes that last step safe.
 
+Matching two sheets by their silhouettes turns out not to be enough. The idle
+and the skill measured within a percent of each other - registered against one
+another at every combination of resting poses, the best fit sat at 0.99 to
+1.03 - and the cub still read as the larger animal on the pet screen, where
+the two swap on the same spot a second apart. The drawings differ where the
+eye looks: rounder cheeks and a bigger eye on the idle sheet. So the idle is
+taken down 4% against a judgement rather than a measurement, and its dx and dy
+move with the scale so the ground line stays exactly where it was, which is
+what the skill and the celebration were both fitted against. The celebration
+is now the outlier at around 14% larger than the two of them.
+
 An `order` turns up a second problem worth naming, because it applies to every
 clip with its own timing. A keyframes rule that stops at its last frame has no
 100% stop, so the browser writes one from the element's own style — which is

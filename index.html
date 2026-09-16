@@ -2612,7 +2612,12 @@ const DEFAULT_SPRITES = {
     // rows sit 41px and 78px high in the pack, so each frame is pinned to the
     // ground line of its row's least-occluded frame - the bamboo is meant to
     // move, the cub is not.
-    frames:12, rows:1, fps:2, aspect:0.900, scale:0.986, dx:3.5, dy:-16.8
+    // The cub is drawn chunkier here than on its skill sheet - rounder cheeks,
+    // a bigger eye - so at a matched silhouette it still read as the larger
+    // animal when the two swapped on the same spot. Taken down 4% to sit with
+    // the skill; dx and dy move with it so the ground line does not, which is
+    // what every other sheet was fitted against.
+    frames:12, rows:1, fps:2, aspect:0.900, scale:0.947, dx:3.3, dy:-14.2
   }
 };
 /* What the animation tester is showing instead of your own pet: a form, a mood
@@ -2641,7 +2646,7 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-16 cc94335";
+const BUILD_ID = "2026-09-16 a34d235";
 const ART_VERSION = "18";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
