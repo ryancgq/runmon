@@ -205,9 +205,14 @@ second copy to keep in sync. `demo.html` is just a small launcher page.
 ## Trying it out
 
 Open the page on a phone and allow location access when it asks. If you are on
-a desktop, or indoors without a GPS fix, turn on **Simulated GPS** in Settings
-— it fakes a plausible route so you can walk through the whole flow. Runs
-recorded that way are tagged `sim` in your history.
+a desktop, or indoors without a GPS fix, open [the
+sandbox](https://ryancgq.github.io/runmon/demo.html) instead — it runs for you
+and walks through the whole flow without a GPS fix.
+
+A fake route used to be a switch in Settings, which put invented runs into a
+real pet's history and left the app with two ways of meaning "a run". The
+sandbox already did the same job better, keeps its own save, and says what it
+is on every screen, so it is the only place a route is invented now.
 
 Nothing is uploaded anywhere. Your pet, runs, XP and settings live in this
 browser's `localStorage`, on this device only. Settings has JSON export and
@@ -223,7 +228,7 @@ import if you want to move a save or keep a backup.
 | **Evolve** | Lifetime stats, the five-stage evolution tree for all three species, and 20 badges |
 | **Friends** | Your friend code, adding someone by theirs, and everyone's pet with their level and totals |
 | **History** | Every run by month, with route thumbnails; reached from **See all runs** under Recent runs |
-| **Settings** | Strava, units, body weight, simulated GPS, XP bar animation, new game |
+| **Settings** | Strava, units, body weight, XP bar animation, new game |
 
 History gave up its tab to Friends. Four tabs and a run button is as many as the
 bar holds, and of the two, the one you open daily is the one with other people

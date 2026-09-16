@@ -1218,10 +1218,6 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
       </div>
 
       <div class="section-title">Tracking</div>
-      <div class="row tap" id="row-sim">
-        <div class="t"><div class="n">Simulated GPS</div><div class="h">Fakes a route so you can try the app indoors or on a desktop. Runs are tagged as simulated.</div></div>
-        <div class="toggle" id="tg-sim"><i></i></div>
-      </div>
       <div class="row stack" id="row-simspeed" hidden>
         <div class="t"><div class="n">Simulated run speed</div><div class="h" id="simspeed-help"></div></div>
         <div class="seg" id="seg-simspeed"></div>
@@ -2609,7 +2605,7 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-16 b6cb1a6";
+const BUILD_ID = "2026-09-16 f2540d9";
 const ART_VERSION = "20";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -3527,17 +3523,6 @@ function looksLikeMobile(){
 function isNoLocationProvider(err){
   return /api key|network location|provider|403|not available|failed to (query|determine)/i.test(String(err && err.message || ""));
 }
-/** Drop straight into the simulator, mid-run if need be. */
-function switchToSim(){
-  save.settings.simulate = true;
-  persist(); renderSettings();
-  stopGeo();
-  banner(null);
-  if (tracker.active && !tracker.simId) startSim();
-  else setGps("good", "Simulated GPS ready");
-  toast("Simulated GPS on", "good", "\u{1F9EA}");
-}
-
 /* --- position handling --------------------------------------------------- */
 function acceptPosition(lat, lng, accuracy, tsMs){
   tracker.lastFixAt = Date.now();
@@ -3685,8 +3670,7 @@ function startGeo(){
     p => acceptPosition(p.coords.latitude, p.coords.longitude, p.coords.accuracy || 999, p.timestamp),
     err => {
       if (err.code === 1){
-        banner("Location permission was denied. Allow location for this site in your browser settings, then start the run again.",
-               null, { label:"Use Simulated GPS instead", fn: switchToSim });
+        banner("Location permission was denied. Allow location for this site in your browser settings, then start the run again.");
         setGps("off", "Permission denied");
         if (tracker.active) abortRun();
       } else if (err.code === 2){
@@ -3694,8 +3678,10 @@ function startGeo(){
         // instead, and Chromium builds without a Google API key get a 403 back.
         // That is not something the user can fix by walking outside.
         if (isNoLocationProvider(err) || !looksLikeMobile()){
-          banner("This browser cannot work out where you are. Desktop browsers have no GPS chip and fall back to a network location service — which some builds (Chromium, Brave, several Linux packages) ship without the key that service needs. <b>Open this page on a phone</b> for real tracking, or try the app right here with a fake route.",
-                 "warn", { label:"Use Simulated GPS", fn: switchToSim });
+          // The sandbox is where a fake route lives now, and it keeps its own save,
+          // so nothing invented on a desktop can land in a real pet's history.
+          banner("This browser cannot work out where you are. Desktop browsers have no GPS chip and fall back to a network location service — which some builds (Chromium, Brave, several Linux packages) ship without the key that service needs. <b>Open this page on a phone</b> for real tracking, or try the sandbox, which runs for you.",
+                 "warn", { label:"Open the sandbox", fn: () => { location.href = "demo.html"; } });
           setGps("off", "No location provider");
           if (tracker.active) abortRun();
         } else {
@@ -4350,9 +4336,7 @@ function renderSettings(){
   $$("#seg-units button").forEach(b => b.classList.toggle("on", b.dataset.u === save.settings.units));
   $("#set-weight").value = save.settings.weightKg;
   $("#set-weight-u").textContent = "kg";
-  $("#tg-sim").classList.toggle("on", !!save.settings.simulate);
   if (DEMO){
-    $("#row-sim").hidden = true;
     $("#row-simspeed").hidden = false;
     const w = runWarp();
     $("#simspeed-help").innerHTML =
@@ -5017,10 +5001,6 @@ function wire(){
     }
   });
 
-  $("#row-sim").addEventListener("click", () => {
-    save.settings.simulate = !save.settings.simulate; persist(); renderSettings();
-    toast(save.settings.simulate ? "Simulated GPS on — runs will be tagged sim" : "Simulated GPS off", "", save.settings.simulate ? "🧪" : "📡");
-  });
   $("#row-keepawake").addEventListener("click", () => {
     save.settings.wakeLock = !save.settings.wakeLock; persist(); renderSettings();
   });
@@ -5121,7 +5101,10 @@ function boot(){
   const has = loadSave();
   // the sandbox exists so mechanics can be tried without going outside, and a
   // save made before this setting existed would have it off
-  if (DEMO) save.settings.simulate = true;
+  // The sandbox is the only place a fake route is drawn now. A save from before
+  // the setting was removed could still be carrying it switched on, and with
+  // nothing left to switch it off that would be a locked door.
+  save.settings.simulate = DEMO;
   applyXpAnim();
   if (has){
     recompute();
