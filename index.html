@@ -1649,7 +1649,7 @@ const SPECIES = {
     blurb:"A quiet spirit of moss and old wood. Grows steadily, forgives slowly, glows when you are consistent.",
     theme:{ accent:"#4ade80", accent2:"#bef264", ink:"#05230f", glow:"74,222,128" },
     stages:[
-      { name:"Leaf Bud",    desc:"Layer on layer of leaf, wrapped tight. It sheds one every so often, and whatever is inside gets closer." },
+      { name:"Leaf Bud",    desc:"Layer on layer of leaf, wrapped tight. It sheds one every so often." },
       { name:"Bamboo Cub",  desc:"Round, hungry, and entirely bamboo-motivated. Will drop everything for a fresh stalk." },
       { name:"Fernkin",     desc:"Twig antlers, a moss cloak, and the beginnings of a serious opinion about mornings." },
       { name:"Thicketmane", desc:"Antlers heavy with leaves. Small flowers open when your streak is alive." },
@@ -2662,7 +2662,7 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-16 8ff951d";
+const BUILD_ID = "2026-09-16 8a5fe7f";
 const ART_VERSION = "19";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
