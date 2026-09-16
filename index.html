@@ -1483,6 +1483,22 @@ const SKILLS = {
            they are held rather than cycled, and the last one longest. */
         durations:[380, 340, 300, 260, 230, 200, 180, 160, 150, 170, 260, 460],
         aspect:1.061, scale:1.376, dx:5.6, dy:-25.2 } }
+  ],
+  verdant: [
+    // also named for what the panda thinks it is doing
+    { id:"green-gale", name:"Green Gale", ico:"\u{1F343}", stage:1, level:8,
+      blurb:"Gathers the forest's strength and lets it go in one mighty gust. Stand upwind.",
+      sprite:{ src:"art/skill-fart.png", frames:12, fps:3,
+        /* Brace, gather, and the wrong end opens. The seven charge frames
+           quicken the way the Puffling's do, then everything stops: the
+           release is one drawing held long enough to be a beat, because the
+           joke is the pause, not the puff. The cloud grows over two frames,
+           and the last two alternate so the panda glances about while it
+           hangs there rather than lying perfectly still through the shame. */
+        order:    [0, 1, 2, 3, 4, 5, 6,  7,   8,   9,  10, 11, 10, 11],
+        durations:[380, 340, 310, 280, 250, 215, 180,  440,  280, 320,
+                   300, 300, 380, 440],
+        aspect:1.405, scale:1.036, dx:-0.4, dy:0.2 } }
   ]
 };
 function skillsFor(speciesId){ return SKILLS[speciesId] || []; }
@@ -2621,7 +2637,7 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-15 d914d90";
+const BUILD_ID = "2026-09-16 9e4be8f";
 const ART_VERSION = "16";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;

@@ -297,6 +297,18 @@ each, so cycling them reads as sustained energy where holding one would read as
 a freeze. The clip still runs to the same 2,250ms as every other celebration
 and the confetti still goes off on 810ms.
 
+The cub's skill sheet needed one thing none of the others did. Its twelve
+frames arrive as a 4x3 grid, and the top row's paws run six pixels past the
+line an even split of the sheet's height would draw. Cut there, those six rows
+of black were not lost - they landed at the top of every frame in the row
+below, and played back as two small dark crescents hanging in mid-air above
+the panda while it charged. The fix is to cut on the sheet's own rows: the
+bands of actual content, found by looking for the empty rows between them,
+which here sit 77 to 99 pixels deep and leave no doubt where one row ends.
+Column boundaries did fall where an even split puts them, checked the same
+way. Worth doing for every sheet from now on - an even split is an assumption,
+and this one had been quietly wrong.
+
 An `order` turns up a second problem worth naming, because it applies to every
 clip with its own timing. A keyframes rule that stops at its last frame has no
 100% stop, so the browser writes one from the element's own style — which is
@@ -337,25 +349,34 @@ use them.
 ## Skills
 
 A form is not the end of a stage, it is the start of one: a pet keeps learning
-inside the form it grew into. The Cinderling and the Puffling have one move
-each, both at level 8; the Blazewyrm learns all three of its own between level
-15, where the form arrives, and level 30, where the next one does; and the
-Zephyrite has the first of its own at 18, the same level the Blazewyrm starts.
+inside the form it grew into. The Cinderling, the Puffling and the Bamboo Cub
+have one move each, all at level 8; the Blazewyrm learns all three of its own
+between level 15, where the form arrives, and level 30, where the next one
+does; and the Zephyrite has the first of its own at 18, the same level the
+Blazewyrm starts.
 
 | Skill | Form | Learns at | What it does |
 | --- | --- | --- | --- |
 | 🔥 fireball | Cinderling | Level 8 | Sold as the strongest fire you will ever see. Three seconds of winding up, then a cough and some smoke. |
 | ⚡ Spark | Puffling | Level 8 | Guaranteed to leave something scorched. The something is the squirrel. |
+| 🍃 Green Gale | Bamboo Cub | Level 8 | The forest's strength, gathered and released. Out of the wrong end. |
 | 🔥 Fireball | Blazewyrm | Level 18 | Draws a breath and spits a packed ball of flame |
 | 💥 Flame Stomp | Blazewyrm | Level 22 | Lands hard enough to throw a ring of fire out around it |
 | ☄️ Flying Swoop | Blazewyrm | Level 26 | A low, fast pass trailing fire |
 | 🌩️ Lightning Bolt | Zephyrite | Level 18 | Asks the sky for help. The sky, this time, obliges. |
 
-Both babies' moves are the same joke told twice, which is deliberate: a first
-skill is named for what the pet thinks it is doing. The Cinderling coughs
-smoke; the Puffling's Spark gathers the whole storm and earths it through
-itself, and spends the last second and a half sitting there singed while the
-smoke drifts off it.
+All three babies' moves are the same joke told three times, which is
+deliberate: a first skill is named for what the pet thinks it is doing. The
+Cinderling coughs smoke; the Puffling's Spark gathers the whole storm and
+earths it through itself, and spends the last second and a half sitting there
+singed while the smoke drifts off it; the Bamboo Cub braces, pulls a whole
+orbiting ring of green in around itself over seven quickening frames, and
+opens the wrong end. Its timing is built around the beat rather than the
+build: everything stops on the release, one drawing held for 440ms, because
+the joke is the pause and not the puff. Then the cloud grows over two frames
+and the cub spends the last second and a half lying flat, glancing left and
+right — the two flattened frames alternate, so it is checking whether anyone
+saw rather than lying perfectly still.
 The Zephyrite's is the same idea grown up and not played for laughs: it
 gathers, the sky answers with an orb, and a bolt comes down. Its charge quickens
 the same way, but the four strike frames grow rather than flicker, so they are
