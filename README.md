@@ -225,6 +225,16 @@ this behaviour; the Cinder Egg cracks on frame 9 both times, while the acorn
 splits on 7 and spreads on 10, measured off the sheets rather than assumed. While a level-up is armed the pet is still drawn as it was *before* it,
 or you would come home to an already cracked shell and then watch it crack.
 
+The Verdant egg is the exception that proves what the packing is for. It does
+not crack — it swells, a tight bud at level 1 and an open one at 3, 226px tall
+and then 310px in the pack. So its three phases are packed in one pass like
+the other two eggs, sharing a frame, a ground line to a pixel and a centre to
+about one, but they are deliberately *not* normalised to a common body size
+the way the shell phases are. Normalising is right when the art is the same
+object changing state and wrong when the change of size **is** the state. All
+three grow from the same ground line, so the bud swells upward rather than
+drifting.
+
 A celebration's sheet is not the sheet the pet is already wearing, and a CSS
 background does not start loading until something paints it — which for a
 celebration is the instant the clip takes over from the idle. So the first play
@@ -374,7 +384,11 @@ The Cinderling and the Blazewyrm (Ember, stages 2 and 3) ship as pixel art in
 [`art/ember-cinderling.png`](art/ember-cinderling.png) and
 [`art/ember-blazewyrm.png`](art/ember-blazewyrm.png) — 12-frame loops at 2 fps
 — and the Bamboo Cub (Verdant, stage 2) in
-[`art/verdant-bamboo-cub.png`](art/verdant-bamboo-cub.png). The rest are inline SVG.
+[`art/verdant-bamboo-cub.png`](art/verdant-bamboo-cub.png). The Verdant egg
+ships as three sheets too, one per phase:
+[`art/verdant-egg.png`](art/verdant-egg.png),
+[`-cracked`](art/verdant-egg-cracked.png) and
+[`-breaking`](art/verdant-egg-breaking.png). The rest are inline SVG.
 
 Note that this pet plays one continuous loop rather than a per-mood animation,
 so its face cycles through every expression regardless of how recently you ran.

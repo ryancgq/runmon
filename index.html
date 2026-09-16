@@ -1524,6 +1524,11 @@ const EGG_PHASES = {
     { from:1, src:"art/nimbus-egg.png" },
     { from:2, src:"art/nimbus-egg-cracked.png" },
     { from:3, src:"art/nimbus-egg-breaking.png" }
+  ],
+  verdant: [
+    { from:1, src:"art/verdant-egg.png" },
+    { from:2, src:"art/verdant-egg-cracked.png" },
+    { from:3, src:"art/verdant-egg-breaking.png" }
   ]
 };
 function eggPhaseSrc(species, level){
@@ -2593,6 +2598,17 @@ const DEFAULT_SPRITES = {
     src:"art/nimbus-egg.png",
     frames:12, rows:1, fps:2, aspect:1.194, scale:0.932, dx:0.00, dy:-2.19
   },
+  "verdant:0": {
+    // The Sprout, and the src the level swaps - see EGG_PHASES. Packed like the
+    // other two eggs, in one pass across all three phases so they share a frame,
+    // a ground line and a centre. Unlike them it is NOT normalised to one body
+    // size: the other eggs crack, this one swells - 226px tall at level 1 and
+    // 310px at level 3 - and that growth is the art saying something is coming.
+    // The bud is the largest blob, so the leaves drifting off it cannot drag
+    // the anchor around.
+    src:"art/verdant-egg.png",
+    frames:12, rows:1, fps:2, aspect:1.310, scale:0.93, dx:0, dy:2.3
+  },
   "nimbus:1": {
     src:"art/nimbus-puffling.png",
     // 12-frame loop: sits, blinks, an acorn drops in, and it eats. The pack's
@@ -2646,7 +2662,7 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-16 a34d235";
+const BUILD_ID = "2026-09-16 200d91c";
 const ART_VERSION = "18";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
