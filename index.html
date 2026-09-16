@@ -2675,7 +2675,7 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-16 0f5601a";
+const BUILD_ID = "2026-09-16 54fc8b4";
 const ART_VERSION = "20";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -2941,6 +2941,7 @@ function playClip(cfg, tag){
   if (!holder || skillPlaying || !cfg || spriteBroken[cfg.src]) return false;
   probeSprite(cfg.src);
   skillPlaying = tag;
+  holder.classList.remove("egg-crack");     // the clip does its own moving
   holder.innerHTML = spriteHTML(cfg, "okay", true);
   renderSkillChips();
   clearTimeout(skillTimer);
@@ -3173,6 +3174,12 @@ function renderHome(){
   const d = derived, sp = d.species;
   const shown = previewPet || { id: sp.id, stage: d.stage, mood: d.mood.key };
   if (!skillPlaying) paintPet($("#home-pet"), shown.id, shown.stage, shown.mood);
+  // An egg rocks here the way it does through onboarding - the same shake on
+  // the same holder - so the form you are waiting on behaves alike in both
+  // places. It comes off the moment the shell hatches, and playClip takes it
+  // off for the length of a celebration: the crack clips have their own motion
+  // and do not want a rotation on top of it.
+  $("#home-pet").classList.toggle("egg-crack", shown.stage === 0 && !skillPlaying);
   $("#pet-stage").classList.toggle("has-sprite", !!$("#home-pet .sprite-view"));
   renderSkillChips();
   $("#pet-name-txt").textContent = save.petName || sp.name;

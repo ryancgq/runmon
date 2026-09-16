@@ -215,6 +215,13 @@ The two transition sheets hold each crack state for two or three frames rather
 than drawing twelve distinct ones — the sparkles change underneath, the shell
 does not. That is why their burst frames fall where they do.
 
+An egg rocks while you wait on it — the same 1.6s shake onboarding gives it,
+on the same holder, so the form behaves alike in both places. It comes off the
+moment the shell hatches, and off again for the length of a celebration: the
+crack clips have their own motion and do not want a rotation on top of it. The
+wind-up needs no such handling, since the shiver it puts on the holder simply
+replaces the shake for its second and a half.
+
 Eggs crack as they level. They are the one form whose art changes inside its
 own stage — intact at level 1, a first split at 2, a full web at 3 — and the
 crack is the level-up celebration: `<species>:0@2` and `<species>:0@3` in
