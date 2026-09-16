@@ -309,6 +309,20 @@ Column boundaries did fall where an even split puts them, checked the same
 way. Worth doing for every sheet from now on - an even split is an assumption,
 and this one had been quietly wrong.
 
+The same sheet then needed the anchoring taken a step further than any before
+it. The other packs correct a drift that is regular - each row drawn a little
+higher than the last - and one ground line per row is enough to answer it.
+This one drifts about ten pixels left per column as well, and underneath both
+it simply does not draw the cub in the same place twice: 55 source pixels
+between the leftmost frame and the rightmost, which on the pet screen was the
+cub hopping some 26 pixels about the stage while it charged. So every frame is
+anchored on its own here. The floor fixes y, because the cub is planted in all
+twelve frames and its lowest pixel is the ground line, and the body's centre
+of mass fixes x. The head alone and the paws alone were measured too; the
+whole body scored best, taking frame-to-frame overlap from 0.77 to 0.86. What
+is left on screen is 3.5px of wander and 1px of bob, and that residue is the
+cub turning its head, which is drawn.
+
 An `order` turns up a second problem worth naming, because it applies to every
 clip with its own timing. A keyframes rule that stops at its last frame has no
 100% stop, so the browser writes one from the element's own style — which is
@@ -372,11 +386,14 @@ earths it through itself, and spends the last second and a half sitting there
 singed while the smoke drifts off it; the Bamboo Cub braces, pulls a whole
 orbiting ring of green in around itself over seven quickening frames, and
 opens the wrong end. Its timing is built around the beat rather than the
-build: everything stops on the release, one drawing held for 440ms, because
-the joke is the pause and not the puff. Then the cloud grows over two frames
-and the cub spends the last second and a half lying flat, glancing left and
-right — the two flattened frames alternate, so it is checking whether anyone
-saw rather than lying perfectly still.
+build: everything stops on the release, one drawing held for 700ms, because
+the joke is the pause and not the puff. The cloud then takes the clip's three
+longest holds, 1.8 seconds between them — more than the whole charge, and it
+needs to be: at the 1,040ms it first ran to, the thing the whole skill is
+about went past before you could register it. The cub spends the last second
+and a half lying flat, glancing left and right — the two flattened frames
+alternate, so it is checking whether anyone saw rather than lying perfectly
+still.
 The Zephyrite's is the same idea grown up and not played for laughs: it
 gathers, the sky answers with an orb, and a bolt comes down. Its charge quickens
 the same way, but the four strike frames grow rather than flicker, so they are
