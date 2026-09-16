@@ -1355,6 +1355,13 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
    Runmon — a single-file running tracker with a virtual pet.
    Sections:  1 config   2 maths   3 state   4 art   5 render
               6 tracking 7 screens 8 settings 9 boot
+
+   Those nine are nine separate <script> blocks, not one. Each runs to
+   completion before the next is parsed, so a `const` or `function` declared in
+   a later block does not exist while an earlier one is executing - only once
+   the page has finished loading and something calls into it. Top-level tables
+   in an early block therefore cannot use a helper defined further down; where
+   one does the same work inline, that is why, and the comment there says so.
    ========================================================================== */
 
 /* ---------------------------------------------------------------------------
