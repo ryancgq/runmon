@@ -563,6 +563,7 @@ body::before{
 .xp-line{display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:#c6cddd}
 .xp-line b{font-variant-numeric:tabular-nums}
 .xp-line.bonus{color:var(--accent-2)}
+.xp-line.dock{color:#f0a0a0}
 .xp-line.total{border-top:1px dashed var(--line);padding-top:10px;margin-top:2px;font-size:15.5px;color:var(--text);font-weight:800}
 .xp-line.total b{font-family:"Fredoka One","Fredoka",sans-serif;font-size:19px;color:var(--accent)}
 
@@ -1419,8 +1420,10 @@ const MAX_LEVEL   = 99;
 const EARLY_UNTIL = 5;           // levels below this one cost extra to leave
 const EARLY_MULT  = 2;           // ...this much extra
 
-const STREAK_BONUS_STEP = 0.10;  // +10% for a 2-day streak
-const STREAK_BONUS_MAX  = 0.50;  // capped at +50%
+/* The streak no longer multiplies XP on its own - the mood ladder does that,
+   and it is derived from the same run days, so paying for both was paying
+   twice for one habit. The consecutive-day count stays: it is a stat on the
+   home screen and several badges test it. */
 
 const EVO_LEVELS = [1, 5, 15, 30, 50];   // stage index -> level required
 
@@ -1755,15 +1758,35 @@ const SPECIES = {
 };
 const SPECIES_ORDER = ["ember","verdant","nimbus"];
 
-/* Moods, worst to best. `gap` = whole days since the last run. */
+/* Moods, a ladder the pet climbs a rung at a time. A run of MOOD_MIN_KM or
+   more moves it up one, at most once a day, so the way back from the bottom is
+   five days of running rather than one heroic outing. Neglect moves it down,
+   but every rung has its own patience: Elated goes after a single idle day,
+   while a pet already Sad takes a week to give up entirely. The bottom is
+   deliberately sticky - once somebody has lapsed the game stops kicking them,
+   and a once-a-week runner settles around Restless instead of on the floor.
+
+   `xpPct` and `streakMult` both multiply a run's XP and are kept apart because
+   the run summary shows them as two lines: one is the pet's mood and the other
+   is the reward for keeping it up. A single combined figure would say neither.
+   Together they run from x0.50 at the floor to x1.25 at the top.
+
+   The keys are the original six and must stay that way - the speech pools in
+   LINES and the .mood-* idle animations are keyed by them. */
 const MOODS = {
-  elated:{ key:"elated", label:"Elated",   emoji:"🤩" },
-  happy: { key:"happy",  label:"Happy",    emoji:"😄" },
-  okay:  { key:"okay",   label:"Content",  emoji:"🙂" },
-  bored: { key:"bored",  label:"Restless", emoji:"😕" },
-  sad:   { key:"sad",    label:"Sad",      emoji:"😢" },
-  asleep:{ key:"asleep", label:"Hungry",   emoji:"😴" }
+  elated:{ rank:5, key:"elated", label:"Elated",   emoji:"🤩", xpPct:100, streakMult:1.25, idle:1 },
+  happy: { rank:4, key:"happy",  label:"Happy",    emoji:"😄", xpPct:90,  streakMult:1.20, idle:2 },
+  okay:  { rank:3, key:"okay",   label:"Content",  emoji:"🙂", xpPct:80,  streakMult:1.10, idle:3 },
+  bored: { rank:2, key:"bored",  label:"Restless", emoji:"😕", xpPct:70,  streakMult:1.00, idle:5 },
+  sad:   { rank:1, key:"sad",    label:"Sad",      emoji:"😢", xpPct:60,  streakMult:1.00, idle:7 },
+  asleep:{ rank:0, key:"asleep", label:"Hungry",   emoji:"😴", xpPct:50,  streakMult:1.00, idle:Infinity }
 };
+const MOOD_BY_RANK = Object.values(MOODS).sort((a, b) => a.rank - b.rank);
+const MOOD_MIN_KM  = 2;   // shorter than this holds the rung but cannot raise it
+const MOOD_START   = 4;   // a fresh pet is Happy: new, not neglected
+const moodByRank = r => MOOD_BY_RANK[Math.max(0, Math.min(MOOD_BY_RANK.length - 1, r))];
+/** What a run at this mood is worth as a fraction of its base XP. */
+const moodMultiplier = m => (m.xpPct / 100) * m.streakMult;
 
 const BADGES = [
   { id:"first",     ico:"👟", name:"First Steps",  test:s=>s.runs.length>=1 },
@@ -1814,13 +1837,17 @@ function baseXpForDistance(D){
 /** The flat part (100 XP/km) so the summary can show the bonus separately. */
 function flatXp(D){ return XP_PER_KM * Math.max(0, D); }
 function enduranceXp(D){ return Math.max(0, baseXpForDistance(D) - flatXp(D)); }
-function streakMultiplier(streakDays){
-  if (streakDays < 2) return 1;
-  return 1 + Math.min(STREAK_BONUS_STEP * (streakDays - 1), STREAK_BONUS_MAX);
-}
-/** Full XP for one run. `streakDays` counts the run's own day. */
-function xpForRun(D, streakDays){
-  return Math.round(baseXpForDistance(D) * streakMultiplier(streakDays));
+/* One run's XP, split into the four rows the summary shows. They are worked
+   out here rather than at each call site so the rows always add up to the
+   total: `mood` and `streak` are remainders against the rounded running sum,
+   not independently rounded figures, which is what stops a breakdown from
+   landing a point away from the number above it. */
+function xpParts(km, mood){
+  const flat  = Math.round(flatXp(km));
+  const end   = Math.round(enduranceXp(km));
+  const after = Math.round(baseXpForDistance(km) * (mood.xpPct / 100));
+  const total = Math.round(baseXpForDistance(km) * moodMultiplier(mood));
+  return { flat, end, mood: after - (flat + end), streak: total - after, total };
 }
 
 /** Distance that would earn `xp`, i.e. the inverse of baseXpForDistance. */
@@ -2024,7 +2051,7 @@ function recompute(){
     streak: current, bestStreak: best,
     level: lv.level, into: lv.into, need: lv.need, pct: lv.pct,
     stage, lastRunTs, gapDays,
-    mood: moodFor(gapDays, runs.length),
+    mood: moodByRank(moodRankAt(runs, Date.now())),
     species: save.species ? SPECIES[save.species] : SPECIES.ember,
     skills: skillsFor(save.species).map(sk => ({
       ...sk,
@@ -2042,13 +2069,48 @@ function recompute(){
   return derived;
 }
 
-function moodFor(gapDays, runCount){
-  if (!runCount) return MOODS.okay;
-  if (gapDays <= 0) return MOODS.elated;
-  if (gapDays === 1) return MOODS.happy;
-  if (gapDays === 2) return MOODS.bored;
-  if (gapDays <= 4)  return MOODS.sad;
-  return MOODS.asleep;
+/* The rung is replayed from the run log, never stored, so deleting a run or
+   importing an old one from Strava rolls the mood back with everything else -
+   the same rule the rest of `derived` follows. A stored counter would drift the
+   first time a run landed out of order, which is the bug family that cost four
+   rounds on the XP bar.
+
+   One pass over the days from the first run to `nowTs`: a long enough run
+   climbs a rung, any run at all clears the idle count, and a silent day spends
+   one of the current rung's patience. */
+function nextDayKey(k){
+  const d = new Date(k + "T00:00:00");
+  d.setDate(d.getDate() + 1);
+  return dayKey(d.getTime());
+}
+function moodRankAt(runs, nowTs){
+  if (!runs.length) return MOOD_START;
+  const best = new Map();
+  for (const r of runs){
+    const k = dayKey(r.t);
+    best.set(k, Math.max(best.get(k) || 0, r.km));
+  }
+  let cursor = dayKey(runs[0].t);
+  const end = dayKey(nowTs);
+  if (daysBetweenKeys(cursor, end) < 0) return MOOD_START;   // clock went backwards
+  let rank = MOOD_START, idle = 0;
+  for (;;){
+    const km = best.get(cursor);
+    if (km != null){
+      if (km >= MOOD_MIN_KM) rank = Math.min(MOOD_BY_RANK.length - 1, rank + 1);
+      idle = 0;                       // a short run still says somebody is here
+    } else if (++idle >= moodByRank(rank).idle){
+      rank = Math.max(0, rank - 1);
+      idle = 0;
+    }
+    if (cursor === end) break;
+    cursor = nextDayKey(cursor);
+  }
+  return rank;
+}
+/** The mood a run recorded at `atTs` is paid at: the rung before it climbs. */
+function moodIfRunNow(atTs){
+  return moodByRank(moodRankAt(save.runs.filter(r => r.t < atTs), atTs));
 }
 
 /** Streak that a run finishing right now would land on. */
@@ -2815,7 +2877,10 @@ function speechFor(){
   const set = LINES[save.species] || LINES.ember;
   const pool = set[d.mood.key] || set.okay;
   const idx = Math.floor((Date.now() / 60000 + d.runs.length) % pool.length);
-  return `${pool[idx]} <span class="mood-tag">${d.mood.emoji} ${d.mood.label}</span>`;
+  // the effective figure, not either half of it: this is the one number that
+  // answers "what is a run worth right now"
+  const pct = Math.round(moodMultiplier(d.mood) * 100);
+  return `${pool[idx]} <span class="mood-tag">${d.mood.emoji} ${d.mood.label} · ${pct}% XP</span>`;
 }
 
 /* --- route drawing (used for summary + history thumbnails) --------------- */
@@ -3825,19 +3890,27 @@ function compressPath(segments, maxPoints){
 /* Every run is built here, whoever recorded it: the GPS tracker, the sandbox's
    shortcut, or Strava. The XP arithmetic lived in two places before a third
    source would have made three, and a run whose XP depended on where it came
-   from would be a bug waiting to happen. `at` matters because the streak
-   multiplier is judged at the moment of the run, not the moment of import. */
+   from would be a bug waiting to happen. `at` matters because the mood is
+   judged at the moment of the run, not the moment of import.
+
+   The run is paid at the rung it starts in and climbs afterwards, so a Hungry
+   pet's comeback run earns 50% and the next one earns 60%. Climbing is the
+   reward, payable next time; scoring at the new rung would make the ladder
+   free and therefore pointless. */
 function makeRun(at, km, sec, extra){
   const streak = streakIfRunNow(at);
-  const base = baseXpForDistance(km), mult = streakMultiplier(streak);
+  const mood = moodIfRunNow(at);
+  const p = xpParts(km, mood);
   return Object.assign({
     id: "r" + at.toString(36) + Math.random().toString(36).slice(2, 6),
     t: at, km, sec,
     kcal: calories(km, sec, save.settings.weightKg),
-    xp: Math.round(base * mult),
-    xpFlat: Math.round(flatXp(km)),
-    xpEndurance: Math.round(enduranceXp(km)),
-    xpStreakBonus: Math.round(base * mult - base),
+    xp: p.total,
+    xpFlat: p.flat,
+    xpEndurance: p.end,
+    xpMood: p.mood,
+    xpStreak: p.streak,
+    mood: mood.key,
     streak, sim: false, path: []
   }, extra || {});
 }
@@ -3933,17 +4006,26 @@ function showSummary(run, opts){
     card.appendChild(d);
   }
 
-  const bonusPct = Math.round((streakMultiplier(run.streak || 1) - 1) * 100);
+  const m = run.mood ? MOODS[run.mood] : null;
   const lines = [
     `<div class="xp-line"><span>Distance · ${U.distStr(run.km,2)} ${U.label} at ${XP_PER_KM} XP/km</span><b>+${nf(run.xpFlat || 0)}</b></div>`,
     (run.xpEndurance > 0
       ? `<div class="xp-line bonus"><span>Endurance bonus · longer runs pay more per km</span><b>+${nf(run.xpEndurance)}</b></div>`
       : `<div class="xp-line" style="opacity:.55"><span>Endurance bonus · builds up as a run gets longer</span><b>+0</b></div>`)
   ];
-  if (bonusPct > 0)
-    lines.push(`<div class="xp-line bonus"><span>Streak bonus · ${run.streak} days in a row (+${bonusPct}%)</span><b>+${nf(run.xpStreakBonus || 0)}</b></div>`);
-  else
-    lines.push(`<div class="xp-line" style="opacity:.55"><span>Streak bonus · run again tomorrow for +10%</span><b>+0</b></div>`);
+  if (m){
+    // the mood row is the only one that can take XP away, so it is the only
+    // one that is not written with a plus in front of it
+    lines.push(run.xpMood < 0
+      ? `<div class="xp-line dock"><span>Mood · ${m.label} — ${m.xpPct}% XP</span><b>${nf(run.xpMood)}</b></div>`
+      : `<div class="xp-line" style="opacity:.55"><span>Mood · ${m.label} — full XP</span><b>+0</b></div>`);
+    lines.push(run.xpStreak > 0
+      ? `<div class="xp-line bonus"><span>${m.label} bonus · ×${m.streakMult.toFixed(2)}</span><b>+${nf(run.xpStreak)}</b></div>`
+      : `<div class="xp-line" style="opacity:.55"><span>Mood bonus · reach ${MOODS.okay.label} for a multiplier</span><b>+0</b></div>`);
+  } else if (run.xpStreakBonus){
+    // logged before moods became a ladder, when the streak paid on its own
+    lines.push(`<div class="xp-line bonus"><span>Streak bonus · ${run.streak} days in a row</span><b>+${nf(run.xpStreakBonus)}</b></div>`);
+  }
   lines.push(`<div class="xp-line total"><span>Total earned</span><b>${nf(run.xp)} XP</b></div>`);
   $("#sum-xp-lines").innerHTML = lines.join("");
 
@@ -4453,18 +4535,21 @@ function demoJumpToLevel(level, done){
     const short = target - total;
     const km = Math.min(10, Math.max(0.1, kmForXp(short)));
     kms.push(km);
-    total += Math.round(baseXpForDistance(km));
+    total += xpParts(km, MOODS.elated).total;
   }
   const today = Date.now();
   save.runs = kms.map((km, i) => {
     const t = today - (kms.length - 1 - i) * 86400000;
     const sec = Math.round(km * 6 * 60);
+    // consecutive 10 km days, so the pet these land on is Elated - which is
+    // also the only rung that makes the jump land on the level asked for
+    const p = xpParts(km, MOODS.elated);
     return {
       id: "d" + t.toString(36) + i, t, km, sec,
       kcal: calories(km, sec, save.settings.weightKg),
-      xp: Math.round(baseXpForDistance(km)),
-      xpFlat: Math.round(flatXp(km)), xpEndurance: Math.round(enduranceXp(km)),
-      xpStreakBonus: 0, streak: i + 1, sim: true, path: []
+      xp: p.total, xpFlat: p.flat, xpEndurance: p.end,
+      xpMood: p.mood, xpStreak: p.streak, mood: "elated",
+      streak: i + 1, sim: true, path: []
     };
   });
   save.badges = {};

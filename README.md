@@ -715,7 +715,34 @@ run are worth more than earlier ones. The rate climbs continuously from ×1.0 to
 ×2.0 at 20 km, so one long run beats the same distance chopped into short ones:
 5 km earns 563 XP, but 10 km earns 1,250 rather than 1,126.
 
-**Streaks.** +10% for each consecutive day you run, capped at +50%.
+**Moods.** The pet sits on a six-rung ladder, and the rung multiplies every run
+it earns. A run of **2 km or more climbs one rung**, at most once a day, so the
+way up from the bottom is five days of running rather than one heroic outing.
+Shorter runs still earn XP and still count as showing up — they just do not
+climb. Neglect walks it back down, but each rung has its own patience:
+
+| Mood | XP | Bonus | Effective | Idle days to drop a rung |
+| --- | --- | --- | --- | --- |
+| 🤩 Elated | 100% | ×1.25 | **×1.25** | 1 |
+| 😄 Happy | 90% | ×1.20 | **×1.08** | 2 |
+| 🙂 Content | 80% | ×1.10 | **×0.88** | 3 |
+| 😕 Restless | 70% | ×1.00 | **×0.70** | 5 |
+| 😢 Sad | 60% | ×1.00 | **×0.60** | 7 |
+| 😴 Hungry | 50% | ×1.00 | **×0.50** | floor |
+
+A run is paid at the rung it starts in and climbs afterwards, so a Hungry pet's
+comeback run earns 50% and the next one earns 60%. Climbing is the reward,
+payable next time; scoring at the new rung would make the ladder free.
+
+The bottom is deliberately sticky. Eighteen idle days separate Elated from the
+floor and the lower rungs are the slow ones, so somebody who has already lapsed
+is not chased further down. Running daily or every other day holds Elated,
+weekly settles around Content, fortnightly around Sad. New pets start Happy:
+new is not the same as neglected.
+
+The consecutive-day **streak** is still counted and still earns badges, but it
+no longer multiplies XP on its own. It and the mood are derived from the same
+run days, so paying for both was paying twice for one habit.
 
 **Levels.** Every level costs more than the last. The growth factor starts at
 ×1.5 and eases off as levels climb — a flat ×1.5 forever would put level 50
@@ -732,10 +759,13 @@ The curve as tuned:
 
 | Form | Level | Total XP | Roughly |
 | --- | --- | --- | --- |
-| Baby | 5 | 3,033 | ~27 km |
-| Teen | 15 | 21,533 | ~191 km |
-| Adult | 30 | 82,005 | ~729 km |
-| Final | 50 | 176,744 | ~1,571 km |
+| Baby | 5 | 3,033 | ~22 km |
+| Teen | 15 | 21,533 | ~153 km |
+| Adult | 30 | 82,005 | ~583 km |
+| Final | 50 | 176,744 | ~1,257 km |
+
+Distances assume 5 km runs with the pet held at Elated. A pet left at Restless
+earns 0.70× rather than 1.25×, so the same forms cost it nearly twice as far.
 
 `LEVEL_BASE`, `LEVEL_DECAY`, `EARLY_UNTIL` and `EARLY_MULT` near the top of the
 file control this, and `Runmon.xpTable()` prints the whole curve in the
