@@ -221,8 +221,10 @@ crack is the level-up celebration: `<species>:0@2` and `<species>:0@3` in
 `LEVEL_UP_ART` carry the shell from one phase to the next and end on the frame
 the new idle opens with, so the celebration and the change of art are one
 event. `EGG_PHASES` is keyed by species, and any species with an entry gets
-this behaviour; the Cinder Egg cracks on frame 9 both times, while the acorn
-splits on 7 and spreads on 10, measured off the sheets rather than assumed. While a level-up is armed the pet is still drawn as it was *before* it,
+this behaviour; the Cinder Egg cracks on frame 9 both times, the acorn splits
+on 7 and spreads on 10, and the Leaf Bud lets its leaves go on 6 and then on 5
+— measured off the sheets rather than assumed, here by watching for the frame
+where two loose blobs first appear beside the bud. While a level-up is armed the pet is still drawn as it was *before* it,
 or you would come home to an already cracked shell and then watch it crack.
 
 The Verdant egg is the exception that proves what the packing is for. It does
@@ -234,6 +236,19 @@ a ground line to a pixel and a centre to about one, but they are deliberately
 Normalising is right when the art is the same object changing state and wrong
 when the change of size **is** the state. All three sit on the same ground
 line, so the bud shrinks down onto it rather than drifting.
+
+Its two transitions then raise a problem the other eggs never had. Each one
+shrinks its bud harder than the two phases it joins differ — about 17% against
+the phases' 10% — so no single scale can make both of its ends match. The ends
+really are the same drawings as the idle frames, which is how you can tell:
+registered against them they sit at 0.95 to 0.98 IoU, and they ask for 0.977
+at the first frame and 1.068 at the last (0.990 and 1.092 for the second
+transition). One factor would leave a visible step at one end, or a smaller one
+at both. So each transition carries a scale **ramp** across its twelve frames
+instead. Both handovers then land exactly — measured on the pet screen, the
+clip's last frame and the idle that replaces it differ by 0.4% in area and not
+at all in ground line — and the correction works out at 0.8% a frame, spread
+under leaves flying off the bud.
 
 A celebration's sheet is not the sheet the pet is already wearing, and a CSS
 background does not start loading until something paints it — which for a
@@ -385,10 +400,12 @@ The Cinderling and the Blazewyrm (Ember, stages 2 and 3) ship as pixel art in
 [`art/ember-blazewyrm.png`](art/ember-blazewyrm.png) — 12-frame loops at 2 fps
 — and the Bamboo Cub (Verdant, stage 2) in
 [`art/verdant-bamboo-cub.png`](art/verdant-bamboo-cub.png). The Verdant egg
-ships as three sheets too, one per phase:
+ships as five: three phases,
 [`art/verdant-egg.png`](art/verdant-egg.png),
 [`-cracked`](art/verdant-egg-cracked.png) and
-[`-breaking`](art/verdant-egg-breaking.png). The rest are inline SVG.
+[`-breaking`](art/verdant-egg-breaking.png), and the two transitions between
+them in [`-crack-1`](art/verdant-egg-crack-1.png) and
+[`-crack-2`](art/verdant-egg-crack-2.png). The rest are inline SVG.
 
 Note that this pet plays one continuous loop rather than a per-mood animation,
 so its face cycles through every expression regardless of how recently you ran.

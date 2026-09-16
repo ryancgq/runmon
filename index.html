@@ -1569,6 +1569,19 @@ const LEVEL_UP_ART = {
   "nimbus:0@3": levelUpClip({ src:"art/nimbus-egg-crack-2.png", frames:12,
     gather:2, burst:10, aspect:1.194, scale:0.932, dx:0.00, dy:-2.19,
     cap:{ top:12, right:45 } }),
+  // The Leaf Bud does not crack, it sheds: the outer leaves open over four
+  // frames and then let go, on frame 6 the first time and frame 5 the second,
+  // counted off the sheets by where two loose blobs first appear beside the
+  // bud. Each transition ends on the frame its new phase opens with - the
+  // clip and the change of art are the same event - which took a scale ramp
+  // in the pack, because these sheets shrink the bud harder than the phases
+  // they join do. See the packing notes in the README.
+  "verdant:0@2": levelUpClip({ src:"art/verdant-egg-crack-1.png", frames:12,
+    gather:1, burst:5, aspect:1.339, scale:1.048, dx:1.05, dy:-3.75,
+    cap:{ top:12, right:45 } }),
+  "verdant:0@3": levelUpClip({ src:"art/verdant-egg-crack-2.png", frames:12,
+    gather:1, burst:4, aspect:1.339, scale:1.048, dx:1.05, dy:-3.75,
+    cap:{ top:12, right:45 } }),
   // this one scowls and shuts its eyes for four frames before any gold shows,
   // so its build is shorter in frames and each of them holds longer. `cap`
   // brings the caption in to meet it: the baby draws 130px wide inside the
@@ -2607,7 +2620,7 @@ const DEFAULT_SPRITES = {
     // shrinking is the art saying something is coming. The bud is the largest
     // blob, so the leaves drifting off it cannot drag the anchor around.
     src:"art/verdant-egg.png",
-    frames:12, rows:1, fps:2, aspect:1.310, scale:0.93, dx:0, dy:2.3
+    frames:12, rows:1, fps:2, aspect:1.339, scale:1.048, dx:1.05, dy:-3.75
   },
   "nimbus:1": {
     src:"art/nimbus-puffling.png",
@@ -2662,8 +2675,8 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-16 8a5fe7f";
-const ART_VERSION = "19";
+const BUILD_ID = "2026-09-16 0f5601a";
+const ART_VERSION = "20";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
 }
