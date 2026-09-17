@@ -721,14 +721,14 @@ way up from the bottom is five days of running rather than one heroic outing.
 Shorter runs still earn XP and still count as showing up — they just do not
 climb. Neglect walks it back down, but each rung has its own patience:
 
-| Mood | XP | Bonus | Effective | Idle days to drop a rung |
-| --- | --- | --- | --- | --- |
-| 🤩 Elated | 100% | ×1.25 | **×1.25** | 1 |
-| 😄 Happy | 90% | ×1.20 | **×1.08** | 2 |
-| 🙂 Content | 80% | ×1.10 | **×0.88** | 3 |
-| 😕 Restless | 70% | ×1.00 | **×0.70** | 5 |
-| 😢 Sad | 60% | ×1.00 | **×0.60** | 7 |
-| 😴 Hungry | 50% | ×1.00 | **×0.50** | floor |
+| Mood | XP | Idle days to drop a rung |
+| --- | --- | --- |
+| 🤩 Elated | 100% | 1 |
+| 😄 Happy | 90% | 2 |
+| 🙂 Content | 80% | 3 |
+| 😕 Restless | 70% | 5 |
+| 😢 Sad | 60% | 7 |
+| 😴 Hungry | 50% | floor |
 
 A run is paid at the rung it starts in and climbs afterwards, so a Hungry pet's
 comeback run earns 50% and the next one earns 60%. Climbing is the reward,
@@ -740,9 +740,25 @@ is not chased further down. Running daily or every other day holds Elated,
 weekly settles around Content, fortnightly around Sad. New pets start Happy:
 new is not the same as neglected.
 
-The consecutive-day **streak** is still counted and still earns badges, but it
-no longer multiplies XP on its own. It and the mood are derived from the same
-run days, so paying for both was paying twice for one habit.
+**Streaks.** A flat **×1.20** on every qualifying run, for anyone running at
+least once every two days. Clear 2 km, do it again within two days, and it
+holds; leave a third day and it is off until the next qualifying run starts a
+new one. There is nothing to climb and no partial credit — it is on or it is
+not.
+
+Two days rather than one is deliberate: a rest day is training, not a lapse,
+and a streak that broke on every rest day would have the game arguing with the
+sport. The counter is the streak's length across the calendar, so running
+Monday and Wednesday reads 3 — that is how long you have kept it going — and it
+only moves when a run actually lands.
+
+The streak is independent of the mood. They read the same run log but answer
+different questions: the mood is how well the pet has been looked after
+lately, the streak is whether you are keeping a cadence right now. A pet can
+be Sad and on a streak (you are three days into a comeback) or Elated with the
+streak just broken (one long run after a fortnight off).
+
+Multiplied out, a run is worth between **×0.50** and **×1.20** of its base.
 
 **Levels.** Every level costs more than the last. The growth factor starts at
 ×1.5 and eases off as levels climb — a flat ×1.5 forever would put level 50
@@ -760,12 +776,13 @@ The curve as tuned:
 | Form | Level | Total XP | Roughly |
 | --- | --- | --- | --- |
 | Baby | 5 | 3,033 | ~22 km |
-| Teen | 15 | 21,533 | ~153 km |
-| Adult | 30 | 82,005 | ~583 km |
-| Final | 50 | 176,744 | ~1,257 km |
+| Teen | 15 | 21,533 | ~160 km |
+| Adult | 30 | 82,005 | ~607 km |
+| Final | 50 | 176,744 | ~1,309 km |
 
-Distances assume 5 km runs with the pet held at Elated. A pet left at Restless
-earns 0.70× rather than 1.25×, so the same forms cost it nearly twice as far.
+Distances assume 5 km runs with the pet at Elated and the streak held — ×1.20.
+A pet left at Restless with the streak broken earns 0.70×, so the same forms
+cost it nearly twice as far.
 
 `LEVEL_BASE`, `LEVEL_DECAY`, `EARLY_UNTIL` and `EARLY_MULT` near the top of the
 file control this, and `Runmon.xpTable()` prints the whole curve in the
