@@ -754,15 +754,17 @@ carries the streak forward — never what earns. A recovery jog on day three is
 still a day you went out, and docking it would punish the easy days that make
 the hard ones possible.
 
-While one is running the home screen carries a quiet strip under the greeting:
-what it is worth and the day the window shuts — named as a weekday rather than
-counted in days, because "by Sat" is something you can hold against a diary.
-Its length is not repeated there; the stat row below already has it. On the last
-day it can be saved the deadline changes colour.
-
-With no streak there is no strip. A drained line listing what you could have is
-a nag on a screen whose job is the pet, and the person without one is the last
-who needs telling. It appears when it means something.
+The home screen carries a quiet strip for it under the greeting: whether one is
+running, what it is worth, and the day the window shuts — named as a weekday
+rather than counted in days, because "by Sat" is something you can hold against
+a diary. Its length is not repeated there; the stat row below already has it.
+On the last day it can be saved the deadline changes colour. With nothing
+running the strip stays in place, drained, so the page never jumps — and it
+says "No streak · run 2 km for ×1.20 XP" rather than stating the multiplier
+flatly, because a greyed-out rate still reads as a rate being paid. With one
+qualifying run in and the window still open it drops the label and says "run
+again by Sat for ×1.20 XP": half way is a better prompt than starting from
+nothing.
 
 Two days rather than one is deliberate: a rest day is training, not a lapse,
 and a streak that broke on every rest day would have the game arguing with the
