@@ -150,6 +150,7 @@ body::before{
 .streak-strip .w{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .streak-strip .w b{color:#c4cbdb;font-weight:900}
 .streak-strip .w::before{content:"\00b7\00a0"}
+.streak-strip .lb:empty + .w::before{content:none}
 /* the last day it can be saved. A colour change and nothing else: a strip this
    quiet does not need to move to be noticed against everything around it. */
 .streak-strip.urgent{border-color:rgba(var(--glow),.34)}
@@ -2081,7 +2082,7 @@ function recompute(){
   derived = {
     runs, totalKm, totalXp, totalSec,
     streak: sk.days, bestStreak: sk.best, streakLive: sk.live,
-    streakLeft: sk.left, streakLast: sk.last,
+    streakLeft: sk.left, streakLast: sk.last, streakCount: sk.count,
     level: lv.level, into: lv.into, need: lv.need, pct: lv.pct,
     stage, lastRunTs, gapDays,
     mood: moodByRank(moodRankAt(runs, Date.now())),
@@ -2155,31 +2156,40 @@ function qualifyingDays(runs){
   for (const r of runs) if (r.km >= QUALIFY_KM) days.add(dayKey(r.t));
   return [...days].sort();
 }
+/* The chain of qualifying days ending at or before `key`, walking back while
+   every link is no wider than STREAK_GAP. `count` is how many days are in it,
+   and that is what decides whether there is a streak at all: one run is a run,
+   and it takes a second one on a different day to make it a habit. */
+function chainEndingAt(days, key){
+  let i = days.length - 1;
+  while (i >= 0 && days[i] > key) i--;
+  if (i < 0 || daysBetweenKeys(days[i], key) > STREAK_GAP) return { count:0, span:0, last:null };
+  let j = i;
+  while (j > 0 && daysBetweenKeys(days[j-1], days[j]) <= STREAK_GAP) j--;
+  return { count: i - j + 1, span: daysBetweenKeys(days[j], days[i]) + 1, last: days[i] };
+}
 /* The streak as of `nowTs`. `days` is its length measured across the calendar -
    run Monday and Wednesday and it reads 3, because that is how long you have
-   been keeping it up - and it only moves when a run actually lands. `live` says
-   whether the window is still open, which is the bit worth warning somebody
-   about; `best` is the longest span ever held, for the badges. */
+   been keeping it up - and it only moves when a run actually lands. `live`
+   needs two qualifying days inside the window, so a single run never reads as
+   a streak. `left` is the slack remaining, 0 meaning it shuts tonight, and
+   `count` lets the home strip tell "nothing yet" from "one in, one to go".
+   `best` is the longest chain ever held, for the badges - also two days or it
+   did not happen. */
 function streakAt(runs, nowTs){
   const days = qualifyingDays(runs);
-  if (!days.length) return { days: 0, live: false, best: 0 };
-  let from = 0, span = 1, best = 1;
-  for (let i = 1; i < days.length; i++){
-    if (daysBetweenKeys(days[i-1], days[i]) <= STREAK_GAP) span = daysBetweenKeys(days[from], days[i]) + 1;
-    else { from = i; span = 1; }
-    if (span > best) best = span;
+  let best = 0;
+  for (let i = 0; i < days.length; ){
+    let j = i;
+    while (j + 1 < days.length && daysBetweenKeys(days[j], days[j+1]) <= STREAK_GAP) j++;
+    if (j > i) best = Math.max(best, daysBetweenKeys(days[i], days[j]) + 1);
+    i = j + 1;
   }
-  const last = days[days.length - 1];
-  const gap = daysBetweenKeys(last, dayKey(nowTs));
-  const live = gap <= STREAK_GAP;
-  // `left` is the days of slack remaining, so 0 means the window shuts tonight
-  return { days: live ? span : 0, live, best, last, left: live ? STREAK_GAP - gap : 0 };
-}
-/** Whether a qualifying run recorded at `atTs` is paid the streak multiplier.
-    The first one ever counts: starting a streak is being on schedule. */
-function streakOnAt(runs, atTs){
-  const days = qualifyingDays(runs.filter(r => r.t < atTs));
-  return !days.length || daysBetweenKeys(days[days.length-1], dayKey(atTs)) <= STREAK_GAP;
+  const key = dayKey(nowTs);
+  const c = chainEndingAt(days, key);
+  const live = c.count >= 2;
+  return { days: live ? c.span : 0, live, best, count: c.count, last: c.last,
+           left: c.last ? STREAK_GAP - daysBetweenKeys(c.last, key) : 0 };
 }
 
 /* unit helpers ------------------------------------------------------------ */
@@ -3273,18 +3283,29 @@ function renderStreakStrip(){
   // that it is not. So the dormant line names the reward as something to go
   // and get, and only a live streak states it flatly.
   const mult = `<b>\u00d7${STREAK_MULT.toFixed(2)} XP</b>`;
+  const due = () => {
+    let k = d.streakLast;
+    for (let i = 0; i < STREAK_GAP; i++) k = nextDayKey(k);
+    return new Date(k + "T00:00:00").toLocaleDateString(undefined, { weekday:"short" });
+  };
   let label, note;
   if (!live){
     label = "No streak";
-    note  = `Run ${QUALIFY_KM} km for ${mult}`;
+    // One qualifying run inside the window is not a streak, but it is half of
+    // one, and telling somebody they are half way is a better prompt than
+    // asking them to start from nothing when they already went out.
+    if (d.streakCount === 1){
+      // one sentence with no label in front of it: "No streak - run again by
+      // Wed for x1.20 XP" does not fit a 320px phone, and of the two halves the
+      // label is the one carrying no information the sentence does not
+      label = "";
+      note  = `Run again by ${due()} for ${mult}`;
+    } else {
+      note = `Run ${QUALIFY_KM} km for ${mult}`;
+    }
   } else {
     label = `Streak ${mult}`;
-    if (urgent) note = `Last day \u2014 run ${QUALIFY_KM} km`;
-    else {
-      let k = d.streakLast;
-      for (let i = 0; i < STREAK_GAP; i++) k = nextDayKey(k);
-      note = `Next run by ${new Date(k + "T00:00:00").toLocaleDateString(undefined, { weekday:"short" })}`;
-    }
+    note  = urgent ? `Last day \u2014 run ${QUALIFY_KM} km` : `Next run by ${due()}`;
   }
   el.innerHTML =
     `<span class="fl">${live ? "\u{1F525}" : "\u{1F4A4}"}</span>
@@ -3972,7 +3993,12 @@ function makeRun(at, km, sec, extra){
   // about whether it gets paid: a recovery jog on day three of a streak is
   // still a day you went out, and docking it would punish the easy days that
   // make the hard ones possible.
-  const streakOn = streakOnAt(save.runs, at);
+  //
+  // The run is folded in before asking, because a qualifying run can be the
+  // second day that starts the streak it then collects on. It cannot be the
+  // first: one run is a run, and a streak wants two days.
+  const withThis = save.runs.concat([{ t: at, km }]);
+  const streakOn = streakAt(withThis, at).live;
   const mood = moodIfRunNow(at);
   const p = xpParts(km, mood, streakOn);
   return Object.assign({
@@ -3986,7 +4012,7 @@ function makeRun(at, km, sec, extra){
     xpStreak: p.streak,
     mood: mood.key,
     streakOn,
-    streak: streakAt(save.runs.concat([{ t: at, km }]), at).days,
+    streak: streakAt(withThis, at).days,
     sim: false, path: []
   }, extra || {});
 }
