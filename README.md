@@ -269,7 +269,7 @@ now; the last two are waiting on theirs.
 
 - **Ember** (fire) — Cinder Egg → Cinderling → Blazewyrm → Pyrelord → Infernarch
 - **Verdant** (forest) — Leaf Bud → Bamboo Cub → Panda → Thicketmane → Grovewarden
-- **Nimbus** (storm) — Static Egg → Sparkit → Zephyrite → Tempestor → Thunderarch
+- **Nimbus** (storm) — Static Egg → Sparky → Zephyrite → Tempestor → Thunderarch
 
 Stages 4 and 5 draw a placeholder rather than the vector forms they used to.
 Those forms were fine beside other vectors and wrong beside the pixel art that
@@ -296,7 +296,7 @@ Your choice sets the app's accent colour. The pet's expression and idle
 animation follow how recently you ran: elated the day you run, happy the day
 after, restless at two days, sad at three, and asleep from five.
 
-The Sparkit — Nimbus's baby — is a squirrel with a charge in its ears, and its
+The Sparky — Nimbus's baby — is a squirrel with a charge in its ears, and its
 twelve frames tell the same kind of story the Bamboo Cub's do: it sits, it
 blinks, an acorn drops in, it eats. Its sheet has been redrawn once since; the
 replacement came with soft edges, which are hardened on the way in because the
@@ -312,7 +312,7 @@ bolt and leaves its tip lying in the corner of the frame above.
 
 Its caption and its name changed with it. The form was written as a scrap of
 cloud that hovers a foot off the ground — which this squirrel plainly does not
-— and called the Puffling for the puff it was meant to be. It is the Sparkit
+— and called the Puffling for the puff it was meant to be. It is the Sparky
 now: spark, plus the word for a young squirrel. The species blurb still says
 Nimbus never quite touches the ground, which is true of the two forms nobody
 has drawn yet and of none of the three that exist.
@@ -412,7 +412,7 @@ source cells draw it in a different spot each frame and a pet that wanders
 inside its own box looks like it is hopping about. Anchor on the dragon, not
 on everything opaque: the butterfly is meant to move.
 
-The Sparkit's celebration is the one that charges rather than flashes: two
+The Sparky's celebration is the one that charges rather than flashes: two
 calm frames, a build through six, a spike-ring on frame 7 held over 8, then four
 frames of sparkles easing back to the pose its idle holds. The beats were read
 off the sheet's own cyan pixel count, which runs about 1,100 at rest, 33,000 on
@@ -426,7 +426,7 @@ baseline from the least-lit frame of each row and correct per row, not per
 frame. Per frame would also cancel the crouch the squirrel does before it fires,
 which is animation, not drift.
 
-The Zephyrite's celebration works the same way as the Sparkit's and needed
+The Zephyrite's celebration works the same way as the Sparky's and needed
 the same care, with one number different: its effect pixels - cyan aura and
 orange bolts together - rest near nothing, build from frame 3, and peak on frame
 8 rather than 7, so its flash is told to land a frame later rather than
@@ -567,7 +567,7 @@ use them.
 ## Skills
 
 A form is not the end of a stage, it is the start of one: a pet keeps learning
-inside the form it grew into. The Cinderling, the Sparkit and the Bamboo Cub
+inside the form it grew into. The Cinderling, the Sparky and the Bamboo Cub
 have one move each, all at level 8; the Blazewyrm learns all three of its own
 between level 15, where the form arrives, and level 30, where the next one
 does; and the Zephyrite has the first of its own at 18, the same level the
@@ -576,7 +576,7 @@ Blazewyrm starts.
 | Skill | Form | Learns at | What it does |
 | --- | --- | --- | --- |
 | 🔥 fireball | Cinderling | Level 8 | Sold as the strongest fire you will ever see. Three seconds of winding up, then a cough and some smoke. |
-| ⚡ Spark | Sparkit | Level 8 | Guaranteed to leave something scorched. The something is the squirrel. |
+| ⚡ Spark | Sparky | Level 8 | Guaranteed to leave something scorched. The something is the squirrel. |
 | 🍃 Green Gale | Bamboo Cub | Level 8 | The forest's strength, gathered and released. Out of the wrong end. |
 | 🔥 Fireball | Blazewyrm | Level 18 | Draws a breath and spits a packed ball of flame |
 | 💥 Flame Stomp | Blazewyrm | Level 22 | Lands hard enough to throw a ring of fire out around it |
@@ -585,7 +585,7 @@ Blazewyrm starts.
 
 All three babies' moves are the same joke told three times, which is
 deliberate: a first skill is named for what the pet thinks it is doing. The
-Cinderling coughs smoke; the Sparkit's Spark gathers the whole storm and
+Cinderling coughs smoke; the Sparky's Spark gathers the whole storm and
 earths it through itself, and spends the last second and a half sitting there
 singed while the smoke drifts off it; the Bamboo Cub braces, pulls a whole
 orbiting ring of green in around itself over six quickening frames, and opens
