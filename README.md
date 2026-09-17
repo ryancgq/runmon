@@ -752,12 +752,13 @@ carries the streak forward — never what earns. A recovery jog on day three is
 still a day you went out, and docking it would punish the easy days that make
 the hard ones possible.
 
-The home screen carries a banner for it under the greeting: the flame, the
-length, the multiplier, and the day the window shuts — named as a weekday
+The home screen carries a quiet strip for it under the greeting: whether one is
+running, what it is worth, and the day the window shuts — named as a weekday
 rather than counted in days, because "by Sat" is something you can hold against
-a diary. On the last day it can be saved, the banner tightens and the flame
-starts breathing. With no streak running it stays in place, drained, so the
-page never jumps and the reward stays visible as something to want.
+a diary. Its length is not repeated there; the stat row below already has it.
+On the last day it can be saved the deadline changes colour, and with nothing
+running the strip stays in place, drained, so the page never jumps and the
+multiplier stays visible as something to want.
 
 Two days rather than one is deliberate: a rest day is training, not a lapse,
 and a streak that broke on every rest day would have the game arguing with the

@@ -131,73 +131,35 @@ body::before{
 .hdr .sub{font-size:12px;color:var(--muted);font-weight:700;margin-top:2px}
 .hdr-spacer{flex:1}
 
-/* The streak banner. Loud on purpose: the multiplier is the one number that
-   changes what a run is worth, and until now it was only discoverable by
-   opening a finished run's summary. It sits under the greeting rather than in
-   the stat row because a stat is something you read and this is something you
-   act on - it carries a deadline. The accent is the species' own, so it reads
-   as part of the pet rather than as chrome bolted on top. */
-.streak-band{
-  position:relative;overflow:hidden;
-  display:flex;align-items:center;gap:12px;
-  margin:0 0 16px;padding:12px 14px;
-  border-radius:16px;border:1px solid var(--line);
-  background:linear-gradient(100deg, rgba(var(--glow),.18), rgba(var(--glow),.05) 58%, transparent), var(--card);
+/* The streak strip. One quiet line under the greeting: whether a streak is
+   running, what it is worth, and when it has to be fed. Deliberately not a
+   card - it is a status, not a feature, and the pet below it should be the
+   loudest thing on the screen. The length is left out because the stat row
+   further down already carries it. The accent is the species' own, so what
+   colour it is still says which pet you have. */
+.streak-strip{
+  display:flex;align-items:center;gap:7px;
+  margin:0 0 14px;padding:7px 11px;border-radius:11px;
+  background:rgba(var(--glow),.07);border:1px solid rgba(var(--glow),.16);
+  font-size:12px;font-weight:700;color:var(--muted);
+  white-space:nowrap;overflow:hidden;
 }
-.streak-band::after{
-  content:"";position:absolute;left:-34px;top:-44px;width:156px;height:156px;
-  background:radial-gradient(circle, rgba(var(--glow),.30), transparent 68%);
-  pointer-events:none;
-}
-.streak-band > *{position:relative;z-index:1}
-.streak-band .fl{
-  flex:none;width:42px;height:42px;border-radius:13px;
-  display:grid;place-items:center;font-size:21px;
-  background:rgba(var(--glow),.16);border:1px solid rgba(var(--glow),.35);
-}
-.streak-band .bd{flex:1;min-width:0}
-.streak-band .n{
-  font-family:"Fredoka One","Fredoka",sans-serif;font-size:17px;line-height:1.15;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
-.streak-band .n b{color:var(--accent);font-family:inherit;font-weight:400}
-.streak-band .w{
-  font-size:11.5px;font-weight:700;color:var(--muted);margin-top:3px;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
-.streak-band .mult{
-  flex:none;padding:7px 11px;border-radius:999px;
-  background:linear-gradient(180deg,var(--accent-2),var(--accent));
-  color:var(--accent-ink);font-size:13px;font-weight:900;
-  box-shadow:0 4px 14px rgba(var(--glow),.35);
-}
-/* the last day it can be saved: the deadline stops being a note and starts
-   being a warning, and the flame breathes rather than sitting still */
-.streak-band.urgent{border-color:rgba(var(--glow),.55)}
-.streak-band.urgent .w{color:var(--accent-2)}
-.streak-band.urgent .fl{animation:streakPulse 1.9s ease-in-out infinite}
-@keyframes streakPulse{50%{transform:scale(1.09);box-shadow:0 0 0 6px rgba(var(--glow),.10)}}
-/* nothing running: the same shape, drained, so the page does not jump when a
-   streak starts or breaks, and the reward stays visible as something to want */
-.streak-band.off{background:var(--card)}
-.streak-band.off::after{display:none}
-.streak-band.off .fl{background:var(--card-2);border-color:var(--line);filter:grayscale(1);opacity:.55}
-.streak-band.off .n{font-size:15px;color:var(--muted)}
-.streak-band.off .mult{
-  background:var(--card-2);color:var(--muted-2);
-  box-shadow:none;border:1px solid var(--line);font-weight:800;
-}
-@media (prefers-reduced-motion:reduce){ .streak-band.urgent .fl{animation:none} }
-/* 320px phones: the longest deadline ("Next run by Wednesday") runs out of
-   room beside a full-size pill, so everything gives a little rather than the
-   one line that carries the deadline being the thing that gets cut */
-@media (max-width:360px){
-  .streak-band{gap:9px;padding:11px}
-  .streak-band .fl{width:38px;height:38px;border-radius:11px;font-size:19px}
-  .streak-band .n{font-size:15.5px}
-  .streak-band .w{font-size:11px}
-  .streak-band .mult{padding:6px 9px;font-size:12px}
-}
+.streak-strip .fl{flex:none;font-size:13px;line-height:1}
+.streak-strip .lb{flex:none;color:#c4cbdb}
+.streak-strip .lb b{color:var(--accent);font-weight:900}
+.streak-strip .w{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.streak-strip .w::before{content:"\00b7\00a0"}
+/* the last day it can be saved. A colour change and nothing else: a strip this
+   quiet does not need to move to be noticed against everything around it. */
+.streak-strip.urgent{border-color:rgba(var(--glow),.34)}
+.streak-strip.urgent .w{color:var(--accent-2);font-weight:800}
+/* nothing running: same line, drained, so the page does not jump when a streak
+   starts or breaks and the multiplier stays visible as something to want */
+.streak-strip.off{background:var(--card);border-color:var(--line)}
+.streak-strip.off .fl{filter:grayscale(1);opacity:.5}
+.streak-strip.off .lb{color:var(--muted)}
+.streak-strip.off .lb b{color:var(--muted-2)}
+@media (max-width:360px){ .streak-strip{font-size:11.5px;gap:6px;padding:7px 9px} }
 .iconbtn{
   width:38px;height:38px;flex:0 0 38px;display:grid;place-items:center;
   border-radius:12px;background:var(--card);border:1px solid var(--line);
@@ -1050,7 +1012,7 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
         </button>
       </div>
 
-      <div class="streak-band" id="streak-band" hidden></div>
+      <div class="streak-strip" id="streak-strip" hidden></div>
 
       <div class="pet-stage" id="pet-stage">
         <div class="pet-halo"></div>
@@ -3288,38 +3250,31 @@ function renderSkillChips(){
        <span class="em">${k.ico}</span>${k.name}</button>`).join("");
 }
 
-/* The banner under the greeting. Three states, and the deadline is named as a
-   weekday rather than counted in days: "by Thursday" is something you can hold
-   against a diary, "2 days left" is arithmetic you have to do again tomorrow. */
-function renderStreakBand(){
-  const el = $("#streak-band"), d = derived;
-  if (!d.runs.length){ el.hidden = true; return; }   // before the first run there is nothing to keep
+/* The strip under the greeting. Three states, and the deadline is named as a
+   weekday rather than counted in days: "by Sat" is something you can hold
+   against a diary, "2 days left" is arithmetic you have to redo tomorrow.
+   Abbreviated because "Next run by Wednesday" is the one string that will not
+   fit on a 320px phone, and a clipped deadline is worse than a short one. */
+function renderStreakStrip(){
+  const el = $("#streak-strip"), d = derived;
+  if (!d.runs.length){ el.hidden = true; return; }   // nothing to keep yet
   el.hidden = false;
   const live = d.streakLive, urgent = live && d.streakLeft === 0;
   el.classList.toggle("off", !live);
   el.classList.toggle("urgent", urgent);
 
-  let due = "";
-  if (live && !urgent){
+  let note;
+  if (!live) note = `Run ${QUALIFY_KM} km to start one`;
+  else if (urgent) note = `Last day \u2014 run ${QUALIFY_KM} km`;
+  else {
     let k = d.streakLast;
     for (let i = 0; i < STREAK_GAP; i++) k = nextDayKey(k);
-    // short form: "Next run by Wednesday" is the one string that will not fit
-    // beside the pill on a 320px phone, and a clipped deadline is worse than
-    // an abbreviated one
-    due = new Date(k + "T00:00:00").toLocaleDateString(undefined, { weekday:"short" });
+    note = `Next run by ${new Date(k + "T00:00:00").toLocaleDateString(undefined, { weekday:"short" })}`;
   }
-  const title = live
-    ? `<b>${d.streak}</b> day streak`
-    : `Start a streak`;
-  // kept short on purpose: the row is one line and ellipsis on a deadline is
-  // worse than no deadline at all
-  const note = !live ? `Run ${QUALIFY_KM} km to begin`
-    : urgent          ? `Last day \u2014 run ${QUALIFY_KM} km`
-    :                   `Next run by ${due}`;
   el.innerHTML =
-    `<div class="fl">${live ? "\u{1F525}" : "\u{1F4A4}"}</div>
-     <div class="bd"><div class="n">${title}</div><div class="w">${note}</div></div>
-     <div class="mult">\u00d7${STREAK_MULT.toFixed(2)} XP</div>`;
+    `<span class="fl">${live ? "\u{1F525}" : "\u{1F4A4}"}</span>
+     <span class="lb">Streak <b>\u00d7${STREAK_MULT.toFixed(2)} XP</b></span>
+     <span class="w">${note}</span>`;
 }
 
 /* --- home ---------------------------------------------------------------- */
@@ -3341,7 +3296,7 @@ function renderHome(){
 
   const hour = new Date().getHours();
   $("#greeting").textContent = hour < 5 ? "Still up?" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-  renderStreakBand();
+  renderStreakStrip();
   $("#greeting-sub").textContent = d.runs.length
     ? (d.gapDays === 0 ? "You already ran today — nice." : d.gapDays === 1 ? "You ran yesterday. Keep it rolling." : `${d.gapDays} days since your last run`)
     : "Let's log your first run";
