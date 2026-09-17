@@ -348,9 +348,9 @@ wind-up needs no such handling, since the shiver it puts on the holder simply
 replaces the shake for its second and a half.
 
 Eggs crack as they level. They are the one form whose art changes inside its
-own stage — intact at level 1, a first split at 2, a full web at 3 — and the
-crack is the level-up celebration: `<species>:0@2` and `<species>:0@3` in
-`LEVEL_UP_ART` carry the shell from one phase to the next and end on the frame
+own stage — intact through levels 1 and 2, a first split at 3, a full web at 4
+— and the crack is the level-up celebration: `<species>:0@3` and
+`<species>:0@4` in `LEVEL_UP_ART` carry the shell from one phase to the next and end on the frame
 the new idle opens with, so the celebration and the change of art are one
 event. `EGG_PHASES` is keyed by species, and any species with an entry gets
 this behaviour; the Cinder Egg cracks on frame 9 both times, the acorn splits
@@ -359,8 +359,14 @@ on 7 and spreads on 10, and the Leaf Bud lets its leaves go on 6 and then on 5
 where two loose blobs first appear beside the bud. While a level-up is armed the pet is still drawn as it was *before* it,
 or you would come home to an already cracked shell and then watch it crack.
 
+The shell's two phases sit at levels 3 and 4 rather than 2 and 3. They used to
+land in the first third of the egg's life — both cracks spent inside 10 km,
+then 15 km looking identical while the longest two level-ups went by with
+nothing to show. At 5 km a day it is now a plain shell to 10 km, cracked to
+20 km, and breaking for the last stretch before it hatches at 25 km.
+
 The Verdant egg is the exception that proves what the packing is for. It does
-not crack — it peels, a full bud at level 1 down to a tight pale core at 3,
+not crack — it peels, a full bud through levels 1 and 2 down to a tight pale core at 4,
 310px tall in the pack and then 226px, a layer of leaf gone each time. So its
 three phases are packed in one pass like the other two eggs, sharing a frame,
 a ground line to a pixel and a centre to about one, but they are deliberately

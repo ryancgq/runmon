@@ -1622,18 +1622,18 @@ function skillsFor(speciesId){ return SKILLS[speciesId] || []; }
 const EGG_PHASES = {
   ember: [
     { from:1, src:"art/ember-egg.png" },
-    { from:2, src:"art/ember-egg-cracked.png" },
-    { from:3, src:"art/ember-egg-breaking.png" }
+    { from:3, src:"art/ember-egg-cracked.png" },
+    { from:4, src:"art/ember-egg-breaking.png" }
   ],
   nimbus: [
     { from:1, src:"art/nimbus-egg.png" },
-    { from:2, src:"art/nimbus-egg-cracked.png" },
-    { from:3, src:"art/nimbus-egg-breaking.png" }
+    { from:3, src:"art/nimbus-egg-cracked.png" },
+    { from:4, src:"art/nimbus-egg-breaking.png" }
   ],
   verdant: [
     { from:1, src:"art/verdant-egg.png" },
-    { from:2, src:"art/verdant-egg-cracked.png" },
-    { from:3, src:"art/verdant-egg-breaking.png" }
+    { from:3, src:"art/verdant-egg-cracked.png" },
+    { from:4, src:"art/verdant-egg-breaking.png" }
   ]
 };
 function eggPhaseSrc(species, level){
@@ -1659,19 +1659,19 @@ const LEVEL_UP_ART = {
   // lands on frame 9 of 12, which leaves no frames for a settle; the template
   // spends that time on the last frame instead, and the shell sits there split
   // open while the caption arrives.
-  "ember:0@2": levelUpClip({ src:"art/ember-egg-crack-1.png", frames:12,
+  "ember:0@3": levelUpClip({ src:"art/ember-egg-crack-1.png", frames:12,
     gather:2, burst:9, aspect:0.871, scale:0.71, dx:0, dy:-0.9,
     cap:{ top:12, right:45 } }),
-  "ember:0@3": levelUpClip({ src:"art/ember-egg-crack-2.png", frames:12,
+  "ember:0@4": levelUpClip({ src:"art/ember-egg-crack-2.png", frames:12,
     gather:2, burst:9, aspect:0.871, scale:0.71, dx:0, dy:-0.9,
     cap:{ top:12, right:45 } }),
   // The Nimbus acorn splits on its own schedule: the first crack arrives on
   // frame 7 of 12, the spread on frame 10. Measured off the sheets rather than
   // copied from the Cinder Egg, which cracks on 9 both times.
-  "nimbus:0@2": levelUpClip({ src:"art/nimbus-egg-crack-1.png", frames:12,
+  "nimbus:0@3": levelUpClip({ src:"art/nimbus-egg-crack-1.png", frames:12,
     gather:2, burst:7, aspect:1.194, scale:0.932, dx:0.00, dy:-2.19,
     cap:{ top:12, right:45 } }),
-  "nimbus:0@3": levelUpClip({ src:"art/nimbus-egg-crack-2.png", frames:12,
+  "nimbus:0@4": levelUpClip({ src:"art/nimbus-egg-crack-2.png", frames:12,
     gather:2, burst:10, aspect:1.194, scale:0.932, dx:0.00, dy:-2.19,
     cap:{ top:12, right:45 } }),
   // The Leaf Bud does not crack, it sheds: the outer leaves open over four
@@ -1681,10 +1681,10 @@ const LEVEL_UP_ART = {
   // clip and the change of art are the same event - which took a scale ramp
   // in the pack, because these sheets shrink the bud harder than the phases
   // they join do. See the packing notes in the README.
-  "verdant:0@2": levelUpClip({ src:"art/verdant-egg-crack-1.png", frames:12,
+  "verdant:0@3": levelUpClip({ src:"art/verdant-egg-crack-1.png", frames:12,
     gather:1, burst:5, aspect:1.339, scale:1.048, dx:1.05, dy:-3.75,
     cap:{ top:12, right:45 } }),
-  "verdant:0@3": levelUpClip({ src:"art/verdant-egg-crack-2.png", frames:12,
+  "verdant:0@4": levelUpClip({ src:"art/verdant-egg-crack-2.png", frames:12,
     gather:1, burst:4, aspect:1.339, scale:1.048, dx:1.05, dy:-3.75,
     cap:{ top:12, right:45 } }),
   // this one scowls and shuts its eyes for four frames before any gold shows,
@@ -1723,8 +1723,8 @@ const LEVEL_UP_ART = {
     gather:2, burst:7, aspect:1.028, scale:1.274, dx:4.9, dy:-2.8 })
 };
 /* Keyed by form, and by level where a form celebrates differently at different
-   levels - which so far is the egg, whose two crack clips belong to levels 2
-   and 3 rather than to the stage as a whole. */
+   levels - which so far is the egg, whose two crack clips belong to levels 3
+   and 4 rather than to the stage as a whole. */
 function levelUpArt(speciesId, stage, level){
   const form = speciesId + ":" + stage;
   return LEVEL_UP_ART[form + "@" + level] || LEVEL_UP_ART[form] || null;
