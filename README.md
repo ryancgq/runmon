@@ -742,9 +742,11 @@ weekly settles around Content, fortnightly around Sad. New pets start Happy:
 new is not the same as neglected.
 
 **Streaks.** A flat **×1.20**, for anyone running at least once every two days.
-Clear 2 km, do it again within two days, and it holds; leave a third day and it
-is off until the next qualifying run starts a new one. There is nothing to
-climb and no partial credit — it is on or it is not.
+It takes **two qualifying runs on separate days** to start one — a single run
+is a run, not a habit, and twice in one day is still one day. After that, clear
+2 km again within two days and it holds; leave a third day and it is off until
+two more runs start a new one. There is nothing to climb and no partial credit
+— it is on or it is not.
 
 While it is running it pays on **every** run, however short. The 2 km bar
 decides what *moves* things — whether a run raises a mood rung, whether it
@@ -759,7 +761,10 @@ a diary. Its length is not repeated there; the stat row below already has it.
 On the last day it can be saved the deadline changes colour. With nothing
 running the strip stays in place, drained, so the page never jumps — and it
 says "No streak · run 2 km for ×1.20 XP" rather than stating the multiplier
-flatly, because a greyed-out rate still reads as a rate being paid.
+flatly, because a greyed-out rate still reads as a rate being paid. With one
+qualifying run in and the window still open it drops the label and says "run
+again by Sat for ×1.20 XP": half way is a better prompt than starting from
+nothing.
 
 Two days rather than one is deliberate: a rest day is training, not a lapse,
 and a streak that broke on every rest day would have the game arguing with the
