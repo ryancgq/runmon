@@ -746,6 +746,13 @@ holds; leave a third day and it is off until the next qualifying run starts a
 new one. There is nothing to climb and no partial credit — it is on or it is
 not.
 
+The home screen carries a banner for it under the greeting: the flame, the
+length, the multiplier, and the day the window shuts — named as a weekday
+rather than counted in days, because "by Sat" is something you can hold against
+a diary. On the last day it can be saved, the banner tightens and the flame
+starts breathing. With no streak running it stays in place, drained, so the
+page never jumps and the reward stays visible as something to want.
+
 Two days rather than one is deliberate: a rest day is training, not a lapse,
 and a streak that broke on every rest day would have the game arguing with the
 sport. The counter is the streak's length across the calendar, so running
