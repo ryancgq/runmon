@@ -359,11 +359,17 @@ on 7 and spreads on 10, and the Leaf Bud lets its leaves go on 6 and then on 5
 where two loose blobs first appear beside the bud. While a level-up is armed the pet is still drawn as it was *before* it,
 or you would come home to an already cracked shell and then watch it crack.
 
-The shell's two phases sit at levels 3 and 4 rather than 2 and 3. They used to
-land in the first third of the egg's life — both cracks spent inside 10 km,
-then 15 km looking identical while the longest two level-ups went by with
-nothing to show. At 5 km a day it is now a plain shell to 10 km, cracked to
-20 km, and breaking for the last stretch before it hatches at 25 km.
+The shell's two phases sit at levels 3 and 4 rather than 2 and 3, and the
+spacing is worth stating in XP rather than kilometres: the same kilometre is
+worth anywhere from 0.50× to 1.20× depending on mood and streak, so distance
+is not a fixed measure of how long a wait feels.
+
+The egg's whole life is 3,033 XP. The changes now fall at 1,000 (33%) and
+1,858 (61%), leaving three waits of 1,000, 858 and 1,175 XP — 33%, 28% and 39%
+of the stage. They used to fall at 400 (13%) and 1,000 (33%), both inside the
+first third, after which the shell looked identical for the remaining 2,033 XP:
+two thirds of the wait, covering the two most expensive level-ups in the stage,
+with nothing to show for either.
 
 The Verdant egg is the exception that proves what the packing is for. It does
 not crack — it peels, a full bud through levels 1 and 2 down to a tight pale core at 4,
