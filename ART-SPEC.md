@@ -122,11 +122,17 @@ the species' colour. It draws no body and no outline on purpose: a silhouette
 would be a guess the real art then has to honour. Supplying a sheet for one of
 these replaces it; nothing else has to change.
 
-Verdant's first three forms are now pandas, while its last two are still
-written as moss spirits. Supply panda art for those two as well, or rewrite
-them — the species reads as two ideas until one of those happens. Their names
-still describe the moss-spirit idea too, where the first three have been
-renamed to match what they are.
+Two of the three lines have diverged from what they were designed as, and both
+diverged the same way: the first three forms were drawn as animals, the last
+two are still written as the elemental spirits the species started out as.
+
+Verdant's first three are pandas, its last two moss spirits. Nimbus's first
+three are squirrels — an acorn-capped egg, then the same creature twice,
+grown — while its last two are floating weather. Supply art that continues the
+animal, or rewrite the last two, but a species reads as two ideas until one of
+those happens. The names go with the old idea as well, where the first three
+have been renamed to match what they are. Ember is the one line that never
+moved: dragons the whole way up.
 
 Egg forms need far less than twelve frames — a pulse, a wobble, a crack. Four
 frames is plenty; supply what the form needs and say how many. The Cinder Egg

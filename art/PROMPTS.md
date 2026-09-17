@@ -88,45 +88,66 @@ frames.
 Size in frame is what makes evolution read as growth: they all display in the
 same box, so a later form must fill more of it.
 
+Forms marked *done* are drawn and shipping — the note beside each says what is
+actually on screen, which for two of the three lines is not what the original
+subject line described. Forms marked ⚠️ **superseded** still carry the
+concept their line was designed around before the art diverged; read the note
+under each table before generating one.
+
 ### Ember — fire, aggressive and energetic
 
-Warm reds and oranges, dark charcoal horns and wings, glowing amber highlights.
+A dragon line. Warm pink-reds through to deep red, dark charcoal horns and
+small bat wings, glowing amber where the fire shows through. It scowls.
 
 | Form | Subject line | Size in frame |
 | --- | --- | --- |
-| 1 · Cinder Egg | `SUBJECT: a dark obsidian egg veined with glowing molten cracks, a small flame flickering at its tip, heat radiating from the shell` | fills ~55% of frame height |
-| 2 · Cinderling | *done* — `art/ember-cinderling.png` | ~70% |
-| 3 · Blazewyrm | *done* — `art/ember-blazewyrm.png` | ~80% |
+| 1 · Cinder Egg | *done* — `art/ember-egg.png`, `-cracked`, `-breaking`, plus `-crack-1` and `-crack-2` (a speckled red shell, not the obsidian one first written for here) | fills ~55% of frame height |
+| 2 · Cinderling | *done* — `art/ember-cinderling.png` (a round pink-red dragon, small dark horns and bat wings, permanently cross) | ~70% |
+| 3 · Blazewyrm | *done* — `art/ember-blazewyrm.png` (the same dragon deeper red and leaner, fire along the wings) | ~80% |
 | 4 · Pyrelord | `SUBJECT: a full-grown fire drake, broad spread wings, a glowing molten core in its chest, heavy horns, air shimmering with heat around it` | ~90% |
 | 5 · Infernarch | `SUBJECT: a regal fire dragon crowned in living flame, wide wings, blazing chest core, orbiting embers, imperious` | ~95% |
 
-### Verdant — forest, calm and glowing
+### Verdant — forest, calm and sleepy
 
-Mossy greens, warm bark browns, pale glowing yellow-green light.
+**The drawn line is pandas**, not the moss spirits first written for here.
+Black and white fur, warm cream muzzles, leaf green as the accent and the
+glow. Forms 4 and 5 below still describe the superseded idea.
 
 | Form | Subject line | Size in frame |
 | --- | --- | --- |
 | 1 · Leaf Bud | *done* — `art/verdant-egg.png`, `-cracked`, `-breaking`, plus `-crack-1` and `-crack-2` (a leaf bud that peels rather than cracks, so the three phases run largest to smallest) | fills ~55% |
-| 2 · Bamboo Cub | *done* — `art/verdant-bamboo-cub.png` (a panda cub; the rest of this line is still moss spirits) | ~70% |
-| 3 · Panda | *done* — `art/verdant-panda.png` (a bigger panda, matching the cub; the two lines below are still the moss-spirit idea) | ~80% |
-| 4 · Thicketmane | `SUBJECT: a forest guardian with broad antlers heavy with leaves, a thick moss mantle, small flowers opening along the antlers, a glowing rune on its chest` | ~90% |
-| 5 · Grovewarden | `SUBJECT: an ancient forest warden, a crown of antlers in blossom, moss robes, a bright green heartlight in its chest, leaves drifting around it` | ~95% |
+| 2 · Bamboo Cub | *done* — `art/verdant-bamboo-cub.png` (a round panda cub, bamboo dropping in for it to catch and eat) | ~70% |
+| 3 · Panda | *done* — `art/verdant-panda.png` (the cub grown, sitting up and mostly asleep) | ~80% |
+| 4 · Thicketmane | ⚠️ superseded — `SUBJECT: a forest guardian with broad antlers heavy with leaves, a thick moss mantle, small flowers opening along the antlers, a glowing rune on its chest` | ~90% |
+| 5 · Grovewarden | ⚠️ superseded — `SUBJECT: an ancient forest warden, a crown of antlers in blossom, moss robes, a bright green heartlight in its chest, leaves drifting around it` | ~95% |
+
+These two are moss spirits and the three forms above them are pandas. The
+names belong to the old idea as well. Rewrite both before generating, or
+rename the line.
 
 ### Nimbus — storm, playful and sparky
 
-Cloud whites and cool blue-greys, bright yellow lightning, no ground contact.
+**The drawn line is squirrels**, not the floating cloud sprites first written
+for here. Cool blues and slate greys, cream chest and muzzle, gold-orange
+lightning, and a cyan teardrop glowing above each eye. They sit on the ground
+like animals. Forms 4 and 5 below still describe the superseded idea.
 
 | Form | Subject line | Size in frame |
 | --- | --- | --- |
-| 1 · Static Egg | `SUBJECT: an egg wrapped tightly in cloud, small arcs of blue and yellow static crackling across the shell` | fills ~55% |
-| 2 · Puffling | `SUBJECT: a small giggling scrap of storm cloud with a lightning-bolt tail, blushing cheeks, hovering just above the line rather than resting on it` | ~70% |
-| 3 · Zephyrite | `SUBJECT: a young storm sprite with bolt-shaped wings, a fluffy cloud body, far too much energy, floating` | ~80% |
-| 4 · Tempestor | `SUBJECT: a rolling storm front with a face, dark cloud mane, lightning arcing from its flanks, a glowing core, floating` | ~90% |
-| 5 · Thunderarch | `SUBJECT: a crowned storm head, a jagged lightning crown, dark thunderhead body, a brilliant core, its own lightning orbiting it, floating` | ~95% |
+| 1 · Static Egg | *done* — `art/nimbus-egg.png`, `-cracked`, `-breaking`, plus `-crack-1` and `-crack-2` (a navy-capped shell like an acorn, which is where the squirrel comes from) | fills ~55% |
+| 2 · Puffling | *done* — `art/nimbus-puffling.png` (a grey-blue squirrel with a big soft tail and cyan marks above the eyes) | ~70% |
+| 3 · Zephyrite | *done* — `art/nimbus-zephyrite.png` (the same squirrel grown up and brighter blue, lightning arcing off the tail) | ~80% |
+| 4 · Tempestor | ⚠️ superseded — `SUBJECT: a rolling storm front with a face, dark cloud mane, lightning arcing from its flanks, a glowing core, floating` | ~90% |
+| 5 · Thunderarch | ⚠️ superseded — `SUBJECT: a crowned storm head, a jagged lightning crown, dark thunderhead body, a brilliant core, its own lightning orbiting it, floating` | ~95% |
 
-Nimbus forms float, so "feet on a shared line" becomes "the **lowest point** of
-the cloud on a shared line" — the rule is that nothing drifts vertically
-between frames, not that it touches the ground.
+Those last two are the cloud-sprite idea the first three forms were drawn out
+of. Generating them as written would give the line a squirrel, a squirrel, and
+then a weather system. Rewrite them as the squirrel grown into a storm before
+using them, or accept the break deliberately.
+
+If a floating form is ever drawn, "feet on a shared line" becomes "the
+**lowest point** on a shared line" — the rule is that nothing drifts
+vertically between frames, not that it touches the ground.
 
 ---
 
