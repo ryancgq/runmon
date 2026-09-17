@@ -359,6 +359,14 @@ on 7 and spreads on 10, and the Leaf Bud lets its leaves go on 6 and then on 5
 where two loose blobs first appear beside the bud. While a level-up is armed the pet is still drawn as it was *before* it,
 or you would come home to an already cracked shell and then watch it crack.
 
+Level 2 is the one level-up inside the egg with no crack to show, and it does
+not pass in silence: the shell shakes — the idle rock wound all the way up,
+building rather than looping so it reads as effort — stops dead, and the
+"Level up" caption lands in the quiet after it. Confetti is smaller than a real
+celebration's, because nothing has actually broken open. Only the egg gets this
+fallback: a later form with no art is art nobody has drawn yet, and shaking a
+panda would be covering for that rather than saying anything.
+
 The shell's two phases sit at levels 3 and 4 rather than 2 and 3, and the
 spacing is worth stating in XP rather than kilometres: the same kilometre is
 worth anywhere from 0.50× to 1.20× depending on mood and streak, so distance
