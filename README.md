@@ -756,9 +756,10 @@ The home screen carries a quiet strip for it under the greeting: whether one is
 running, what it is worth, and the day the window shuts — named as a weekday
 rather than counted in days, because "by Sat" is something you can hold against
 a diary. Its length is not repeated there; the stat row below already has it.
-On the last day it can be saved the deadline changes colour, and with nothing
-running the strip stays in place, drained, so the page never jumps and the
-multiplier stays visible as something to want.
+On the last day it can be saved the deadline changes colour. With nothing
+running the strip stays in place, drained, so the page never jumps — and it
+says "No streak · run 2 km for ×1.20 XP" rather than stating the multiplier
+flatly, because a greyed-out rate still reads as a rate being paid.
 
 Two days rather than one is deliberate: a rest day is training, not a lapse,
 and a streak that broke on every rest day would have the game arguing with the

@@ -148,6 +148,7 @@ body::before{
 .streak-strip .lb{flex:none;color:#c4cbdb}
 .streak-strip .lb b{color:var(--accent);font-weight:900}
 .streak-strip .w{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.streak-strip .w b{color:#c4cbdb;font-weight:900}
 .streak-strip .w::before{content:"\00b7\00a0"}
 /* the last day it can be saved. A colour change and nothing else: a strip this
    quiet does not need to move to be noticed against everything around it. */
@@ -159,6 +160,7 @@ body::before{
 .streak-strip.off .fl{filter:grayscale(1);opacity:.5}
 .streak-strip.off .lb{color:var(--muted)}
 .streak-strip.off .lb b{color:var(--muted-2)}
+.streak-strip.off .w b{color:var(--muted)}
 @media (max-width:360px){ .streak-strip{font-size:11.5px;gap:6px;padding:7px 9px} }
 .iconbtn{
   width:38px;height:38px;flex:0 0 38px;display:grid;place-items:center;
@@ -3265,17 +3267,28 @@ function renderStreakStrip(){
   el.classList.toggle("off", !live);
   el.classList.toggle("urgent", urgent);
 
-  let note;
-  if (!live) note = `Run ${QUALIFY_KM} km to start one`;
-  else if (urgent) note = `Last day \u2014 run ${QUALIFY_KM} km`;
-  else {
-    let k = d.streakLast;
-    for (let i = 0; i < STREAK_GAP; i++) k = nextDayKey(k);
-    note = `Next run by ${new Date(k + "T00:00:00").toLocaleDateString(undefined, { weekday:"short" })}`;
+  // The multiplier moves into the sentence when there is no streak. Greying it
+  // out is not enough on its own: "Streak x1.20 XP" beside a sleeping emoji
+  // still reads as a rate being paid, when the whole point of that state is
+  // that it is not. So the dormant line names the reward as something to go
+  // and get, and only a live streak states it flatly.
+  const mult = `<b>\u00d7${STREAK_MULT.toFixed(2)} XP</b>`;
+  let label, note;
+  if (!live){
+    label = "No streak";
+    note  = `Run ${QUALIFY_KM} km for ${mult}`;
+  } else {
+    label = `Streak ${mult}`;
+    if (urgent) note = `Last day \u2014 run ${QUALIFY_KM} km`;
+    else {
+      let k = d.streakLast;
+      for (let i = 0; i < STREAK_GAP; i++) k = nextDayKey(k);
+      note = `Next run by ${new Date(k + "T00:00:00").toLocaleDateString(undefined, { weekday:"short" })}`;
+    }
   }
   el.innerHTML =
     `<span class="fl">${live ? "\u{1F525}" : "\u{1F4A4}"}</span>
-     <span class="lb">Streak <b>\u00d7${STREAK_MULT.toFixed(2)} XP</b></span>
+     <span class="lb">${label}</span>
      <span class="w">${note}</span>`;
 }
 
