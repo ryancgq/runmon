@@ -737,6 +737,16 @@ A run is paid at the rung it starts in and climbs afterwards, so a Hungry pet's
 comeback run earns 50% and the next one earns 60%. Climbing is the reward,
 payable next time; scoring at the new rung would make the ladder free.
 
+**The day a run falls in does not count against it.** Idle days are counted to
+the end of yesterday, because a day in progress has not finished and the run
+that saves it may be an hour away. Without that the ladder quietly topped out a
+rung below the top: Elated goes to a single idle day, so at the moment you
+logged a run its day was still empty, the replay read that as the idle day, and
+every first run of a day was paid 90% however long the streak behind it. The
+pet was Elated all evening and never Elated at the one moment that paid. A day
+that already has a qualifying run is counted in full, so a second run of the
+day still collects the climb the first earned.
+
 The bottom is deliberately sticky. Eighteen idle days separate Elated from the
 floor and the lower rungs are the slow ones, so somebody who has already lapsed
 is not chased further down. Running daily or every other day holds Elated,
@@ -802,9 +812,13 @@ The curve as tuned:
 | Adult | 30 | 82,005 | ~607 km |
 | Final | 50 | 176,744 | ~1,309 km |
 
-Distances assume 5 km runs with the pet at Elated and the streak held — ×1.20.
-A pet left at Restless with the streak broken earns 0.70×, so the same forms
-cost it nearly twice as far.
+Distances assume 5 km runs at ×1.20 — Elated with the streak held, which is
+what daily running settles at. Simulated from a fresh pet through the real
+scoring path, the egg hatches in **25 km over 5 runs** at that size: the first
+run is paid at Happy with no streak yet, so it costs a little more than the
+table's flat rate. Shorter runs cost more (27 km in 3 km pieces), and so does
+letting the multipliers lapse — a pet left at Restless with the streak broken
+earns 0.70×, so the same forms cost it nearly twice as far.
 
 `LEVEL_BASE`, `LEVEL_DECAY`, `EARLY_UNTIL` and `EARLY_MULT` near the top of the
 file control this, and `Runmon.xpTable()` prints the whole curve in the

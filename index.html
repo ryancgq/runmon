@@ -2085,7 +2085,7 @@ function recompute(){
     streakLeft: sk.left, streakLast: sk.last, streakCount: sk.count,
     level: lv.level, into: lv.into, need: lv.need, pct: lv.pct,
     stage, lastRunTs, gapDays,
-    mood: moodByRank(moodRankAt(runs, Date.now())),
+    mood: moodAt(runs, Date.now()),
     species: save.species ? SPECIES[save.species] : SPECIES.ember,
     skills: skillsFor(save.species).map(sk => ({
       ...sk,
@@ -2142,9 +2142,29 @@ function moodRankAt(runs, nowTs){
   }
   return rank;
 }
+/* The rung as of `ts`, counting the day `ts` falls in only once there is a
+   qualifying run in it. A day in progress cannot be held against the pet: it
+   has not finished, and the run that would save it may be an hour away.
+
+   Without this the ladder quietly topped out one rung below the top. Elated is
+   lost to a single idle day, so at the moment you logged a run the day it fell
+   in was still empty, the replay read that as the idle day, and the pet had
+   already slipped to Happy - every first run of a day was paid 90% however long
+   the streak behind it. The pet was Elated all evening and never Elated at the
+   one moment that paid.
+
+   A day that already has a qualifying run is replayed in full, so a second run
+   of the day still collects the climb the first one earned. */
+function moodAt(runs, ts){
+  const key = dayKey(ts);
+  const ran = runs.some(r => dayKey(r.t) === key && r.km >= QUALIFY_KM);
+  // one millisecond before today began, i.e. the end of yesterday
+  const upTo = ran ? ts : new Date(key + "T00:00:00").getTime() - 1;
+  return moodByRank(moodRankAt(runs, upTo));
+}
 /** The mood a run recorded at `atTs` is paid at: the rung before it climbs. */
 function moodIfRunNow(atTs){
-  return moodByRank(moodRankAt(save.runs.filter(r => r.t < atTs), atTs));
+  return moodAt(save.runs.filter(r => r.t < atTs), atTs);
 }
 
 /** Days on which a run cleared the bar, ascending. Short runs are not in here -
