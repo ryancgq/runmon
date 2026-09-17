@@ -1584,7 +1584,7 @@ const SKILLS = {
       blurb:"Asks the sky for help. The sky, this time, obliges.",
       sprite:{ src:"art/skill-lightning-bolt.png", frames:12, fps:3,
         /* It gathers, the sky answers, and the bolt lands. The charge quickens
-           the way the Sparkit's does; the strike is four frames that grow, so
+           the way the Sparky's does; the strike is four frames that grow, so
            they are held rather than cycled, and the last one longest. */
         durations:[380, 340, 300, 260, 230, 200, 180, 160, 150, 170, 260, 460],
         aspect:1.061, scale:1.376, dx:5.6, dy:-25.2 } }
@@ -1595,7 +1595,7 @@ const SKILLS = {
       blurb:"Gathers the forest's strength and lets it go in one mighty gust. Stand upwind.",
       sprite:{ src:"art/skill-fart.png", frames:12, fps:3,
         /* Brace, gather, and the wrong end opens. Six charge frames quicken
-           the way the Sparkit's do, to a ring of green at its widest - and
+           the way the Sparky's do, to a ring of green at its widest - and
            then frame 7, which draws nothing at all but the cub straining.
            That stop is the joke, so it is the clip's longest hold outright
            and the only beat with no effect on screen. What follows is the
@@ -1698,13 +1698,13 @@ const LEVEL_UP_ART = {
     cap:{ top:16, right:44 } }),
   "ember:2": levelUpClip({ src:"art/levelup-blazewyrm.png", frames:16,
     gather:2, burst:7, aspect:1, scale:1.58, dx:2, dy:-1.1 }),
-  // The Sparkit charges rather than flashes: two calm frames, a build through
+  // The Sparky charges rather than flashes: two calm frames, a build through
   // six, the spike-ring on 7 held over 8, then four frames of sparkles easing
   // back to the idle's own pose. Measured off the sheet's cyan pixel count,
   // which runs 1.1k at rest, 33k on the burst and 1.1k again by frame 12.
-  "nimbus:1": levelUpClip({ src:"art/levelup-sparkit.png", frames:12,
+  "nimbus:1": levelUpClip({ src:"art/levelup-sparky.png", frames:12,
     gather:2, burst:7, aspect:1.075, scale:1.053, dx:-0.85, dy:-7.25 }),
-  // The Zephyrite discharges a frame later than the Sparkit does - its cyan
+  // The Zephyrite discharges a frame later than the Sparky does - its cyan
   // and orange effect pixels rest near nothing, build from frame 3, and peak on
   // 8 rather than 7 - so the flash is told to land there rather than inheriting
   // the baby's timing.
@@ -1783,8 +1783,8 @@ const SPECIES = {
     theme:{ accent:"#7cd4fd", accent2:"#fde047", ink:"#04202e", glow:"124,212,253" },
     stages:[
       { name:"Static Egg",  desc:"An acorn, more or less, with static flicking off the cap." },
-      { name:"Sparkit",    desc:"A static-charged squirrel, ears crackling. Mostly interested in acorns." },
-      { name:"Zephyrite",   desc:"Still a squirrel. The tail is now a hazard. Far too much energy for its size." },
+      { name:"Sparky",    desc:"Static-charged, ears crackling. Mostly interested in acorns." },
+      { name:"Zephyrite",   desc:"Same creature, mostly. The tail is now a hazard. Far too much energy for its size." },
       { name:"Tempestor",   desc:"" },
       { name:"Thunderarch", desc:"" }
     ]
@@ -2574,7 +2574,7 @@ PET_ART.nimbus = [
     ${c.mood === "asleep" ? zzz(154,60) : ""}
   </g>`; },
 
-/* 1 — Sparkit */ (c) => { const i = c.id; return `
+/* 1 — Sparky */ (c) => { const i = c.id; return `
   <defs>
     <radialGradient id="bd${i}" cx="36%" cy="26%"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#bcd7f0"/></radialGradient>
     <filter id="gb${i}" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2.4"/></filter>
@@ -2674,7 +2674,7 @@ const DEFAULT_SPRITES = {
     frames:12, rows:1, fps:2, aspect:1.339, scale:1.048, dx:1.05, dy:-3.75
   },
   "nimbus:1": {
-    src:"art/nimbus-sparkit.png",
+    src:"art/nimbus-sparky.png",
     // 12-frame loop: sits, blinks, an acorn drops in, and it eats. The pack's
     // rows each draw the squirrel higher than the last, so every frame is
     // pinned to one ground line - only the squirrel, since the acorn and the

@@ -135,7 +135,7 @@ like animals. Forms 4 and 5 below still describe the superseded idea.
 | Form | Subject line | Size in frame |
 | --- | --- | --- |
 | 1 · Static Egg | *done* — `art/nimbus-egg.png`, `-cracked`, `-breaking`, plus `-crack-1` and `-crack-2` (a navy-capped shell like an acorn, which is where the squirrel comes from) | fills ~55% |
-| 2 · Sparkit | *done* — `art/nimbus-sparkit.png` (a grey-blue squirrel with a big soft tail and cyan marks above the eyes) | ~70% |
+| 2 · Sparky | *done* — `art/nimbus-sparky.png` (a grey-blue squirrel with a big soft tail and cyan marks above the eyes) | ~70% |
 | 3 · Zephyrite | *done* — `art/nimbus-zephyrite.png` (the same squirrel grown up and brighter blue, lightning arcing off the tail) | ~80% |
 | 4 · Tempestor | ⚠️ superseded — `SUBJECT: a rolling storm front with a face, dark cloud mane, lightning arcing from its flanks, a glowing core, floating` | ~90% |
 | 5 · Thunderarch | ⚠️ superseded — `SUBJECT: a crowned storm head, a jagged lightning crown, dark thunderhead body, a brilliant core, its own lightning orbiting it, floating` | ~95% |
