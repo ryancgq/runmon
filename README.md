@@ -367,6 +367,10 @@ celebration's, because nothing has actually broken open. Only the egg gets this
 fallback: a later form with no art is art nobody has drawn yet, and shaking a
 panda would be covering for that rather than saying anything.
 
+The animation tester carries it under **Level-up with no crack to show** — one
+chip per egg. It has to be listed off `EGG_PHASES` rather than `LEVEL_UP_ART`,
+because the whole point of it is that there is no sheet.
+
 The shell's two phases sit at levels 3 and 4 rather than 2 and 3, and the
 spacing is worth stating in XP rather than kilometres: the same kilometre is
 worth anywhere from 0.50× to 1.20× depending on mood and streak, so distance

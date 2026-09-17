@@ -4843,6 +4843,11 @@ function openAnimationTester(){
     return animTestChip("celebrate",
       `${SPECIES[sp].stages[+st].name}${lv ? ` → Lv ${lv}` : ""}`, `data-key="${key}"`);
   }).join("");
+  // The level-up an egg gets when it has no crack for that level - level 2, as
+  // the phases are keyed today. It is not in LEVEL_UP_ART because it has no
+  // sheet, so it is listed off EGG_PHASES instead.
+  const wobbles = Object.keys(EGG_PHASES).map(sp =>
+    animTestChip("wobble", `${SPECIES[sp].stages[0].name} → Lv 2`, `data-sp="${sp}"`)).join("");
 
   openSheet({
     bare: true,
@@ -4854,6 +4859,7 @@ function openAnimationTester(){
       <div class="fj-label">Mood</div><div class="anim-chips">${moods}</div>
       <div class="fj-label">Skills</div><div class="anim-chips">${skills}</div>
       <div class="fj-label">Level-up celebrations</div><div class="anim-chips">${celebs}</div>
+      <div class="fj-label">Level-up with no crack to show</div><div class="anim-chips">${wobbles}</div>
       <div class="fj-label">On their own</div><div class="anim-chips">
         ${animTestChip("confetti", `<span class="em">\u{1F389}</span>Confetti`, "")}
         ${animTestChip("caption", `<span class="em">\u2728</span>Level Up! caption`, "")}
@@ -4900,6 +4906,14 @@ function playAnimTest(d, root){
       skillPlaying = null;                       // a tester tap always wins
       playClip(sk.sprite, sk.id);
       animTestNote(`Playing ${sk.name}`);
+      break; }
+    case "wobble": {
+      // the shell it shakes in is the one it is on before the level, the same
+      // way a crack clip plays over the phase it is about to leave
+      show(d.sp, 0, 1);
+      skillPlaying = null; charging = false; clearTimeout(chargeTimer);
+      runEggWobble();
+      animTestNote(`Playing the ${SPECIES[d.sp].stages[0].name}'s level-up shake`);
       break; }
     case "celebrate": {
       const art = LEVEL_UP_ART[d.key];
