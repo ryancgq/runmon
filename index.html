@@ -3482,14 +3482,24 @@ function renderEvolve(){
     const req = EVO_LEVELS[k];
     const unlocked = mine && d.level >= req;
     const current = mine && d.stage === k;
+    /* The first three forms are drawn, so the silhouette and the description
+       are the tease, and a name printed beside them answers the question they
+       are asking. It stays back until you have actually been that form - on
+       anybody's tab, because nobody has been a form they never reached.
+
+       Stages 4 and 5 keep the old rule. Nothing is drawn or written for them
+       yet, so the name is all they have, and hiding it would leave a row that
+       says nothing at all. */
+    const teased = k <= 2 ? unlocked : (unlocked || !mine);
+    const desc = k <= 2 ? st.desc
+               : teased ? st.desc : "Keep running to reveal this form.";
     return `${k ? '<div class="evo-connector"></div>' : ""}
       <div class="evo-node ${unlocked ? "" : "locked"} ${current ? "current" : ""}">
         <div class="pet-holder mood-${current ? d.mood.key : "okay"}" data-evo="${evoTab}:${k}"></div>
         <div class="info">
-          <div class="nm">${unlocked || !mine ? st.name : "???"}</div>
+          <div class="nm">${teased ? st.name : "???"}</div>
           <div class="rq">${k === 0 ? "Starting form" : `Unlocks at level ${req}`}${current ? " · current" : ""}</div>
-          ${(unlocked || !mine) && !st.desc ? ""
-            : `<div class="ds">${unlocked || !mine ? st.desc : "Keep running to reveal this form."}</div>`}
+          ${desc ? `<div class="ds">${desc}</div>` : ""}
         </div>
         <div class="stagenum">${k + 1}/5</div>
       </div>`;

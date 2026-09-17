@@ -225,7 +225,7 @@ import if you want to move a save or keep a backup.
 | **Pet** | The animated pet, its name, level, XP bar, mood, weekly streak strip and recent runs |
 | **Run** | Live map, distance, duration, average pace, calories, pause/resume and hold-to-finish |
 | **Summary** | Route trace, run stats, a full XP breakdown, animated bar fill, and any level up or evolution |
-| **Evolve** | Lifetime stats, the five-stage evolution tree for all three species, and 20 badges |
+| **Evolve** | Lifetime stats, the five-stage evolution tree for all three species, and 20 badges. A form you have not been keeps its name back — the silhouette and the description are the tease, and a name beside them answers the question they are asking |
 | **Friends** | Your friend code, adding someone by theirs, and everyone's pet with their level and totals |
 | **History** | Every run by month, with route thumbnails; reached from **See all runs** under Recent runs |
 | **Settings** | Strava, units, body weight, XP bar animation, new game |
