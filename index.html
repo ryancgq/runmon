@@ -2902,11 +2902,13 @@ function applyTheme(speciesId){
    now", and neither half answers it alone. A pet with no runs yet still shows
    its rung: it starts Happy, and that is what a first run will pay. */
 function moodLine(){
+  // The mood's own figure, with no streak folded into it. The two multiply but
+  // they are not the same thing, and a chip that quietly moved between 100% and
+  // 120% for an unchanged mood would read as the mood being unreliable. The
+  // streak has its own strip above and its own row in a run's summary; only the
+  // total at the foot of that summary is ever the two combined.
   const m = derived.mood;
-  // what a qualifying run right now would pay, streak included: the chip is
-  // the answer to "is it worth going out", and the mood alone does not answer it
-  const pct = Math.round((m.xpPct / 100) * (derived.streakLive ? STREAK_MULT : 1) * 100);
-  return `${m.emoji} ${m.label} <span class="pct">· ${pct}% XP</span>`;
+  return `${m.emoji} ${m.label} <span class="pct">· ${m.xpPct}% XP</span>`;
 }
 
 /* --- route drawing (used for summary + history thumbnails) --------------- */
