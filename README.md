@@ -716,10 +716,11 @@ run are worth more than earlier ones. The rate climbs continuously from ×1.0 to
 5 km earns 563 XP, but 10 km earns 1,250 rather than 1,126.
 
 **Moods.** The pet sits on a six-rung ladder, and the rung multiplies every run
-it earns. A run of **2 km or more climbs one rung**, at most once a day, so the
-way up from the bottom is five days of running rather than one heroic outing.
-Shorter runs still earn XP and still count as showing up — they just do not
-climb. Neglect walks it back down, but each rung has its own patience:
+it earns — every run, whatever its distance. A run of **2 km or more climbs one
+rung**, at most once a day, so the way up from the bottom is five days of
+running rather than one heroic outing. Shorter runs are paid at the current
+rung and still count as showing up, holding the pet where it is; they just do
+not climb. Neglect walks it back down, but each rung has its own patience:
 
 | Mood | XP | Idle days to drop a rung |
 | --- | --- | --- |
@@ -740,11 +741,16 @@ is not chased further down. Running daily or every other day holds Elated,
 weekly settles around Content, fortnightly around Sad. New pets start Happy:
 new is not the same as neglected.
 
-**Streaks.** A flat **×1.20** on every qualifying run, for anyone running at
-least once every two days. Clear 2 km, do it again within two days, and it
-holds; leave a third day and it is off until the next qualifying run starts a
-new one. There is nothing to climb and no partial credit — it is on or it is
-not.
+**Streaks.** A flat **×1.20**, for anyone running at least once every two days.
+Clear 2 km, do it again within two days, and it holds; leave a third day and it
+is off until the next qualifying run starts a new one. There is nothing to
+climb and no partial credit — it is on or it is not.
+
+While it is running it pays on **every** run, however short. The 2 km bar
+decides what *moves* things — whether a run raises a mood rung, whether it
+carries the streak forward — never what earns. A recovery jog on day three is
+still a day you went out, and docking it would punish the easy days that make
+the hard ones possible.
 
 The home screen carries a banner for it under the greeting: the flame, the
 length, the multiplier, and the day the window shuts — named as a weekday

@@ -1836,8 +1836,10 @@ const SPECIES_ORDER = ["ember","verdant","nimbus"];
    and a once-a-week runner settles around Restless instead of on the floor.
 
    `xpPct` is the whole of the mood's effect on XP - half a run's worth at the
-   floor, all of it at the top. The streak multiplies separately and has nothing
-   to do with the rung; see STREAK_MULT.
+   floor, all of it at the top - and every run is paid at the current rung
+   whatever its distance. QUALIFY_KM decides only whether a run raises the rung.
+   The streak multiplies separately and has nothing to do with it; see
+   STREAK_MULT.
 
    The keys are the original six and must stay that way: the .mood-* idle
    animations in the stylesheet are keyed by them. */
@@ -1850,7 +1852,7 @@ const MOODS = {
   asleep:{ rank:0, key:"asleep", label:"Hungry",   emoji:"😴", xpPct:50, idle:Infinity }
 };
 const MOOD_BY_RANK = Object.values(MOODS).sort((a, b) => a.rank - b.rank);
-const QUALIFY_KM   = 2;   // the bar a run clears to count, for mood and streak alike
+const QUALIFY_KM   = 2;   // the bar a run clears to MOVE things; every run still earns
 const MOOD_START   = 4;   // a fresh pet is Happy: new, not neglected
 const moodByRank = r => MOOD_BY_RANK[Math.max(0, Math.min(MOOD_BY_RANK.length - 1, r))];
 
@@ -1858,6 +1860,9 @@ const moodByRank = r => MOOD_BY_RANK[Math.max(0, Math.min(MOOD_BY_RANK.length - 
    it again within STREAK_GAP days, and every qualifying run pays STREAK_MULT.
    Miss the window and it is simply off until the next qualifying run starts a
    new one. Nothing to climb, no partial credit.
+
+   While it is running it pays on every run, not only the qualifying ones: the
+   bar is what keeps a streak alive, not what collects on it.
 
    Two days rather than one on purpose. A rest day is training, not a lapse, and
    a streak that broke on every rest day made the game argue with the sport it
@@ -2177,8 +2182,10 @@ function moodIfRunNow(atTs){
   return moodByRank(moodRankAt(save.runs.filter(r => r.t < atTs), atTs));
 }
 
-/** Days on which a run cleared the bar, ascending. Short runs are not in here:
-    they hold a mood rung but they neither extend nor rescue a streak. */
+/** Days on which a run cleared the bar, ascending. Short runs are not in here -
+    they cannot carry a streak forward - but they are still paid the multiplier
+    while one is running, the same way they hold a mood rung without raising
+    it. The bar decides what moves, never what earns. */
 function qualifyingDays(runs){
   const days = new Set();
   for (const r of runs) if (r.km >= QUALIFY_KM) days.add(dayKey(r.t));
@@ -3990,8 +3997,12 @@ function compressPath(segments, maxPoints){
    reward, payable next time; scoring at the new rung would make the ladder
    free and therefore pointless. */
 function makeRun(at, km, sec, extra){
-  // a run under the bar neither extends a streak nor collects on one
-  const streakOn = km >= QUALIFY_KM && streakOnAt(save.runs, at);
+  // Every run collects whatever is in effect, however short. The bar is about
+  // whether a run moves the pet - climbs a rung, carries a streak on - not
+  // about whether it gets paid: a recovery jog on day three of a streak is
+  // still a day you went out, and docking it would punish the easy days that
+  // make the hard ones possible.
+  const streakOn = streakOnAt(save.runs, at);
   const mood = moodIfRunNow(at);
   const p = xpParts(km, mood, streakOn);
   return Object.assign({
