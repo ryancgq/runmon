@@ -1771,8 +1771,8 @@ const SPECIES_ORDER = ["ember","verdant","nimbus"];
    is the reward for keeping it up. A single combined figure would say neither.
    Together they run from x0.50 at the floor to x1.25 at the top.
 
-   The keys are the original six and must stay that way - the speech pools in
-   LINES and the .mood-* idle animations are keyed by them. */
+   The keys are the original six and must stay that way: the .mood-* idle
+   animations in the stylesheet are keyed by them. */
 const MOODS = {
   elated:{ rank:5, key:"elated", label:"Elated",   emoji:"🤩", xpPct:100, streakMult:1.25, idle:1 },
   happy: { rank:4, key:"happy",  label:"Happy",    emoji:"😄", xpPct:90,  streakMult:1.20, idle:2 },
@@ -2844,43 +2844,21 @@ function applyTheme(speciesId){
   if (meta) meta.setAttribute("content", "#0a0c13");
 }
 
-/* --- what the pet says --------------------------------------------------- */
-const LINES = {
-  ember: {
-    elated: ["That was a good burn. Again tomorrow?","You smell like effort. I approve.","My fire is roaring. Do that again."],
-    happy:  ["Still warm from yesterday.","Ready when you are.","I have been practising my roar."],
-    okay:   ["Feeling steady. A run would help.","Embers are fine. Flames are better.","Shall we?"],
-    bored:  ["Two days. My fire is getting low.","I am bored. Boredom makes me chew things.","Laces. Door. Go."],
-    sad:    ["It has been days. I am basically a candle.","Did I do something wrong?","I keep watching the door."],
-    asleep: ["Zzz… wake me when you run.","Too cold to move. Need kilometres.","*a very small puff of smoke*"]
-  },
-  verdant: {
-    elated: ["The whole grove felt that one.","New leaves today. Thank you.","I grew a little while you were out."],
-    happy:  ["Yesterday's rain is still in me.","Good soil, good pace.","I am ready to grow again."],
-    okay:   ["Quiet day. Quiet roots.","A walk becomes a run if you keep going.","I am patient. But not infinitely."],
-    bored:  ["Two days without water, so to speak.","My leaves are curling a bit.","The path is still there, you know."],
-    sad:    ["I have gone a little brown at the edges.","Sunlight would help. Or you, running.","I am wilting, politely."],
-    asleep: ["Dormant. Come back with kilometres.","Zzz… roots only, no leaves.","Winter came early this year."]
-  },
-  nimbus: {
-    elated: ["ZAP! That was electric!","I was hovering the whole time!","Again! Again! Again!"],
-    happy:  ["Still buzzing from yesterday.","Charge is good. Let's top it up.","Wanna go? We could go."],
-    okay:   ["Slight drizzle. Nothing serious.","I could be a storm with a bit of help.","Batteries at 60%."],
-    bored:  ["Two days flat. I am basically fog.","No sparks left. Rude.","I have been zapping the furniture."],
-    sad:    ["Static gone. Just grey now.","I miss the running.","Drip. Drip. That is me."],
-    asleep: ["…out of charge…","Zzz. Plug me into a 5k.","Cloud offline. Try running."]
-  }
-};
-function speechFor(){
-  const d = derived;
-  if (!d.runs.length) return `Nothing logged yet — take me out for a first run and I will start growing.`;
-  const set = LINES[save.species] || LINES.ember;
-  const pool = set[d.mood.key] || set.okay;
-  const idx = Math.floor((Date.now() / 60000 + d.runs.length) % pool.length);
-  // the effective figure, not either half of it: this is the one number that
-  // answers "what is a run worth right now"
-  const pct = Math.round(moodMultiplier(d.mood) * 100);
-  return `${pool[idx]} <span class="mood-tag">${d.mood.emoji} ${d.mood.label} · ${pct}% XP</span>`;
+/* --- the mood badge ------------------------------------------------------
+   This used to be a speech bubble: a line of patter per species per mood, one
+   of three picked by the minute. The moods carry a multiplier now, so what the
+   bubble is for is telling you what a run is worth, and the patter was sitting
+   in front of the only part anybody needed to read. The bubble stays, the
+   chatter is gone.
+
+   The figure is the effective one - mood percentage times the mood's bonus -
+   because that is the single number that answers "what is a run worth right
+   now", and neither half answers it alone. A pet with no runs yet still shows
+   its rung: it starts Happy, and that is what a first run will pay. */
+function moodLine(){
+  const m = derived.mood;
+  const pct = Math.round(moodMultiplier(m) * 100);
+  return `<span class="mood-tag">${m.emoji} ${m.label} · ${pct}% XP</span>`;
 }
 
 /* --- route drawing (used for summary + history thumbnails) --------------- */
@@ -3239,7 +3217,7 @@ function renderHome(){
   renderSkillChips();
   $("#pet-name-txt").textContent = save.petName || sp.name;
   $("#pet-species-txt").textContent = `${sp.stages[d.stage].name} · Stage ${d.stage + 1} of 5`;
-  $("#pet-speech").innerHTML = speechFor();
+  $("#pet-speech").innerHTML = moodLine();
 
   const hour = new Date().getHours();
   $("#greeting").textContent = hour < 5 ? "Still up?" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
