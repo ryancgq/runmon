@@ -875,6 +875,20 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
 .ob-foot{margin-top:auto;padding-top:16px}
 .egg-crack{animation:eggShake 1.6s ease-in-out infinite}
 @keyframes eggShake{0%,72%,100%{transform:rotate(0)}78%{transform:rotate(-6deg)}84%{transform:rotate(6deg)}90%{transform:rotate(-3deg)}}
+/* The level-up an egg gets when it has no crack to show: the idle rock wound
+   all the way up. It builds rather than loops, so it reads as effort, and it
+   stops dead on the last frame - the caption lands in the silence after it
+   rather than over the top of it. */
+.egg-wobble{animation:eggWobble var(--wobble,1500ms) cubic-bezier(.36,.07,.19,.97) both}
+@keyframes eggWobble{
+  0%{transform:rotate(0) scale(1)}
+  10%{transform:rotate(-5deg)}   20%{transform:rotate(5deg)}
+  30%{transform:rotate(-8deg)}   40%{transform:rotate(8deg) scale(1.02)}
+  50%{transform:rotate(-11deg)}  60%{transform:rotate(11deg)}
+  70%{transform:rotate(-14deg) scale(1.05)}  80%{transform:rotate(14deg)}
+  90%{transform:rotate(-6deg)}   100%{transform:rotate(0) scale(1)}
+}
+@media (prefers-reduced-motion:reduce){ .egg-wobble{animation-duration:1ms} }
 
 /* ============================================================
    Modal + toast
@@ -1728,6 +1742,15 @@ const LEVEL_UP_ART = {
 function levelUpArt(speciesId, stage, level){
   const form = speciesId + ":" + stage;
   return LEVEL_UP_ART[form + "@" + level] || LEVEL_UP_ART[form] || null;
+}
+/* Every level-up owes the player something. A form with a sheet plays it; an
+   egg on a level that carries no crack shakes instead. Only the egg gets the
+   fallback: a later form with no art is art that has not been drawn yet, and
+   shaking a panda would be covering for that rather than saying anything. */
+function celebrationFor(speciesId, stage, level){
+  const art = levelUpArt(speciesId, stage, level);
+  if (art) return { art };
+  return stage === 0 ? { art: null } : null;
 }
 
 /* GPS sanity filters */
@@ -3103,6 +3126,44 @@ function runCelebration(art, opts){
   }, 260);
   return true;
 }
+/* The egg's other level-up: no sheet to play, so the shell shakes and then
+   holds still for the caption. Same shape as runCelebration - the same delay
+   to let the screen settle, the same `wanted`/`spend` contract so walking away
+   mid-shake leaves the level-up armed rather than spending it - with the clip
+   swapped for a class and the confetti kept smaller, because nothing has
+   actually broken open. */
+const EGG_WOBBLE_MS = 1500;
+function runEggWobble(opts){
+  opts = opts || {};
+  const wanted = opts.wanted || (() => true);
+  if (charging) return false;
+  setTimeout(() => {
+    if (!wanted() || currentScreen !== "home") return;
+    const holder = $("#home-pet");
+    if (!holder || skillPlaying) return;
+    charging = true;
+    holder.classList.remove("egg-crack", "egg-wobble");   // the idle rock, replaced
+    void holder.offsetWidth;                              // restart on a repeat
+    holder.style.setProperty("--wobble", EGG_WOBBLE_MS + "ms");
+    holder.classList.add("egg-wobble");
+    if (opts.spend) opts.spend();
+    clearTimeout(chargeTimer);
+    chargeTimer = setTimeout(() => {
+      holder.classList.remove("egg-wobble");
+      charging = false;
+      if (currentScreen !== "home") return;
+      confetti(26);
+      popLevelUp(null);
+      if (!replaying) renderHome();      // hands the idle rock back
+    }, EGG_WOBBLE_MS);
+  }, 260);
+  return true;
+}
+/** Play whichever of the two a level-up is owed. */
+function runAnyCelebration(cel, opts){
+  return cel && cel.art ? runCelebration(cel.art, opts) : runEggWobble(opts);
+}
+
 /* Walk the pet through runs that arrived while the app was shut.
    ------------------------------------------------------------------------
    Everything is already saved and uploaded by the time this runs, so leaving
@@ -3179,13 +3240,13 @@ function celebrationsBetween(fromLevel, toLevel){
   const out = [];
   for (let lv = fromLevel + 1; lv <= toLevel; lv++){
     const stage = stageForLevel(lv);
-    const art = levelUpArt(save.species, stage, lv);
-    if (art && (!out.length || out[out.length - 1].art !== art)) out.push({ art, lv, stage });
+    const cel = celebrationFor(save.species, stage, lv);
+    if (cel && (!out.length || out[out.length - 1].art !== cel.art)) out.push({ ...cel, lv, stage });
   }
   return out;
 }
 
-async function playCelebration(art, fromLevel, stage){
+async function playCelebration(cel, fromLevel, stage){
   // the wind-up plays over the form as it was before the level, the same way a
   // run finished in the app does
   previewPet = { id: save.species, stage, mood: derived.mood.key, level: fromLevel };
@@ -3196,8 +3257,9 @@ async function playCelebration(art, fromLevel, stage){
   paintXp(fromLevel, xpToNext(fromLevel), xpToNext(fromLevel), true);
   await wait(60);
   charging = false; skillPlaying = null;
-  runCelebration(art);
-  await wait(260 + LEVEL_UP_CHARGE_MS + clipDurationMs(art) + 240);
+  runAnyCelebration(cel);
+  await wait(cel.art ? 260 + LEVEL_UP_CHARGE_MS + clipDurationMs(cel.art) + 240
+                     : 260 + EGG_WOBBLE_MS + 240);
   previewPet = null;
 }
 
@@ -3249,9 +3311,9 @@ async function replayStravaRuns(ids){
         await wait(barMs());
         if (replaySkipped) break;
         const stage = stageForLevel(lv + 1);
-        const art = levelUpArt(save.species, stage, lv + 1);
+        const cel = celebrationFor(save.species, stage, lv + 1);
         // the same clip twice over for one run would be a repeat, not a reward
-        if (art && art !== lastArt){ lastArt = art; await playCelebration(art, lv, stage); }
+        if (cel && cel.art !== lastArt){ lastArt = cel.art; await playCelebration(cel, lv, stage); }
         paintXp(lv + 1, 0, xpToNext(lv + 1));         // and round again from empty
         await wait(300);
       }
@@ -3268,9 +3330,9 @@ async function replayStravaRuns(ids){
 
 function playPendingLevelUp(){
   if (!pendingLevelUp || charging) return;
-  const art = levelUpArt(save.species, derived.stage, derived.level);
-  if (!art){ pendingLevelUp = false; return; }
-  runCelebration(art, { wanted: () => pendingLevelUp, spend: () => { pendingLevelUp = false; } });
+  const cel = celebrationFor(save.species, derived.stage, derived.level);
+  if (!cel){ pendingLevelUp = false; return; }
+  runAnyCelebration(cel, { wanted: () => pendingLevelUp, spend: () => { pendingLevelUp = false; } });
 }
 function renderSkillChips(){
   const row = $("#home-skills");
@@ -4070,11 +4132,12 @@ function finishRun(){
   persist();
 
   // arm the celebration for whichever form the pet is now, not the one it was
-  pendingLevelUp = derived.level > levelBefore && !!levelUpArt(save.species, derived.stage, derived.level);
+  const cel = celebrationFor(save.species, derived.stage, derived.level);
+  pendingLevelUp = derived.level > levelBefore && !!cel;
   pendingLevelFrom = levelBefore;
   // fetch it while the summary is being read, so it plays the moment you land
-  if (pendingLevelUp){
-    probeSprite(levelUpArt(save.species, derived.stage, derived.level).src);
+  if (pendingLevelUp && cel.art){
+    probeSprite(cel.art.src);
     // and the sheet the clip hands back to, so the swap is not a blank frame
     const after = spriteConfig(save.species, derived.stage);
     if (after && after.src) probeSprite(after.src);
@@ -4711,7 +4774,7 @@ function openDemoPanel(){
           closeSheet();
           const before = derived.level;
           Runmon.addRun(5, 28, 0);
-          pendingLevelUp = derived.level > before && !!levelUpArt(save.species, derived.stage, derived.level);
+          pendingLevelUp = derived.level > before && !!celebrationFor(save.species, derived.stage, derived.level);
           pendingLevelFrom = before;
           const r = save.runs[save.runs.length - 1];
           showSummary(r, { celebrate:true });
