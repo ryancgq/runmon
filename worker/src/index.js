@@ -91,6 +91,35 @@ async function lookupCode(env, code){
   const { athleteId } = await r.json();
   return athleteId || null;
 }
+/* --- the private roster ---------------------------------------------------
+   Durable Objects cannot be listed, so a summary of who is playing has to be
+   indexed as it goes. One object holds a row per athlete under a `row:` prefix
+   - storage *within* a single object is listable, which is the enumeration the
+   namespace itself does not offer.
+
+   The key is an HMAC of the athlete id rather than the id itself. It is stable,
+   so a row updates instead of duplicating, and it cannot be turned back into a
+   Strava profile by anyone who gets at the table. Each row carries the pet card
+   the app already computes for Friends: a pet name, a form, a level, totals.
+   Nothing from Strava beyond what the game has made its own. */
+const rosterStub = env => env.ATHLETE.get(env.ATHLETE.idFromName("roster:all"));
+async function rosterPut(env, athleteId, card){
+  const handle = (await hmac(env.SESSION_SECRET, "roster:" + athleteId)).slice(0, 12);
+  await rosterStub(env).fetch("https://do/roster-put", { method:"POST",
+    body: JSON.stringify({ handle, card: card || null }) });
+}
+/* The admin token is compared as a digest, not as a string. An early-exit
+   string compare hands the token over a character at a time to anybody willing
+   to time the responses. */
+async function adminOk(env, given){
+  if (!env.ADMIN_TOKEN || !given) return false;
+  const [a, b] = await Promise.all([
+    hmac(env.SESSION_SECRET, "admin:" + given),
+    hmac(env.SESSION_SECRET, "admin:" + env.ADMIN_TOKEN)
+  ]);
+  return a === b;
+}
+
 /** Every authenticated route is the same three lines, so they live here. */
 async function withAthlete(request, env, fn){
   const id = await readSession(env, (request.headers.get("Authorization") || "").replace(/^Bearer /, ""));
@@ -146,20 +175,32 @@ export default {
           expires: tok.expires_at * 1000,
           firstName: (tok.athlete && tok.athlete.firstname) || "" }) });
 
+        // on the roster the moment they link, so somebody who connects and never
+        // runs still shows up as a connection rather than as nothing at all
+        await rosterPut(env, athleteId, null);
+
         // the session rides back in the fragment, which browsers do not send to
         // servers and do not put in referrers
         return Response.redirect(appURL(env) + "#strava=" + await mintSession(env, athleteId), 302);
       }
 
       if (path === "/sync" && request.method === "POST")
-        return withAthlete(request, env, stub => stub.fetch("https://do/sync", { method:"POST" }));
+        return await withAthlete(request, env, stub => stub.fetch("https://do/sync", { method:"POST" }));
 
       if (path === "/save" && request.method === "PUT")
-        return withAthlete(request, env, async stub =>
-          stub.fetch("https://do/save", { method:"POST", body: await request.text() }));
+        return await withAthlete(request, env, async (stub, id) => {
+          const body = await request.text();
+          const res = await stub.fetch("https://do/save", { method:"POST", body });
+          // the roster row is a copy of the card, refreshed as the save lands
+          try {
+            const parsed = JSON.parse(body);
+            if (parsed && parsed.card) await rosterPut(env, id, parsed.card);
+          } catch (e){ /* a save that will not parse is the DO's problem, not the roster's */ }
+          return res;
+        });
 
       if (path === "/disconnect" && request.method === "POST")
-        return withAthlete(request, env, stub => stub.fetch("https://do/wipe", { method:"POST" }));
+        return await withAthlete(request, env, stub => stub.fetch("https://do/wipe", { method:"POST" }));
 
       /* --- friends ---------------------------------------------------------
          A friend code is a random six characters, not anything derived from the
@@ -169,7 +210,7 @@ export default {
          the code itself, which is how a stranger's code finds their pet without
          anybody being able to enumerate the other direction. */
       if (path === "/friends/me")
-        return withAthlete(request, env, async (stub, id) => {
+        return await withAthlete(request, env, async (stub, id) => {
           const r = await stub.fetch("https://do/code", { method:"POST",
             body: JSON.stringify({ athleteId: id }) });
           const { code, card } = await r.json();
@@ -178,7 +219,7 @@ export default {
         });
 
       if (path === "/friends/lookup")
-        return withAthlete(request, env, async (stub, me) => {
+        return await withAthlete(request, env, async (stub, me) => {
           // 200 with an `error` for anything about the code itself. An HTTP
           // status is about the request reaching us, and the app leans on that
           // distinction: a real 404 means this broker predates Friends.
@@ -197,7 +238,7 @@ export default {
       // One round trip for a whole friends list. Codes only - a card carries a
       // pet and totals, never runs, routes or anything about the athlete.
       if (path === "/friends/cards" && request.method === "POST")
-        return withAthlete(request, env, async () => {
+        return await withAthlete(request, env, async () => {
           const body = await request.json().catch(() => ({}));
           const codes = [...new Set((body.codes || []).map(normaliseCode).filter(Boolean))].slice(0, 60);
           const cards = {};
@@ -211,12 +252,92 @@ export default {
           return json(env, { cards });
         });
 
+      /* --- the private summary -------------------------------------------
+         Not public facing. Wrong token or no token gets the same 404 as a
+         route that does not exist, so the endpoint does not advertise itself
+         to anybody scanning, and the token travels in a header rather than a
+         query string, which would end up in logs and browser history.
+
+         Plain text by default because it is read in a terminal; ?format=json
+         for anything that wants to parse it. */
+      if (path === "/admin/summary"){
+        const given = (request.headers.get("Authorization") || "").replace(/^Bearer /, "");
+        if (!await adminOk(env, given)) return json(env, { error:"no such endpoint" }, 404);
+        const r = await rosterStub(env).fetch("https://do/roster-list");
+        const { rows } = await r.json();
+        rows.sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0));
+        if (url.searchParams.get("format") === "json")
+          return new Response(JSON.stringify({ count: rows.length, rows }, null, 2),
+            { headers:{ "Content-Type":"application/json", "Cache-Control":"no-store" } });
+        return new Response(summaryTable(rows),
+          { headers:{ "Content-Type":"text/plain; charset=utf-8", "Cache-Control":"no-store" } });
+      }
+
       return json(env, { error:"no such endpoint" }, 404);
     } catch (err){
+      // every route above is `return await`, not `return`: a returned promise
+      // rejects after the try block has already exited, so without the await
+      // this catch never sees it and a malformed body escapes as a raw runtime
+      // error instead of the 500 it is meant to become.
       return json(env, { error: String(err && err.message || err) }, 500);
     }
   }
 };
+
+/* What a roster row keeps of a card. Named rather than spread wholesale so
+   that a field added to the card for the game does not silently land in the
+   private table as well. */
+function rosterCard(c){
+  return {
+    pet: String(c.pet || "").slice(0, 24),
+    species: String(c.species || "").slice(0, 12),
+    form: String(c.form || "").slice(0, 24),
+    stage: Number(c.stage) || 0,
+    level: Number(c.level) || 0,
+    km: Number(c.km) || 0,
+    weekKm: Number(c.weekKm) || 0,
+    runs: Number(c.runs) || 0,
+    streak: Number(c.streak) || 0,
+    best: Number(c.best) || 0,
+    lastRun: Number(c.lastRun) || null
+  };
+}
+/* A plain-text table, because this is read over curl in a terminal. Columns are
+   padded to their widest value rather than to a guess, so a long pet name does
+   not push everything out of line. */
+function summaryTable(rows){
+  const DAY = 86400000, now = Date.now();
+  const ago = t => !t ? "\u2014" : (d => d === 0 ? "today" : d === 1 ? "1 day" : d + " days")
+    (Math.round((now - t) / DAY));
+  const head = ["HANDLE","PET","SPECIES","FORM","LV","KM","WEEK","RUNS","STREAK","LAST RUN","LINKED"];
+  const body = rows.map(r => [
+    r.handle || "", r.pet || "\u2014", r.species || "\u2014", r.form || "not hatched",
+    String(r.level || "\u2014"), (r.km || 0).toFixed(1), (r.weekKm || 0).toFixed(1),
+    String(r.runs || 0), String(r.streak || 0), ago(r.lastRun), ago(r.firstSeen)
+  ]);
+  const w = head.map((h, i) => Math.max(h.length, ...body.map(b => b[i].length)));
+  const line = cells => cells.map((c, i) => c.padEnd(w[i])).join("  ").trimEnd();
+
+  const hatched = rows.filter(r => (r.stage || 0) > 0).length;
+  const active7 = rows.filter(r => r.lastRun && now - r.lastRun < 7 * DAY).length;
+  const km = rows.reduce((a, r) => a + (r.km || 0), 0);
+  const runs = rows.reduce((a, r) => a + (r.runs || 0), 0);
+  const out = [
+    `Runmon \u00b7 ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC`,
+    "",
+    `Connected to Strava   ${rows.length}`,
+    `Hatched               ${hatched}`,
+    `Ran in the last week  ${active7}`,
+    `Lifetime              ${km.toFixed(1)} km over ${runs} runs`,
+    "",
+    line(head),
+    w.map(n => "-".repeat(n)).join("  "),
+    ...body.map(line)
+  ];
+  // the blank lines above are structure, so only the conditional tail is dropped
+  if (rows.length >= 1000) out.push("", "(1000-row page limit reached)");
+  return out.join("\n") + "\n";
+}
 
 /* --- one athlete --------------------------------------------------------- */
 export class Athlete {
@@ -238,6 +359,26 @@ export class Athlete {
     }
     if (path === "/dir-get")
       return this.ok({ athleteId: await this.state.storage.get("owner") || null });
+    /* the same class standing in as the roster, one key per athlete. `firstSeen`
+       is kept from whatever was there, so a row records when somebody linked
+       rather than when they last saved. */
+    if (path === "/roster-put"){
+      const { handle, card } = await request.json();
+      const key = "row:" + handle;
+      const prev = await this.state.storage.get(key) || {};
+      await this.state.storage.put(key, {
+        handle,
+        ...(card ? rosterCard(card) : {}),
+        ...(prev.pet && !card ? rosterCard(prev) : {}),   // a re-link keeps the pet
+        firstSeen: prev.firstSeen || Date.now(),
+        lastSeen: Date.now()
+      });
+      return this.ok({ ok: true });
+    }
+    if (path === "/roster-list"){
+      const map = await this.state.storage.list({ prefix: "row:", limit: 1000 });
+      return this.ok({ rows: [...map.values()] });
+    }
     return new Response("no", { status: 404 });
   }
 
