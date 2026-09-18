@@ -850,6 +850,14 @@ console.
 
 ## How tracking works
 
+The run screen says so under the Start button: phone GPS is the worse of the
+two ways a run gets in, and the person about to press start is the one who
+should hear it. The wording changes on whether Strava is already connected —
+an offer to connect, or a reminder that those runs sync on their own — and it
+hides the moment a run begins, when it is too late to act on and would be
+nothing but a nag.
+
+
 - `navigator.geolocation.watchPosition` at high accuracy, plotted live on a
   [Leaflet](https://leafletjs.com/) map (loaded from a CDN)
 - Distance between fixes via the Haversine formula

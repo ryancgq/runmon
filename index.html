@@ -519,6 +519,22 @@ body::before{
 .gps-pill[data-q="off"] .dot{background:#5d6478}
 @keyframes blinkDot{50%{opacity:.25}}
 
+/* Said under the button rather than over it: this tracker works, it is just
+   the worse of the two ways in, and somebody about to press start should know
+   that without being stopped. Only while idle - mid-run it is too late to be
+   useful and would only nag. */
+.track-note{
+  display:flex;gap:9px;align-items:flex-start;
+  margin:12px 2px 0;padding:10px 12px;
+  background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:12px;
+  font-size:11.5px;font-weight:600;color:var(--muted);line-height:1.5;
+}
+.track-note .em{flex:none;font-size:13px;line-height:1.35}
+.track-note b{color:#c4cbdb;font-weight:800}
+.track-note button{
+  display:block;margin-top:5px;padding:0;background:none;border:0;
+  color:var(--accent);font:inherit;font-weight:800;cursor:pointer;
+}
 .recenter{
   position:absolute;right:14px;z-index:10;bottom:8px;
   width:40px;height:40px;border-radius:13px;display:grid;place-items:center;
@@ -1124,6 +1140,7 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
               <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg> Start run
             </button>
           </div>
+          <div class="track-note" id="track-note" hidden></div>
         </div>
       </div>
     </section>
@@ -3755,7 +3772,28 @@ function resetTrackUI(){
   $("#run-ctl").className = "run-ctl single";
   $("#run-ctl").innerHTML = `<button class="ctl go" id="btn-start"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg> Start run</button>`;
   $("#btn-start").addEventListener("click", startRun);
+  renderTrackNote();
   setGps("off", "Ready when you are");
+}
+
+/* Phone GPS is the worse of the two ways a run gets in, and the person about to
+   press start is the one who should hear it. Said under the button rather than
+   over it, and only while idle: mid-run it is too late to act on and would be
+   nothing but a nag. */
+function renderTrackNote(){
+  const el = $("#track-note");
+  if (!el) return;
+  if (tracker.active){ el.hidden = true; return; }
+  const linked = stravaLinked();
+  const tail = linked
+    ? "Your Strava runs already sync in on their own, so this is here for when you have not got it to hand."
+    : "Record there instead and your runs sync in automatically. This is here for when you have not got it to hand.";
+  el.innerHTML =
+    `<span class="em">\u{1F4A1}</span>
+     <div><b>More accurate on Strava.</b> Phone GPS drifts between buildings and
+     under trees, which costs you distance and the XP that comes with it. ${tail}
+     ${(!linked && STRAVA_ON) ? '<button type="button" data-nav="settings">Connect Strava</button>' : ""}</div>`;
+  el.hidden = false;
 }
 
 function setGps(quality, text){
@@ -3978,6 +4016,7 @@ function startRun(){
   tracker.startedAt = Date.now(); tracker.elapsedMs = 0; tracker.resumedAt = Date.now();
   tracker.accuracy = null; tracker.lastFixAt = 0; tracker.warp = 1;
   follow = true; $("#recenter").classList.remove("show");
+  $("#track-note").hidden = true;          // too late to act on once you are off
   if (mapReady) clearRouteLayers();
   banner(null);
 
