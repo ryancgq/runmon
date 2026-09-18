@@ -175,9 +175,13 @@ export default {
           expires: tok.expires_at * 1000,
           firstName: (tok.athlete && tok.athlete.firstname) || "" }) });
 
-        // on the roster the moment they link, so somebody who connects and never
-        // runs still shows up as a connection rather than as nothing at all
-        await rosterPut(env, athleteId, null);
+        // On the roster the moment they link, so somebody who connects and never
+        // runs still shows up as a connection rather than as nothing at all.
+        // Guarded, and deliberately: the roster is bookkeeping, and a failed
+        // write must never be the reason somebody cannot link their Strava.
+        // Unguarded it would fall to the catch below and answer a 500 where the
+        // athlete is owed a redirect carrying their session.
+        try { await rosterPut(env, athleteId, null); } catch (e){ /* not worth a failed link */ }
 
         // the session rides back in the fragment, which browsers do not send to
         // servers and do not put in referrers
