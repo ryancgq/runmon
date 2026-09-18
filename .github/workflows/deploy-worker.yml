@@ -221,6 +221,30 @@ jobs:
           say "deploy anyway."
           say ""
 
+      # wrangler-action fails the whole deploy if a name in its `secrets` list
+      # has no value in the env block - it will not treat one as optional. So
+      # the list is built here from what is actually set, and ADMIN_TOKEN only
+      # joins it once it exists. Listing it unconditionally turned an optional
+      # secret into a required one and stopped the deploy before any code
+      # shipped.
+      - name: Work out which secrets to push
+        id: seclist
+        env:
+          ADMIN: ${{ secrets.ADMIN_TOKEN }}
+        run: |
+          {
+            echo "list<<SECEOF"
+            echo "STRAVA_CLIENT_SECRET"
+            echo "SESSION_SECRET"
+            if [ -n "$ADMIN" ]; then echo "ADMIN_TOKEN"; fi
+            echo "SECEOF"
+          } >> "$GITHUB_OUTPUT"
+          if [ -n "$ADMIN" ]; then
+            echo "ADMIN_TOKEN is set - /admin/summary will answer to it"
+          else
+            echo "ADMIN_TOKEN is not set - /admin/summary will 404 for everybody"
+          fi
+
       - name: Deploy to Cloudflare
         id: deploy
         uses: cloudflare/wrangler-action@v4
@@ -230,14 +254,12 @@ jobs:
           workingDirectory: worker
           # each name here is pushed to the worker with `wrangler secret put`,
           # taking its value from the env block below
-          secrets: |
-            STRAVA_CLIENT_SECRET
-            SESSION_SECRET
-            ADMIN_TOKEN
+          secrets: ${{ steps.seclist.outputs.list }}
         env:
           STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
-          # optional: unset means /admin/summary answers 404 to everybody
+          # optional: absent from the list above when unset, which leaves
+          # /admin/summary answering 404 to everybody
           ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
 
       - name: Tell me the URL
