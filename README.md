@@ -883,6 +883,53 @@ Everything derives from the run log, so deleting a run correctly rolls back XP,
 level, evolution stage, streaks and badges. Routes are simplified to 320 points
 before saving to keep `localStorage` small.
 
+### The private roster
+
+Durable Objects cannot be listed — there is no call that returns every object
+in a namespace — so nothing could answer "how many people are playing" until
+the worker started keeping an index as it went. One object now holds a row per
+athlete under a `row:` prefix, and storage *inside* a single object is
+listable, which is the enumeration the namespace itself does not offer.
+
+```
+curl -H "Authorization: Bearer $ADMIN_TOKEN" \
+     https://<your-worker>.workers.dev/admin/summary
+```
+
+```
+Runmon · 2026-09-18 04:40 UTC
+
+Connected to Strava   4
+Hatched               3
+Ran in the last week  3
+Lifetime              457.8 km over 78 runs
+
+HANDLE        PET  SPECIES  FORM         LV  KM     WEEK  RUNS  STREAK  LAST RUN  LINKED
+------------  ---  -------  -----------  --  -----  ----  ----  ------  --------  ------
+QHk6bPEhPaHM  Ash  ember    Blazewyrm    15  180.0  45.0  30    3       1 day     today
+aaaaaaaaaaaa  —    —        not hatched  —   0.0    0.0   0     0       —         today
+```
+
+Add `?format=json` for anything that wants to parse it.
+
+**It is not public facing.** The wrong token, or no token, gets the same 404 as
+an address that does not exist, so the route never advertises itself to anybody
+scanning. The token travels in a header rather than a query string, which would
+end up in logs and browser history, and it is compared as a digest rather than
+as a string — an early-exit string compare hands a secret over one character at
+a time to anybody willing to time the responses. With `ADMIN_TOKEN` unset the
+route 404s for everybody, including you.
+
+**A row is the game's own view of a player, not Strava's.** The key is an HMAC
+of the athlete id rather than the id itself: stable, so a row updates instead of
+duplicating, and not reversible into a Strava profile by anybody who gets at the
+table. What it carries is the pet card the app already computes for Friends — a
+pet name, a form, a level, totals — and it is copied field by field rather than
+spread wholesale, so a field added to the card for the game does not silently
+land in the private table as well. Somebody who links and never runs still
+appears, as a row with no pet: a connection is worth knowing about even when
+nothing came of it.
+
 ## Development
 
 There is nothing to install or build. Edit `index.html` and reload.
