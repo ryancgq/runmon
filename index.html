@@ -646,7 +646,6 @@ body::before{
 .attr .v{font-family:"Fredoka One","Fredoka",sans-serif;font-size:15px;letter-spacing:.3px}
 .attr .bar{height:6px;border-radius:999px;background:#0c0f18;border:1px solid var(--line);overflow:hidden}
 .attr .bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--accent),var(--accent-2))}
-.attr-note{font-size:11px;color:var(--muted);font-weight:600;line-height:1.45;margin-top:12px}
 
 /* skills */
 .skill-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px}
@@ -1091,7 +1090,6 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
       <div class="section-title">Attributes</div>
       <div class="card">
         <div class="attr-grid" id="home-attrs"></div>
-        <div class="attr-note" id="home-attr-note"></div>
       </div>
 
       <div class="section-title">This week</div>
@@ -2858,7 +2856,7 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-20 8c9a6ec";
+const BUILD_ID = "2026-09-20 34b5372";
 const ART_VERSION = "20";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -3522,7 +3520,11 @@ function renderHome(){
   renderRecent();
 }
 /* The attribute block. Bars are drawn against ATTR_SCALE, not against the
-   row's own maximum, so the four lengths mean the same thing on every pet. */
+   row's own maximum, so the four lengths mean the same thing on every pet.
+
+   The numbers are shown and the rule behind them is not. That every species
+   spends the same budget, and that evolving adds to it, is a nicer thing for
+   a player to work out than to be told. */
 function renderAttrs(speciesId, level){
   const a = attrsFor(speciesId, level), total = attrTotal(level);
   $("#home-attrs").innerHTML = ATTR_ORDER.map(k => {
@@ -3532,12 +3534,6 @@ function renderAttrs(speciesId, level){
         <div class="bar"><i style="width:${pct}%"></i></div>
       </div>`;
   }).join("");
-  const stage = stageForLevel(level);
-  const nextEvo = EVO_LEVELS.find(l => l > level);
-  const bonus = nextEvo ? ATTR_EVO[stageForLevel(nextEvo)] - ATTR_EVO[stage] : 0;
-  $("#home-attr-note").textContent = bonus
-    ? `Every pet has ${total} points at level ${level} — only the split differs. Evolving at Lv ${nextEvo} adds ${bonus} more.`
-    : `Every pet has ${total} points at level ${level} — only the split differs.`;
 }
 function startOfWeek(){
   const n = new Date(); n.setHours(0,0,0,0);

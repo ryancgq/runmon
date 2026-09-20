@@ -746,7 +746,9 @@ and nothing for the cards or the roster to carry.
 
 Every species has the **same total at a given level** and differs only in how
 that total is split, so no form is simply handed more than another. The split
-*is* the identity.
+*is* the identity. None of that is stated in the app: the numbers are
+shown, the rule behind them is not, because working it out is nicer than being
+told it.
 
 | | HP | Defence | Power | Speed | |
 |---|---|---|---|---|---|
