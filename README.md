@@ -606,6 +606,20 @@ Blazewyrm starts.
 | 💥 Flame Stomp | Blazewyrm | Level 22 | Lands hard enough to throw a ring of fire out around it |
 | ☄️ Flying Swoop | Blazewyrm | Level 26 | A low, fast pass trailing fire |
 | 🌩️ Lightning Bolt | Zephyrite | Level 18 | Asks the sky for help. The sky, this time, obliges. |
+| 😴 Nap | Panda | Level 18 | Sits down mid-fight and sleeps. Wakes up better, if it wakes up. |
+
+**A move is kept for good.** It used to retire with the form that taught it,
+which left a Pyrelord with nothing at all — no form above the third has skills,
+and no art to make any. It is the pet that learnt the move, not the shape. The
+clip still shows the form it was drawn for, which is visible but not wrong, and
+stops being so when those forms are drawn.
+
+**Nap has no sheet yet.** It is learnt, listed, and works in a battle; it simply
+cannot be tapped to watch, and the Evolution screen says *"Learnt · animation
+coming"* rather than pretending otherwise. Drawing `art/skill-nap.png` to the
+same convention as Green Gale is the whole of what is left. It exists because
+the Panda was the only third form with an empty skill row, which reads as a bug
+rather than as a gap.
 
 All three babies' moves are the same joke told three times, which is
 deliberate: a first skill is named for what the pet thinks it is doing. The
@@ -779,6 +793,74 @@ off the same 202 points. By 99 the pool is 760.
 The bars are drawn against the widest slice anyone has (37%), not against the
 row's own biggest number, so a Panda's Speed reads as short next to a
 Blazewyrm's — which is the point — and no bar jumps as a stat grows.
+
+## Battle
+
+Two pets, taking turns, decided by their attributes and the moves you pick.
+The engine is pure arithmetic — it draws nothing, waits for nothing, touches no
+save — so a fight seeded the same way plays out identically on any device.
+That is what lets a battle be replayed from a seed and a list of choices rather
+than stored blow by blow.
+
+**Mood and streak are deliberately absent.** A battle is about the pet you grew,
+not the week you had, and nobody should lose because they were ill on a Tuesday.
+
+```
+damage   = Power × multiplier × K/(K + Defence) × (1 ± 35%)
+K        = the average of both totals × 0.6
+HP pool  = HP × 5
+```
+
+| | |
+| --- | --- |
+| **Who opens** | a coin weighted by Speed, not a comparison |
+| **Extra turns** | the speed gap as a chance, capped at 35% |
+| **Skills** | one skill, then two ordinary turns, whatever else is off cooldown |
+| **Length** | 8–13 turns, about 30–40 seconds with the clips |
+
+Every number was settled by simulation rather than by taste, and four of the
+rules exist because the simulation contradicted the obvious guess.
+
+**Mitigation is divisive, not subtractive.** Subtracting Defence from damage
+made the Panda unkillable at low levels and paper at high ones.
+
+**K scales with the level of the fight.** Held fixed, Defence quietly grew more
+valuable every level, and a level-99 Panda won 67% of everything.
+
+**A skill costs a shared cooldown, not just its own.** Without it the
+Blazewyrm's four moves are simply four times the damage of everybody else's
+one, and Verdant against Ember collapses to 24%.
+
+**Who opens is a weighted coin.** "Faster always goes first" sounds fair and is
+not: Speed rises with level like everything else, so in a fight between two of
+the same species the higher level always opened — and a fight lasting four hits
+each is decided by who lands the first one. **A pet one level up won a hundred
+fights in a hundred.** Making it likely rather than certain put the upset back
+on the table, and cost the fast pet nothing it had earned: at a Zephyrite's
+speed against a Panda's it still opens three times in four.
+
+| Level advantage | +1 | +2 | +3 | +5 | +10 |
+| --- | --- | --- | --- | --- | --- |
+| Higher level wins | 55% | 59% | 64% | 74% | 88% |
+
+Two things the simulation ruled out. **Crits are off**: a crit raises mean
+damage, which shortens fights, which hands them to whoever moved first — it
+made Ember lose to Nimbus 62/38. **Nap is once a battle**: two Pandas with a
+repeatable 30% heal out-heal each other's damage forever, and the fight only
+ended because the engine gave up at eighty turns.
+
+### How balanced it actually is
+
+Between 40% and 61% across every pairing and level — a soft triangle rather
+than three flat coin-flips. Ember beats Verdant, Nimbus beats Ember, Verdant
+and Nimbus are level. That is the floor given the attribute weights: the
+weights and the combat maths are one system, and with the weights fixed this
+is as close to even as the maths gets. Mirror matches are fair to within a
+fifth of a point over 30,000 fights each.
+
+| Level 26 | Verdant v Ember | Verdant v Nimbus | Ember v Nimbus |
+| --- | --- | --- | --- |
+| Row wins | 40% | 52% | 46% |
 
 ## How XP works
 

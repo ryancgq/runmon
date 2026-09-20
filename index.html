@@ -638,6 +638,83 @@ body::before{
 .evo-reveal .new{filter:drop-shadow(0 0 22px rgba(var(--glow),.9));animation:popIn .8s var(--ease) both}
 @keyframes popIn{0%{transform:scale(.3) rotate(-14deg);opacity:0}62%{transform:scale(1.14) rotate(4deg);opacity:1}100%{transform:scale(1) rotate(0)}}
 
+/* ============================================================
+   Battle
+   ============================================================ */
+/* The screen is already a flex column; it just must not scroll, and the field
+   between the two pets is the one part allowed to take the slack. */
+#screen-battle{overflow:hidden;padding-top:0}
+#screen-battle>.bt-field{flex:1 1 auto;min-height:0}
+.bt-top{display:flex;align-items:center;gap:10px;padding:14px 16px 0}
+.bt-turn{margin-left:auto;font-size:10.5px;font-weight:800;letter-spacing:1.2px;
+  text-transform:uppercase;color:var(--muted)}
+/* space-evenly rather than centred: the three rows fill the height they are
+   given instead of huddling in the middle of it with 150px of nothing above */
+.bt-field{flex:1;display:flex;flex-direction:column;justify-content:space-between;gap:14px;padding:18px 16px 10px}
+.bt-row{display:flex;align-items:center;gap:12px}
+/* they face each other - theirs on the right, yours on the left */
+.bt-row.you{flex-direction:row-reverse}
+/* mirrored sides, but a name still reads name-then-level on both */
+.bt-row.you .bt-nm{justify-content:flex-end}
+.bt-row.you .bt-hpn{text-align:right}
+.bt-meta{flex:1;min-width:0}
+.bt-nm{display:flex;align-items:baseline;gap:8px;margin-bottom:6px}
+.bt-nm b{font-size:15px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bt-nm span{font-size:10.5px;font-weight:800;color:var(--muted);letter-spacing:.6px;flex:0 0 auto}
+.bt-hp{height:10px;border-radius:999px;background:#0c0f18;border:1px solid var(--line);overflow:hidden}
+.bt-hp i{display:block;height:100%;width:100%;border-radius:999px;
+  background:linear-gradient(90deg,#3ddc84,#8ff0a4);transition:width .45s var(--ease)}
+.bt-hp i.mid{background:linear-gradient(90deg,#ffd23f,#ffb300)}
+.bt-hp i.low{background:linear-gradient(90deg,#ff5c7a,#ff8a5c)}
+.bt-hpn{font-size:10.5px;font-weight:800;color:var(--muted);margin-top:4px;letter-spacing:.4px}
+/* The art overruns its box by design - a sprite is scaled up inside the
+   holder - so the slot is inset from the screen edge by more than that
+   overhang, or a Panda loses a paw to the bezel. */
+.bt-slot{position:relative;width:126px;height:126px;flex:0 0 126px;margin:0 6px}
+.bt-slot .pet-holder{width:100%;height:100%}
+.bt-slot.hit{animation:btHit .34s var(--ease)}
+@keyframes btHit{0%,100%{transform:translateX(0)}25%{transform:translateX(-7px)}
+  55%{transform:translateX(6px)}80%{transform:translateX(-3px)}}
+.bt-slot.act{animation:btAct .3s var(--ease)}
+@keyframes btAct{0%,100%{transform:translateY(0)}45%{transform:translateY(-9px) scale(1.04)}}
+.bt-float{
+  position:absolute;left:50%;top:14%;transform:translateX(-50%);
+  font-family:"Fredoka One","Fredoka",sans-serif;font-size:21px;letter-spacing:.5px;
+  color:#ff8a9c;text-shadow:0 2px 10px rgba(0,0,0,.6);pointer-events:none;
+  animation:btFloat 1s var(--ease) forwards;
+}
+.bt-float.heal{color:#8ff0a4}
+@keyframes btFloat{0%{opacity:0;transform:translate(-50%,10px) scale(.7)}
+  22%{opacity:1;transform:translate(-50%,-2px) scale(1.1)}
+  100%{opacity:0;transform:translate(-50%,-34px) scale(1)}}
+.bt-say{
+  min-height:46px;display:flex;align-items:center;justify-content:center;text-align:center;
+  font-size:12.5px;font-weight:700;color:#c8d0e2;line-height:1.5;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);padding:9px 12px;
+}
+.bt-moves{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:0 16px 22px}
+.bt-move{
+  display:flex;align-items:center;gap:9px;padding:13px 12px;border-radius:var(--r-md);
+  background:var(--card);border:1px solid var(--line);font-size:13px;font-weight:800;
+  text-align:left;transition:.16s var(--ease);
+}
+.bt-move .em{font-size:16px;line-height:1;flex:0 0 auto}
+.bt-move .wait{margin-left:auto;font-size:10px;font-weight:800;color:var(--muted);letter-spacing:.5px}
+.bt-move:active{transform:scale(.97)}
+.bt-move[disabled]{opacity:.38;pointer-events:none}
+.bt-move.hero{grid-column:1/-1;background:linear-gradient(180deg,rgba(var(--glow),.16),var(--card));
+  border-color:rgba(var(--glow),.42)}
+.bt-end{position:absolute;inset:0;display:grid;place-items:center;padding:26px;
+  background:rgba(6,8,14,.82);backdrop-filter:blur(7px);z-index:6}
+.bt-end[hidden]{display:none}
+.bt-end-card{width:100%;max-width:320px;text-align:center;
+  background:linear-gradient(180deg,var(--card),var(--card-2));
+  border:1px solid var(--line);border-radius:var(--r-lg);padding:26px 20px 20px}
+.bt-end-ico{font-size:42px;line-height:1;margin-bottom:8px}
+.bt-end-card h3{margin:0 0 6px;font-size:21px;font-family:"Fredoka One","Fredoka",sans-serif}
+.bt-end-card p{font-size:12.5px;margin:0 0 18px;line-height:1.5}
+.bt-end-card .btn{margin-top:8px}
+
 /* battle attributes - display only until Battle exists */
 .attr-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}
 .attr{display:flex;flex-direction:column;gap:5px}
@@ -1265,6 +1342,50 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
     </section>
 
     <!-- ===================== SETTINGS ===================== -->
+    <!-- ===================== BATTLE ===================== -->
+    <section class="screen flush no-nav" id="screen-battle">
+      <div class="bt-top">
+        <button class="iconbtn" id="bt-quit" aria-label="Leave the battle">
+          <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+        <div class="bt-turn" id="bt-turn">Turn 1</div>
+      </div>
+
+      <div class="bt-field">
+        <div class="bt-row foe">
+          <div class="bt-meta">
+            <div class="bt-nm"><b id="bt-foe-nm">Their pet</b><span id="bt-foe-lv">Lv 1</span></div>
+            <div class="bt-hp"><i id="bt-foe-hp"></i></div>
+            <div class="bt-hpn" id="bt-foe-hpn">0 / 0</div>
+          </div>
+          <div class="bt-slot"><div class="pet-holder" id="bt-foe-pet"></div></div>
+        </div>
+
+        <div class="bt-say" id="bt-say">&nbsp;</div>
+
+        <div class="bt-row you">
+          <div class="bt-slot"><div class="pet-holder" id="bt-you-pet"></div></div>
+          <div class="bt-meta">
+            <div class="bt-nm"><b id="bt-you-nm">Your pet</b><span id="bt-you-lv">Lv 1</span></div>
+            <div class="bt-hp"><i id="bt-you-hp"></i></div>
+            <div class="bt-hpn" id="bt-you-hpn">0 / 0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bt-moves" id="bt-moves"></div>
+
+      <div class="bt-end" id="bt-end" hidden>
+        <div class="bt-end-card">
+          <div class="bt-end-ico" id="bt-end-ico">\u{1F3C6}</div>
+          <h3 id="bt-end-h">You win</h3>
+          <p class="muted" id="bt-end-p"></p>
+          <button class="btn primary" id="bt-again">Fight again</button>
+          <button class="btn ghost" id="bt-done">Done</button>
+        </div>
+      </div>
+    </section>
+
     <section class="screen" id="screen-settings">
       <div class="hdr">
         <button class="iconbtn" data-nav="home" aria-label="Back">
@@ -1581,6 +1702,8 @@ const SKILLS = {
     // and the whole joke is that this one is named and sold as the same thing
     { id:"fizzle", name:"fireball", ico:"\u{1F525}", stage:1, level:8,
       blurb:"The strongest, most powerful breath of fire you will ever see!",
+      // it hurts itself more than anyone, but what follows is the real one
+      battle:{ dmg:0.40, self:0.02, cd:4, stoke:{ mult:1.5, hits:2 } },
       sprite:{ src:"art/skill-fizzle.png", frames:16, fps:8.1,
         /* The joke only works if you believe it this time, so the wind-up runs
            three seconds - three times what it did - and the sheet's six charge
@@ -1595,18 +1718,23 @@ const SKILLS = {
         aspect:1.3125, scale:1.23, dx:-5, dy:-4.2 } },
     { id:"fireball", name:"Fireball", ico:"\u{1F525}", stage:2, level:18,
       blurb:"Draws a breath, then spits a packed ball of flame down the road ahead.",
+      battle:{ dmg:1.25, cd:3, burn:{ pct:0.20, turns:2 } },
       sprite:{ src:"art/skill-fireball.png",     frames:16, fps:12.5,
         // the breath holds, the release is sharp, the ball carries on out
         durations:[150,150,140,130, 120,110,100, 90,90,90, 110,110,120,130,140,200],
         aspect:1.270, scale:1.85, dx:12, dy:-31 } },
     { id:"flame-stomp", name:"Flame Stomp", ico:"\u{1F4A5}", stage:2, level:22,
       blurb:"Rears up and lands hard enough to throw a ring of fire out around it.",
+      // a shockwave goes under a guard rather than through it - and lands you
+      // flat-footed for doing it
+      battle:{ dmg:1.05, pierce:0.50, cd:3, open:{ pct:0.25, turns:2 } },
       sprite:{ src:"art/skill-flame-stomp.png",  frames:16, fps:12.5,
         // the rear-up hangs, the slam is quick, the ring spreads and fades
         durations:[160,150,140,130, 120,100,90,80, 100,120,130,140, 150,160,170,220],
         aspect:1.270, scale:1.98, dx:13, dy:-25 } },
     { id:"flying-swoop", name:"Flying Swoop", ico:"\u2604\uFE0F", stage:2, level:26,
       blurb:"Those wings finally earn their keep: a low, fast pass trailing fire.",
+      battle:{ dmg:1.15, cd:3, charge:{ spd:0.10, pow:0.06, max:3 } },
       sprite:{ src:"art/skill-flying-swoop.png", frames:16, fps:14.3,
         // slow either end, but the pass stays fast or the dragon floats
         durations:[170,160,150, 130,110,90, 80,80,80,90,100, 120,140,160,180,220],
@@ -1616,6 +1744,9 @@ const SKILLS = {
     // named for what the squirrel thinks it is doing
     { id:"spark", name:"Spark", ico:"\u26A1", stage:1, level:8,
       blurb:"Guaranteed to leave something scorched. No promises about what.",
+      // the charge is the point: a speed buff alone is worth nothing against
+      // something already slower than you, so it sharpens the hits as well
+      battle:{ dmg:0.90, self:0.01, cd:3, charge:{ spd:0.08, pow:0.12, max:3 } },
       sprite:{ src:"art/skill-spark.png", frames:12, fps:3,
         /* Charge, discharge, consequences. The bolts multiply over eight frames
            that quicken as they go, then the two discharge frames alternate so
@@ -1627,6 +1758,8 @@ const SKILLS = {
         aspect:1.079, scale:1.139, dx:3.2, dy:-13.6 } },
     { id:"lightning-bolt", name:"Lightning Bolt", ico:"\u{1F329}\uFE0F", stage:2, level:18,
       blurb:"Asks the sky for help. The sky, this time, obliges.",
+      // the Zephyrite's only move, so it carries the whole form
+      battle:{ dmg:1.65, pierce:0.25, cd:3 },
       sprite:{ src:"art/skill-lightning-bolt.png", frames:12, fps:3,
         /* It gathers, the sky answers, and the bolt lands. The charge quickens
            the way the Sparky's does; the strike is four frames that grow, so
@@ -1638,6 +1771,8 @@ const SKILLS = {
     // also named for what the panda thinks it is doing
     { id:"green-gale", name:"Green Gale", ico:"\u{1F343}", stage:1, level:8,
       blurb:"Gathers the forest's strength and lets it go in one mighty gust. Stand upwind.",
+      // whatever else it does, it does not leave the cub better defended
+      battle:{ dmg:1.10, cd:3, soften:{ pct:0.06, max:3 } },
       sprite:{ src:"art/skill-fart.png", frames:12, fps:3,
         /* Brace, gather, and the wrong end opens. Six charge frames quicken
            the way the Sparky's do, to a ring of green at its widest - and
@@ -1652,7 +1787,24 @@ const SKILLS = {
         order:    [0, 1, 2, 3, 4, 5,  6,   7,   8,   9,  10, 11, 10, 11],
         durations:[340, 310, 280, 250, 220, 190,  600,  560, 480, 620,
                    240, 240, 300, 360],
-        aspect:1.348, scale:0.986, dx:1.9, dy:-0.5 } }
+        aspect:1.348, scale:0.986, dx:1.9, dy:-0.5 } },
+    /* The Panda had nothing at all, which made it the only third form with an
+       empty skill row - something a player reads as a bug rather than as a
+       gap. Nap fills it and suits the creature: it does no damage, it takes a
+       turn, and it leaves you wide open while you are asleep. The nerve of it
+       is the point.
+
+       No sheet yet, so `sprite` is null. It is learnt, it is listed, and it
+       works in a battle; it simply cannot be tapped to watch. Drawing
+       art/skill-nap.png and filling this in is the whole of what is left. */
+    { id:"nap", name:"Nap", ico:"\u{1F634}", stage:2, level:18,
+      blurb:"Sits down mid-fight and sleeps. Wakes up better, if it wakes up.",
+      /* Once a battle, and that is not a balance dial being turned: two
+         Pandas with a repeatable 30% heal out-heal each other's damage
+         forever, and the fight only ends because the engine gives up at
+         eighty turns. You do not lie down twice in the same fight. */
+      battle:{ dmg:0, cd:4, heal:0.30, expose:1.6, at:0.60, once:true },
+      sprite:null }
   ]
 };
 function skillsFor(speciesId){ return SKILLS[speciesId] || []; }
@@ -2042,6 +2194,217 @@ function attrsFor(speciesId, level){
   return out;
 }
 
+/* ---------------------------------------------------------------------------
+   The battle engine.
+
+   Pure arithmetic: it draws nothing, waits for nothing, and touches no save.
+   Given two species, two levels and a seed it plays out identically every
+   time, on any device - which is what lets a battle be replayed from a seed
+   and a list of choices rather than stored blow by blow.
+
+   Every number here was settled by simulation rather than by taste, and three
+   of the rules exist because the simulation contradicted the obvious guess:
+
+   - Mitigation is divisive, not subtractive. Subtracting Defence from damage
+     made the Panda unkillable at low levels and paper at high ones.
+   - K scales with the level of the fight. Held fixed, Defence quietly grew
+     more valuable every level, and a level-99 Panda won 67% of everything.
+   - A skill costs a shared cooldown, not just its own. Without that, the
+     Blazewyrm's three moves are simply three times the damage of everybody
+     else's one, and it wins 76% of its fights.                             */
+const BT = {
+  POOL: 5,        // HP pool is HP x this, so a fight lasts about ten turns
+  MIT: 0.6,       // mitigation constant, as a fraction of the fight's level
+  JIT: 0.35,      // every hit varies by this much either way
+  CRIT: 0,        // ...and this often it lands clean. Off: a crit raises mean
+  CRIT_X: 1.8,    // damage, which shortens fights, which hands them to whoever
+                  // moved first - it made Ember lose to Nimbus 62/38.
+  TILT: 1,        // how far Speed tilts the coin for the first move
+  EXTRA: 0.35,    // ...and the most it can buy in extra turns
+  GCD: 2,         // turns after any skill before another can be used
+  MAX_TURNS: 80   // a draw is impossible, but a loop should not be
+};
+
+/** xorshift32. Small, fast, and identical everywhere - which Math.random,
+    being unseedable, is not. */
+function btRng(seed){
+  let x = (seed | 0) || 0x2F6E2B1;
+  return () => {
+    x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
+    return (x >>> 0) / 4294967296;
+  };
+}
+
+/** One side of a fight, built from nothing but species and level. Mood and
+    streak are deliberately absent: a battle is about the pet you grew, not
+    the week you had, and nobody should lose because they were ill on a
+    Tuesday. */
+function btSide(speciesId, level, name){
+  const a = attrsFor(speciesId, level);
+  return {
+    name, speciesId, level, stage: stageForLevel(level),
+    pow: a.pow, def: a.def, spd: a.spd,
+    max: Math.round(a.hp * BT.POOL),
+    cur: Math.round(a.hp * BT.POOL),
+    powMul: 1, spdMul: 1, defMul: 1,
+    stoke: null,      // { mult, hits } - the Fizzle's payoff
+    burn: null,       // { dmg, left } - ticks at the end of your own turns
+    open: 0, openPct: 0,
+    exposed: 0,       // one incoming hit lands this much harder
+    charges: 0, softens: 0,
+    gcd: 0, cds: {}, used: {},
+    // A move is kept for good, so the kit is everything learnt by this level.
+    // Skills with no `battle` block are not fightable at all.
+    kit: skillsFor(speciesId).filter(k => k.battle && level >= k.level)
+  };
+}
+
+function newBattle(you, foe, seed){
+  const st = {
+    seed: seed >>> 0,
+    rng: btRng(seed),
+    a: btSide(you.species, you.level, you.name),
+    b: btSide(foe.species, foe.level, foe.name),
+    K: 0, turn: "a", no: 0, over: false, winner: null, log: [], moves: []
+  };
+  st.K = (attrTotal(st.a.level) + attrTotal(st.b.level)) / 2 * BT.MIT;
+  /* Who opens is a weighted coin, not a comparison. "Faster always goes
+     first" sounds fair and is not: Speed rises with level like everything
+     else, so in a fight between two of the same species the higher level
+     always opened - and a fight lasting four hits each is decided by who
+     lands the first one. A pet one level up won a hundred fights in a
+     hundred. Making it likely rather than certain is what puts an upset back
+     on the table, and it costs the fast pet nothing it had earned: at a
+     Zephyrite's speed against a Panda's it still opens three times in four. */
+  const sa = st.a.spd, sb = st.b.spd;
+  st.turn = st.rng() < 0.5 + BT.TILT * (sa - sb) / (sa + sb) ? "a" : "b";
+  return st;
+}
+
+const btOther = k => (k === "a" ? "b" : "a");
+
+/** What this side can do right now. `ready` is false rather than the move
+    being hidden, so a cooldown is something you can see ticking down. */
+function btMoves(st, key){
+  const s = st[key];
+  const out = [{ id:"attack", name:"Attack", ico:"\u{1F44A}", ready:true, wait:0 }];
+  for (const k of s.kit){
+    const spent = k.battle.once && s.used[k.id];
+    const own = s.cds[k.id] || 0;
+    const wait = Math.max(own, s.gcd);
+    out.push({ id:k.id, name:k.name, ico:k.ico, spent: !!spent,
+               ready: !spent && wait === 0, wait, heal: !!k.battle.heal });
+  }
+  return out;
+}
+
+function btHit(st, x, y, mult, pierce){
+  const def = y.def * y.defMul * (y.open > 0 ? 1 - y.openPct : 1) * (1 - (pierce || 0));
+  let d = x.pow * x.powMul * mult * (st.K / (st.K + def));
+  d *= 1 - BT.JIT + st.rng() * 2 * BT.JIT;
+  if (st.rng() < BT.CRIT){ d *= BT.CRIT_X; st.crit = true; }
+  if (x.stoke){ d *= x.stoke.mult; if (--x.stoke.hits <= 0) x.stoke = null; }
+  if (y.exposed){ d *= y.exposed; y.exposed = 0; }
+  return Math.max(1, Math.round(d));
+}
+
+/** Perform one action and hand the turn on. Returns the event the screen
+    narrates; the caller keeps calling until `st.over`, or until it is the
+    player's turn again. */
+function btAct(st, moveId){
+  if (st.over) return null;
+  const key = st.turn, x = st[key], y = st[btOther(key)];
+  const sk = moveId === "attack" ? null : x.kit.find(k => k.id === moveId);
+  const ev = { side:key, move:moveId, name: sk ? sk.name : "Attack",
+               ico: sk ? sk.ico : "\u{1F44A}", dmg:0, self:0, heal:0, notes:[] };
+  st.moves.push(moveId);
+
+  if (!sk){
+    ev.dmg = btHit(st, x, y, 1, 0);
+    y.cur -= ev.dmg;
+  } else {
+    const b = sk.battle;
+    x.cds[sk.id] = b.cd;
+    x.used[sk.id] = true;
+    x.gcd = BT.GCD;
+    if (b.dmg > 0){ ev.dmg = btHit(st, x, y, b.dmg, b.pierce); y.cur -= ev.dmg; }
+    if (b.self){ ev.self = Math.max(1, Math.round(x.max * b.self)); x.cur -= ev.self;
+                 ev.notes.push(`${x.name} hurts itself`); }
+    if (b.stoke){ x.stoke = { mult:b.stoke.mult, hits:b.stoke.hits };
+                  ev.notes.push(`Next ${b.stoke.hits} hits land harder`); }
+    if (b.charge && x.charges < b.charge.max){
+      x.charges++;
+      x.spdMul += b.charge.spd; x.powMul += b.charge.pow;
+      ev.notes.push(`Charged ×${x.charges} — faster and sharper`);
+    }
+    if (b.soften && x.softens < b.soften.max){
+      x.softens++;
+      x.defMul = Math.max(0.1, x.defMul - b.soften.pct);
+      ev.notes.push(`${x.name}'s guard drops`);
+    }
+    if (b.open){ x.open = b.open.turns; x.openPct = b.open.pct;
+                 ev.notes.push(`${x.name} lands flat-footed`); }
+    if (b.burn){ y.burn = { dmg: Math.max(1, Math.round(ev.dmg * b.burn.pct)),
+                            left: b.burn.turns };
+                 ev.notes.push(`${y.name} is burning`); }
+    if (b.heal){
+      ev.heal = Math.min(x.max - x.cur, Math.round(x.max * b.heal));
+      x.cur += ev.heal;
+      y.exposed = b.expose;
+      ev.notes.push(`${x.name} is wide open`);
+    }
+  }
+
+  // The actor's own end of turn: cooldowns run down, and anything burning it
+  // bites. Burn is charged here rather than to the turn it was lit on, so two
+  // turns of burn always means two of this side's turns.
+  for (const id in x.cds) if (x.cds[id] > 0) x.cds[id]--;
+  if (x.gcd > 0) x.gcd--;
+  if (x.open > 0) x.open--;
+  if (x.burn){
+    x.cur -= x.burn.dmg;
+    ev.burn = x.burn.dmg;
+    ev.notes.push(`${x.name} takes ${x.burn.dmg} from the burn`);
+    if (--x.burn.left <= 0) x.burn = null;
+  }
+
+  x.cur = Math.max(0, Math.min(x.max, x.cur));
+  y.cur = Math.max(0, y.cur);
+  ev.hp = { a: st.a.cur, b: st.b.cur };
+  st.no++;
+
+  if (y.cur <= 0){ st.over = true; st.winner = key; }
+  else if (x.cur <= 0){ st.over = true; st.winner = btOther(key); }
+  else if (st.no >= BT.MAX_TURNS){
+    st.over = true;
+    st.winner = st.a.cur / st.a.max >= st.b.cur / st.b.max ? "a" : "b";
+  } else {
+    // Speed buys extra turns, but only up to a point: uncapped, one fast pet
+    // simply never hands the turn back.
+    const sx = x.spd * x.spdMul, sy = y.spd * y.spdMul;
+    const p = Math.max(0, Math.min(BT.EXTRA, (sx - sy) / (sx + sy)));
+    if (st.rng() < p) ev.again = true; else st.turn = btOther(key);
+  }
+  ev.over = st.over;
+  st.log.push(ev);
+  return ev;
+}
+
+/** What the other pet does. Its owner is not here - they consented to the
+    fight, they did not sign up to play it - so it picks for itself: the first
+    move it has ready, and a Nap only once it is hurt enough to be worth the
+    turn. */
+function btChoose(st, key){
+  const s = st[key];
+  for (const k of s.kit){
+    if ((s.cds[k.id] || 0) > 0 || s.gcd > 0) continue;
+    if (k.battle.once && s.used[k.id]) continue;
+    if (k.battle.heal && s.cur > s.max * (k.battle.at || 0.55)) continue;
+    return k.id;
+  }
+  return "attack";
+}
+
 /** ACSM running equation -> kilocalories. */
 function calories(km, seconds, weightKg){
   if (km <= 0 || seconds <= 0) return 0;
@@ -2182,10 +2545,19 @@ function recompute(){
     stage, lastRunTs, gapDays,
     mood: moodAt(runs, Date.now()),
     species: save.species ? SPECIES[save.species] : SPECIES.ember,
+    // A move used to retire with the form that taught it, which left a
+    // Pyrelord with nothing at all: no form above the third has skills, or art
+    // to make any. It is the pet that learnt the move, not the shape, so a
+    // move now stays for good. The clip still shows the form it was drawn for,
+    // which is visible but not wrong, and stops being so when those forms are
+    // drawn.
+    //
+    // `playable` is the narrower question of whether there is a clip to play:
+    // Nap is learnt and usable in a battle before it is animated.
     skills: skillsFor(save.species).map(sk => ({
       ...sk,
       known: lv.level >= sk.level,
-      playable: lv.level >= sk.level && stage === sk.stage
+      playable: lv.level >= sk.level && !!sk.sprite
     })),
     days: new Set(days)
   };
@@ -2856,7 +3228,7 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-20 34b5372";
+const BUILD_ID = "2026-09-20 3cd97e5";
 const ART_VERSION = "20";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -3691,11 +4063,12 @@ function renderEvolve(){
     $("#skill-count").textContent = `${list.filter(k => k.known).length}/${list.length}`;
     $("#skill-list").innerHTML = list.map(k => {
       const form = sp.stages[k.stage].name;
-      // a move belongs to the form that learnt it, so it retires with that form
+      // A move is kept for good now, so there is no "outgrown" row any more.
+      // The middle case is a move that is learnt but has no clip yet.
       const note = k.playable ? "Learnt \u00b7 tap to use"
-                 : k.known    ? `Outgrown \u00b7 was ${form}'s`
+                 : k.known    ? "Learnt \u00b7 animation coming"
                               : `${form} learns this at level ${k.level}`;
-      return `<div class="skill-item ${k.playable ? "known" : "locked"}" ${k.playable ? `data-skill-go="${k.id}"` : ""}>
+      return `<div class="skill-item ${k.known ? "known" : "locked"}" ${k.playable ? `data-skill-go="${k.id}"` : ""}>
         <div class="ico">${k.known ? k.ico : "\u{1F512}"}</div>
         <div class="t">
           <div class="nm">${k.name}</div>
@@ -3744,7 +4117,7 @@ function go(name){
   // while you are in it - a screen with no tab highlighted reads as being lost.
   const lit = name === "history" ? "home" : name;
   $$(".tab[data-nav]").forEach(t => t.classList.toggle("on", t.dataset.nav === lit));
-  const chromeless = name === "track" || name === "summary";
+  const chromeless = name === "track" || name === "summary" || name === "battle";
   $("#tabbar").classList.toggle("hidden", chromeless);
   $("#fab").classList.toggle("hidden", chromeless);
   $("#demo-badge").classList.toggle("hidden", chromeless);
@@ -4948,7 +5321,7 @@ function openAnimationTester(){
                    `data-sp="${sp}" data-lv="${ph.from}"`)).join("")}</div>`).join("");
   const moods = Object.values(MOODS).map(m =>
     animTestChip("mood", `<span class="em">${m.emoji}</span>${m.label}`, `data-mood="${m.key}"`)).join("");
-  const skills = SPECIES_ORDER.flatMap(id => skillsFor(id).map(sk =>
+  const skills = SPECIES_ORDER.flatMap(id => skillsFor(id).filter(sk => sk.sprite).map(sk =>
     animTestChip("skill", `<span class="em">${sk.ico}</span>${sk.name}`, `data-sp="${id}" data-sk="${sk.id}"`))).join("");
   const celebs = Object.keys(LEVEL_UP_ART).map(key => {
     const [form, lv] = key.split("@");
@@ -4961,6 +5334,17 @@ function openAnimationTester(){
   // sheet, so it is listed off EGG_PHASES instead.
   const wobbles = Object.keys(EGG_PHASES).map(sp =>
     animTestChip("wobble", `${SPECIES[sp].stages[0].name} → Lv 2`, `data-sp="${sp}"`)).join("");
+  /* Somewhere to try a fight before the challenge flow exists to start one
+     properly. Every species at your own level, and your own species a few
+     levels either side - which is what a real friend most often is, and the
+     matchup worth watching for whether a level gap feels unfair. */
+  const fights = [
+    ...SPECIES_ORDER.map(id =>
+      animTestChip("fight", `<span class="em">⚔️</span>${SPECIES[id].name}`,
+                   `data-sp="${id}" data-dl="0"`)),
+    ...[-5, -2, 2, 5].map(dl =>
+      animTestChip("fight", `Mirror ${dl > 0 ? "+" : ""}${dl}`, `data-dl="${dl}"`))
+  ].join("");
 
   openSheet({
     bare: true,
@@ -4973,6 +5357,7 @@ function openAnimationTester(){
       <div class="fj-label">Skills</div><div class="anim-chips">${skills}</div>
       <div class="fj-label">Level-up celebrations</div><div class="anim-chips">${celebs}</div>
       <div class="fj-label">Level-up with no crack to show</div><div class="anim-chips">${wobbles}</div>
+      <div class="fj-label">Battle \u2014 your pet against</div><div class="anim-chips">${fights}</div>
       <div class="fj-label">On their own</div><div class="anim-chips">
         ${animTestChip("confetti", `<span class="em">\u{1F389}</span>Confetti`, "")}
         ${animTestChip("caption", `<span class="em">\u2728</span>Level Up! caption`, "")}
@@ -4989,6 +5374,160 @@ function openAnimationTester(){
     }
   });
 }
+/* ---------------------------------------------------------------------------
+   The battle screen.
+
+   The engine decided the whole fight the moment it was seeded; this only
+   paces it out so it can be watched. Nothing here may change an outcome -
+   if it could, a replay on another device would disagree with the original.
+   ------------------------------------------------------------------------- */
+let battle = null, btLock = false, btTimers = [];
+
+const BT_BEAT  = 560;    // a plain attack, start to finish
+const BT_AFTER = 340;    // ...and the pause before the next side moves
+
+function btClear(){ btTimers.forEach(clearTimeout); btTimers = []; }
+function btWait(fn, ms){ btTimers.push(setTimeout(fn, ms)); }
+
+function startBattle(you, foe){
+  btClear();
+  battle = newBattle(you, foe, (Math.random() * 0xFFFFFFFF) >>> 0);
+  battle.you = you; battle.foe = foe;
+  btLock = false;
+  $("#bt-end").hidden = true;
+  go("battle");
+  paintPet($("#bt-you-pet"), you.species, stageForLevel(you.level), "okay");
+  paintPet($("#bt-foe-pet"), foe.species, stageForLevel(foe.level), "okay");
+  $("#bt-you-nm").textContent = you.name;
+  $("#bt-foe-nm").textContent = foe.name;
+  $("#bt-you-lv").textContent = `Lv ${you.level} · ${SPECIES[you.species].stages[stageForLevel(you.level)].name}`;
+  $("#bt-foe-lv").textContent = `Lv ${foe.level} · ${SPECIES[foe.species].stages[stageForLevel(foe.level)].name}`;
+  btSay(battle.turn === "a" ? `${you.name} moves first.` : `${foe.name} is quicker off the mark.`);
+  renderBattle();
+  if (battle.turn === "b") btWait(btFoeTurn, 900);
+}
+
+/* One child, always. The box centres with flex, and flex makes every text node
+   between two elements its own item - which ate the spaces around "used". */
+function btSay(text){ $("#bt-say").innerHTML = `<span>${text}</span>`; }
+
+function btBars(){
+  for (const [key, id] of [["a", "you"], ["b", "foe"]]){
+    const s = battle[key], pct = Math.max(0, s.cur / s.max);
+    const bar = $(`#bt-${id}-hp`);
+    bar.style.width = (pct * 100).toFixed(1) + "%";
+    bar.classList.toggle("mid", pct <= 0.5 && pct > 0.22);
+    bar.classList.toggle("low", pct <= 0.22);
+    $(`#bt-${id}-hpn`).textContent = `${Math.max(0, s.cur)} / ${s.max}`;
+  }
+  $("#bt-turn").textContent = `Turn ${battle.no + 1}`;
+}
+
+/* The move buttons. A move on cooldown stays on screen with its count rather
+   than disappearing: a button that vanishes reads as a bug, and knowing that
+   the big one is two turns away is most of the decision. */
+function renderBattle(){
+  btBars();
+  const moves = btMoves(battle, "a");
+  $("#bt-moves").innerHTML = moves.map((m, i) => {
+    const note = m.spent ? "done" : m.wait ? `${m.wait} turn${m.wait === 1 ? "" : "s"}` : "";
+    return `<button class="bt-move ${i === 0 ? "hero" : ""}" data-move="${m.id}"
+      ${m.ready && !btLock && battle.turn === "a" && !battle.over ? "" : "disabled"}>
+      <span class="em">${m.ico}</span>${m.name}
+      ${note ? `<span class="wait">${note}</span>` : ""}</button>`;
+  }).join("");
+}
+
+/** One side acts, and the screen catches up with it. */
+function btRun(moveId){
+  if (!battle || battle.over || btLock) return;
+  const side = battle.turn;
+  const actor = side === "a" ? "you" : "foe";
+  const target = side === "a" ? "foe" : "you";
+  const sk = moveId === "attack" ? null
+           : battle[side].kit.find(k => k.id === moveId);
+  const ev = btAct(battle, moveId);
+  if (!ev) return;
+  btLock = true;
+  renderBattle();
+
+  // A drawn skill plays its own clip in the acting pet's slot; everything else
+  // gets the lunge. Nap has no sheet yet, so it takes the lunge too - which is
+  // why it can be learnt and used before it has been drawn.
+  const slot = $(`#bt-${actor}-pet`).parentElement;
+  let beat = BT_BEAT;
+  if (sk && sk.sprite && !spriteBroken[sk.sprite.src]){
+    beat = clipDurationMs(sk.sprite) + 80;
+    $(`#bt-${actor}-pet`).innerHTML = spriteHTML(sk.sprite, "okay", true);
+  } else {
+    slot.classList.add("act");
+    btWait(() => slot.classList.remove("act"), 320);
+  }
+
+  const lines = [`<b>${battle[side].name}</b> used <b>${ev.name}</b>.`];
+  if (ev.notes.length) lines.push(ev.notes.join(" · "));
+  btSay(lines.join("<br>"));
+
+  btWait(() => {
+    // The pet goes back to its idle, then the damage lands.
+    if (sk && sk.sprite){
+      const who = side === "a" ? battle.you : battle.foe;
+      paintPet($(`#bt-${actor}-pet`), who.species, stageForLevel(who.level), "okay");
+    }
+    if (ev.dmg) btLand(target, ev.dmg, false);
+    if (ev.self) btLand(actor, ev.self, false);
+    if (ev.burn) btLand(actor, ev.burn, false);
+    if (ev.heal) btLand(actor, ev.heal, true);
+    btBars();
+
+    btWait(() => {
+      btLock = false;
+      if (battle.over) return btFinish();
+      renderBattle();
+      if (battle.turn === "b") btWait(btFoeTurn, 260);
+      else if (ev.again) btSay(`<b>${battle.a.name}</b> is fast enough to go again.`);
+    }, BT_AFTER);
+  }, beat);
+}
+
+function btLand(who, n, heal){
+  const slot = $(`#bt-${who}-pet`).parentElement;
+  if (!heal){
+    slot.classList.add("hit");
+    btWait(() => slot.classList.remove("hit"), 360);
+  }
+  const tag = document.createElement("span");
+  tag.className = "bt-float" + (heal ? " heal" : "");
+  tag.textContent = (heal ? "+" : "−") + n;
+  slot.appendChild(tag);
+  btWait(() => tag.remove(), 1000);
+}
+
+function btFoeTurn(){
+  if (!battle || battle.over || battle.turn !== "b") return;
+  btRun(btChoose(battle, "b"));
+}
+
+function btFinish(){
+  const won = battle.winner === "a";
+  const left = won ? battle.a.cur : battle.b.cur;
+  const of   = won ? battle.a.max : battle.b.max;
+  $("#bt-end-ico").textContent = won ? "\u{1F3C6}" : "\u{1F4A4}";
+  $("#bt-end-h").textContent = won ? "You win" : "You lost";
+  $("#bt-end-p").textContent = won
+    ? `${battle.a.name} saw off ${battle.b.name} in ${battle.no} turns, with ${left} of ${of} left.`
+    : `${battle.b.name} had ${left} of ${of} still in the tank after ${battle.no} turns.`;
+  $("#bt-end").hidden = false;
+  renderBattle();
+}
+
+function leaveBattle(){
+  btClear();
+  battle = null; btLock = false;
+  $("#bt-end").hidden = true;
+  go("home");
+}
+
 /** Show what the tester is previewing, since the name under the pet is still yours. */
 function animTestNote(text){
   const el = $("#anim-now");
@@ -5004,6 +5543,20 @@ function playAnimTest(d, root){
   };
   if (root) $$("[data-anim]", root).forEach(b => b.classList.remove("on"));
   switch (d.anim){
+    // A battle takes the whole screen, so it closes the tester on its way out
+    // rather than leaving a sheet open behind it.
+    case "fight": {
+      closeSheet();
+      previewPet = null;
+      const lv = Math.max(1, Math.min(MAX_LEVEL, derived.level + (+d.dl || 0)));
+      startBattle({ species: save.species, level: derived.level,
+                    name: save.petName || derived.species.name },
+                  { species: d.sp || save.species, level: lv,
+                    name: (d.sp && d.sp !== save.species)
+                          ? SPECIES[d.sp].name
+                          : `Rival Lv ${lv}` });
+      return;
+    }
     case "idle":  show(d.sp, +d.st); break;
     case "egg":   show(d.sp, 0, +d.lv); break;
     case "mood": {
@@ -5293,6 +5846,16 @@ function wire(){
     const go2 = e.target.closest("[data-skill-go]");
     if (go2){ go("home"); playSkill(go2.dataset.skillGo); }
   });
+  $("#bt-moves").addEventListener("click", e => {
+    const m = e.target.closest("[data-move]");
+    if (m && battle && battle.turn === "a") btRun(m.dataset.move);
+  });
+  $("#bt-quit").addEventListener("click", leaveBattle);
+  $("#bt-done").addEventListener("click", leaveBattle);
+  $("#bt-again").addEventListener("click", () => {
+    if (battle) startBattle(battle.you, battle.foe);
+  });
+
   // the pet itself is the most obvious thing to poke
   $("#pet-stage").addEventListener("click", () => {
     const known = derived.skills.filter(k => k.playable);
