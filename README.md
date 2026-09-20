@@ -734,6 +734,50 @@ a game people play against each other, everyone should be looking at the same
 creature. Adding or changing art means editing `DEFAULT_SPRITES` and shipping
 it, which is what `ART-SPEC.md` describes.
 
+## Attributes
+
+Every pet carries four numbers — **HP, Defence, Power and Speed** — shown on the
+Pet screen under the level card. Nothing reads them yet: Battle does not exist.
+They are there so the shape of a species is visible while it grows.
+
+They are **derived, never stored**, from species and level alone, the same rule
+as everything else in the game. There is no save to migrate, nothing to drift,
+and nothing for the cards or the roster to carry.
+
+Every species has the **same total at a given level** and differs only in how
+that total is split, so no form is simply handed more than another. The split
+*is* the identity.
+
+| | HP | Defence | Power | Speed | |
+|---|---|---|---|---|---|
+| 🌿 Verdant | 37% | 26% | 27% | 10% | outlasts you |
+| 🔥 Ember | 19% | 19% | 37% | 25% | ends it early |
+| ⚡ Nimbus | 21% | 19% | 30% | 29% | acts twice |
+
+```
+total(level) = 100 + 6 × (level − 1) + evoBonus[stage]
+evoBonus     = [0, 0, 18, 42, 72]        // cumulative, by stage index
+```
+
+Evolving adds a step on top of the per-level growth, but only from the **third**
+form on. The first two arrive at levels 1 and 5, which is before anybody has
+really begun, so a bonus there would be a bigger starting number rather than a
+reward — the same reasoning that put `EARLY_MULT` on the egg.
+
+| Evolution | Total before → after | Worth |
+|---|---|---|
+| Lv 5 → stage 2 | 118 → 124 | nothing extra — an ordinary level |
+| Lv 15 → stage 3 | 178 → 202 | **4 levels** at once |
+| Lv 30 → stage 4 | 286 → 316 | **5 levels** |
+| Lv 50 → stage 5 | 430 → 466 | **6 levels** |
+
+At level 15 a Blazewyrm reads 38 / 38 / 75 / 51 and a Panda 75 / 53 / 55 / 20,
+off the same 202 points. By 99 the pool is 760.
+
+The bars are drawn against the widest slice anyone has (37%), not against the
+row's own biggest number, so a Panda's Speed reads as short next to a
+Blazewyrm's — which is the point — and no bar jumps as a stat grows.
+
 ## How XP works
 
 **Distance → XP.** 100 XP per kilometre, and later kilometres inside a single

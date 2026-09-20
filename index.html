@@ -638,6 +638,16 @@ body::before{
 .evo-reveal .new{filter:drop-shadow(0 0 22px rgba(var(--glow),.9));animation:popIn .8s var(--ease) both}
 @keyframes popIn{0%{transform:scale(.3) rotate(-14deg);opacity:0}62%{transform:scale(1.14) rotate(4deg);opacity:1}100%{transform:scale(1) rotate(0)}}
 
+/* battle attributes - display only until Battle exists */
+.attr-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}
+.attr{display:flex;flex-direction:column;gap:5px}
+.attr .top{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.attr .k{font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:1.1px;font-weight:800}
+.attr .v{font-family:"Fredoka One","Fredoka",sans-serif;font-size:15px;letter-spacing:.3px}
+.attr .bar{height:6px;border-radius:999px;background:#0c0f18;border:1px solid var(--line);overflow:hidden}
+.attr .bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--accent),var(--accent-2))}
+.attr-note{font-size:11px;color:var(--muted);font-weight:600;line-height:1.45;margin-top:12px}
+
 /* skills */
 .skill-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px}
 .skill-chip{
@@ -1076,6 +1086,12 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
           <span><b id="home-xpnow">0</b> / <span id="home-xpneed">400</span> XP</span>
           <span id="home-xpleft">400 XP to Lv 2</span>
         </div>
+      </div>
+
+      <div class="section-title">Attributes</div>
+      <div class="card">
+        <div class="attr-grid" id="home-attrs"></div>
+        <div class="attr-note" id="home-attr-note"></div>
       </div>
 
       <div class="section-title">This week</div>
@@ -1987,6 +2003,47 @@ function stageForLevel(level){
   return s;
 }
 
+/* Battle attributes. Four numbers, derived from species and level and never
+   stored - so there is no save to migrate, nothing to drift, and nothing for
+   the roster or the cards to carry.
+
+   Every species has the *same total* at a given level and differs only in how
+   it is split, so no form is simply handed more than another: the split is the
+   identity. Verdant outlasts you, Ember ends it early, Nimbus acts twice.
+
+   Evolution adds a step on top of the per-level growth, but only from the
+   third form on. The first two arrive at levels 1 and 5, which is before
+   anybody has really begun, so a bonus there would be a bigger starting number
+   rather than a reward - the same reasoning that put EARLY_MULT on the egg.
+
+   Nothing reads these yet; Battle does not exist. They are on the Pet screen
+   so the shape of a species is visible while it grows.                       */
+const ATTR_BASE   = 100;                  // the pool at level 1
+const ATTR_GROWTH = 6;                    // ...and every level after
+const ATTR_EVO    = [0, 0, 18, 42, 72];   // cumulative, by stage index
+const ATTR_ORDER  = ["hp", "def", "pow", "spd"];
+const ATTR_LABEL  = { hp:"HP", def:"Defence", pow:"Power", spd:"Speed" };
+const ATTR_SPLIT  = {
+  verdant: { hp:0.37, def:0.26, pow:0.27, spd:0.10 },
+  ember:   { hp:0.19, def:0.19, pow:0.37, spd:0.25 },
+  nimbus:  { hp:0.21, def:0.19, pow:0.30, spd:0.29 }
+};
+/* The widest slice anyone has. Bars are drawn against it rather than against
+   the row's own biggest number, so a Verdant's Speed reads as short next to an
+   Ember's - which is the whole point - and no bar jumps when a stat grows. */
+const ATTR_SCALE  = 0.37;
+
+function attrTotal(level){
+  return ATTR_BASE + ATTR_GROWTH * (level - 1) + ATTR_EVO[stageForLevel(level)];
+}
+function attrsFor(speciesId, level){
+  const split = ATTR_SPLIT[speciesId] || ATTR_SPLIT.ember;
+  const total = attrTotal(level);
+  const out = {};
+  for (const k of ATTR_ORDER) out[k] = Math.round(total * split[k]);
+  return out;
+}
+
 /** ACSM running equation -> kilocalories. */
 function calories(km, seconds, weightKg){
   if (km <= 0 || seconds <= 0) return 0;
@@ -2801,7 +2858,7 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-17 b39b63b";
+const BUILD_ID = "2026-09-20 8c9a6ec";
 const ART_VERSION = "20";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -3458,8 +3515,29 @@ function renderHome(){
   $("#home-weekdist").innerHTML = `${U.distStr(weekKm, 1)}<small>${U.label}</small>`;
   $("#home-total").innerHTML = `${U.distStr(d.totalKm, d.totalKm >= 100 ? 0 : 1)}<small>${U.label}</small>`;
 
+  renderAttrs(shown.id,
+    (previewPet && previewPet.level != null) ? previewPet.level : d.level);
+
   renderWeek();
   renderRecent();
+}
+/* The attribute block. Bars are drawn against ATTR_SCALE, not against the
+   row's own maximum, so the four lengths mean the same thing on every pet. */
+function renderAttrs(speciesId, level){
+  const a = attrsFor(speciesId, level), total = attrTotal(level);
+  $("#home-attrs").innerHTML = ATTR_ORDER.map(k => {
+    const pct = Math.max(4, Math.min(100, Math.round(100 * a[k] / (total * ATTR_SCALE))));
+    return `<div class="attr">
+        <div class="top"><span class="k">${ATTR_LABEL[k]}</span><span class="v">${a[k]}</span></div>
+        <div class="bar"><i style="width:${pct}%"></i></div>
+      </div>`;
+  }).join("");
+  const stage = stageForLevel(level);
+  const nextEvo = EVO_LEVELS.find(l => l > level);
+  const bonus = nextEvo ? ATTR_EVO[stageForLevel(nextEvo)] - ATTR_EVO[stage] : 0;
+  $("#home-attr-note").textContent = bonus
+    ? `Every pet has ${total} points at level ${level} — only the split differs. Evolving at Lv ${nextEvo} adds ${bonus} more.`
+    : `Every pet has ${total} points at level ${level} — only the split differs.`;
 }
 function startOfWeek(){
   const n = new Date(); n.setHours(0,0,0,0);
