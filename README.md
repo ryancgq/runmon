@@ -906,6 +906,14 @@ than stored blow by blow.
 **Mood and streak are deliberately absent.** A battle is about the pet you grew,
 not the week you had, and nobody should lose because they were ill on a Tuesday.
 
+**The screen keeps its own copy of both healths.** `btAct()` settles the whole
+action the instant it is called — that is what makes the engine replayable — so
+the engine's figure is the post-hit one while the attacker is still winding up.
+Painting the bars from it dropped the opponent's health at the *start* of the
+animation and then floated the damage number over it a clip later. The bars now
+advance only when the blow lands: at the end of the attacker's clip, or 400ms
+into a plain attack, which is just past the lunge.
+
 ```
 damage   = Power × multiplier × K/(K + Defence) × (1 ± 35%)
 K        = the average of both totals × 0.6

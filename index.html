@@ -3395,7 +3395,7 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-21 6225fef";
+const BUILD_ID = "2026-09-21 c6a6209";
 const ART_VERSION = "23";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -5569,7 +5569,16 @@ function openAnimationTester(){
    ------------------------------------------------------------------------- */
 let battle = null, btLock = false, btTimers = [];
 
-const BT_BEAT  = 560;    // a plain attack, start to finish
+/* What the bars are currently showing, which is not what the engine knows.
+   btAct() settles the whole action the instant it is called - that is the
+   point of a pure engine - so `battle.b.cur` is already the post-hit figure
+   while the attacker is still winding up. Painting the bars from it dropped
+   the opponent's health at the start of the animation and then floated the
+   damage number over it a clip later. The screen keeps its own copy and
+   advances it when the blow lands. */
+let btShown = null;
+
+const BT_BEAT  = 400;    // a plain attack: the lunge, then the hit
 const BT_AFTER = 340;    // ...and the pause before the next side moves
 
 function btClear(){ btTimers.forEach(clearTimeout); btTimers = []; }
@@ -5580,6 +5589,7 @@ function startBattle(you, foe){
   battle = newBattle(you, foe, (Math.random() * 0xFFFFFFFF) >>> 0);
   battle.you = you; battle.foe = foe;
   btLock = false;
+  btShown = { a: battle.a.cur, b: battle.b.cur, turn: battle.no };
   $("#bt-end").hidden = true;
   go("battle");
   paintPet($("#bt-you-pet"), you.species, stageForLevel(you.level), "okay");
@@ -5597,16 +5607,23 @@ function startBattle(you, foe){
    between two elements its own item - which ate the spaces around "used". */
 function btSay(text){ $("#bt-say").innerHTML = `<span>${text}</span>`; }
 
+/** Paint the bars from `btShown`, never from the engine. */
 function btBars(){
   for (const [key, id] of [["a", "you"], ["b", "foe"]]){
-    const s = battle[key], pct = Math.max(0, s.cur / s.max);
+    const max = battle[key].max, cur = Math.max(0, btShown[key]);
+    const pct = Math.max(0, cur / max);
     const bar = $(`#bt-${id}-hp`);
     bar.style.width = (pct * 100).toFixed(1) + "%";
     bar.classList.toggle("mid", pct <= 0.5 && pct > 0.22);
     bar.classList.toggle("low", pct <= 0.22);
-    $(`#bt-${id}-hpn`).textContent = `${Math.max(0, s.cur)} / ${s.max}`;
+    $(`#bt-${id}-hpn`).textContent = `${cur} / ${max}`;
   }
-  $("#bt-turn").textContent = `Turn ${battle.no + 1}`;
+  $("#bt-turn").textContent = `Turn ${btShown.turn + 1}`;
+}
+/** The blow has landed: catch the bars up with what the engine already knows. */
+function btCatchUp(){
+  btShown = { a: battle.a.cur, b: battle.b.cur, turn: battle.no };
+  btBars();
 }
 
 /* The move buttons. A move on cooldown stays on screen with its count rather
@@ -5664,7 +5681,7 @@ function btRun(moveId){
     if (ev.self) btLand(actor, ev.self, false);
     if (ev.burn) btLand(actor, ev.burn, false);
     if (ev.heal) btLand(actor, ev.heal, true);
-    btBars();
+    btCatchUp();
 
     btWait(() => {
       btLock = false;
