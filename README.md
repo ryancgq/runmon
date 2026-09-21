@@ -893,8 +893,36 @@ learns Flame Stomp at 22.
 
 **Distance → XP.** 100 XP per kilometre, and later kilometres inside a single
 run are worth more than earlier ones. The rate climbs continuously from ×1.0 to
-×2.0 at 20 km, so one long run beats the same distance chopped into short ones:
-5 km earns 563 XP, but 10 km earns 1,250 rather than 1,126.
+×1.30 at 15 km, so one long run beats the same distance chopped into short
+ones: 5 km earns 525 XP, but 10 km earns 1,100 rather than 1,050.
+
+| Distance | Flat | Endurance | Total | Effective |
+| --- | --- | --- | --- | --- |
+| 5 km | 500 | 25 | **525** | ×1.05 |
+| 10 km | 1,000 | 100 | **1,100** | ×1.10 |
+| 15 km | 1,500 | 225 | **1,725** | ×1.15 |
+| 20 km | 2,000 | 375 | **2,375** | ×1.19 |
+| 30 km | 3,000 | 675 | **3,675** | ×1.23 |
+| Marathon | 4,220 | 1,041 | **5,261** | ×1.25 |
+
+The ×1.30 is the *marginal* rate — what the 15th kilometre itself pays, not a
+multiplier on the run. Because the rate ramps up from 100, the effective
+multiplier is always lower, and it approaches ×1.30 from below however far you
+go.
+
+The ceiling used to be ×2.0 at 20 km, which made a marathon worth 7,440 XP and
+every kilometre past the twentieth worth double a beginner's. Pulling the climb
+in to 15 km spread the cut the right way round: a 5 km run lost 7%, a 20 km run
+21%, a marathon 29%.
+
+**The rate can never fall**, which is what rules out the obvious fix of simply
+capping the bonus in absolute terms. The moment a kilometre is worth less than
+an earlier one, two half-runs beat one whole one and the bonus pays for the
+opposite of endurance. That leaves exactly two dials — how fast the rate climbs
+and where it stops — and between them they set the ceiling, `1 + K × cap`.
+
+None of it is retroactive: every run stores the XP it earned and `recompute()`
+adds those stored numbers up, so nobody's level moved.
 
 **Moods.** The pet sits on a six-rung ladder, and the rung multiplies every run
 it earns — every run, whatever its distance. A run of **2 km or more climbs one
