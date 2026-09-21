@@ -180,7 +180,7 @@ down through all six moods), or start over and pick a different pet.
 **Test animations** is the one that levels nothing. It opens a panel that does
 not dim the screen, so the pet stays in view above it while you tap through
 every animation the app has: fifteen idles across all three species, the egg's
-three crack phases, six moods, eight skills, ten level-up celebrations — each
+three crack phases, six moods, nine skills, ten level-up celebrations — each
 with its full wind-up, burst and caption — and the confetti, the caption and
 the wind-up on their own. The pet is painted straight onto the stage and the
 celebrations run without a level to spend, so you can watch a Blazewyrm's
@@ -653,6 +653,7 @@ Blazewyrm starts.
 | ☄️ Flying Swoop | Blazewyrm | Level 26 | A low, fast pass trailing fire |
 | 🌩️ Lightning Bolt | Zephyrite | Level 18 | Asks the sky for help. The sky, this time, obliges. |
 | 😴 Nap | Panda | Level 18 | Sits down mid-fight and sleeps. Wakes up better, if it wakes up. |
+| 🪨 Landslide | Panda | Level 22 | Curls up, picks a direction and commits. Steering was never part of the plan. |
 
 **A move belongs to the form that learnt it** and retires with that form. The
 Evolution screen still lists an outgrown one, marked as what it was.
@@ -696,9 +697,25 @@ that arrives without art: a move that is this form's own but has no sheet shows
 a dashed chip that says so when tapped, and the Evolution screen reads
 *"Learnt · animation coming"*.
 
-**The Panda's whole kit is Nap**, and Nap does no damage. It is the only third
-form with a single move. That is a gap waiting on a second Verdant skill, not a
-balance decision.
+**Landslide is the Panda's damage**, and it closed the last real gap in the
+roster: until it existed, Nap was the whole kit and Nap does nothing to
+anybody, which made the third form the only one that could not threaten a
+thing.
+
+It goes through a guard rather than around it — a rolling weight does not care
+how well you are braced — and the cost is a real one: its own Defence is halved
+for three turns afterwards while it unrolls, on a five-turn cooldown. The first
+draft was a bigger hit more often and put Verdant at 65% against Ember and 69%
+against Nimbus from level 22 on. Tuning found the balance sits at a heavier hit
+paid for more dearly rather than a smaller one paid for lightly: 0.95 damage on
+a four-turn cooldown scored identically, but a move called Landslide that hits
+for less than a shove is not worth having.
+
+Its sheet is packed from whole gutter cells rather than content crops. The ball
+wobbles about its cell's centre and that wobble is drawn, so centring each frame
+on its own content would have steadied a ball that is meant to be lurching. The
+pet does not travel across the frame — the roll is carried by the speed lines —
+so there is no horizontal motion to preserve, only the wobble.
 
 All three babies' moves are the same joke told three times, which is
 deliberate: a first skill is named for what the pet thinks it is doing. The

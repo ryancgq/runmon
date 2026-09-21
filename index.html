@@ -1885,7 +1885,45 @@ const SKILLS = {
            drawn leaving it. */
         durations:[220, 240, 260, 360, 360, 220, 190, 220,
                    340, 400, 400, 400, 280, 220, 200, 340],
-        aspect:1.0790, scale:1.2, dx:4.05, dy:-22.01 } }
+        aspect:1.0790, scale:1.2, dx:4.05, dy:-22.01 } },
+    /* The Panda's damage. It needed one: Nap was its whole kit and Nap does
+       nothing to anybody, which made the third form the only one that could
+       not threaten a thing.
+
+       Named for what it is rather than for what the pet thinks it is doing -
+       the third forms all get straight names - and Verdant's word for an
+       unstoppable weight of earth going downhill is the right one. */
+    { id:"landslide", name:"Landslide", ico:"\u{1FAA8}", stage:2, level:22,
+      blurb:"Curls up, picks a direction and commits. Steering was never part of the plan.",
+      /* Heavy, and it goes through a guard rather than around it: a rolling
+         weight does not care how well you are braced, which is what `pierce`
+         is for. The cost is the obvious one, and it is a real one - a pet
+         curled into a ball cannot defend itself, so its own Defence is halved
+         for three turns afterwards while it unrolls.
+
+         The first draft was a bigger hit on a shorter cooldown, and it put
+         Verdant at 65% against Ember and 69% against Nimbus from level 22 on.
+         Tuning found the balance sits at a heavier hit paid for more dearly
+         rather than a smaller one paid for lightly: at 0.95 damage on a
+         4-turn cooldown the numbers came out the same, but a move called
+         Landslide that hits for less than a shove is not worth having. */
+      battle:{ dmg:1.25, pierce:0.35, cd:5, open:{ pct:0.50, turns:3 } },
+      sprite:{ src:"art/skill-landslide.png", frames:16, fps:5.4,
+        /* Three seconds: a beat of sitting there before it commits, a tuck,
+           then eleven frames accelerating from 190ms down to 98ms as the ball
+           spins up and the speed lines build. It leaves frame at 14 and the
+           last two are dust, held longest of all - the pet is gone and the
+           screen has to say so before the idle comes back.
+
+           Packed from whole gutter cells rather than content crops. The ball
+           wobbles about its cell's centre and that wobble is drawn, so
+           centring each frame on its own content would have steadied a ball
+           that is meant to be lurching. The pet does not travel across the
+           frame - the roll is carried by the speed lines - so there is no
+           horizontal motion to preserve, only the wobble. */
+        durations:[360, 275, 230, 190, 160, 138, 120, 110,
+                   98, 98, 98, 98, 110, 160, 250, 480],
+        aspect:1.1890, scale:1.184, dx:4.9, dy:-13.04 } }
   ]
 };
 function skillsFor(speciesId){ return SKILLS[speciesId] || []; }
@@ -3357,7 +3395,7 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-21 3d03e8c";
+const BUILD_ID = "2026-09-21 6225fef";
 const ART_VERSION = "23";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
