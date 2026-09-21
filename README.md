@@ -671,14 +671,25 @@ line — ten of the twelve boundaries come out crossing nothing at all, and the
 two that touch cross 46 and 15 pixels instead of shearing an ear flat. The same
 lesson as the Panda's celebration, applied before shipping it rather than after.
 
+**The last three frames were drawn smaller than the rest** and are scaled back
+up — ×1.13, ×1.10 and ×1.06 — so the pet does not shrink on its way back to the
+idle. Measured by fitting each frame's silhouette against the first one over a
+range of scales and taking the best overlap, which is the only comparison that
+survives the pose changing: frames 1–6 fit each other within 2%, and 14, 15 and
+16 did not. The lying frames cannot be compared to a sitting one that way, so
+they were checked against each other instead and agree to within 7%, which is
+drawing rather than drift.
+
 **Frames keep the height off the ground they were drawn at**, measured against
 their own row's floor. Standing them all on one line is the obvious way to pack
 a sheet and it is wrong here: frame 14 is the pet startled awake and leaving the
 ground by 41px, and a flat floor silently plants it back down. Everything else
 lands within 5px of its row, which is the drawing's own wobble and is kept
 rather than straightened — once you are flattening, you cannot tell the wobble
-from the jump. The celebration sheet was checked for the same thing and has
-none: every frame of it sits within 3px of its row.
+from the jump. The jump is scaled with its frame, 41px to 46px, so the pet does
+not leave the ground by a different amount than it was drawn leaving it. The
+celebration sheet was checked for the same thing and has none: every frame of it
+sits within 3px of its row.
 
 The dimmed-chip machinery it used to need is still there for the next skill
 that arrives without art: a move that is this form's own but has no sheet shows

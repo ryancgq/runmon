@@ -1863,6 +1863,16 @@ const SKILLS = {
            come out crossing nothing at all, and the two that touch cross 46
            and 15 pixels instead of shearing an ear flat.
 
+           The last three frames were drawn smaller than the rest and are
+           scaled back up - x1.13, x1.10 and x1.06 - so the pet does not shrink
+           on its way back to the idle. Measured by fitting each frame's
+           silhouette against the first one over a range of scales and taking
+           the best overlap, which is the only comparison that survives the
+           pose changing: frames 1-6 all fit within 2% of each other, 14, 15
+           and 16 did not. The lying frames cannot be compared to a sitting one
+           that way, so they were checked against each other instead and agree
+           to within 7%, which is drawing rather than drift.
+
            Frames keep the height off the ground they were drawn at, measured
            against their own row's floor. Standing them all on one line is the
            obvious way to pack a sheet and it is wrong here: frame 14 is the
@@ -1870,10 +1880,12 @@ const SKILLS = {
            silently plants it back down. Everything else lands within 5px of
            its row, which is the drawing's own wobble and is kept rather than
            straightened - once you are flattening you cannot tell the wobble
-           from the jump. */
+           from the jump. The jump is scaled with its frame, 41px to 46px, so
+           the pet does not leave the ground by a different amount than it was
+           drawn leaving it. */
         durations:[220, 240, 260, 360, 360, 220, 190, 220,
                    340, 400, 400, 400, 280, 220, 200, 340],
-        aspect:1.1833, scale:1.2, dx:4.05, dy:-13.51 } }
+        aspect:1.0790, scale:1.2, dx:4.05, dy:-22.01 } }
   ]
 };
 function skillsFor(speciesId){ return SKILLS[speciesId] || []; }
@@ -3345,8 +3357,8 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-21 15edf52";
-const ART_VERSION = "22";
+const BUILD_ID = "2026-09-21 3d03e8c";
+const ART_VERSION = "23";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
 }
