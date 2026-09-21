@@ -180,7 +180,7 @@ down through all six moods), or start over and pick a different pet.
 **Test animations** is the one that levels nothing. It opens a panel that does
 not dim the screen, so the pet stays in view above it while you tap through
 every animation the app has: fifteen idles across all three species, the egg's
-three crack phases, six moods, four skills, nine level-up celebrations — each
+three crack phases, six moods, four skills, ten level-up celebrations — each
 with its full wind-up, burst and caption — and the confetti, the caption and
 the wind-up on their own. The pet is painted straight onto the stage and the
 celebrations run without a level to spend, so you can watch a Blazewyrm's
@@ -463,6 +463,30 @@ loses most of it, reporting the pet a dozen pixels higher than it is. Take the
 baseline from the least-lit frame of each row and correct per row, not per
 frame. Per frame would also cancel the crouch the squirrel does before it fires,
 which is animation, not drift.
+
+The Panda's is the only celebration that swells twice. Green motes gather and
+fade over frames 2–7, the pet shuts its eyes through 8–10 with next to nothing
+on screen, and only then does the real bloom build and break — a green and blue
+vortex on 13, at its widest on 14. Counted off the sheet's own effect pixels,
+which run 0 at rest, 7.6k on the first swell, 63 in the lull and 23.8k on 13.
+Frames 13 and 14 are two drawings of the same vortex rather than one drawing
+held, so the aura is carried by alternating them, the way the Bamboo Cub's
+bloom is.
+
+Its `burst` is 12, not the 13 where the vortex actually is. The number counts
+the beats that come *before* the flash, so naming the vortex itself made it the
+last beat of the build — and the build accelerates into the burst, which put
+the clip's whole point on its shortest hold, 41ms. At 12 the two flash beats
+land on the vortex and it holds for 720ms instead. The Bamboo Cub is numbered
+the same way for the same reason.
+
+It arrived as a 4×4 grid and was repacked into a strip cell by cell with no
+re-anchoring: the grid was already aligned, and pinning each frame to its own
+content would have moved the pet about underneath the effect. The panda is
+drawn slimmer here than on its idle sheet — a bigger head on a narrower body —
+so no single scale matches both the width and the height of the idle it cuts
+away from. The entry splits the difference, 4% wide and 4% short, with the
+ground line matched exactly, which is the axis the eye actually catches.
 
 The Zephyrite's celebration works the same way as the Sparky's and needed
 the same care, with one number different: its effect pixels - cyan aura and

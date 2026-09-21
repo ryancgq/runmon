@@ -1960,7 +1960,35 @@ const LEVEL_UP_ART = {
   // which is the pet back at rest: the burst was over before you saw it.
   "verdant:1": levelUpClip({ src:"art/levelup-bamboo-cub.png", frames:12,
     order:[0,1,2,3,4,5,6, 7,8, 7,8,7, 9,10, 11],
-    gather:2, burst:7, aspect:1.028, scale:1.274, dx:4.9, dy:-2.8 })
+    gather:2, burst:7, aspect:1.028, scale:1.274, dx:4.9, dy:-2.8 }),
+  /* The Panda's, and the only sheet here that swells twice. Green motes
+     gather and fade over frames 2-7, the pet shuts its eyes through 8-10 with
+     next to nothing on screen, and only then does the real bloom build and
+     break - a green and blue vortex on 13, its widest on 14. Counted off the
+     sheet's own effect pixels, which run 0 at rest, 7.6k on the first swell,
+     63 in the lull and 23.8k on 13.
+
+     13 and 14 are two drawings of the same vortex rather than one drawing
+     held, so the aura is carried by alternating them, the way the Bamboo Cub's
+     bloom is. Delivered as a 4x4 grid and repacked into a strip cell by cell
+     with no re-anchoring: the grid was already aligned, and pinning each frame
+     to its own content would have moved the pet about underneath the effect.
+
+     `burst` is 12 and not 13, which is where the vortex actually is. The
+     count is of the beats that come *before* the flash, so naming the vortex
+     itself makes it the last beat of the build - and the build accelerates,
+     so the clip's whole point landed on its shortest hold, 41ms. At 12 the
+     two flash beats fall on the vortex instead. The Bamboo Cub is numbered
+     the same way for the same reason.
+
+     It is drawn slimmer here than on its idle sheet - a bigger head on a
+     narrower body - so no single scale matches both the width and the height
+     of the idle it cuts away from. This one splits the difference, 4% wide and
+     4% short, with the ground line matched exactly, which is the axis the eye
+     actually catches. */
+  "verdant:2": levelUpClip({ src:"art/levelup-panda.png", frames:16,
+    order:[0,1,2,3,4,5,6,7,8,9,10,11, 12,13,12,13, 14,15],
+    gather:2, burst:12, aspect:1.013, scale:1.222, dx:-1.56, dy:-30.57 })
 };
 /* Keyed by form, and by level where a form celebrates differently at different
    levels - which so far is the egg, whose two crack clips belong to levels 3
@@ -3281,7 +3309,7 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-21 0c4a77e";
+const BUILD_ID = "2026-09-21 ede7562";
 const ART_VERSION = "20";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
