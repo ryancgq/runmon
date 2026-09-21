@@ -2677,6 +2677,9 @@ const DEFAULT_SAVE = {
   // [{ code, card, addedAt }] - the card is the last one the broker gave us, so
   // a list still draws itself with no connection and refreshes when there is one
   friends: [],
+  // [{ id, card }] - everybody the broker knows about, cached for the same
+  // reason. While the game is small this is what the Friends tab shows.
+  roster: [],
 };
 
 let save = structuredCloneSafe(DEFAULT_SAVE);
@@ -3444,7 +3447,7 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-21 48a966c";
+const BUILD_ID = "2026-09-21 465e1a3";
 const ART_VERSION = "23";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -5065,11 +5068,42 @@ function friendsFail(err){
   return /\(404\)/.test(m) ? "The server has not been updated with Friends yet." : m;
 }
 
+/* ---------------------------------------------------------------------------
+   Friend codes, dormant. The Friends tab lists everyone the broker knows
+   instead, because with this few players asking them to swap six characters to
+   find each other is friction for its own sake. Nothing below is called from
+   the interface any more, and none of it has been deleted: the broker still
+   serves /friends/me, /friends/lookup and /friends/cards, so putting the code
+   flow back is a change to the tab and nothing else. It will want putting back
+   the day the roster stops being a list you would read top to bottom.
+   ------------------------------------------------------------------------- */
 async function loadMyCode(){
   if (myFriendCode || !stravaLinked()) return myFriendCode;
   const r = await stravaCall("/friends/me");
   myFriendCode = r.code || null;
   return myFriendCode;
+}
+
+const playerList = () => Array.isArray(save.roster) ? save.roster : (save.roster = []);
+
+/* Everybody the broker knows about. While there are a handful of players,
+   asking them to swap six-character codes to find each other is friction for
+   its own sake, so the tab lists the lot and the code flow is not shown.
+
+   The broker only returns rows that have hatched something, and only to a
+   linked athlete. Cards are cached in the save like the friend cards were, so
+   the tab draws before the network answers and simply looks older than it is
+   if the network never does. Everything is put through safeCard() on the way
+   in for the same reason it always was: a stage of 99 or a pet named after an
+   <img> tag arrives from another device, not from here. */
+async function refreshPlayers(){
+  if (!stravaLinked()) return;
+  const r = await stravaCall("/friends/all");
+  const rows = (r.players || [])
+    .map(p => ({ id: String(p.id || "").slice(0, 24), card: safeCard(p.card) }))
+    .filter(p => p.id && p.card);
+  save.roster = rows;
+  persist();
 }
 
 /** Refresh every friend's card in one round trip. Cards are cached in the save,
@@ -5141,15 +5175,10 @@ function safeCard(c){
     uses, so a friend's Panda is the Panda. */
 function friendRowHTML(f){
   const c = safeCard(f.card);
-  if (!c) return `<button class="friend" data-friend="${f.code}">
-      <div class="pet-holder mood-okay"></div>
-      <div class="who"><div class="n">${prettyCode(f.code)}</div>
-        <div class="h">Waiting for their first pet</div></div>
-      <span class="go"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>
-    </button>`;
+  if (!c) return "";                     // the broker only sends hatched pets
   const ago = c.lastRun ? relDay(c.lastRun) : "no runs yet";
-  return `<button class="friend" data-friend="${f.code}">
-      <div class="pet-holder mood-okay" data-friend-art="${f.code}"></div>
+  return `<button class="friend" data-friend="${f.id}">
+      <div class="pet-holder mood-okay" data-friend-art="${f.id}"></div>
       <div class="who">
         <div class="n">${esc(c.pet)} <span class="chip">LV ${c.level}</span></div>
         <div class="h">${esc(c.form)} \u00b7 Stage ${c.stage + 1} of 5</div>
@@ -5181,7 +5210,7 @@ const esc = t => String(t == null ? "" : t)
 function renderFriends(){
   const body = $("#friends-body"), sub = $("#friends-sub");
   if (!body) return;
-  const list = friendList();
+  const list = playerList();
 
   if (!stravaLinked()){
     // The sandbox has no athlete and no broker, so there is nothing for a code
@@ -5195,49 +5224,28 @@ function renderFriends(){
              has neither. Everything else here works without one.</p></div>`
       : `<div class="empty-state"><div class="ico">\u{1F91D}</div>
           <h3>Friends need your Strava link</h3>
-          <p>Your friend code is tied to your Strava athlete, which is what lets another
-             Runmon find your pet. Connect in Settings and your code appears here.</p>
+          <p>Everyone playing shows up here, and the link is what puts you among them.
+             Connect in Settings and the others appear.</p>
           <button class="btn primary" data-nav="settings" style="max-width:260px;margin:0 auto">Open Settings</button></div>`;
     return;
   }
 
   sub.textContent = list.length
-    ? `${list.length} friend${list.length === 1 ? "" : "s"}`
+    ? `${list.length} other pet${list.length === 1 ? "" : "s"}`
     : "See how everyone's pet is doing";
 
-  const code = myFriendCode
-    ? `<div class="code-box">${prettyCode(myFriendCode)}</div>`
-    : `<div class="code-box pending">${friendsNote || "Getting your code\u2026"}</div>`;
-
   body.innerHTML = `
-    <div class="section-title">Your code</div>
-    ${code}
-    <div class="addrow" style="margin-bottom:4px">
-      <button class="btn ghost" id="friend-share" ${myFriendCode ? "" : "disabled"}
-        style="flex:1">Share my code</button>
-    </div>
-    <p class="muted" style="font-size:11.5px;font-weight:700;line-height:1.6;margin:10px 2px 0">
-      Give this to someone and they can follow your pet. It shows your pet, your
-      level and your totals \u2014 never your runs or where you ran them.</p>
-
-    <div class="section-title">Add a friend</div>
-    <div class="addrow">
-      <input class="inp" id="friend-code-in" maxlength="7" placeholder="ABC123"
-        autocapitalize="characters" autocomplete="off" spellcheck="false" inputmode="text">
-      <button class="btn primary" id="friend-add" ${friendsBusy ? "disabled" : ""}>${friendsBusy ? "\u2026" : "Add"}</button>
-    </div>
-
-    <div class="section-title">Following</div>
+    <div class="section-title">Everyone playing</div>
     ${list.length ? list.map(friendRowHTML).join("") : `
       <div class="empty-state" style="padding:30px 18px">
-        <div class="ico">\u{1F440}</div><h3>Nobody yet</h3>
-        <p>Swap codes with someone who runs. Their pet turns up here, and their
-           level moves when they do.</p></div>`}`;
+        <div class="ico">\u{1F440}</div><h3>Nobody else yet</h3>
+        <p>Every pet whose owner has linked Strava turns up here, ordered by
+           level. Right now that is just yours.</p></div>`}`;
 
   // the pets, painted after the markup exists
   for (const f of list){
     if (!f.card) continue;
-    const el = body.querySelector(`[data-friend-art="${f.code}"]`);
+    const el = body.querySelector(`[data-friend-art="${f.id}"]`);
     if (el) paintPet(el, f.card.species, f.card.stage, "okay");
   }
 }
@@ -5261,24 +5269,22 @@ async function openFriendsTab(){
   renderFriends();
   if (!stravaLinked()) return;
   try {
-    await loadMyCode();
+    await refreshPlayers();
     friendsNote = null;
   } catch (err){
-    friendsNote = friendsFail(err);
+    friendsNote = friendsFail(err);   // the cached roster still stands
   }
-  renderFriends();
-  try { await refreshFriends(); } catch (err){ /* the cached cards still stand */ }
   renderFriends();
 }
 
 /** A friend's profile. Their pet big, their numbers under it. */
-function openFriend(code){
-  const f = friendList().find(x => x.code === code);
+function openFriend(id){
+  const f = playerList().find(x => x.id === id);
   if (!f) return;
   const c = safeCard(f.card);
   openSheet({
-    title: c ? esc(c.pet) : prettyCode(code),
-    desc: c ? `${esc(c.form)} \u00b7 Level ${c.level} \u00b7 ${prettyCode(code)}` : prettyCode(code),
+    title: c ? esc(c.pet) : "Their pet",
+    desc: c ? `${esc(c.form)} \u00b7 Level ${c.level}` : "",
     body: c ? `
       <div class="pet-stage" style="min-height:170px;margin:4px 0 14px">
         <div class="pet-halo"></div>
@@ -5298,10 +5304,7 @@ function openFriend(code){
         Battle is not built yet \u2014 this is where it will live.</p>`
       : `<p class="desc">No pet on this code yet.</p>`,
     onOpen: () => { if (c) paintPet($("#friend-big"), c.species, c.stage, "okay"); },
-    actions: [
-      { label:"Done", cls:"ghost", fn: closeSheet },
-      { label:"Remove", cls:"danger", fn: () => { closeSheet(); removeFriend(code); } }
-    ]
+    actions: [{ label:"Done", cls:"ghost", fn: closeSheet }]
   });
 }
 
@@ -6244,15 +6247,10 @@ function wire(){
   });
   /* --- friends --- */
   $("#home-seeall").addEventListener("click", () => go("history"));
-  $("#friends-refresh").addEventListener("click", () => { myFriendCode = null; openFriendsTab(); });
+  $("#friends-refresh").addEventListener("click", () => openFriendsTab());
   $("#friends-body").addEventListener("click", e => {
     const row = e.target.closest("[data-friend]");
     if (row) return openFriend(row.dataset.friend);
-    if (e.target.closest("#friend-add")) return addFriendByCode($("#friend-code-in").value);
-    if (e.target.closest("#friend-share")) return shareMyCode();
-  });
-  $("#friends-body").addEventListener("keydown", e => {
-    if (e.key === "Enter" && e.target.id === "friend-code-in") addFriendByCode(e.target.value);
   });
 
   $("#row-xpanim").addEventListener("click", () => {

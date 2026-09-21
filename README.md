@@ -237,6 +237,27 @@ runs on the Pet screen instead and keeps the Pet tab lit while you are in it.
 
 ## Friends
 
+**The tab lists everyone, and the code flow is dormant.** While there are a
+handful of players, asking them to swap six characters to find each other is
+friction for its own sake, so `/friends/all` returns every athlete the broker
+knows who has hatched something, ordered by level. It needs a session, so it is
+players seeing players rather than a URL anybody can fetch, and the handle it
+returns is the roster's own HMAC — it identifies a row without being reversible
+into a Strava profile.
+
+This is the same roster the admin summary reads, which was built to be private;
+pointing the app at it means every player sees every other player's pet name,
+form, level, distances, run count, streaks and last run date without having
+chosen to. No Strava data, no real names, no routes — the card shape is the one
+that was always meant for friends — but being *listed* is new, and nothing in
+the app says so. That is a deliberate call for a game this small and wants
+revisiting before it is not.
+
+None of the friend-code machinery has been deleted. The broker still serves
+`/friends/me`, `/friends/lookup` and `/friends/cards`, and the app still carries
+the functions that call them, so putting the code flow back is a change to the
+tab and nothing else.
+
 A friend code is six characters from an alphabet with no I, O, 0 or 1 in it,
 minted once per athlete and kept. Codes are random rather than derived from
 anything: a Strava athlete id is on the end of every profile URL, and a code

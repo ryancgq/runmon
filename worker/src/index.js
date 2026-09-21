@@ -222,6 +222,30 @@ export default {
           return json(env, { code, card });
         });
 
+      /* Everybody who has linked and hatched something, which while the game
+         is this small is what the Friends tab shows instead of a list you have
+         to build by hand. It reads the same roster the admin summary does -
+         the rows are written on every save - and hands back the same card a
+         friend code would have got you: a pet, a form and totals, never runs
+         or routes or anything about the athlete.
+
+         It needs a session, so this is players seeing players rather than a
+         URL anybody can curl. The handle is the roster's own HMAC, not an
+         athlete id, so it identifies a row without being reversible into a
+         Strava profile. */
+      if (path === "/friends/all")
+        return await withAthlete(request, env, async (_stub, me) => {
+          const mine = (await hmac(env.SESSION_SECRET, "roster:" + me)).slice(0, 12);
+          const r = await rosterStub(env).fetch("https://do/roster-list");
+          const { rows } = await r.json();
+          const players = (rows || [])
+            .filter(x => x.handle !== mine && x.pet)
+            .map(x => ({ id: x.handle, card: rosterCard(x), lastSeen: x.lastSeen || 0 }))
+            .sort((a, b) => (b.card.level - a.card.level) || (b.card.km - a.card.km))
+            .slice(0, 200);
+          return json(env, { players });
+        });
+
       if (path === "/friends/lookup")
         return await withAthlete(request, env, async (stub, me) => {
           // 200 with an `error` for anything about the code itself. An HTTP
