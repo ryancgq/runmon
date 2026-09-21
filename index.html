@@ -1607,17 +1607,23 @@ const LEGACY_SAVE_KEYS = DEMO ? [] : ["runpet.save.v1"];
    climbs, and where it stops climbing - and between them they set the ceiling
    a very long run approaches: 1 + K * cap.
 
-   That ceiling used to be x2.0, which made a marathon worth 7,440 XP, and
-   every kilometre past the twentieth worth double a beginner's. It is x1.30
-   now. The climb also finishes at 15 km rather than 20, so it is spread
-   across the distances people actually run: a 5 km run lost 7% and a marathon
-   lost 29%, which is the way round it wanted to be.
+   That ceiling used to be x2.0, which made a marathon worth 7,440 XP and
+   every kilometre past the twentieth worth double a beginner's. It is x1.12,
+   and the climb finishes at 12 km. A marathon is worth 4,654 - 37% less than
+   it was - while a 5 km run lost 9%, which is the way round it wanted to be.
+
+   This is close to the floor. The bonus exists to make one long run beat the
+   same distance split across several short ones, and it can only do that
+   while the rate is still climbing: at x1.12 a 10 km run out-earns two 5 km
+   runs by 2%, which is about as thin as the margin can get and still be the
+   point of the mechanic. Lowering it much further would be a decision to
+   remove endurance rather than to tune it.
 
    None of this is retroactive. Every run stores the XP it earned, and
    `recompute()` adds those stored numbers up, so nobody's level moves.       */
 const XP_PER_KM        = 100;
-const ENDURANCE_K      = 0.02;   // +2% of base per km run
-const ENDURANCE_CAP_KM = 15;     // rate tops out at x1.30 at 15 km
+const ENDURANCE_K      = 0.01;   // +1% of base per km run
+const ENDURANCE_CAP_KM = 12;     // rate tops out at x1.12 at 12 km
 
 /* Level curve ---------------------------------------------------------------
    Level 1 -> 2 costs 200 XP and each following level costs more, exactly as
@@ -1627,13 +1633,13 @@ const ENDURANCE_CAP_KM = 15;     // rate tops out at x1.30 at 15 km
      factor(n) = 1 + 0.5 * LEVEL_DECAY^(n-1)
 
    n=1 gives exactly x1.5, and it relaxes towards ~x1.02 near level 50. At
-   5 km a day, elated and on a streak, the third form arrives at ~175 lifetime
-   km, level 50 at ~1,400 and level 99 at ~3,300. (Stages four and five are
+   5 km a day, elated and on a streak, the third form arrives at ~180 lifetime
+   km, level 50 at ~1,440 and level 99 at ~3,355. (Stages four and five are
    written into this curve at levels 30 and 50 and STAGE_CAP holds the pet
    below them, so the last reachable form is the one at 15.)
 
    The egg is the exception. Four levels at the base curve hatched it after
-   about 20 km - three or four runs - which is before anybody has really begun,
+   about 21 km - three or four runs - which is before anybody has really begun,
    so every level below EARLY_UNTIL costs EARLY_MULT times what the curve says.
    It is applied on top rather than folded into LEVEL_BASE because only the egg
    is being slowed: raising the base would drag all 99 levels with it.        */
@@ -3275,7 +3281,7 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-21 cf8db55";
+const BUILD_ID = "2026-09-21 0c4a77e";
 const ART_VERSION = "20";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;

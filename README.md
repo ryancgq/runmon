@@ -893,27 +893,33 @@ learns Flame Stomp at 22.
 
 **Distance → XP.** 100 XP per kilometre, and later kilometres inside a single
 run are worth more than earlier ones. The rate climbs continuously from ×1.0 to
-×1.30 at 15 km, so one long run beats the same distance chopped into short
-ones: 5 km earns 525 XP, but 10 km earns 1,100 rather than 1,050.
+×1.12 at 12 km, so one long run beats the same distance chopped into short
+ones: 5 km earns 513 XP, but 10 km earns 1,050 rather than 1,025.
 
 | Distance | Flat | Endurance | Total | Effective |
 | --- | --- | --- | --- | --- |
-| 5 km | 500 | 25 | **525** | ×1.05 |
-| 10 km | 1,000 | 100 | **1,100** | ×1.10 |
-| 15 km | 1,500 | 225 | **1,725** | ×1.15 |
-| 20 km | 2,000 | 375 | **2,375** | ×1.19 |
-| 30 km | 3,000 | 675 | **3,675** | ×1.23 |
-| Marathon | 4,220 | 1,041 | **5,261** | ×1.25 |
+| 5 km | 500 | 13 | **513** | ×1.03 |
+| 10 km | 1,000 | 50 | **1,050** | ×1.05 |
+| 15 km | 1,500 | 108 | **1,608** | ×1.07 |
+| 20 km | 2,000 | 168 | **2,168** | ×1.08 |
+| 30 km | 3,000 | 288 | **3,288** | ×1.10 |
+| Marathon | 4,220 | 434 | **4,654** | ×1.10 |
 
-The ×1.30 is the *marginal* rate — what the 15th kilometre itself pays, not a
+The ×1.12 is the *marginal* rate — what the 12th kilometre itself pays, not a
 multiplier on the run. Because the rate ramps up from 100, the effective
-multiplier is always lower, and it approaches ×1.30 from below however far you
+multiplier is always lower, and it approaches ×1.12 from below however far you
 go.
 
 The ceiling used to be ×2.0 at 20 km, which made a marathon worth 7,440 XP and
-every kilometre past the twentieth worth double a beginner's. Pulling the climb
-in to 15 km spread the cut the right way round: a 5 km run lost 7%, a 20 km run
-21%, a marathon 29%.
+every kilometre past the twentieth worth double a beginner's. It is now worth
+4,654 — 37% less — while a 5 km run lost 9%, which is the way round it wanted
+to be.
+
+**This is close to the floor.** The bonus exists to make one long run beat the
+same distance split up, and it can only do that while the rate is still
+climbing. At ×1.12 a 10 km run out-earns two 5 km runs by 2% — about as thin
+as that margin can get and still be the point of the mechanic. Going much
+lower would be a decision to remove endurance rather than to tune it.
 
 **The rate can never fall**, which is what rules out the obvious fix of simply
 capping the bonus in absolute terms. The moment a kilometre is worth less than
