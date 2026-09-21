@@ -1861,10 +1861,19 @@ const SKILLS = {
            the upper pet's feet. Cut on a minimum-cost seam that weaves between
            them rather than on a straight line - ten of the twelve boundaries
            come out crossing nothing at all, and the two that touch cross 46
-           and 15 pixels instead of shearing an ear flat. */
+           and 15 pixels instead of shearing an ear flat.
+
+           Frames keep the height off the ground they were drawn at, measured
+           against their own row's floor. Standing them all on one line is the
+           obvious way to pack a sheet and it is wrong here: frame 14 is the
+           pet startled awake and leaving the ground by 41px, and a flat floor
+           silently plants it back down. Everything else lands within 5px of
+           its row, which is the drawing's own wobble and is kept rather than
+           straightened - once you are flattening you cannot tell the wobble
+           from the jump. */
         durations:[220, 240, 260, 360, 360, 220, 190, 220,
                    340, 400, 400, 400, 280, 220, 200, 340],
-        aspect:1.1833, scale:1.2, dx:4.05, dy:-14.31 } }
+        aspect:1.1833, scale:1.2, dx:4.05, dy:-13.51 } }
   ]
 };
 function skillsFor(speciesId){ return SKILLS[speciesId] || []; }
@@ -3336,8 +3345,8 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-21 934cffe";
-const ART_VERSION = "21";
+const BUILD_ID = "2026-09-21 15edf52";
+const ART_VERSION = "22";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
 }

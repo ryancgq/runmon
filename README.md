@@ -671,6 +671,15 @@ line — ten of the twelve boundaries come out crossing nothing at all, and the
 two that touch cross 46 and 15 pixels instead of shearing an ear flat. The same
 lesson as the Panda's celebration, applied before shipping it rather than after.
 
+**Frames keep the height off the ground they were drawn at**, measured against
+their own row's floor. Standing them all on one line is the obvious way to pack
+a sheet and it is wrong here: frame 14 is the pet startled awake and leaving the
+ground by 41px, and a flat floor silently plants it back down. Everything else
+lands within 5px of its row, which is the drawing's own wobble and is kept
+rather than straightened — once you are flattening, you cannot tell the wobble
+from the jump. The celebration sheet was checked for the same thing and has
+none: every frame of it sits within 3px of its row.
+
 The dimmed-chip machinery it used to need is still there for the next skill
 that arrives without art: a move that is this form's own but has no sheet shows
 a dashed chip that says so when tapped, and the Evolution screen reads
