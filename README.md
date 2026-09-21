@@ -480,12 +480,20 @@ the clip's whole point on its shortest hold, 41ms. At 12 the two flash beats
 land on the vortex and it holds for 720ms instead. The Bamboo Cub is numbered
 the same way for the same reason.
 
-It arrived as a 4×4 grid and was repacked into a strip cell by cell with no
-re-anchoring: the grid was already aligned, and pinning each frame to its own
-content would have moved the pet about underneath the effect. The panda is
+It arrived as a 4×4 grid, and the grid is not on a grid. The pet is taller than
+its nominal cell and its feet cross into the row below, so cutting at even
+sixteenths put the previous frame's paws at the top of the next one — invisible
+under the effect for most of the clip, and obvious in the settled frames at the
+end. The cut follows the sheet's own empty gutters instead (rows 29–326,
+338–641, 667–930 and 932–1223, no two the same height), and each cell is then
+centred and stood on a common floor. Every cell has the pet's feet on its own
+bottom edge, so bottom-aligning them is what lines the pets up; nothing is
+anchored per frame, which would cancel the lean the pet does at the bloom.
+
+The panda is
 drawn slimmer here than on its idle sheet — a bigger head on a narrower body —
 so no single scale matches both the width and the height of the idle it cuts
-away from. The entry splits the difference, 4% wide and 4% short, with the
+away from. The entry splits the difference, 1.4% wide and 1.4% short, with the
 ground line matched exactly, which is the axis the eye actually catches.
 
 The Zephyrite's celebration works the same way as the Sparky's and needed

@@ -1970,9 +1970,19 @@ const LEVEL_UP_ART = {
 
      13 and 14 are two drawings of the same vortex rather than one drawing
      held, so the aura is carried by alternating them, the way the Bamboo Cub's
-     bloom is. Delivered as a 4x4 grid and repacked into a strip cell by cell
-     with no re-anchoring: the grid was already aligned, and pinning each frame
-     to its own content would have moved the pet about underneath the effect.
+     bloom is.
+
+     It arrived as a 4x4 grid, and the grid is not on a grid: the pet is taller
+     than its nominal cell and its feet cross into the row below, so cutting at
+     even sixteenths put the previous frame's paws at the top of the next one.
+     Invisible under the effect for most of the clip and obvious in the settled
+     frames at the end, which is where it was spotted. The cut follows the
+     sheet's own empty gutters instead - rows 29-326, 338-641, 667-930 and
+     932-1223, no two the same height - and each cell is then centred and stood
+     on a common floor. Every cell has the pet's feet on its own bottom edge,
+     so bottom-aligning them is what lines the pets up. Nothing is anchored per
+     frame: that would cancel the lean the pet does at the bloom, which is
+     animation rather than drift.
 
      `burst` is 12 and not 13, which is where the vortex actually is. The
      count is of the beats that come *before* the flash, so naming the vortex
@@ -1983,12 +1993,12 @@ const LEVEL_UP_ART = {
 
      It is drawn slimmer here than on its idle sheet - a bigger head on a
      narrower body - so no single scale matches both the width and the height
-     of the idle it cuts away from. This one splits the difference, 4% wide and
-     4% short, with the ground line matched exactly, which is the axis the eye
-     actually catches. */
+     of the idle it cuts away from. This one splits the difference, 1.4% wide
+     and 1.4% short, with the ground line matched exactly, which is the axis
+     the eye catches. */
   "verdant:2": levelUpClip({ src:"art/levelup-panda.png", frames:16,
     order:[0,1,2,3,4,5,6,7,8,9,10,11, 12,13,12,13, 14,15],
-    gather:2, burst:12, aspect:1.013, scale:1.222, dx:-1.56, dy:-30.57 })
+    gather:2, burst:12, aspect:1.0195, scale:1.186, dx:5.18, dy:-27.08 })
 };
 /* Keyed by form, and by level where a form celebrates differently at different
    levels - which so far is the egg, whose two crack clips belong to levels 3
@@ -3309,8 +3319,8 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-21 ede7562";
-const ART_VERSION = "20";
+const BUILD_ID = "2026-09-21 749f674";
+const ART_VERSION = "21";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
 }
