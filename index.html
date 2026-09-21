@@ -1847,7 +1847,24 @@ const SKILLS = {
          forever, and the fight only ends because the engine gives up at
          eighty turns. You do not lie down twice in the same fight. */
       battle:{ dmg:0, cd:4, heal:0.32, expose:1.6, at:0.50, once:true },
-      sprite:null }
+      sprite:{ src:"art/skill-nap.png", frames:16, fps:3.4,
+        /* The longest clip in the game, at 4.65s, because the joke is that it
+           takes its time: three frames of getting drowsy, two of a yawn held
+           open, a flop onto its side, and then a full second and a quarter
+           asleep while the z, the zz and the zzz arrive. Waking is quicker
+           than going under - 280, 220, 200 - and the last frame sits up and
+           holds, so the clip hands the pet back in the pose the idle opens
+           with rather than mid-scramble.
+
+           Its 4x4 grid overlaps: the sleeping row and the waking row touch,
+           and in two of the four columns the lower pet's ears reach up past
+           the upper pet's feet. Cut on a minimum-cost seam that weaves between
+           them rather than on a straight line - ten of the twelve boundaries
+           come out crossing nothing at all, and the two that touch cross 46
+           and 15 pixels instead of shearing an ear flat. */
+        durations:[220, 240, 260, 360, 360, 220, 190, 220,
+                   340, 400, 400, 400, 280, 220, 200, 340],
+        aspect:1.1833, scale:1.2, dx:4.05, dy:-14.31 } }
   ]
 };
 function skillsFor(speciesId){ return SKILLS[speciesId] || []; }
@@ -3319,7 +3336,7 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-21 749f674";
+const BUILD_ID = "2026-09-21 934cffe";
 const ART_VERSION = "21";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;

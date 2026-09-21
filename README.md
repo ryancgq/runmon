@@ -180,7 +180,7 @@ down through all six moods), or start over and pick a different pet.
 **Test animations** is the one that levels nothing. It opens a panel that does
 not dim the screen, so the pet stays in view above it while you tap through
 every animation the app has: fifteen idles across all three species, the egg's
-three crack phases, six moods, four skills, ten level-up celebrations — each
+three crack phases, six moods, eight skills, ten level-up celebrations — each
 with its full wind-up, burst and caption — and the confetti, the caption and
 the wind-up on their own. The pet is painted straight onto the stage and the
 celebrations run without a level to spend, so you can watch a Blazewyrm's
@@ -657,12 +657,24 @@ Blazewyrm starts.
 **A move belongs to the form that learnt it** and retires with that form. The
 Evolution screen still lists an outgrown one, marked as what it was.
 
-**Nap has no sheet yet.** It is learnt, listed, and works in a battle; it simply
-cannot be tapped to watch. On the Pet screen its chip is dimmed and dashed and
-says so when tapped; the Evolution screen reads *"Learnt · animation coming"*.
-Leaving it off the Pet screen entirely was worse — that gave the Panda an empty
-skill row, which is the thing Nap was added to fix. Drawing `art/skill-nap.png`
-to the same convention as Green Gale is all that is left.
+**Nap is the longest clip in the game**, at 4.65 seconds, because the joke is
+that it takes its time: three frames of getting drowsy, two of a yawn held open,
+a flop onto its side, and then a full second and a quarter asleep while the z,
+the zz and the zzz arrive. Waking is quicker than going under — 280, 220, 200 —
+and the last frame sits up and holds, so the clip hands the pet back in the pose
+the idle opens with rather than mid-scramble.
+
+Its 4×4 grid overlaps: the sleeping row and the waking row touch, and in two of
+the four columns the lower pet's ears reach up past the upper pet's feet. It is
+cut on a minimum-cost seam that weaves between them rather than on a straight
+line — ten of the twelve boundaries come out crossing nothing at all, and the
+two that touch cross 46 and 15 pixels instead of shearing an ear flat. The same
+lesson as the Panda's celebration, applied before shipping it rather than after.
+
+The dimmed-chip machinery it used to need is still there for the next skill
+that arrives without art: a move that is this form's own but has no sheet shows
+a dashed chip that says so when tapped, and the Evolution screen reads
+*"Learnt · animation coming"*.
 
 **The Panda's whole kit is Nap**, and Nap does no damage. It is the only third
 form with a single move. That is a gap waiting on a second Verdant skill, not a
