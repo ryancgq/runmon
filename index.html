@@ -734,6 +734,7 @@ body::before{
 .skill-chip .em{font-size:14px;line-height:1}
 .skill-chip:active{transform:scale(.94)}
 .skill-chip.busy{opacity:.5}
+.skill-chip.soon{opacity:.55;border-style:dashed}
 .skill-chip.on{border-color:rgba(var(--glow),.6);color:var(--accent);background:linear-gradient(180deg,rgba(var(--glow),.16),var(--card))}
 .skill-list{display:flex;flex-direction:column;gap:9px}
 .skill-item{
@@ -1058,6 +1059,7 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
 .fj .pet-holder{width:100%;aspect-ratio:1;height:auto}
 .fj .nm{font-size:8.5px;font-weight:800;color:#c2cadb;line-height:1.15;text-align:center}
 .fj .lv{font-size:8px;font-weight:800;color:var(--muted);letter-spacing:.4px}
+.fj[disabled]{opacity:.42;pointer-events:none}
 .fj.on{border-color:rgba(var(--glow),.6);background:linear-gradient(180deg,rgba(var(--glow),.15),var(--card))}
 .fj.on .nm{color:var(--accent)}
 .fj:active{transform:scale(.94)}
@@ -1627,6 +1629,18 @@ const EARLY_MULT  = 2;           // ...this much extra
 
 const EVO_LEVELS = [1, 5, 15, 30, 50];   // stage index -> level required
 
+/* Evolution stops at the third form for now. The fourth and fifth have no art
+   - they draw a placeholder with a ? in it - and a form nobody has drawn is
+   not a reward for two hundred kilometres. Holding the pet at its third form
+   is the honest version of that, and it takes the awkwardness with it: a
+   Pyrelord had no skills of its own and no art for any, so it either fought
+   bare-handed or borrowed the Blazewyrm's clips.
+
+   Raising this is the whole of what is needed when the art lands. The levels,
+   the names, the tree rows and the attribute step are all here already and
+   none of them move.                                                        */
+const STAGE_CAP = 2;
+
 /* Moves a pet picks up as it grows. Each one belongs to a single form and is
    learnt inside that form's own stretch of levels, so evolving is not the end
    of a stage - it is the start of one. The Blazewyrm holds levels 15-29 and
@@ -1718,7 +1732,7 @@ const SKILLS = {
         aspect:1.3125, scale:1.23, dx:-5, dy:-4.2 } },
     { id:"fireball", name:"Fireball", ico:"\u{1F525}", stage:2, level:18,
       blurb:"Draws a breath, then spits a packed ball of flame down the road ahead.",
-      battle:{ dmg:1.25, cd:3, burn:{ pct:0.20, turns:2 } },
+      battle:{ dmg:1.10, cd:3, burn:{ pct:0.20, turns:2 } },
       sprite:{ src:"art/skill-fireball.png",     frames:16, fps:12.5,
         // the breath holds, the release is sharp, the ball carries on out
         durations:[150,150,140,130, 120,110,100, 90,90,90, 110,110,120,130,140,200],
@@ -1734,7 +1748,9 @@ const SKILLS = {
         aspect:1.270, scale:1.98, dx:13, dy:-25 } },
     { id:"flying-swoop", name:"Flying Swoop", ico:"\u2604\uFE0F", stage:2, level:26,
       blurb:"Those wings finally earn their keep: a low, fast pass trailing fire.",
-      battle:{ dmg:1.15, cd:3, charge:{ spd:0.10, pow:0.06, max:3 } },
+      // a fast pass, not a heavy one: it hits for less than a plain attack and
+      // buys tempo instead
+      battle:{ dmg:0.85, cd:3, charge:{ spd:0.10, pow:0.06, max:3 } },
       sprite:{ src:"art/skill-flying-swoop.png", frames:16, fps:14.3,
         // slow either end, but the pass stays fast or the dragon floats
         durations:[170,160,150, 130,110,90, 80,80,80,90,100, 120,140,160,180,220],
@@ -1746,7 +1762,7 @@ const SKILLS = {
       blurb:"Guaranteed to leave something scorched. No promises about what.",
       // the charge is the point: a speed buff alone is worth nothing against
       // something already slower than you, so it sharpens the hits as well
-      battle:{ dmg:0.90, self:0.01, cd:3, charge:{ spd:0.08, pow:0.12, max:3 } },
+      battle:{ dmg:1.05, self:0.01, cd:3, charge:{ spd:0.08, pow:0.12, max:3 } },
       sprite:{ src:"art/skill-spark.png", frames:12, fps:3,
         /* Charge, discharge, consequences. The bolts multiply over eight frames
            that quicken as they go, then the two discharge frames alternate so
@@ -1759,7 +1775,7 @@ const SKILLS = {
     { id:"lightning-bolt", name:"Lightning Bolt", ico:"\u{1F329}\uFE0F", stage:2, level:18,
       blurb:"Asks the sky for help. The sky, this time, obliges.",
       // the Zephyrite's only move, so it carries the whole form
-      battle:{ dmg:1.65, pierce:0.25, cd:3 },
+      battle:{ dmg:1.65, pierce:0.35, cd:3 },
       sprite:{ src:"art/skill-lightning-bolt.png", frames:12, fps:3,
         /* It gathers, the sky answers, and the bolt lands. The charge quickens
            the way the Sparky's does; the strike is four frames that grow, so
@@ -1772,7 +1788,7 @@ const SKILLS = {
     { id:"green-gale", name:"Green Gale", ico:"\u{1F343}", stage:1, level:8,
       blurb:"Gathers the forest's strength and lets it go in one mighty gust. Stand upwind.",
       // whatever else it does, it does not leave the cub better defended
-      battle:{ dmg:1.10, cd:3, soften:{ pct:0.06, max:3 } },
+      battle:{ dmg:1.25, cd:3, soften:{ pct:0.06, max:3 } },
       sprite:{ src:"art/skill-fart.png", frames:12, fps:3,
         /* Brace, gather, and the wrong end opens. Six charge frames quicken
            the way the Sparky's do, to a ring of green at its widest - and
@@ -1803,7 +1819,7 @@ const SKILLS = {
          Pandas with a repeatable 30% heal out-heal each other's damage
          forever, and the fight only ends because the engine gives up at
          eighty turns. You do not lie down twice in the same fight. */
-      battle:{ dmg:0, cd:4, heal:0.30, expose:1.6, at:0.60, once:true },
+      battle:{ dmg:0, cd:4, heal:0.32, expose:1.6, at:0.50, once:true },
       sprite:null }
   ]
 };
@@ -2150,7 +2166,14 @@ function levelFromXp(totalXp){
 function stageForLevel(level){
   let s = 0;
   for (let i = 0; i < EVO_LEVELS.length; i++) if (level >= EVO_LEVELS[i]) s = i;
-  return s;
+  // The one chokepoint. Everything downstream - art, skills, the attribute
+  // step, the card a friend sees, the celebration - reads the stage from here.
+  return Math.min(s, STAGE_CAP);
+}
+/** The level of the next evolution, or null while there is nothing to grow into. */
+function nextEvoLevel(level){
+  const at = EVO_LEVELS[stageForLevel(level) + 1];
+  return at != null && stageForLevel(at) > stageForLevel(level) ? at : null;
 }
 
 /* Battle attributes. Four numbers, derived from species and level and never
@@ -2253,9 +2276,10 @@ function btSide(speciesId, level, name){
     exposed: 0,       // one incoming hit lands this much harder
     charges: 0, softens: 0,
     gcd: 0, cds: {}, used: {},
-    // A move is kept for good, so the kit is everything learnt by this level.
-    // Skills with no `battle` block are not fightable at all.
-    kit: skillsFor(speciesId).filter(k => k.battle && level >= k.level)
+    // This form's own moves, which is what makes the kit change when the pet
+    // does. Skills with no `battle` block are not fightable at all.
+    kit: skillsFor(speciesId).filter(k =>
+      k.battle && level >= k.level && stageForLevel(level) === k.stage)
   };
 }
 
@@ -2545,19 +2569,21 @@ function recompute(){
     stage, lastRunTs, gapDays,
     mood: moodAt(runs, Date.now()),
     species: save.species ? SPECIES[save.species] : SPECIES.ember,
-    // A move used to retire with the form that taught it, which left a
-    // Pyrelord with nothing at all: no form above the third has skills, or art
-    // to make any. It is the pet that learnt the move, not the shape, so a
-    // move now stays for good. The clip still shows the form it was drawn for,
-    // which is visible but not wrong, and stops being so when those forms are
-    // drawn.
-    //
-    // `playable` is the narrower question of whether there is a clip to play:
-    // Nap is learnt and usable in a battle before it is animated.
+    /* A move belongs to the form that learnt it and retires with that form.
+       Carrying moves forward was a way round a Pyrelord having none of its
+       own; holding the pet at its third form removes the problem instead, and
+       takes with it a Blazewyrm whose move list read "fireball" and "Fireball"
+       one above the other.
+
+       Three questions, because they have three different answers:
+         known    - learnt at some point, so the Evolution screen lists it
+         current  - this form's own, so it can be taken into a battle
+         playable - and there is a clip, which Nap does not have yet          */
     skills: skillsFor(save.species).map(sk => ({
       ...sk,
-      known: lv.level >= sk.level,
-      playable: lv.level >= sk.level && !!sk.sprite
+      known:    lv.level >= sk.level,
+      current:  lv.level >= sk.level && stage === sk.stage,
+      playable: lv.level >= sk.level && stage === sk.stage && !!sk.sprite
     })),
     days: new Set(days)
   };
@@ -3228,7 +3254,7 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-20 3cd97e5";
+const BUILD_ID = "2026-09-21 6b1a5e7";
 const ART_VERSION = "20";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -3493,6 +3519,8 @@ function playClip(cfg, tag){
   return true;
 }
 function playSkill(id){
+  const soon = derived.skills.find(k => k.id === id && k.current && !k.sprite);
+  if (soon){ toast(`${soon.name} has no animation yet \u2014 it still works in a battle`, "", soon.ico); return; }
   const sk = derived.skills.find(k => k.id === id && k.playable);
   if (!sk) return;
   if (spriteBroken[sk.sprite.src]){ toast(`${sk.name} artwork is missing`, "warn", "\u26A0\uFE0F"); return; }
@@ -3778,15 +3806,20 @@ function playPendingLevelUp(){
   if (!cel){ pendingLevelUp = false; return; }
   runAnyCelebration(cel, { wanted: () => pendingLevelUp, spend: () => { pendingLevelUp = false; } });
 }
+/* Every move this form has, including one with no clip yet. Leaving Nap out
+   because it cannot be watched gave the Panda an empty row - which is the
+   thing Nap was added to fix. A chip with nothing to play is dimmed and says
+   so when tapped, which is worse than an animation and far better than the
+   move appearing not to exist. */
 function renderSkillChips(){
   const row = $("#home-skills");
-  const known = derived.skills.filter(k => k.playable);
+  const mine = derived.skills.filter(k => k.current);
   // fetch the sheets as soon as the pet knows the move, so the first tap plays
   // straight away instead of waiting on a download
-  known.forEach(k => probeSprite(k.sprite.src));
-  row.hidden = !known.length;
-  row.innerHTML = known.map(k =>
-    `<button class="skill-chip ${skillPlaying === k.id ? "on" : ""} ${skillPlaying && skillPlaying !== k.id ? "busy" : ""}" data-skill="${k.id}">
+  mine.forEach(k => { if (k.sprite) probeSprite(k.sprite.src); });
+  row.hidden = !mine.length;
+  row.innerHTML = mine.map(k =>
+    `<button class="skill-chip ${k.playable ? "" : "soon"} ${skillPlaying === k.id ? "on" : ""} ${skillPlaying && skillPlaying !== k.id ? "busy" : ""}" data-skill="${k.id}">
        <span class="em">${k.ico}</span>${k.name}</button>`).join("");
 }
 
@@ -3876,8 +3909,11 @@ function renderHome(){
   // itself, with paintXp, at each step it wants shown.
   if (!replaying) paintXp(d.level, d.into, d.need);
 
-  const nextEvo = EVO_LEVELS.find(l => l > d.level);
-  $("#home-nextevo").textContent = nextEvo ? `Next form at Lv ${nextEvo}` : "Final form reached";
+  // "Final form reached" would be a lie: two more are written, they are just
+  // not drawn. The chip says what is true instead.
+  const nextEvo = nextEvoLevel(d.level);
+  $("#home-nextevo").textContent = nextEvo ? `Next form at Lv ${nextEvo}`
+                                           : "New forms still being drawn";
 
   $("#home-streak").innerHTML = d.streak + (d.streak >= 2 ? ' <small>🔥</small>' : "");
   const weekStart = startOfWeek();
@@ -4025,7 +4061,11 @@ function renderEvolve(){
   const mine = evoTab === save.species;
   $("#evo-tree").innerHTML = sp.stages.map((st, k) => {
     const req = EVO_LEVELS[k];
-    const unlocked = mine && d.level >= req;
+    // A row above the cap cannot be reached at any level, so it does not get
+    // to promise one. "Unlocks at level 30" when it will not is worse than
+    // saying nothing.
+    const reachable = k <= STAGE_CAP;
+    const unlocked = mine && reachable && d.level >= req;
     const current = mine && d.stage === k;
     /* One rule for all five: a form's name waits until you have been it. What
        is drawn and what is written are the tease, and a name printed beside
@@ -4042,7 +4082,9 @@ function renderEvolve(){
         <div class="pet-holder mood-${current ? d.mood.key : "okay"}" data-evo="${evoTab}:${k}"></div>
         <div class="info">
           <div class="nm">${unlocked ? st.name : "???"}</div>
-          <div class="rq">${k === 0 ? "Starting form" : `Unlocks at level ${req}`}${current ? " · current" : ""}</div>
+          <div class="rq">${!reachable ? "Still being drawn"
+                            : k === 0 ? "Starting form"
+                            : `Unlocks at level ${req}`}${current ? " · current" : ""}</div>
           ${desc ? `<div class="ds">${desc}</div>` : ""}
         </div>
         <div class="stagenum">${k + 1}/5</div>
@@ -4063,10 +4105,11 @@ function renderEvolve(){
     $("#skill-count").textContent = `${list.filter(k => k.known).length}/${list.length}`;
     $("#skill-list").innerHTML = list.map(k => {
       const form = sp.stages[k.stage].name;
-      // A move is kept for good now, so there is no "outgrown" row any more.
-      // The middle case is a move that is learnt but has no clip yet.
+      // Four states, and the order matters: a move can be this form's own and
+      // still have no clip to show for it.
       const note = k.playable ? "Learnt \u00b7 tap to use"
-                 : k.known    ? "Learnt \u00b7 animation coming"
+                 : k.current  ? "Learnt \u00b7 animation coming"
+                 : k.known    ? `Outgrown \u00b7 was ${form}'s`
                               : `${form} learns this at level ${k.level}`;
       return `<div class="skill-item ${k.known ? "known" : "locked"}" ${k.playable ? `data-skill-go="${k.id}"` : ""}>
         <div class="ico">${k.known ? k.ico : "\u{1F512}"}</div>
@@ -5238,7 +5281,8 @@ function demoJumpToLevel(level, done){
 }
 
 function nextSkill(d){
-  return d.skills.find(k => !k.known && k.stage >= d.stage) || null;
+  // Nothing above the cap is reachable, so it is not "next" in any useful sense
+  return d.skills.find(k => !k.known && k.stage >= d.stage && k.stage <= STAGE_CAP) || null;
 }
 function openDemoPanel(){
   const d = derived;
@@ -5250,10 +5294,11 @@ function openDemoPanel(){
       <br>${d.runs.length ? "<b>Skip a day</b> walks the pet down through all six moods." : "<b>Log a run</b> first — mood is measured from your last run, so it needs one to move."}`,
     body: `<div class="fj-label">Jump to any form</div>
       <div class="fj-grid">${d.species.stages.map((st, i) => `
-        <button class="fj ${i === d.stage ? "on" : ""}" data-form="${i}">
+        <button class="fj ${i === d.stage ? "on" : ""}" data-form="${i}"
+                ${i > STAGE_CAP ? "disabled" : ""}>
           <div class="pet-holder tiny" data-fj="${i}"></div>
           <div class="nm">${st.name}</div>
-          <div class="lv">Lv ${EVO_LEVELS[i]}</div>
+          <div class="lv">${i > STAGE_CAP ? "not drawn" : `Lv ${EVO_LEVELS[i]}`}</div>
         </button>`).join("")}</div>`,
     actions:[
       { label:"Log a run", cls:"primary", fn: () => {
@@ -5861,7 +5906,8 @@ function wire(){
     const known = derived.skills.filter(k => k.playable);
     if (!known.length || skillPlaying) return;
     skillCycle = (skillCycle + 1) % known.length;
-    playSkill(known[skillCycle].id);
+    playSkill(known[skillCycle].id);   // only ones with a clip: poking the pet
+                                       // should never produce a toast
   });
   if (DEMO){
     $("#demo-badge").hidden = false;

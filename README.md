@@ -271,6 +271,20 @@ now; the last two are waiting on theirs.
 - **Verdant** (forest) — Leaf Bud → Bamboo Cub → Panda → Thicketmane → Grovewarden
 - **Nimbus** (storm) — Static Egg → Sparky → Zephyrite → Tempestor → Thunderarch
 
+**Evolution stops at the third form for now.** `STAGE_CAP` holds every pet
+there however far it levels, because a form nobody has drawn is not a reward
+for two hundred kilometres. Raising that one constant is the whole of what is
+needed when the art lands — the levels, the names, the tree rows and the
+attribute step are all written already and none of them move. The Evolution
+screen says *"Still being drawn"* on those two rows rather than naming a level
+it will not honour, and the Pet screen's chip reads *"New forms still being
+drawn"* instead of *"Final form reached"*, which would be a lie.
+
+It takes an awkwardness with it. A Pyrelord had no skills of its own and no art
+for any, so it either fought bare-handed or borrowed the Blazewyrm's clips —
+and a Blazewyrm that kept its Cinderling move had a list reading *fireball* and
+*Fireball*, one above the other, distinguishable by a capital letter.
+
 Stages 4 and 5 draw a placeholder rather than the vector forms they used to.
 Those forms were fine beside other vectors and wrong beside the pixel art that
 replaced their earlier stages — a pet that changed medium halfway up its own
@@ -608,18 +622,19 @@ Blazewyrm starts.
 | 🌩️ Lightning Bolt | Zephyrite | Level 18 | Asks the sky for help. The sky, this time, obliges. |
 | 😴 Nap | Panda | Level 18 | Sits down mid-fight and sleeps. Wakes up better, if it wakes up. |
 
-**A move is kept for good.** It used to retire with the form that taught it,
-which left a Pyrelord with nothing at all — no form above the third has skills,
-and no art to make any. It is the pet that learnt the move, not the shape. The
-clip still shows the form it was drawn for, which is visible but not wrong, and
-stops being so when those forms are drawn.
+**A move belongs to the form that learnt it** and retires with that form. The
+Evolution screen still lists an outgrown one, marked as what it was.
 
 **Nap has no sheet yet.** It is learnt, listed, and works in a battle; it simply
-cannot be tapped to watch, and the Evolution screen says *"Learnt · animation
-coming"* rather than pretending otherwise. Drawing `art/skill-nap.png` to the
-same convention as Green Gale is the whole of what is left. It exists because
-the Panda was the only third form with an empty skill row, which reads as a bug
-rather than as a gap.
+cannot be tapped to watch. On the Pet screen its chip is dimmed and dashed and
+says so when tapped; the Evolution screen reads *"Learnt · animation coming"*.
+Leaving it off the Pet screen entirely was worse — that gave the Panda an empty
+skill row, which is the thing Nap was added to fix. Drawing `art/skill-nap.png`
+to the same convention as Green Gale is all that is left.
+
+**The Panda's whole kit is Nap**, and Nap does no damage. It is the only third
+form with a single move. That is a gap waiting on a second Verdant skill, not a
+balance decision.
 
 All three babies' moves are the same joke told three times, which is
 deliberate: a first skill is named for what the pet thinks it is doing. The
@@ -784,11 +799,16 @@ reward — the same reasoning that put `EARLY_MULT` on the egg.
 |---|---|---|
 | Lv 5 → stage 2 | 118 → 124 | nothing extra — an ordinary level |
 | Lv 15 → stage 3 | 178 → 202 | **4 levels** at once |
-| Lv 30 → stage 4 | 286 → 316 | **5 levels** |
-| Lv 50 → stage 5 | 430 → 466 | **6 levels** |
+| Lv 30 → stage 4 | — | waiting on the art |
+| Lv 50 → stage 5 | — | waiting on the art |
+
+The last two steps are written and unreachable, because `STAGE_CAP` holds the
+pet at its third form. A bonus for evolving is not paid for an evolution that
+does not happen, so past level 15 the pool grows by a flat 6 a level: 202 at
+15, 292 at 30, 706 at 99.
 
 At level 15 a Blazewyrm reads 38 / 38 / 75 / 51 and a Panda 75 / 53 / 55 / 20,
-off the same 202 points. By 99 the pool is 760.
+off the same 202 points.
 
 The bars are drawn against the widest slice anyone has (37%), not against the
 row's own biggest number, so a Panda's Speed reads as short next to a
@@ -827,9 +847,8 @@ made the Panda unkillable at low levels and paper at high ones.
 **K scales with the level of the fight.** Held fixed, Defence quietly grew more
 valuable every level, and a level-99 Panda won 67% of everything.
 
-**A skill costs a shared cooldown, not just its own.** Without it the
-Blazewyrm's four moves are simply four times the damage of everybody else's
-one, and Verdant against Ember collapses to 24%.
+**A skill costs a shared cooldown, not just its own.** Without it a form's
+three moves are simply three times the damage of everybody else's one.
 
 **Who opens is a weighted coin.** "Faster always goes first" sounds fair and is
 not: Speed rises with level like everything else, so in a fight between two of
@@ -851,16 +870,24 @@ ended because the engine gave up at eighty turns.
 
 ### How balanced it actually is
 
-Between 40% and 61% across every pairing and level — a soft triangle rather
-than three flat coin-flips. Ember beats Verdant, Nimbus beats Ember, Verdant
-and Nimbus are level. That is the floor given the attribute weights: the
-weights and the combat maths are one system, and with the weights fixed this
-is as close to even as the maths gets. Mirror matches are fair to within a
-fifth of a point over 30,000 fights each.
+Within three points of even at every level and every pairing. Mirror matches
+are fair to within a fifth of a point over 30,000 fights each, so there is no
+advantage in being the one who sent the challenge.
 
-| Level 26 | Verdant v Ember | Verdant v Nimbus | Ember v Nimbus |
+| Row wins | Verdant v Ember | Verdant v Nimbus | Ember v Nimbus |
 | --- | --- | --- | --- |
-| Row wins | 40% | 52% | 46% |
+| Level 12 | 50% | 48% | 49% |
+| Level 26 | 49% | 51% | 50% |
+| Level 99 | 51% | 52% | 49% |
+
+Capping evolution is what made this reachable. While moves carried forward a
+form's kit kept growing, and the three species drifted into a 40–61% triangle
+that no amount of tuning closed; with each form holding its own moves the worst
+pairing came in from 20 points out to 3.
+
+The one dent is **level 18**, where the Zephyrite has its Lightning Bolt and
+the Blazewyrm has only the first of three: Ember takes 41% there until it
+learns Flame Stomp at 22.
 
 ## How XP works
 
