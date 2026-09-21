@@ -180,7 +180,7 @@ down through all six moods), or start over and pick a different pet.
 **Test animations** is the one that levels nothing. It opens a panel that does
 not dim the screen, so the pet stays in view above it while you tap through
 every animation the app has: fifteen idles across all three species, the egg's
-three crack phases, six moods, nine skills, ten level-up celebrations — each
+three crack phases, six moods, ten skills, ten level-up celebrations — each
 with its full wind-up, burst and caption — and the confetti, the caption and
 the wind-up on their own. The pet is painted straight onto the stage and the
 celebrations run without a level to spend, so you can watch a Blazewyrm's
@@ -654,6 +654,7 @@ Blazewyrm starts.
 | 🌩️ Lightning Bolt | Zephyrite | Level 18 | Asks the sky for help. The sky, this time, obliges. |
 | 😴 Nap | Panda | Level 18 | Sits down mid-fight and sleeps. Wakes up better, if it wakes up. |
 | 🪨 Landslide | Panda | Level 22 | Curls up, picks a direction and commits. Steering was never part of the plan. |
+| 🌀 Arc Lash | Zephyrite | Level 22 | Cracks its tail like a whip. Whatever is downrange gets the storm. |
 
 **A move belongs to the form that learnt it** and retires with that form. The
 Evolution screen still lists an outgrown one, marked as what it was.
@@ -696,6 +697,26 @@ The dimmed-chip machinery it used to need is still there for the next skill
 that arrives without art: a move that is this form's own but has no sheet shows
 a dashed chip that says so when tapped, and the Evolution screen reads
 *"Learnt · animation coming"*.
+
+**Arc Lash is the first move that reaches into somebody else's guard.** Every
+other effect in the game is something a pet does to itself; this drops the
+opponent's Defence 40% for three of their turns, which is worth more to Nimbus
+than to anybody — a pet built to act twice makes the second act land harder.
+Two sources of the same problem take the longer and deeper of the pair rather
+than overwriting each other.
+
+Its first draft hit for *less* than a plain attack, on the theory that the
+debuff was the payment. It made Nimbus measurably worse: a weak move still
+spends the shared cooldown the Bolt is waiting on, so the pet was paying twice
+and buying once. **A second skill has to beat a basic attack on the turn it is
+used, or it is a liability however good its rider is.**
+
+Its grid needed a vertical seam — in the middle row the burst frame and its
+neighbour touch — and one more thing besides. Column 0 has no separator to its
+left, so its origin has to come from the grid's own pitch rather than from the
+sheet's left content edge. Those are not the same kind of reference, and using
+the edge slid every first-column frame 25px sideways: three frames of the same
+resting pose landed 62px apart instead of 16.
 
 **Landslide is the Panda's damage**, and it closed the last real gap in the
 roster: until it existed, Nap was the whole kit and Nap does nothing to
