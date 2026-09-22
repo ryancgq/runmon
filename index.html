@@ -3739,9 +3739,12 @@ function moodLine(){
   // screen that already says such a thing. Kept out of the mood's own figure
   // for the reason above: they multiply, they are not the same number.
   const pen = markPenalty(save.marks, Date.now());
+  // No separator characters. The chip is a flex row, so each span is already
+  // its own item with a gap either side of it - a "·" inside one then sits in
+  // the middle of that gap and reads as a stray dot rather than as a divider.
   const hit = pen > 0.005
-    ? ` <span class="hit">· \u2212${Math.round(pen * 100)}% battle</span>` : "";
-  return `${m.emoji} ${m.label} <span class="pct">· ${m.xpPct}% XP</span>${hit}`;
+    ? `<span class="hit">\u2212${Math.round(pen * 100)}% battle</span>` : "";
+  return `${m.emoji} ${m.label} <span class="pct">${m.xpPct}% XP</span>${hit}`;
 }
 
 /* --- route drawing (used for summary + history thumbnails) --------------- */
