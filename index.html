@@ -4043,6 +4043,13 @@ function heldSetFor(ids){
 
 async function replayStravaRuns(ids){
   if (replaying) return;
+  /* Nothing to walk if there is no pet yet. Somebody can link Strava before
+     they hatch - the Settings screen does not ask them to pick first - and
+     their whole history then arrives with nothing to show it to. Every painter
+     downstream assumes a species, so this threw before it drew anything, and
+     took the rest of renderAll() with it. The runs are kept either way; they
+     simply feed the pet from the moment there is one. */
+  if (!save.species){ heldRuns = null; recompute(); renderAll(); return; }
   const held = heldSetFor(ids);
   if (!held){ heldRuns = null; recompute(); renderAll(); return; }
   // chronological, so a week of runs is walked in the order they were run
@@ -4344,7 +4351,12 @@ function renderEvolve(){
   $("#ev-best").textContent = d.bestStreak;
   $("#ev-xp").textContent = d.totalXp >= 10000 ? nf(d.totalXp/1000, 1) + "k" : nf(d.totalXp);
 
-  if (!evoTab) evoTab = save.species;
+  // Falls back to a real species rather than to nothing. Somebody who links
+  // Strava before hatching has no species at all, and a sync then renders this
+  // screen with `evoTab` null - SPECIES[null] is undefined and the throw took
+  // renderAll() down with it. With no pet the tree is a preview of what you
+  // could become, so any species is a reasonable thing to be showing.
+  if (!evoTab) evoTab = save.species || SPECIES_ORDER[0];
   $("#spec-tabs").innerHTML = SPECIES_ORDER.map(id => `
     <button class="spec-tab ${id === evoTab ? "on" : ""}" data-spec="${id}">
       ${SPECIES[id].name}${id === save.species ? '<span class="yours">yours</span>' : '<span class="yours" style="color:var(--muted)">locked</span>'}
@@ -6203,6 +6215,20 @@ async function stravaSync(opts){
       save = Object.assign(structuredCloneSafe(DEFAULT_SAVE), res.save);
       save.settings = Object.assign({}, DEFAULT_SAVE.settings, res.save.settings || {});
     }
+    /* Marks before any run is priced, and after the branch above, which can
+       replace `save` wholesale and would throw them away.
+
+       This is the whole reason it is here rather than only on the Friends tab:
+       a run imported from Strava is priced by makeRun() the moment it arrives,
+       and somebody who never opens Friends would have been priced against
+       marks they had never fetched - that is, none. Being attacked has to cost
+       the same whether or not you go looking.
+
+       Guarded, because a run must still log if the broker is unreachable. The
+       failure direction is the forgiving one: stale marks are usually fewer
+       than current ones. */
+    try { await refreshMarks(); } catch (e){ /* an unpriced run beats no run */ }
+
     const imported = [], newIds = [];
     for (const a of (res.activities || [])){
       if (!a.km || a.km <= 0 || !a.sec) continue;
