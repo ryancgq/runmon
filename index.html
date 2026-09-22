@@ -2124,12 +2124,14 @@ const RAID_BOSS = {
      move that is ready, so whatever sits at the top of this list is what he
      opens every fight with - and he opens by stopping to scream his own name.
 
-     That one turn is the whole reason a raid works. He deletes a low-level pet
-     with a single blow, so an opening attack ends the fight before anybody has
-     acted; an opening roar hands them two turns instead. Measured: fights go
-     from 1.4 turns to 3.0 and everybody's contribution rises by about 150%,
-     without making him one jot less lethal. Put Splitter first and the feature
-     dies with it. */
+     He no longer opens with it reliably - btChoose() rolls among whatever he
+     has ready - but the roar is still the thing the attempt turns on. He
+     deletes a low-level pet with a single blow, so an opening attack ends the
+     fight before anybody has acted; an opening roar hands them two turns
+     instead. Guaranteed it was worth 3.0 turns and 26.3 damage an attempt; as
+     a one-in-three roll it averages 1.9 and 15.4, and the pool came down to
+     match. What was bought with that damage is that no two attempts open the
+     same way. */
   kit: [
     { id:"uwaaargh", name:"UWAAAARGH!", ico:"\u{1F4E2}",
       blurb:"He stops to scream his own name at you. It is the only moment you will get.",
@@ -2167,11 +2169,12 @@ const RAID_BOSS = {
      broker is expected to scale it per raid from the roster - a field that has
      levelled does an order of magnitude more damage than this one. At six
      players running 30km a week it is about four weeks at today's levels. It
-     was 2000 before he had skills; his opening roar more than doubled what
-     everybody takes off him, so the pool had to double to keep the raid the
-     same length. Set high on purpose; it is easier to make him weaker later than
+     has moved twice: 2000 before he had skills, 4000 once a guaranteed opening
+     roar more than doubled what everybody took off him, and 2300 now that the
+     roar is a one-in-three roll rather than a certainty. Each time the pool
+     followed the damage to keep the raid about the same length. Set high on purpose; it is easier to make him weaker later than
      to explain why he died in a weekend. */
-  battle: { hp:4000, pow:420, def:25, spd:140 }
+  battle: { hp:2300, pow:420, def:25, spd:140 }
 };
 /* One attempt for every 5 km run, banked - a 15 km long run is three swings at
    him. Attempts are the only thing a raid spends, and running is the only thing
@@ -2863,13 +2866,25 @@ function btAct(st, moveId){
     fight is settled away from the screen. */
 function btChoose(st, key){
   const s = st[key];
+  const ready = [];
   for (const k of s.kit){
     if ((s.cds[k.id] || 0) > 0 || s.gcd > 0) continue;
     if (k.battle.once && s.used[k.id]) continue;
     if (k.battle.heal && s.cur > s.max * (k.battle.at || 0.55)) continue;
-    return k.id;
+    if (!s.boss) return k.id;      // a pet takes the first thing it has ready
+    ready.push(k.id);
   }
-  return "attack";
+  if (!ready.length) return "attack";
+  /* A raid boss picks among what is ready instead, so no two attempts on him
+     open the same way. It is the difference between a rule and a roll: his
+     roar costs him a turn and is the only thing that lets a low-level pet act
+     twice, so whether it comes out first is the luck of the attempt. About one
+     in three.
+
+     Drawn from st.rng() and never from Math.random(), or the engine stops
+     being a pure function of its seed and a replay on another device disagrees
+     with the fight it is replaying. */
+  return ready[Math.floor(st.rng() * ready.length)];
 }
 
 /* ---------------------------------------------------------------------------
