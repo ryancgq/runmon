@@ -118,6 +118,17 @@ const rosterStub = env => env.ATHLETE.get(env.ATHLETE.idFromName("roster:all"));
    the friend codes already use and under a prefix that cannot collide with an
    athlete id either. Written beside the roster row so the two cannot drift. */
 const handleStub = (env, handle) => env.ATHLETE.get(env.ATHLETE.idFromName("h:" + handle));
+/* Everyone who linked Strava before battles existed has a roster row and no
+   way back from their handle, which made them visible in Friends and
+   impossible to attack. The handle is an HMAC, so there is nothing to backfill
+   from - the entry can only be written by the athlete it belongs to, the next
+   time they are seen. Hence this on the sync path: one round trip, and the
+   object writes only when the entry is actually absent. */
+async function ensureHandle(env, athleteId){
+  const handle = (await hmac(env.SESSION_SECRET, "roster:" + athleteId)).slice(0, 12);
+  await handleStub(env, handle).fetch("https://do/dir-ensure", { method:"POST",
+    body: JSON.stringify({ athleteId }) });
+}
 async function lookupHandle(env, handle){
   const r = await handleStub(env, handle).fetch("https://do/dir-get");
   const { athleteId } = await r.json();
@@ -237,7 +248,14 @@ export default {
       }
 
       if (path === "/sync" && request.method === "POST")
-        return await withAthlete(request, env, stub => stub.fetch("https://do/sync", { method:"POST" }));
+        return await withAthlete(request, env, async (stub, id) => {
+          // Sync is what every player does on opening the app, which makes it
+          // the place an old account becomes reachable again. Guarded: a
+          // directory write is bookkeeping and must never cost somebody
+          // their runs.
+          try { await ensureHandle(env, id); } catch (e){ /* not worth a failed sync */ }
+          return stub.fetch("https://do/sync", { method:"POST" });
+        });
 
       if (path === "/save" && request.method === "PUT")
         return await withAthlete(request, env, async (stub, id) => {
@@ -363,7 +381,12 @@ export default {
           const mine   = (rows || []).find(x => x.handle === myHandle);
           const theirs = (rows || []).find(x => x.handle === target);
           if (!theirs || !theirs.pet) return json(env, { error:"no such player" }, 404);
-          if (!await lookupHandle(env, target)) return json(env, { error:"no such player" }, 404);
+          // Listed in Friends but not reachable: their roster row predates the
+          // directory. "No such player" was actively misleading - they are
+          // plainly there on the screen - so say what is true and what fixes
+          // it. It heals itself the moment they next open the app.
+          if (!await lookupHandle(env, target))
+            return json(env, { error:"They have not opened Runmon since battles arrived. Ask them to open the app once." }, 409);
 
           const gap  = (Number(theirs.level) || 0) - (Number(mine && mine.level) || 0);
           const seed = crypto.getRandomValues(new Uint32Array(1))[0];
@@ -505,6 +528,14 @@ export class Athlete {
     }
     if (path === "/dir-get")
       return this.ok({ athleteId: await this.state.storage.get("owner") || null });
+    /* Write only when there is nothing there. Decided inside the object so the
+       check and the write are one round trip rather than two. */
+    if (path === "/dir-ensure"){
+      const { athleteId } = await request.json();
+      const had = await this.state.storage.get("owner");
+      if (!had) await this.state.storage.put("owner", String(athleteId));
+      return this.ok({ ok:true, wrote: !had });
+    }
 
     /* --- pile-on marks ---------------------------------------------------
        Marks live with the pet they are on rather than in one table, because
