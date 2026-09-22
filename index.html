@@ -2110,6 +2110,35 @@ const RAID_BOSS = {
   /* Square frames, 364px, twelve of them. Slow on purpose: he is a thing that
      looms rather than a pet that bustles. */
   sprite: { frames:12, rows:1, fps:1.6, aspect:1, scale:1, dx:0, dy:0 },
+
+  /* His three moves, and the ORDER IS THE DESIGN. btChoose takes the first
+     move that is ready, so whatever sits at the top of this list is what he
+     opens every fight with - and he opens by stopping to scream his own name.
+
+     That one turn is the whole reason a raid works. He deletes a low-level pet
+     with a single blow, so an opening attack ends the fight before anybody has
+     acted; an opening roar hands them two turns instead. Measured: fights go
+     from 1.4 turns to 3.0 and everybody's contribution rises by about 150%,
+     without making him one jot less lethal. Put Splitter first and the feature
+     dies with it. */
+  kit: [
+    { id:"uwaaargh", name:"UWAAAARGH!", ico:"\u{1F4E2}",
+      blurb:"He stops to scream his own name at you. It is the only moment you will get.",
+      battle:{ dmg:0, cd:6, stoke:{ mult:1.6, hits:2 },
+               charge:{ spd:0.08, pow:0.20, max:2 } },
+      sprite:{ src:"art/boss-skill-warcry.png", frames:16, rows:1, fps:7,
+               aspect:1.6266, scale:1, dx:0, dy:0 } },
+    { id:"splitter", name:"Splitter", ico:"\u{1FAA8}",
+      blurb:"Both hands overhead, then down. The ground goes first and you go second.",
+      battle:{ dmg:2.2, pierce:0.7, cd:4 },
+      sprite:{ src:"art/boss-skill-smash.png", frames:16, rows:1, fps:9,
+               aspect:1.3285, scale:1, dx:0, dy:0 } },
+    { id:"torchswing", name:"Torchswing", ico:"\u{1F525}",
+      blurb:"A flat, sweeping arc that takes everything at knee height with it.",
+      battle:{ dmg:1.35, cd:2 },
+      sprite:{ src:"art/boss-skill-swing.png", frames:16, rows:1, fps:9,
+               aspect:1.3285, scale:1, dx:0, dy:0 } }
+  ],
   /* Defence is low for a creature this size, and deliberately. It does not
      change how long anybody survives - that is entirely his power - it only
      changes how much they take off him before they go. High defence squashed
@@ -2122,11 +2151,12 @@ const RAID_BOSS = {
      hp is the pool for a raid at the levels this was tuned against, and the
      broker is expected to scale it per raid from the roster - a field that has
      levelled does an order of magnitude more damage than this one. At six
-     players running 30km a week it is about five weeks at today's levels and
-     well under two once they reach level 15, so call it four weeks with
-     levelling. Set high on purpose; it is easier to make him weaker later than
+     players running 30km a week it is about four weeks at today's levels. It
+     was 2000 before he had skills; his opening roar more than doubled what
+     everybody takes off him, so the pool had to double to keep the raid the
+     same length. Set high on purpose; it is easier to make him weaker later than
      to explain why he died in a weekend. */
-  battle: { hp:2000, pow:420, def:25, spd:140 }
+  battle: { hp:4000, pow:420, def:25, spd:140 }
 };
 /* One attempt for every 5 km run, banked - a 15 km long run is three swings at
    him. Attempts are the only thing a raid spends, and running is the only thing
