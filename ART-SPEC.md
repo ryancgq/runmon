@@ -186,6 +186,31 @@ Real problems from the first two rounds, worth avoiding:
 | Feet not on a common baseline | The pet hops 34 px between frames — still visible today |
 | Uneven frame widths, or gutters | Frames land half-and-half; you see two half-pets at once |
 | Soft or anti-aliased edges | Fringing once the app renders it pixelated |
+| Figures drawn over their cell's edges | A cut on the even grid went through four frames of a skill |
+| Sheets of one creature drawn at different sizes | It shrinks whenever it uses that skill |
+
+The last two are what the raid boss's four sheets arrived as, and they are
+worth reading together because the fix for one is not the fix for the other.
+
+His wind-up frames are drawn taller than the cell they sit in, so his feet
+hang into the row below. Cutting on the even grid takes his legs off; letting
+a seam find its own way round leaves a diagonal tear through him, which is
+what shipped first. Neither is needed: every boundary on these sheets has a
+row or column of untouched pixels within a third of a cell of where the grid
+says it should be, so a straight cut at the quietest line separates the frames
+and the overhang comes with the frame it belongs to. The overhang is the
+animation, not an error to correct, so each frame goes back at its offset from
+its **even** cell origin and the whole sheet is widened to hold the largest.
+
+Size is the separate problem. Measured against a cell of his idle sheet he
+stands 279 px tall doing nothing, 268 mid-swing, 261 mid-smash and 215
+mid-roar, on canvases that are not all the same width. Nothing in the packing
+can tell: each sheet is internally consistent. It shows up only on screen,
+because a `sprite-view` is the slot's width and whatever height its `aspect`
+implies, so a shorter drawing renders a smaller creature. `scale`, `dx` and
+`dy` are what correct it, and they are measured rather than guessed - shoot
+the slot, difference it against the same slot holding nothing, and solve for
+the values that put the silhouette at the idle's height, centre and foot line.
 
 ## 10. Generation prompts
 

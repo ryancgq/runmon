@@ -2132,29 +2132,41 @@ const RAID_BOSS = {
      a one-in-three roll it averages 1.9 and 15.4, and the pool came down to
      match. What was bought with that damage is that no two attempts open the
      same way. */
+  /* Each clip carries its own scale/dx/dy because the three sheets arrived at
+     three different sizes: measured against a cell of his idle sheet, he is
+     drawn 279 pixels tall standing still, 268 in the swing, 261 in the smash
+     and 215 in the warcry, on canvases that are not even the same width. A
+     sprite-view is the slot's width and whatever height its aspect implies,
+     so all three rendered him short, which is what "he gets smaller when he
+     uses a skill" was. These three numbers are not guesses: bossfit.mjs
+     screenshots his slot, differences it against the same slot with nothing
+     in it, and solves for the values that put his silhouette at the same
+     height, centre and foot line as the idle - which they now are, to within
+     a pixel. Re-run it if any of these sheets is ever redrawn; the sheet
+     geometry and these three numbers only make sense together. */
   kit: [
     { id:"uwaaargh", name:"UWAAAARGH!", ico:"\u{1F4E2}",
       blurb:"He stops to scream his own name at you. It is the only moment you will get.",
       battle:{ dmg:0, cd:6, stoke:{ mult:1.6, hits:2 },
                charge:{ spd:0.08, pow:0.20, max:2 } },
       sprite:{ src:"art/boss-skill-warcry.png", frames:16, rows:1, fps:7,
-               aspect:1.6266, scale:1, dx:0, dy:0 } },
+               aspect:1.7913, scale:1.60, dx:9.1, dy:6.2 } },
     { id:"splitter", name:"Splitter", ico:"\u{1FAA8}",
       blurb:"Both hands overhead, then down. The ground goes first and you go second.",
       battle:{ dmg:2.2, pierce:0.7, cd:4 },
       sprite:{ src:"art/boss-skill-smash.png", frames:16, rows:1, fps:9,
-               aspect:1.3285, scale:1, dx:0, dy:0 } },
+               aspect:1.2073, scale:1.15, dx:2.7, dy:17.7 } },
     /* Repacked from a second export. The first arrived as RGB on solid white,
        and keying that left a pale rim on 45.8% of his outline - anti-aliasing
        had smeared the black edge into the background, and the greys it left
        sat under any threshold that did not also eat his tusks. With real alpha
        the same measurement is 0.4%, against 0.8% and 0.0% for the sheets that
-       always had it. Same geometry, so nothing below changed. */
+       always had it. */
     { id:"torchswing", name:"Torchswing", ico:"\u{1F525}",
       blurb:"A flat, sweeping arc that takes everything at knee height with it.",
       battle:{ dmg:1.35, cd:2 },
       sprite:{ src:"art/boss-skill-swing.png", frames:16, rows:1, fps:9,
-               aspect:1.3285, scale:1, dx:0, dy:0 } }
+               aspect:1.3880, scale:1.19, dx:7.3, dy:8.9 } }
   ],
   /* Defence is low for a creature this size, and deliberately. It does not
      change how long anybody survives - that is entirely his power - it only
@@ -3824,8 +3836,8 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-22 e1f00e9";
-const ART_VERSION = "23";
+const BUILD_ID = "2026-09-22 5ffb4c3";
+const ART_VERSION = "24";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
 }
@@ -6362,6 +6374,21 @@ let btShown = null;
 const BT_BEAT  = 400;    // a plain attack: the lunge, then the hit
 const BT_AFTER = 340;    // ...and the pause before the next side moves
 
+/* A raid attempt is watched more than it is played, and it is short - he can
+   end a low-level pet in two blows - so at PvP's pace the whole thing was over
+   before you had read who moved first, and the end card landed on top of the
+   blow that caused it. These four hold the screen still at the points where
+   there is something to look at. The engine settled the fight the moment it
+   was seeded, so none of this can change it; it only decides how long you get
+   to see it. */
+const BT_OPEN     = 900;    // before anyone moves
+const BT_OPEN_BOSS= 2000;   // ...and longer against him: he fills the screen
+const BT_GAP      = 260;    // between one side finishing and the other starting
+const BT_GAP_BOSS = 620;
+const BT_END      = 420;    // the last blow, before the result covers it
+const BT_END_BOSS = 1500;   // the damage tag lives 1000ms; let it finish
+const BT_READ     = 1400;   // a milestone line, which nothing else will repeat
+
 function btClear(){ btTimers.forEach(clearTimeout); btTimers = []; }
 function btWait(fn, ms){ btTimers.push(setTimeout(fn, ms)); }
 
@@ -6411,7 +6438,7 @@ function startBattle(you, foe, opts){
   const foeName = battle.boss ? RAID_BOSS.short : foe.name;
   btSay(battle.turn === "a" ? `${esc(you.name)} moves first.` : `${esc(foeName)} is quicker off the mark.`);
   renderBattle();
-  if (battle.turn === "b") btWait(btFoeTurn, 900);
+  if (battle.turn === "b") btWait(btFoeTurn, battle.boss ? BT_OPEN_BOSS : BT_OPEN);
 }
 
 /* One child, always. The box centres with flex, and flex makes every text node
@@ -6453,21 +6480,23 @@ function btPaintBoss(force){
   $("#bt-foe-pet").innerHTML = spriteHTML(cfg, "okay");
 }
 
-/** The blow has landed: catch the bars up with what the engine already knows. */
+/** The blow has landed: catch the bars up with what the engine already knows.
+    Answers whether it crossed a mark, which is worth an extra beat on screen. */
 function btCatchUp(){
   const before = battle.boss ? btShown.b / battle.b.max : 1;
   btShown = { a: battle.a.cur, b: battle.b.cur, turn: battle.no };
   btBars();
-  if (!battle.boss) return;
+  if (!battle.boss) return false;
   /* Said the moment the bar crosses, over whatever the fight was saying. One
      blow can cross more than one mark, so the deepest is the one that gets
      the line - "he drops to one knee" reads oddly after "he staggers". */
   const crossed = raidCrossed(before, Math.max(0, battle.b.cur) / battle.b.max);
-  if (!crossed.length) return;
+  if (!crossed.length) return false;
   const m = crossed[crossed.length - 1];
   btSay(`<b>${esc(m.title)}.</b> ${esc(m.line)}`);
   $("#bt-foe-lv").textContent = bossPhase(Math.max(0, battle.b.cur) / battle.b.max).note;
   battle.crossed = (battle.crossed || []).concat(crossed.map(x => x.at));
+  return true;
 }
 
 /* The move buttons. A move on cooldown stays on screen with its count rather
@@ -6532,13 +6561,18 @@ function btRun(moveId){
     if (ev.self) btLand(actor, ev.self, false);
     if (ev.burn) btLand(actor, ev.burn, false);
     if (ev.heal) btLand(actor, ev.heal, true);
-    btCatchUp();
+    const crossed = btCatchUp();
 
     btWait(() => {
       btLock = false;
-      if (battle.over) return btFinish();
+      // A blow that took him past a mark put a line on screen; it is the only
+      // time it is said, so it gets read before anything replaces it.
+      const read = crossed ? BT_READ : 0;
+      if (battle.over)
+        return btWait(btFinish, read + (battle.boss ? BT_END_BOSS : BT_END));
       renderBattle();
-      if (battle.turn === "b") btWait(btFoeTurn, 260);
+      if (battle.turn === "b")
+        btWait(btFoeTurn, read + (battle.boss ? BT_GAP_BOSS : BT_GAP));
       else if (ev.again) btSay(`<b>${battle.a.name}</b> is fast enough to go again.`);
     }, BT_AFTER);
   }, beat);
@@ -6566,11 +6600,27 @@ function btFinish(){
   const won = battle.winner === "a";
   const left = won ? battle.a.cur : battle.b.cur;
   const of   = won ? battle.a.max : battle.b.max;
+  const turns = `${battle.no} turn${battle.no === 1 ? "" : "s"}`;
   $("#bt-end-ico").textContent = won ? "\u{1F3C6}" : "\u{1F4A4}";
   $("#bt-end-h").textContent = won ? "You win" : "You lost";
-  $("#bt-end-p").textContent = won
-    ? `${battle.a.name} saw off ${battle.b.name} in ${battle.no} turns, with ${left} of ${of} left.`
-    : `${battle.b.name} had ${left} of ${of} still in the tank after ${battle.no} turns.`;
+  /* A raid is scored on what you took off him, not on what is left of him -
+     "2800 of 2800 still in the tank" is a true sentence that tells an attempt
+     nothing about itself, and the whole point of one attempt is its share.
+     Losing is the normal outcome, so the line has to be worth reading anyway. */
+  if (battle.boss){
+    /* What this attempt took, which is hpAtStart minus what is left - not
+       1 - cur/max. He enters a raid on whatever everybody else has already
+       left him, so that figure is the raid's progress and would credit one
+       attempt with weeks of other people's running. */
+    const on   = Math.max(0, battle.b.cur) / battle.b.max * 100;
+    const chip = (battle.hpAtStart - Math.max(0, battle.b.cur)) / battle.b.max * 100;
+    const took = chip >= 0.05 ? `took ${chip.toFixed(1)}% off him` : "did not mark him";
+    $("#bt-end-p").textContent = won
+      ? `${battle.a.name} put ${RAID_BOSS.short} down in ${turns}, finishing the last ${chip.toFixed(1)}%.`
+      : `${turns}, and you ${took}. He is on ${on.toFixed(1)}%.`;
+  } else $("#bt-end-p").textContent = won
+    ? `${battle.a.name} saw off ${battle.b.name} in ${turns}, with ${left} of ${of} left.`
+    : `${battle.b.name} had ${left} of ${of} still in the tank after ${turns}.`;
   $("#bt-end").hidden = false;
   $("#bt-end-mark").textContent = "";
   // A real attack is spent. Offering a rematch here would read as a way to
