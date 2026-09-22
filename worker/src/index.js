@@ -13,6 +13,14 @@
      POST /sync         new activities since last time, plus the stored save
      PUT  /save         store the save and the ids the client actually imported
      POST /disconnect   tell Strava to forget us, then forget the athlete
+     POST /battle/start  claim an attack on somebody, and spend it
+     POST /battle/report how the fight went; the mark is priced here
+     GET  /battle/marks  what is standing on your own pet, and its fight log
+
+   The battle routes are the one place this stops being a pure broker: it
+   prices a mark, because the attacker cannot be trusted to price their own.
+   It still knows nothing about levels beyond the number the roster row
+   already carried.
 --------------------------------------------------------------------------- */
 
 const STRAVA = env => env.STRAVA_BASE || "https://www.strava.com";
@@ -103,11 +111,49 @@ async function lookupCode(env, code){
    the app already computes for Friends: a pet name, a form, a level, totals.
    Nothing from Strava beyond what the game has made its own. */
 const rosterStub = env => env.ATHLETE.get(env.ATHLETE.idFromName("roster:all"));
+
+/* A handle is an HMAC, so it cannot be turned back into an athlete id by
+   arithmetic - which is the point, and also a problem the moment one player
+   needs to reach another. The way back is a directory entry, the same trick
+   the friend codes already use and under a prefix that cannot collide with an
+   athlete id either. Written beside the roster row so the two cannot drift. */
+const handleStub = (env, handle) => env.ATHLETE.get(env.ATHLETE.idFromName("h:" + handle));
+async function lookupHandle(env, handle){
+  const r = await handleStub(env, handle).fetch("https://do/dir-get");
+  const { athleteId } = await r.json();
+  return athleteId || null;
+}
 async function rosterPut(env, athleteId, card){
   const handle = (await hmac(env.SESSION_SECRET, "roster:" + athleteId)).slice(0, 12);
   await rosterStub(env).fetch("https://do/roster-put", { method:"POST",
     body: JSON.stringify({ handle, card: card || null }) });
+  await handleStub(env, handle).fetch("https://do/dir-set", { method:"POST",
+    body: JSON.stringify({ athleteId }) });
 }
+
+/* --- what a battle costs the pet that was attacked ------------------------
+   This is the same arithmetic as markGapMul()/markFor() in index.html, and it
+   is here rather than trusted from the client because the client is the
+   attacker: it reports how the fight went, and the worker prices it. Levels
+   come from the roster, so neither side's claim about them is read.
+
+   The duplication is deliberate but it is a liability - change one copy and
+   replays disagree with the marks they produced. Both carry MARK_VERSION and
+   every mark records it, so a drift shows up in the data rather than silently.
+   ------------------------------------------------------------------------- */
+const MARK_VERSION = 1;
+const MARK_UNIT    = 0.10;
+const MARK_CAP     = 0.30;
+const MARK_HOURS   = 24;
+const markGapMul = gap => gap >= 0 ? Math.min(1, 0.2 + 0.16 * gap)
+                                   : 0.2 * Math.pow(0.75, -gap);
+function markFor(chip, gap, win){
+  const c = Math.max(0, Math.min(1, chip || 0));
+  return MARK_UNIT * c * markGapMul(gap) * (win ? 1.4 : 1);
+}
+/* Three a day, and never the same target twice inside a day. The second rule
+   is the one that matters: it is what makes a pile-on need other people. */
+const ATTACKS_PER_DAY = 3;
 /* The admin token is compared as a digest, not as a string. An early-exit
    string compare hands the token over a character at a time to anybody willing
    to time the responses. */
@@ -288,6 +334,76 @@ export default {
 
          Plain text by default because it is read in a terminal; ?format=json
          for anything that wants to parse it. */
+      /* A battle is claimed before it is fought and reported after, which is
+         two round trips for what looks like one act. It is deliberate: with a
+         single call the attacker could abandon any fight going badly and try
+         again until it went well, and every attack would land as a knockout.
+         The attack is spent at /battle/start, so walking away costs it.
+
+         The defender is not consulted at either end. btChoose plays their pet
+         on the attacker's device; they were never asked and cannot decline,
+         which is the only reason an XP penalty works at all - one you can
+         refuse is one nobody ever takes. */
+      if (path === "/battle/start" && request.method === "POST")
+        return await withAthlete(request, env, async (stub, me) => {
+          const body   = await request.json().catch(() => ({}));
+          const target = String(body.target || "").slice(0, 24);
+          if (!target) return json(env, { error:"no target" }, 400);
+
+          const myHandle = (await hmac(env.SESSION_SECRET, "roster:" + me)).slice(0, 12);
+          if (target === myHandle) return json(env, { error:"that is you" }, 400);
+
+          // Levels are read off the roster, never off the request. It is the
+          // one number the whole mark hangs on, and it is fixed here so it
+          // cannot move between the fight starting and its result arriving.
+          const r = await rosterStub(env).fetch("https://do/roster-list");
+          const { rows } = await r.json();
+          const mine   = (rows || []).find(x => x.handle === myHandle);
+          const theirs = (rows || []).find(x => x.handle === target);
+          if (!theirs || !theirs.pet) return json(env, { error:"no such player" }, 404);
+          if (!await lookupHandle(env, target)) return json(env, { error:"no such player" }, 404);
+
+          const gap  = (Number(theirs.level) || 0) - (Number(mine && mine.level) || 0);
+          const seed = crypto.getRandomValues(new Uint32Array(1))[0];
+          const gate = await stub.fetch("https://do/attack-claim", { method:"POST",
+            body: JSON.stringify({ target, seed, gap, at: Date.now() }) });
+          const g = await gate.json();
+          if (!g.ok) return json(env, { error: g.why, until: g.until || 0 }, 429);
+          return json(env, { ok:true, seed, gap, left: g.left });
+        });
+
+      /* How it went. The seed has to match the claim, so a result cannot be
+         reported for a fight that was never started. */
+      if (path === "/battle/report" && request.method === "POST")
+        return await withAthlete(request, env, async (stub, me) => {
+          const body = await request.json().catch(() => ({}));
+          const chip = Math.max(0, Math.min(1, Number(body.chip) || 0));
+          const win  = !!body.win;
+          const seed = (Number(body.seed) || 0) >>> 0;
+
+          const c = await (await stub.fetch("https://do/attack-close", { method:"POST",
+            body: JSON.stringify({ seed }) })).json();
+          if (!c.ok) return json(env, { error: c.why }, 409);
+
+          const owner = await lookupHandle(env, c.target);
+          if (!owner) return json(env, { error:"no such player" }, 404);
+
+          const myHandle = (await hmac(env.SESSION_SECRET, "roster:" + me)).slice(0, 12);
+          const at  = Date.now();
+          const amt = markFor(chip, c.gap, win);
+          const row = { at, amt, by: myHandle, chip, win, seed, gap: c.gap, v: MARK_VERSION };
+          await (await athleteStub(env, owner)).fetch("https://do/mark-add", {
+            method:"POST", body: JSON.stringify(row) });
+          await stub.fetch("https://do/log-add", { method:"POST",
+            body: JSON.stringify({ ...row, dir:"out", who: c.target }) });
+          return json(env, { ok:true, amt, gap: c.gap });
+        });
+
+      /* What is standing on your own pet, and the fights it has been in. The
+         app prices its runs from this. */
+      if (path === "/battle/marks")
+        return await withAthlete(request, env, stub => stub.fetch("https://do/marks"));
+
       if (path === "/admin/summary"){
         const given = (request.headers.get("Authorization") || "").replace(/^Bearer /, "");
         if (!await adminOk(env, given)) return json(env, { error:"no such endpoint" }, 404);
@@ -387,6 +503,71 @@ export class Athlete {
     }
     if (path === "/dir-get")
       return this.ok({ athleteId: await this.state.storage.get("owner") || null });
+
+    /* --- pile-on marks ---------------------------------------------------
+       Marks live with the pet they are on rather than in one table, because
+       that is who reads them: the app asks for its own and prices its runs.
+       Expired ones are dropped on every touch, so the list stays the size of
+       a day's attention rather than growing forever. */
+    if (path === "/mark-add"){
+      const row   = await request.json();
+      const fresh = (await this.state.storage.get("marks") || [])
+        .filter(m => Date.now() - (m.at || 0) < MARK_HOURS * 3600e3);
+      fresh.push(row);
+      await this.state.storage.put("marks", fresh.slice(-40));
+      await this.logAdd({ ...row, dir:"in", who: row.by });
+      return this.ok({ ok:true });
+    }
+    if (path === "/marks"){
+      const marks = (await this.state.storage.get("marks") || [])
+        .filter(m => Date.now() - (m.at || 0) < MARK_HOURS * 3600e3);
+      return this.ok({ marks, battles: await this.state.storage.get("battles") || [] });
+    }
+    if (path === "/log-add"){
+      await this.logAdd(await request.json());
+      return this.ok({ ok:true });
+    }
+
+    /* Claim an attack: spend it, and remember what was claimed so the result
+       can be checked against it later. Both limits are decided here, together,
+       because they are one decision - an attack that is not allowed must not
+       be recorded as spent. The claim is what makes abandoning a fight cost
+       something, so it is written whether or not a result ever arrives. */
+    if (path === "/attack-claim"){
+      const { target, seed, gap, at } = await request.json();
+      const day  = Math.floor(at / 86400e3);
+      const seen = await this.state.storage.get("atkDay");
+      const used = seen === day ? (await this.state.storage.get("atkCount") || 0) : 0;
+
+      const hits = await this.state.storage.get("atkHits") || {};
+      for (const k of Object.keys(hits))
+        if (at - hits[k] >= MARK_HOURS * 3600e3) delete hits[k];
+
+      if (hits[target])
+        return this.ok({ ok:false, why:"already attacked them today",
+                         until: hits[target] + MARK_HOURS * 3600e3 });
+      if (used >= ATTACKS_PER_DAY)
+        return this.ok({ ok:false, why:"out of attacks today",
+                         until: (day + 1) * 86400e3 });
+
+      hits[target] = at;
+      await this.state.storage.put({ atkDay: day, atkCount: used + 1, atkHits: hits,
+                                     pending: { target, seed, gap, at } });
+      return this.ok({ ok:true, left: ATTACKS_PER_DAY - used - 1 });
+    }
+
+    /* Close it against the claim. An hour is long enough for the longest fight
+       anybody will sit through and short enough that a claim cannot be banked
+       and spent against a level that has since moved. */
+    if (path === "/attack-close"){
+      const { seed } = await request.json();
+      const p = await this.state.storage.get("pending");
+      if (!p) return this.ok({ ok:false, why:"no fight was started" });
+      if ((p.seed >>> 0) !== (seed >>> 0)) return this.ok({ ok:false, why:"that is not the fight that was started" });
+      if (Date.now() - p.at > 3600e3) return this.ok({ ok:false, why:"that fight took too long" });
+      await this.state.storage.delete("pending");
+      return this.ok({ ok:true, target: p.target, gap: p.gap });
+    }
     /* the same class standing in as the roster, one key per athlete. `firstSeen`
        is kept from whatever was there, so a row records when somebody linked
        rather than when they last saved. */
@@ -408,6 +589,14 @@ export class Athlete {
       return this.ok({ rows: [...map.values()] });
     }
     return new Response("no", { status: 404 });
+  }
+
+  /* Both sides of a fight keep a copy: yours says what you did, theirs says
+     what was done to them. Fifty is a couple of weeks of a busy game. */
+  async logAdd(row){
+    const log = await this.state.storage.get("battles") || [];
+    log.push(row);
+    await this.state.storage.put("battles", log.slice(-50));
   }
 
   async open(tok){

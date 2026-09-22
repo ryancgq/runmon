@@ -1020,6 +1020,99 @@ The one dent is **level 18**, where the Zephyrite has its Lightning Bolt and
 the Blazewyrm has only the first of three: Ember takes 41% there until it
 learns Flame Stomp at 22.
 
+### Pile-on marks
+
+Winning a battle is not the prize. **Every fight leaves a mark on the pet that
+was attacked, and a mark takes a share of the XP its owner earns by running**
+while it lasts. It is the only thing one player can do to another, and it is
+deliberately not something anyone can do alone.
+
+```
+chip   = 1 − defenderHP_end / defenderHP_max      // 1 when they were knocked out
+gapMul = gap >= 0 ? min(1, 0.2 + 0.16 × gap)      // gap = their level − yours
+                  : 0.2 × 0.75^−gap
+mark   = 0.10 × chip × gapMul × (win ? 1.4 : 1)
+```
+
+Marks from **distinct** attackers stack, cap at **−30%**, and each fades over
+its own 24 hours so a pile-on drains away through the following day rather than
+ending at a stroke. Three attacks a day, and never the same target twice.
+
+`gapMul` is the whole design in one curve. It pays for punching up and it does
+not pay for punching down, so nothing forbids attacking somebody below you — it
+is simply not worth the attack you spent.
+
+| Gap | `gapMul` | A win leaves | A 60% chip leaves |
+| --- | --- | --- | --- |
+| 5+ up | 1.00 | 14.0% | 6.0% |
+| 3 up | 0.68 | 9.5% | 4.1% |
+| 1 up | 0.36 | 5.0% | 2.2% |
+| Even | 0.20 | 2.8% | 1.2% |
+| 3 down | 0.08 | 1.1% | 0.5% |
+| 5 down | 0.05 | 0.7% | 0.3% |
+
+The consequence is the point, and it needs no rule to enforce it: **the
+highest-level player is the best target for everybody else and the only one who
+cannot answer in kind.** Collusion against the leader is not a loophole, it is
+the intended play.
+
+It is also self-limiting. `gapMul` shrinks as the field closes, so the pressure
+on the leader fades exactly as it does its job — at parity a mark is a fifth of
+full size. It is a feedback loop, not a punishment.
+
+Losing still leaves a mark, which is what makes a hopeless attack on the leader
+worth making; winning is worth 40% more on top.
+
+**Tuned by simulation, not by taste.** Running the real engine across the level
+pairs that actually occur:
+
+| Gap | Attacker wins | Mean chip | Mean mark | Attackers to reach the cap |
+| --- | --- | --- | --- | --- |
+| 0 | 46% | 0.88 | 2.2% | 13.9 |
+| 1 | 37% | 0.85 | 3.7% | 8.1 |
+| 2 | 27% | 0.79 | 4.8% | 6.2 |
+| 3 | 18% | 0.73 | 5.6% | 5.3 |
+| 4 | 15% | 0.69 | 6.4% | 4.7 |
+| 5 | 11% | 0.64 | 7.0% | 4.3 |
+
+A single attacker's best day in twenty is 9.5% at a three-level gap — about a
+third of the cap. Five committed attackers reach it. Note the win rates: a
+five-level gap is **not** a close fight, it is a 1-in-10 upset. What makes the
+attack worth making anyway is that the chip counts even when you lose.
+
+The XP is **gone, not deferred**. A run docked by a pile-on is docked for good,
+and `recompute()` needs no release logic because there is nothing to release.
+The run's distance, streak and badges are untouched — only the pet's XP. The
+summary says so in its own row, naming the number of attackers rather than the
+arithmetic, because what matters to whoever is reading it is that people came
+after them.
+
+The mechanic only bites somebody who is running, so it cannot punish anyone for
+being injured or resting — an idle player pays nothing.
+
+### How a battle is actually had
+
+**Nobody accepts a battle.** The attacker plays their own side on the battle
+screen; `btChoose` plays the defender, who is not present and was never asked.
+This reverses the earlier "the friend must accept" decision, and it had to:
+an XP penalty you can decline is a penalty nobody ever takes, and the leader —
+the only player the mechanic is aimed at — would simply have declined forever.
+It also deleted most of the challenge inbox, the accept flow and the 48-hour
+expiry that were scoped for it.
+
+A battle is **claimed before it is fought and reported after**, which is two
+round trips for what looks like one act. With a single call, an attacker could
+abandon any fight going badly and try again until it went well, and every
+attack would land as a knockout. The attack is spent at `/battle/start`, so
+walking away costs it.
+
+The broker picks the seed and **derives both levels from the roster**, never
+from the request. The client reports only the chip and who won. The mark
+arithmetic is duplicated between `index.html` and the worker, which is a real
+liability — change one copy and replays disagree with the marks they produced —
+so both carry `MARK_VERSION` and every mark records it, putting any drift in
+the data rather than leaving it silent.
+
 ## How XP works
 
 **Distance → XP.** 100 XP per kilometre, and later kilometres inside a single

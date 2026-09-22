@@ -1382,6 +1382,7 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
           <div class="bt-end-ico" id="bt-end-ico">\u{1F3C6}</div>
           <h3 id="bt-end-h">You win</h3>
           <p class="muted" id="bt-end-p"></p>
+          <p class="muted" id="bt-end-mark" style="font-weight:800"></p>
           <button class="btn primary" id="bt-again">Fight again</button>
           <button class="btn ghost" id="bt-done">Done</button>
         </div>
@@ -2286,18 +2287,27 @@ function baseXpForDistance(D){
 /** The flat part (100 XP/km) so the summary can show the bonus separately. */
 function flatXp(D){ return XP_PER_KM * Math.max(0, D); }
 function enduranceXp(D){ return Math.max(0, baseXpForDistance(D) - flatXp(D)); }
-/* One run's XP, split into the four rows the summary shows. They are worked
+/* One run's XP, split into the five rows the summary shows. They are worked
    out here rather than at each call site so the rows always add up to the
-   total: `mood` and `streak` are remainders against the rounded running sum,
-   not independently rounded figures, which is what stops a breakdown from
-   landing a point away from the number above it. */
-function xpParts(km, mood, streakOn){
+   total: `mood`, `streak` and `marked` are remainders against the rounded
+   running sum, not independently rounded figures, which is what stops a
+   breakdown from landing a point away from the number above it.
+
+   `penalty` is what other players have done to you - see markPenalty(). It is
+   the last factor deliberately: a pile-on takes a share of what the run was
+   worth after every bonus, so being marked never quietly cancels the streak
+   you kept or the endurance you earned. Those rows still read the way they
+   always did, and the loss is one line of its own underneath. */
+function xpParts(km, mood, streakOn, penalty){
+  const pen   = Math.max(0, Math.min(MARK_CAP, penalty || 0));
   const base  = baseXpForDistance(km);
   const flat  = Math.round(flatXp(km));
   const end   = Math.round(enduranceXp(km));
   const after = Math.round(base * (mood.xpPct / 100));
-  const total = Math.round(base * (mood.xpPct / 100) * (streakOn ? STREAK_MULT : 1));
-  return { flat, end, mood: after - (flat + end), streak: total - after, total };
+  const kept  = Math.round(base * (mood.xpPct / 100) * (streakOn ? STREAK_MULT : 1));
+  const total = Math.round(kept * (1 - pen));
+  return { flat, end, mood: after - (flat + end), streak: kept - after,
+           marked: total - kept, total };
 }
 
 /** Distance that would earn `xp`, i.e. the inverse of baseXpForDistance. */
@@ -2604,10 +2614,11 @@ function btAct(st, moveId){
   return ev;
 }
 
-/** What the other pet does. Its owner is not here - they consented to the
-    fight, they did not sign up to play it - so it picks for itself: the first
-    move it has ready, and a Nap only once it is hurt enough to be worth the
-    turn. */
+/** What the other pet does. Battles are not accepted, they are simply had -
+    the defender is not present and was never asked - so their pet picks for
+    itself: the first move it has ready, and a Nap only once it is hurt enough
+    to be worth the turn. It is also what plays the attacker's side when a
+    fight is settled away from the screen. */
 function btChoose(st, key){
   const s = st[key];
   for (const k of s.kit){
@@ -2617,6 +2628,64 @@ function btChoose(st, key){
     return k.id;
   }
   return "attack";
+}
+
+/* ---------------------------------------------------------------------------
+   Pile-on marks.
+
+   Every battle leaves a mark on the pet that was attacked, and a mark is a
+   share of the XP its owner earns by running while it lasts. It is the only
+   thing one player can do to another, and it is deliberately not something
+   anybody can do alone: the cap is out of one attacker's reach and within
+   four or five attackers' reach.
+
+   What decides the size is how far you reached up. `markGapMul` is the whole
+   design in one curve - it pays for punching up and it does not pay for
+   punching down - so nothing forbids attacking somebody below you, it is
+   simply not worth the attack you spent. The consequence is the point: the
+   highest-level player is the best target for everybody else and the only one
+   who cannot answer in kind. It needs no rule, no champion status and no
+   separate mode; it falls out of the arithmetic.
+
+   The constants came from simulating the real engine rather than from taste.
+   At a three-level gap - the middle of the spread this was tuned for - an
+   attack averages 5.6% and it takes 5.3 attackers to reach the cap, while one
+   attacker's best day in twenty is 9.5%, about a third of it. Between peers a
+   mark is 2.2% and it would take fourteen of them, which is why an even fight
+   is worth having for the record rather than for this. */
+const MARK_UNIT  = 0.10;      // one attack's worth, before chip and the gap
+const MARK_CAP   = 0.30;      // ...and the most everybody together can stack
+const MARK_HOURS = 24;        // how long one mark takes to fade to nothing
+
+/* How much a mark is worth, by how far above you the target was. Continuous at
+   parity - both branches give 0.2 - rising to full value five levels up and
+   halving about every two and a half levels down. It saturates at +5 rather
+   than running on, so a wider gap than the game expects behaves like five
+   levels instead of paying out of all proportion. */
+function markGapMul(gap){
+  return gap >= 0 ? Math.min(1, 0.2 + 0.16 * gap)
+                  : 0.2 * Math.pow(0.75, -gap);
+}
+
+/* `chip` is the share of the defender's health that came off, so it is 1 when
+   they were knocked out. Losing still leaves a mark - that is what makes a
+   hopeless attack on the leader worth making at all - and winning is worth
+   40% more on top of it. */
+function markFor(chip, gap, win){
+  const c = Math.max(0, Math.min(1, chip || 0));
+  return MARK_UNIT * c * markGapMul(gap) * (win ? 1.4 : 1);
+}
+
+/* What the marks currently on you add up to. Each fades over its own day
+   rather than all of them expiring together, so a pile-on drains away through
+   the day after instead of ending at a stroke. */
+function markPenalty(marks, now){
+  let sum = 0;
+  for (const m of marks || []){
+    const life = 1 - ((now || Date.now()) - (m.at || 0)) / (MARK_HOURS * 3600e3);
+    if (life > 0) sum += (m.amt || 0) * life;
+  }
+  return Math.min(MARK_CAP, Math.max(0, sum));
 }
 
 /** ACSM running equation -> kilocalories. */
@@ -2680,6 +2749,13 @@ const DEFAULT_SAVE = {
   // [{ id, card }] - everybody the broker knows about, cached for the same
   // reason. While the game is small this is what the Friends tab shows.
   roster: [],
+  // [{ at, amt, by }] - what other players have done to you, each fading over
+  // its own day. The broker is the record; this is the copy the run summary
+  // reads, so a run still prices itself correctly with no connection.
+  marks: [],
+  // [{ at, dir, who, chip, win, amt }] - the fights you were in, yours and
+  // theirs, newest last. `dir` is "out" when you attacked.
+  battles: [],
 };
 
 let save = structuredCloneSafe(DEFAULT_SAVE);
@@ -3447,7 +3523,7 @@ function spriteConfig(species, stage){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-21 465e1a3";
+const BUILD_ID = "2026-09-22 87b7243";
 const ART_VERSION = "23";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -4813,7 +4889,13 @@ function makeRun(at, km, sec, extra){
   const withThis = save.runs.concat([{ t: at, km }]);
   const streakOn = streakAt(withThis, at).live;
   const mood = moodIfRunNow(at);
-  const p = xpParts(km, mood, streakOn);
+  // What other players have taken off this run. It is read once, here, and
+  // then written into the run: a mark fades, and a run logged under one should
+  // keep reading the way it did on the day rather than quietly healing.
+  const pen = markPenalty(save.marks, at);
+  const by  = (save.marks || []).filter(m =>
+    at - (m.at || 0) < MARK_HOURS * 3600e3).length;
+  const p = xpParts(km, mood, streakOn, pen);
   return Object.assign({
     id: "r" + at.toString(36) + Math.random().toString(36).slice(2, 6),
     t: at, km, sec,
@@ -4823,6 +4905,9 @@ function makeRun(at, km, sec, extra){
     xpEndurance: p.end,
     xpMood: p.mood,
     xpStreak: p.streak,
+    xpMarked: p.marked,
+    marked: pen,
+    markedBy: by,
     mood: mood.key,
     streakOn,
     streak: streakAt(withThis, at).days,
@@ -4941,6 +5026,15 @@ function showSummary(run, opts){
   } else if (run.xpStreakBonus){
     // logged before moods became a ladder, when the streak paid on its own
     lines.push(`<div class="xp-line bonus"><span>Streak bonus · ${run.streak} days in a row</span><b>+${nf(run.xpStreakBonus)}</b></div>`);
+  }
+  // The pile-on row only appears when there was one. It names the number of
+  // attackers rather than the arithmetic: what matters to somebody reading
+  // this is that people came after them, not that 0.1 times a chip times a
+  // gap came to 17%. The distance, the streak and the badges above are
+  // untouched, which is the other half of the message.
+  if (run.xpMarked < 0){
+    const who = (run.markedBy || 0) > 1 ? `${run.markedBy} players` : "another player";
+    lines.push(`<div class="xp-line dock"><span>Piled on · ${who} attacked your pet — ${Math.round((run.marked || 0) * 100)}% XP</span><b>${nf(run.xpMarked)}</b></div>`);
   }
   lines.push(`<div class="xp-line total"><span>Total earned</span><b>${nf(run.xp)} XP</b></div>`);
   $("#sum-xp-lines").innerHTML = lines.join("");
@@ -5103,6 +5197,19 @@ async function refreshPlayers(){
     .map(p => ({ id: String(p.id || "").slice(0, 24), card: safeCard(p.card) }))
     .filter(p => p.id && p.card);
   save.roster = rows;
+  persist();
+}
+
+/* What other players have done to your pet. Cached in the save because the run
+   summary prices a run against it, and a run logged with no connection must
+   still come out at the number the broker would have given it. */
+async function refreshMarks(){
+  if (!stravaLinked()) return;
+  const r = await stravaCall("/battle/marks");
+  save.marks = (r.marks || [])
+    .map(m => ({ at: Number(m.at) || 0, amt: Number(m.amt) || 0, by: String(m.by || "").slice(0, 24) }))
+    .filter(m => m.at > 0 && m.amt > 0);
+  save.battles = (r.battles || []).slice(-50);
   persist();
 }
 
@@ -5269,7 +5376,7 @@ async function openFriendsTab(){
   renderFriends();
   if (!stravaLinked()) return;
   try {
-    await refreshPlayers();
+    await Promise.all([refreshPlayers(), refreshMarks()]);
     friendsNote = null;
   } catch (err){
     friendsNote = friendsFail(err);   // the cached roster still stands
@@ -5300,12 +5407,45 @@ function openFriend(id){
         <div class="stat"><div class="v">${c.best}</div><div class="k">Best streak</div></div>
         <div class="stat"><div class="v">${c.lastRun ? shortAgo(c.lastRun) : "\u2014"}</div><div class="k">Last run</div></div>
       </div>
-      <p class="muted" style="font-size:11px;font-weight:700;text-align:center;margin:14px 0 0">
-        Battle is not built yet \u2014 this is where it will live.</p>`
+      ${attackNote(c)}`
       : `<p class="desc">No pet on this code yet.</p>`,
     onOpen: () => { if (c) paintPet($("#friend-big"), c.species, c.stage, "okay"); },
-    actions: [{ label:"Done", cls:"ghost", fn: closeSheet }]
+    actions: c && save.species && stravaLinked()
+      ? [{ label:"Attack", cls:"primary", fn: () => attackFriend(id, c) },
+         { label:"Done", cls:"ghost", fn: closeSheet }]
+      : [{ label:"Done", cls:"ghost", fn: closeSheet }]
   });
+}
+
+/* What attacking them is worth, in words rather than arithmetic. Saying it
+   before the fight rather than after is the point: the whole mechanic only
+   works if people can see that the leader is the target worth having. */
+function attackNote(c){
+  const gap = (c.level || 0) - derived.level;
+  const worth = markGapMul(gap) / markGapMul(5);      // against the best it gets
+  const how = gap >= 5   ? "They are well above you, so a mark on them is worth everything it can be."
+            : gap >= 2   ? "They are above you, so a mark on them counts for a good deal."
+            : gap >= -1  ? "You are evenly matched, so a mark either way is a scratch."
+            :              "They are below you. Nothing stops you, but the mark would be worth almost nothing.";
+  return `<p class="muted" style="font-size:11px;font-weight:700;text-align:center;margin:14px 0 0">
+    ${how}<br><span style="opacity:.7">Worth about ${Math.round(worth * 100)}% of a full mark \u00b7 three attacks a day, one each</span></p>`;
+}
+
+/* Claim the fight, then play it. The broker picks the seed and spends the
+   attack up front, so quitting a fight that is going badly costs it rather
+   than handing out a free retry. */
+async function attackFriend(id, c){
+  try {
+    const r = await stravaCall("/battle/start", { method:"POST",
+      body: JSON.stringify({ target: id }) });
+    closeSheet();
+    startBattle(
+      { species: save.species, level: derived.level, name: save.petName || "Your pet" },
+      { species: c.species,    level: c.level,       name: c.pet },
+      { seed: r.seed, stake: { target: id, seed: r.seed } });
+  } catch (err){
+    toast(err.message || "Could not start that fight.", "bad");
+  }
 }
 
 /* --- settings ------------------------------------------------------------ */
@@ -5636,9 +5776,17 @@ const BT_AFTER = 340;    // ...and the pause before the next side moves
 function btClear(){ btTimers.forEach(clearTimeout); btTimers = []; }
 function btWait(fn, ms){ btTimers.push(setTimeout(fn, ms)); }
 
-function startBattle(you, foe){
+/* `opts.seed` makes the fight reproducible - the broker picks it when a battle
+   is claimed, so the result reported back belongs to a fight it knows about.
+   `opts.stake` carries that claim, and its presence is what separates a real
+   attack from the animation tester: no stake, nothing is reported and nobody
+   is marked. */
+function startBattle(you, foe, opts){
+  const o = opts || {};
   btClear();
-  battle = newBattle(you, foe, (Math.random() * 0xFFFFFFFF) >>> 0);
+  battle = newBattle(you, foe,
+    (o.seed != null ? o.seed : Math.random() * 0xFFFFFFFF) >>> 0);
+  battle.stake = o.stake || null;
   battle.you = you; battle.foe = foe;
   btLock = false;
   btShown = { a: battle.a.cur, b: battle.b.cur, turn: battle.no };
@@ -5773,7 +5921,37 @@ function btFinish(){
     ? `${battle.a.name} saw off ${battle.b.name} in ${battle.no} turns, with ${left} of ${of} left.`
     : `${battle.b.name} had ${left} of ${of} still in the tank after ${battle.no} turns.`;
   $("#bt-end").hidden = false;
+  $("#bt-end-mark").textContent = "";
+  // A real attack is spent. Offering a rematch here would read as a way to
+  // improve on the result, and it is not one.
+  $("#bt-again").hidden = !!battle.stake;
   renderBattle();
+  if (battle.stake) btReport(battle);
+}
+
+/* Tell the broker how it went. The chip - the share of their health that came
+   off - is the whole report along with who won; the broker knows the levels
+   and prices the mark itself, so there is nothing here worth lying about that
+   would not simply be ignored.
+
+   A failure is said out loud rather than swallowed. The attack was already
+   spent when the fight was claimed, so a player who is told nothing would
+   reasonably think it had not counted. */
+async function btReport(b){
+  const line = $("#bt-end-mark");
+  const chip = 1 - Math.max(0, b.b.cur) / b.b.max;
+  line.textContent = "Reporting\u2026";
+  try {
+    const r = await stravaCall("/battle/report", { method:"POST",
+      body: JSON.stringify({ seed: b.stake.seed, chip, win: b.winner === "a" }) });
+    const pct = Math.round((r.amt || 0) * 1000) / 10;
+    line.textContent = pct >= 0.1
+      ? `You took ${Math.round(chip * 100)}% off ${b.foe.name} and left a mark worth \u2212${pct}% of their XP for a day.`
+      : `${b.foe.name} is below you, so the mark you left is worth almost nothing.`;
+    await refreshMarks();
+  } catch (e){
+    line.textContent = "The fight happened, but the broker did not answer \u2014 the mark may not have landed.";
+  }
 }
 
 function leaveBattle(){
@@ -5929,7 +6107,13 @@ async function stravaCall(path, init){
     headers: { "Authorization": "Bearer " + stravaSession, "Content-Type": "application/json" }
   }, init || {}));
   if (r.status === 401){ stravaForget(); throw new Error("Strava link expired — connect again."); }
-  if (!r.ok) throw new Error("The Strava link is not answering (" + r.status + ").");
+  if (!r.ok){
+    // The broker says why it refused - "out of attacks today" is worth far
+    // more to whoever is reading it than the status code was.
+    let why = "";
+    try { why = ((await r.json()) || {}).error || ""; } catch (e){}
+    throw new Error(why || "The Strava link is not answering (" + r.status + ").");
+  }
   return r.json();
 }
 function stravaForget(){
