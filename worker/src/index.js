@@ -151,9 +151,11 @@ function markFor(chip, gap, win){
   const c = Math.max(0, Math.min(1, chip || 0));
   return MARK_UNIT * c * markGapMul(gap) * (win ? 1.4 : 1);
 }
-/* Three a day, and never the same target twice inside a day. The second rule
-   is the one that matters: it is what makes a pile-on need other people. */
-const ATTACKS_PER_DAY = 3;
+/* Two a day, and never the same target twice inside a day. The second rule is
+   the one that matters: it is what makes a pile-on need other people. The
+   first decides how much of a day's damage any one player can be responsible
+   for, and two makes choosing a target a real decision rather than a sweep. */
+const ATTACKS_PER_DAY = 2;
 /* The admin token is compared as a digest, not as a string. An early-exit
    string compare hands the token over a character at a time to anybody willing
    to time the responses. */
@@ -521,7 +523,17 @@ export class Athlete {
     if (path === "/marks"){
       const marks = (await this.state.storage.get("marks") || [])
         .filter(m => Date.now() - (m.at || 0) < MARK_HOURS * 3600e3);
-      return this.ok({ marks, battles: await this.state.storage.get("battles") || [] });
+      // How many attacks are left today, worked out the same way the claim
+      // does it. The app has no other way to know without spending one.
+      const day  = Math.floor(Date.now() / 86400e3);
+      const used = (await this.state.storage.get("atkDay")) === day
+        ? (await this.state.storage.get("atkCount") || 0) : 0;
+      const hits = await this.state.storage.get("atkHits") || {};
+      const spent = Object.keys(hits)
+        .filter(k => Date.now() - hits[k] < MARK_HOURS * 3600e3);
+      return this.ok({ marks, battles: await this.state.storage.get("battles") || [],
+                       attacksLeft: Math.max(0, ATTACKS_PER_DAY - used),
+                       attacksPerDay: ATTACKS_PER_DAY, hitToday: spent });
     }
     if (path === "/log-add"){
       await this.logAdd(await request.json());
