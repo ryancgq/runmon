@@ -2846,6 +2846,13 @@ function loadSave(){
     const parsed = JSON.parse(raw);
     save = Object.assign(structuredCloneSafe(DEFAULT_SAVE), parsed);
     save.settings = Object.assign({}, DEFAULT_SAVE.settings, parsed.settings || {});
+    /* Treadmill runs were opt-in and the switch is gone. Dropping the setting
+       without clearing it would strand anybody who had turned it on: the
+       broker reads this flag off the stored save to decide which activity
+       types to fetch, so their treadmill runs would go on counting with no
+       control left anywhere to stop them. Deleted rather than set false so
+       the key does not linger and read as a setting that still exists. */
+    delete save.settings.stravaVirtual;
     save.runs = Array.isArray(parsed.runs) ? parsed.runs : [];
     save.badges = parsed.badges || {};
     return !!save.species;
@@ -5703,11 +5710,6 @@ function renderStravaPanel(){
            <div class="h">Your runs come from Strava. Last checked: ${when}. Only runs recorded after you connected count.</div></div>
          <button class="btn ghost" style="width:auto;padding:9px 15px;font-size:13px" id="strava-sync"${stravaBusy ? " disabled" : ""}>${stravaBusy ? "Checking…" : "Check now"}</button>
        </div>${err}${why}
-       <div class="row tap" id="row-virtual">
-         <div class="t"><div class="n">Count treadmill runs</div>
-           <div class="h">Virtual runs have no GPS and their distance is whatever the machine said.</div></div>
-         <div class="toggle${save.settings.stravaVirtual ? " on" : ""}" id="tg-virtual"><i></i></div>
-       </div>
        <div class="row">
          <div class="t"><div class="n">Disconnect</div>
            <div class="h">Revokes Runmon's access at Strava and deletes your pet from the server. This cannot be undone.</div></div>
@@ -6293,10 +6295,11 @@ function playAnimTest(d, root){
 let stravaSession = null, stravaBusy = false, stravaLastError = null, savePushTimer = null;
 /* What the last check actually found, so "nothing new" can say why. */
 let stravaSeen = null;
-/* Mirrors ALWAYS + OPT_IN in the worker; only used to word the message. The
-   treadmill type is conditional there too, so asking about it has to be. */
-const countedTypes = () =>
-  ["Run", "TrailRun"].concat(save.settings.stravaVirtual ? ["VirtualRun"] : []);
+/* Mirrors ALWAYS in the worker; only used to word the message. Treadmill runs
+   used to be opt-in and are now simply not counted: their distance is whatever
+   the machine claimed, with no GPS behind it, and a pet fed on a number a
+   treadmill made up is not measuring anything. */
+const countedTypes = () => ["Run", "TrailRun"];
 
 /* Why the last check came back empty, in one sentence, or "" if it did not.
    Written once and used by both the toast and the settings panel, so the two
@@ -6325,7 +6328,7 @@ function stravaWhyEmpty(){
   if (stravaSeen.fresh === 0)
     return `All ${stravaSeen.since} activities since you connected have already been counted.`;
   if (!counted.length && names.length && names.every(t => t === "VirtualRun"))
-    return `Strava has ${k.VirtualRun} treadmill run${k.VirtualRun === 1 ? "" : "s"} waiting. Switch on “Count treadmill runs” and check again.`;
+    return `Strava has ${k.VirtualRun} treadmill run${k.VirtualRun === 1 ? "" : "s"} waiting, and treadmill runs do not count — their distance is whatever the machine said, with no GPS behind it.`;
   if (!counted.length)
     return `Strava returned ${names.map(t => `${k[t]} × ${t}`).join(", ")} — none of a type that counts.`;
   return "";
@@ -6380,6 +6383,10 @@ async function stravaSync(opts){
     if (res.save && !save.species && res.save.species){
       save = Object.assign(structuredCloneSafe(DEFAULT_SAVE), res.save);
       save.settings = Object.assign({}, DEFAULT_SAVE.settings, res.save.settings || {});
+      // The other doorway a stored save comes in by, and it can carry the old
+      // treadmill flag just as loadSave() can. Cleared here too, or a save
+      // that followed somebody from another device would switch it back on.
+      delete save.settings.stravaVirtual;
     }
     /* Marks before any run is priced, and after the branch above, which can
        replace `save` wholesale and would throw them away.
@@ -6709,13 +6716,6 @@ function wire(){
       return;
     }
     if (e.target.closest("#strava-sync")){ stravaSync({ loud:true }); return; }
-    if (e.target.closest("#row-virtual")){
-      save.settings.stravaVirtual = !save.settings.stravaVirtual;
-      persist(); renderStravaPanel();
-      toast(save.settings.stravaVirtual ? "Treadmill runs will count" : "Treadmill runs will be ignored",
-            "", "\u{1F3C3}");
-      return;
-    }
     if (e.target.closest("#strava-off")){
       openSheet({
         title:"Disconnect Strava?",
