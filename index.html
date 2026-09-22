@@ -2133,6 +2133,12 @@ const RAID_BOSS = {
       battle:{ dmg:2.2, pierce:0.7, cd:4 },
       sprite:{ src:"art/boss-skill-smash.png", frames:16, rows:1, fps:9,
                aspect:1.3285, scale:1, dx:0, dy:0 } },
+    /* Repacked from a second export. The first arrived as RGB on solid white,
+       and keying that left a pale rim on 45.8% of his outline - anti-aliasing
+       had smeared the black edge into the background, and the greys it left
+       sat under any threshold that did not also eat his tusks. With real alpha
+       the same measurement is 0.4%, against 0.8% and 0.0% for the sheets that
+       always had it. Same geometry, so nothing below changed. */
     { id:"torchswing", name:"Torchswing", ico:"\u{1F525}",
       blurb:"A flat, sweeping arc that takes everything at knee height with it.",
       battle:{ dmg:1.35, cd:2 },
