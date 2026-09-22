@@ -6425,10 +6425,13 @@ function btBars(){
 /* His sheet is chosen from what is LEFT, so a blow that takes him past a mark
    changes the drawing in the same beat the bar moves. */
 let btBossPhaseSrc = null;
-function btPaintBoss(){
+function btPaintBoss(force){
   const frac = Math.max(0, btShown.b) / battle.b.max;
   const cfg = bossSpriteCfg(frac);
-  if (cfg.src === btBossPhaseSrc) return;     // only redraw when the sheet changes
+  // Normally only when the sheet changes, or every bar tick would restart his
+  // idle loop. `force` is for putting him back after one of his own clips,
+  // where the sheet is the same one but the slot no longer holds it.
+  if (!force && cfg.src === btBossPhaseSrc) return;
   btBossPhaseSrc = cfg.src;
   $("#bt-foe-pet").innerHTML = spriteHTML(cfg, "okay");
 }
@@ -6496,10 +6499,17 @@ function btRun(moveId){
   btSay(lines.join("<br>"));
 
   btWait(() => {
-    // The pet goes back to its idle, then the damage lands.
+    // Back to the idle, then the damage lands. The boss's idle is his own
+    // sheet, not a pet's: `battle.foe` is only the stand-in object a raid is
+    // started with, so painting from it put YOUR pet in his slot the moment he
+    // finished a skill.
     if (sk && sk.sprite){
-      const who = side === "a" ? battle.you : battle.foe;
-      paintPet($(`#bt-${actor}-pet`), who.species, stageForLevel(who.level), "okay", who.level);
+      if (battle.boss && side === "b"){
+        btPaintBoss(true);
+      } else {
+        const who = side === "a" ? battle.you : battle.foe;
+        paintPet($(`#bt-${actor}-pet`), who.species, stageForLevel(who.level), "okay", who.level);
+      }
     }
     if (ev.dmg) btLand(target, ev.dmg, false);
     if (ev.self) btLand(actor, ev.self, false);
