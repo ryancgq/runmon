@@ -1525,7 +1525,7 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
       </div>
       <div class="ob-foot">
         <button class="btn primary" id="ob-go">Choose an egg</button>
-        <p class="muted center" style="font-size:11px;font-weight:700;margin-top:14px;line-height:1.6">
+        <p class="muted center" id="ob-privacy" style="font-size:11px;font-weight:700;margin-top:14px;line-height:1.6">
           Needs location permission while a run is in progress.<br>Nothing ever leaves your device.
         </p>
       </div>
@@ -1623,6 +1623,18 @@ const SAVE_KEY = DEMO ? "runmon.demo.v1" : "runmon.save.v1";
    it keeps working on a plane and needs no worker deployed to test new art. */
 const RUNMON_API = "https://runmon-strava.runmon-gq.workers.dev";
 const STRAVA_ON  = !DEMO && !!RUNMON_API;
+
+/* The phone's own GPS tracker, currently off outside the sandbox. A browser
+   tab is a poor place to measure a run - it is throttled in the background,
+   killed when the screen locks on some phones, and its distance is a sum of
+   noisy fixes - and Strava is simply better at it. So runs come from Strava,
+   and the tracker stays in the code behind this one flag rather than being
+   deleted, because the reason it is off is accuracy and not regret.
+
+   The sandbox keeps it. It has no Strava and no broker by design, so without
+   the tracker there would be no way to feed a pet in there at all. Its GPS is
+   simulated anyway. */
+const NATIVE_RUN = DEMO;
 const SESSION_KEY = "runmon.strava.session";
 /* Saves written before the app was renamed. Read once, copied to SAVE_KEY, and
    deliberately left in place as a backup — but cleared on reset, or a "new game"
@@ -4232,9 +4244,15 @@ function renderHome(){
   const hour = new Date().getHours();
   $("#greeting").textContent = hour < 5 ? "Still up?" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
   renderStreakStrip();
+  // With the tracker off there is no "log a run" to invite, so an empty pet
+  // says where runs actually come from instead of asking for something the
+  // app can no longer do.
+  const noRunsYet = NATIVE_RUN ? "Let's log your first run"
+    : stravaLinked() ? "Your runs arrive from Strava"
+    : "Connect Strava in Settings to feed your pet";
   $("#greeting-sub").textContent = d.runs.length
     ? (d.gapDays === 0 ? "You already ran today — nice." : d.gapDays === 1 ? "You ran yesterday. Keep it rolling." : `${d.gapDays} days since your last run`)
-    : "Let's log your first run";
+    : noRunsYet;
 
   // through paintXp rather than beside it: this used to paint the row itself,
   // which meant the no-going-backwards rule lived in only one of the two
@@ -4358,9 +4376,14 @@ function renderHistory(){
   $("#hist-total").textContent = `${U.distStr(derived.totalKm, 1)} ${U.label}`;
   const el = $("#hist-list");
   if (!runs.length){
-    el.innerHTML = `<div class="empty-state"><div class="ico">🏃</div>
+    el.innerHTML = NATIVE_RUN
+      ? `<div class="empty-state"><div class="ico">🏃</div>
       <h3>No runs yet</h3><p>Every run you log lands here — and feeds your pet.</p>
-      <button class="btn primary" data-nav="track" style="max-width:240px;margin:0 auto">Start your first run</button></div>`;
+      <button class="btn primary" data-nav="track" style="max-width:240px;margin:0 auto">Start your first run</button></div>`
+      : `<div class="empty-state"><div class="ico">🏃</div>
+      <h3>No runs yet</h3><p>Runs come from Strava — record one there and it lands
+         here, and feeds your pet, the next time you open Runmon.</p>
+      ${stravaLinked() ? "" : `<button class="btn primary" data-nav="settings" style="max-width:240px;margin:0 auto">Connect Strava</button>`}</div>`;
     return;
   }
   let html = "", lastMonth = "";
@@ -4489,6 +4512,11 @@ function renderAll(){
 /* --- navigation ---------------------------------------------------------- */
 let currentScreen = "home";
 function go(name){
+  // Before the early return, not after: rewriting the name afterwards would
+  // let go("track") from the home screen fall through and re-navigate home.
+  // Nothing may route into the tracker while it is off - not a stale hash,
+  // not a data-nav left in some markup, not a console call.
+  if (name === "track" && !NATIVE_RUN) name = "home";
   if (name === currentScreen) return;
   if (currentScreen === "track" && tracker.active && name !== "track"){
     // leaving the run screen does not stop the run
@@ -4507,7 +4535,9 @@ function go(name){
   $$(".tab[data-nav]").forEach(t => t.classList.toggle("on", t.dataset.nav === lit));
   const chromeless = name === "track" || name === "summary" || name === "battle";
   $("#tabbar").classList.toggle("hidden", chromeless);
-  $("#fab").classList.toggle("hidden", chromeless);
+  // `|| !NATIVE_RUN` belongs here rather than anywhere else: this line runs on
+  // every navigation and would undo a hide applied once at startup.
+  $("#fab").classList.toggle("hidden", chromeless || !NATIVE_RUN);
   $("#demo-badge").classList.toggle("hidden", chromeless);
 
   if (name === "history") { renderHistory(); }
@@ -5709,6 +5739,12 @@ function showOnboarding(){
       "Sandbox build — jump to any form, change the pet's mood, log runs<br>instantly. Its own save slot; your real pet is untouched.";
   }
   applyTheme(hero);
+  // Location is only ever asked for by the tracker. With it off the line is
+  // simply untrue, and a permission warning nobody will meet is the kind of
+  // thing that stops somebody at the first screen.
+  const priv = $("#ob-privacy");
+  if (priv && !NATIVE_RUN)
+    priv.innerHTML = "Runs come from Strava.<br>Nothing ever leaves your device.";
   paintPet($("#ob-hero"), hero, 0, "okay");
   renderSpeciesPicks();
   paintPet($("#ob-strava-art"), hero, 0, "okay");
@@ -5746,10 +5782,14 @@ function hatch(){
   renderAll();
   $("#onboard").classList.remove("show");
   $("#tabbar").classList.remove("hidden");
-  $("#fab").classList.remove("hidden");
+  // Not an unconditional remove: go("home") below early-returns when home is
+  // already the current screen, so this is the last word on the button and
+  // would otherwise hand it back on the one screen that hides it.
+  $("#fab").classList.toggle("hidden", !NATIVE_RUN);
   go("home");
   setTimeout(() => {
-    toast(`${name} hatched! Go for a run to feed it.`, "good", "🥚");
+    toast(NATIVE_RUN ? `${name} hatched! Go for a run to feed it.`
+                     : `${name} hatched! Record a run in Strava to feed it.`, "good", "🥚");
     confetti(50);
   }, 420);
 }
@@ -6523,7 +6563,18 @@ function wire(){
     if (e.target === $("#sheet-wrap")) closeSheet();
   });
 
-  $("#fab").addEventListener("click", () => go("track"));
+  // The run button, and the notch in the tab bar that exists to make room for
+  // it. Both go together: a floating button over a gap reads as a missing
+  // control, and a gap with nothing over it reads as a bug.
+  if (NATIVE_RUN){
+    $("#fab").addEventListener("click", () => go("track"));
+  } else {
+    // The button is hidden by go(); this closes the notch in the tab bar that
+    // existed to make room for it. `display` rather than the hidden attribute,
+    // because .tab sets display:flex and would win against it.
+    const spacer = $(".tab.spacer");
+    if (spacer) spacer.style.display = "none";
+  }
   document.addEventListener("click", e => {
     const fj = e.target.closest("[data-form]");
     if (fj) demoJumpToForm(+fj.dataset.form);
