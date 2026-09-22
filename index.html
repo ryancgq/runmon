@@ -415,6 +415,10 @@ body::before{
   white-space:nowrap;
 }
 .mood-chip .pct{color:var(--accent)}
+/* Three segments do not fit a 320px phone on one line, so this is the one
+   chip allowed to wrap. Centred, so a two-line chip still reads as one thing. */
+.mood-chip{flex-wrap:wrap;justify-content:center;white-space:normal}
+.mood-chip .hit{color:var(--danger)}
 
 /* level ring */
 .lvl-badge{
@@ -2780,6 +2784,9 @@ const DEFAULT_SAVE = {
   // the day's allowance as the broker last reported it. The broker is the one
   // that counts; this is only what the Friends tab draws before it answers.
   attacks: { left: null, perDay: 2, at: 0 },
+  // when the pet was last told it had been attacked. Marks older than this
+  // have had their toast; anything newer has not.
+  marksSeenAt: 0,
 };
 
 let save = structuredCloneSafe(DEFAULT_SAVE);
@@ -3726,7 +3733,15 @@ function moodLine(){
   // streak has its own strip above and its own row in a run's summary; only the
   // total at the foot of that summary is ever the two combined.
   const m = derived.mood;
-  return `${m.emoji} ${m.label} <span class="pct">· ${m.xpPct}% XP</span>`;
+  // And what other players are taking, when they are taking anything. It
+  // belongs beside the mood because it is the same kind of fact - a multiplier
+  // on what the next run pays - and the mood chip is the only place on this
+  // screen that already says such a thing. Kept out of the mood's own figure
+  // for the reason above: they multiply, they are not the same number.
+  const pen = markPenalty(save.marks, Date.now());
+  const hit = pen > 0.005
+    ? ` <span class="hit">· \u2212${Math.round(pen * 100)}% battle</span>` : "";
+  return `${m.emoji} ${m.label} <span class="pct">· ${m.xpPct}% XP</span>${hit}`;
 }
 
 /* --- route drawing (used for summary + history thumbnails) --------------- */
@@ -6227,7 +6242,14 @@ async function stravaSync(opts){
        Guarded, because a run must still log if the broker is unreachable. The
        failure direction is the forgiving one: stale marks are usually fewer
        than current ones. */
+    const marksSeen = save.marksSeenAt || 0;
     try { await refreshMarks(); } catch (e){ /* an unpriced run beats no run */ }
+    // Anything that landed while they were away. The defender is never at the
+    // fight - their pet is played for them - so without this the first they
+    // hear of being attacked is a red row docking a run they have already
+    // finished. A penalty nobody announced reads as a bug rather than as
+    // something another player did.
+    const freshMarks = (save.marks || []).filter(m => (m.at || 0) > marksSeen);
 
     const imported = [], newIds = [];
     for (const a of (res.activities || [])){
@@ -6269,6 +6291,17 @@ async function stravaSync(opts){
       else pendingReplay = pendingReplay.concat(newIds);   // played on arrival
     }
     renderAll();
+    // Said whether or not the sync was asked for: a quiet background sync is
+    // exactly when this news arrives, and holding it back until they happen to
+    // pull to refresh would defeat the point.
+    if (freshMarks.length){
+      const pen = Math.round(markPenalty(save.marks, Date.now()) * 100);
+      const who = freshMarks.length === 1 ? "Someone attacked your pet"
+                                          : `${freshMarks.length} players attacked your pet`;
+      toast(`${who} \u2014 \u2212${pen}% XP for a day`, "bad", "\u2694\uFE0F");
+      save.marksSeenAt = Date.now();
+      persist();
+    }
     if (opts && opts.loud){
       if (imported.length){
         toast(`${imported.length} run${imported.length === 1 ? "" : "s"} from Strava`, "good", "\u{1F3C3}");
