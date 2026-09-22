@@ -2072,8 +2072,10 @@ const RAID_BOSS = {
   name: "Sir UwaaarghhhhUWAAGRRHH",
   short:"Sir Uwaaarghhhh",
   blurb:"Something enormous has come down off the hill, and it is holding a torch.",
-  /* Worn down in four stages, by the share of his health still left. Listed
-     high to low; the first row whose `from` he is still above is the one drawn. */
+  /* Worn down in four stages, changing at 100%, 75%, 50% and 25% of his health.
+     Listed high to low; the first row he is still at or above is the one drawn,
+     so the sheet changes as he falls BELOW each mark rather than on reaching
+     it - at exactly 75% he is still the first sheet. */
   phases: [
     { from:0.75, src:"art/boss-uwaaargh-0.png", note:"barely marked" },
     { from:0.50, src:"art/boss-uwaaargh-1.png", note:"bruised" },
@@ -2083,12 +2085,27 @@ const RAID_BOSS = {
   /* Square frames, 364px, twelve of them. Slow on purpose: he is a thing that
      looms rather than a pet that bustles. */
   sprite: { frames:12, rows:1, fps:1.6, aspect:1, scale:1, dx:0, dy:0 },
-  battle: { pow:420, def:300, spd:140 }
+  /* Defence is low for a creature this size, and deliberately. It does not
+     change how long anybody survives - that is entirely his power - it only
+     changes how much they take off him before they go. High defence squashed
+     everybody together: a level-1 pet did 2.1 and a level-5 did 3.4, two
+     numbers nobody could tell apart on a bar. At 90 the same pair read 5.0 and
+     7.8. The multiple between best and worst actually narrows; what widens is
+     the gap you can see.
+
+     hp is the pool for a raid at the levels this was tuned against, and the
+     broker is expected to scale it per raid from the roster - a field that has
+     levelled does an order of magnitude more damage than this one. At six
+     players running 30km a week it is about nine weeks at today's levels and
+     under three once they reach level 15, so call it four to six weeks with
+     levelling. Set high on purpose; it is easier to make him weaker later than
+     to explain why he died in a weekend. */
+  battle: { hp:2000, pow:420, def:90, spd:140 }
 };
 /** The sheet for a boss with `frac` of his health left (1 = untouched). */
 function bossPhase(frac){
   const f = Math.max(0, Math.min(1, Number(frac)));
-  for (const p of RAID_BOSS.phases) if (f > p.from) return p;
+  for (const p of RAID_BOSS.phases) if (f >= p.from) return p;
   return RAID_BOSS.phases[RAID_BOSS.phases.length - 1];
 }
 function bossSpriteCfg(frac){
