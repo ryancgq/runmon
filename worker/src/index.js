@@ -414,9 +414,25 @@ export default {
           if (!owner) return json(env, { error:"no such player" }, 404);
 
           const myHandle = (await hmac(env.SESSION_SECRET, "roster:" + me)).slice(0, 12);
+
+          /* Both pets' names travel with the row. A handle is an HMAC and means
+             nothing to a person, and the app cannot always translate one: it
+             knows the roster only after somebody has opened Friends, and the
+             one place this has to read well - the notice on opening the app -
+             is exactly where it may not have. The names are already public to
+             every player in the roster, so nothing new is being told. */
+          const r = await rosterStub(env).fetch("https://do/roster-list");
+          const { rows } = await r.json();
+          const nameOf = h => {
+            const row = (rows || []).find(x => x.handle === h);
+            return row && row.pet ? String(row.pet).slice(0, 24) : "";
+          };
+
           const at  = Date.now();
           const amt = markFor(chip, c.gap, win);
-          const row = { at, amt, by: myHandle, chip, win, seed, gap: c.gap, v: MARK_VERSION };
+          const row = { at, amt, by: myHandle, byName: nameOf(myHandle),
+                        toName: nameOf(c.target), chip, win, seed,
+                        gap: c.gap, v: MARK_VERSION };
           await (await athleteStub(env, owner)).fetch("https://do/mark-add", {
             method:"POST", body: JSON.stringify(row) });
           await stub.fetch("https://do/log-add", { method:"POST",
