@@ -887,6 +887,29 @@ body::before{
 .atk-bar .t .h{font-size:11.5px;color:var(--muted);font-weight:700;margin-top:3px;line-height:1.45}
 .atk-bar .t .h.marked{color:var(--danger)}
 
+/* Notices. Above the pet because that is the first thing looked at, and each
+   one keeps its own dismiss - crossing one out must not take the others with
+   it, since they are usually about unrelated things. */
+.notices{display:flex;flex-direction:column;gap:8px;margin:2px 0 4px}
+.notice{
+  display:flex;align-items:flex-start;gap:10px;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);
+  padding:11px 12px;
+}
+.notice.raid{border-color:rgba(255,92,122,.34);background:rgba(255,92,122,.07)}
+.notice.hit{border-color:rgba(255,92,122,.26)}
+.notice .em{flex:0 0 auto;font-size:16px;line-height:1.2}
+.notice .t{flex:1;min-width:0}
+.notice .t .n{font-size:13px;font-weight:800;color:#dbe1ef}
+.notice .t .h{font-size:11.5px;font-weight:700;color:var(--muted);margin-top:3px;line-height:1.5}
+.notice .t .w{font-size:10.5px;font-weight:700;color:var(--muted);opacity:.7;margin-top:4px}
+.notice .x{
+  flex:0 0 auto;width:26px;height:26px;border-radius:50%;
+  display:grid;place-items:center;color:var(--muted);
+  background:transparent;border:0;font-size:15px;line-height:1;
+}
+.notice .x:active{transform:scale(.9)}
+
 /* The battle log. Lighter than a friend row on purpose - it is a record, not
    somewhere to tap - so no card, just a rule between entries. */
 .bt-log-row{
@@ -1179,6 +1202,8 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.5.68.86 1.22.98H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </button>
       </div>
+
+      <div class="notices" id="notices" hidden></div>
 
       <div class="streak-strip" id="streak-strip" hidden></div>
 
@@ -2089,19 +2114,51 @@ const RAID_BOSS = {
      change how long anybody survives - that is entirely his power - it only
      changes how much they take off him before they go. High defence squashed
      everybody together: a level-1 pet did 2.1 and a level-5 did 3.4, two
-     numbers nobody could tell apart on a bar. At 90 the same pair read 5.0 and
-     7.8. The multiple between best and worst actually narrows; what widens is
-     the gap you can see.
+     numbers nobody could tell apart on a bar. At 25 the same pair read 8.8 and
+     12.7. The multiple between best and worst actually narrows; what widens is
+     the gap you can see, and by 25 the returns have nearly run out - dropping
+     it further to 8 buys only another 23%.
 
      hp is the pool for a raid at the levels this was tuned against, and the
      broker is expected to scale it per raid from the roster - a field that has
      levelled does an order of magnitude more damage than this one. At six
-     players running 30km a week it is about nine weeks at today's levels and
-     under three once they reach level 15, so call it four to six weeks with
+     players running 30km a week it is about five weeks at today's levels and
+     well under two once they reach level 15, so call it four weeks with
      levelling. Set high on purpose; it is easier to make him weaker later than
      to explain why he died in a weekend. */
-  battle: { hp:2000, pow:420, def:90, spd:140 }
+  battle: { hp:2000, pow:420, def:25, spd:140 }
 };
+/* One attempt for every 5 km run, banked - a 15 km long run is three swings at
+   him. Attempts are the only thing a raid spends, and running is the only thing
+   that makes them, which is the whole reason the raid is attached to this game
+   rather than to some button. */
+const KM_PER_ATTEMPT = 5;
+const attemptsForKm = km => Math.floor(Math.max(0, km) / KM_PER_ATTEMPT);
+
+/* What the raid says as he comes apart, keyed to the same marks his artwork
+   changes on. Said on the battle screen by whoever lands the blow that crosses
+   one, and kept afterwards as a notice on everybody's home screen - a thing
+   the whole raid did is worth more than a line one person saw once. */
+const RAID_MILESTONES = [
+  { at:0.75, title:"First blood",
+    line:"Sir Uwaaarghhhh staggers. The moss on his shoulder has been knocked loose.",
+    note:"The raid has taken him below three quarters. He has started to bleed." },
+  { at:0.50, title:"Halfway",
+    line:"He is breathing hard now, and the torch dips. Half of him is gone.",
+    note:"Sir Uwaaarghhhh is down to half. Keep running." },
+  { at:0.25, title:"On his last legs",
+    line:"He drops to one knee. The roar is not what it was.",
+    note:"A quarter left. He is nearly finished \u2014 do not let him rest." },
+  { at:0.00, title:"Felled",
+    line:"Sir UwaaarghhhhUWAAGRRHH goes down, and the hill is quiet.",
+    note:"He is down. Everyone who landed a blow gets the badge." }
+];
+/* Which marks a hit crossed, going from `before` to `after` health. Returns
+   them high to low, because one very large hit can cross more than one. */
+function raidCrossed(before, after){
+  return RAID_MILESTONES.filter(m => before > m.at && after <= m.at);
+}
+
 /** The sheet for a boss with `frac` of his health left (1 = untouched). */
 function bossPhase(frac){
   const f = Math.max(0, Math.min(1, Number(frac)));
@@ -2880,8 +2937,15 @@ const DEFAULT_SAVE = {
   // that counts; this is only what the Friends tab draws before it answers.
   attacks: { left: null, perDay: 2, at: 0 },
   // when the pet was last told it had been attacked. Marks older than this
-  // have had their toast; anything newer has not.
+  // have had their notice; anything newer has not.
   marksSeenAt: 0,
+  // [{ id, kind, title, body, at }] - things that happened while you were away
+  // and are still worth knowing. They sit on the home screen until dismissed.
+  notices: [],
+  // ids already crossed out. Kept because most notices are worked out afresh
+  // from state rather than delivered once - without this, dismissing the one
+  // about being attacked would simply mint it again on the next sync.
+  noticesGone: [],
 };
 
 let save = structuredCloneSafe(DEFAULT_SAVE);
@@ -4300,6 +4364,26 @@ function renderStreakStrip(){
 }
 
 /* --- home ---------------------------------------------------------------- */
+const NOTICE_ICON = { raid:"\u2694\uFE0F", hit:"\u{1F6E1}\uFE0F", info:"\u2728" };
+
+function renderNotices(){
+  const el = $("#notices");
+  if (!el) return;
+  const list = (save.notices || []).slice().sort((a, b) => b.at - a.at);
+  el.hidden = !list.length;
+  if (!list.length){ el.innerHTML = ""; return; }
+  el.innerHTML = list.map(n => `
+    <div class="notice ${esc(n.kind)}">
+      <span class="em">${NOTICE_ICON[n.kind] || NOTICE_ICON.info}</span>
+      <div class="t">
+        <div class="n">${esc(n.title)}</div>
+        ${n.body ? `<div class="h">${esc(n.body)}</div>` : ""}
+        <div class="w">${agoShort(n.at)}</div>
+      </div>
+      <button class="x" data-notice="${esc(n.id)}" aria-label="Dismiss">\u2715</button>
+    </div>`).join("");
+}
+
 function renderHome(){
   const d = derived, sp = d.species;
   const shown = previewPet || { id: sp.id, stage: d.stage, mood: d.mood.key };
@@ -4576,6 +4660,7 @@ function renderEvolve(){
 function renderAll(){
   recompute();
   applyTheme(save.species);
+  renderNotices();
   renderHome();
   renderHistory();
   renderEvolve();
@@ -5395,6 +5480,42 @@ async function refreshPlayers(){
     .filter(p => p.id && p.card);
   save.roster = rows;
   persist();
+}
+
+/* ---------------------------------------------------------------------------
+   Notices.
+
+   A toast says a thing once and takes it away again, which is the wrong shape
+   for news that arrived while nobody was looking: somebody opens the app, a
+   line about being attacked slides past during the hatch animation, and that is
+   the only time it is ever said. These stay on the home screen until they are
+   crossed out.
+
+   Every notice needs a stable id, because they are re-derived rather than
+   delivered - the attack notice is worked out from the marks on the pet every
+   time a sync runs. The id is what stops a second sync minting a duplicate,
+   and `noticesGone` is what stops a dismissed one coming straight back.
+   ------------------------------------------------------------------------- */
+const NOTICE_MAX = 12;
+const NOTICE_GONE_MAX = 80;
+
+function noticeAdd(n){
+  if (!n || !n.id) return false;
+  const gone = save.noticesGone || (save.noticesGone = []);
+  const list = save.notices    || (save.notices    = []);
+  if (gone.indexOf(n.id) >= 0 || list.some(x => x.id === n.id)) return false;
+  list.push({ id:String(n.id), kind:n.kind || "info", title:String(n.title || ""),
+              body:String(n.body || ""), at:Number(n.at) || Date.now() });
+  if (list.length > NOTICE_MAX) list.splice(0, list.length - NOTICE_MAX);
+  return true;
+}
+function noticeDismiss(id){
+  const gone = save.noticesGone || (save.noticesGone = []);
+  save.notices = (save.notices || []).filter(n => n.id !== id);
+  if (gone.indexOf(id) < 0) gone.push(id);
+  if (gone.length > NOTICE_GONE_MAX) gone.splice(0, gone.length - NOTICE_GONE_MAX);
+  persist();
+  renderNotices();
 }
 
 /* Who a handle belongs to. The broker sends the pet's name alongside it now,
@@ -6591,6 +6712,15 @@ async function stravaSync(opts){
                 :                           "Someone";
       toast(`${esc(who)} attacked your pet \u2014 \u2212${pen}% XP for a day`,
             "bad", "\u2694\uFE0F");
+      /* And the durable half. The toast is for whoever happens to be looking;
+         this is for whoever was not. Keyed to the newest mark in the batch, so
+         a second sync over the same attacks cannot mint it twice. */
+      const newest = freshMarks.reduce((hi, m) => Math.max(hi, m.at || 0), 0);
+      noticeAdd({ id:"hit:" + newest, kind:"hit",
+                  title:`${who} attacked your pet`,
+                  body:`\u2212${pen}% XP while the marks last. They fade over a day.`,
+                  at:newest || Date.now() });
+      renderNotices();
       // Stamped from the marks themselves, not from this device's clock. `at`
       // is the broker's time; Date.now() is the phone's, and a phone running
       // even slightly fast would set a watermark no later mark could beat -
@@ -6666,6 +6796,11 @@ function stravaSchedulePush(){
 function wire(){
   // navigation
   document.addEventListener("click", e => {
+    // before the nav check: a notice can sit inside something navigable, and
+    // crossing one out must not also take you somewhere.
+    const x = e.target.closest("[data-notice]");
+    if (x){ e.stopPropagation(); noticeDismiss(x.dataset.notice); return; }
+
     const nav = e.target.closest("[data-nav]");
     if (nav){ go(nav.dataset.nav); return; }
 
