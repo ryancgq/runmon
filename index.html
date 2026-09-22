@@ -2051,6 +2051,50 @@ const EGG_PHASES = {
     { from:4, src:"art/verdant-egg-breaking.png" }
   ]
 };
+/* ---------------------------------------------------------------------------
+   The raid boss.
+
+   Not a species at a level: he is built by hand, because nothing about him fits
+   the pet ladder. His art changes with how much health the raid has taken off
+   him - four sheets, the same trick the Cinder Egg uses inside its own stage -
+   and all four were packed against one shared window across all 48 frames, so
+   swapping sheets mid-raid cannot make him jump.
+
+   He hits hard enough to delete a low-level pet in a single blow. That was
+   asked for knowingly: it costs about three quarters of everybody's damage,
+   because what you contribute is almost entirely how long you survive, and it
+   makes a level-1 attempt a second and a half long. The pool is sized around
+   it rather than against it - see the worker - and the bar is drawn as a
+   percentage so the small numbers behind it never show.
+   ------------------------------------------------------------------------- */
+const RAID_BOSS = {
+  id:   "uwaaargh",
+  name: "Sir UwaaarghhhhUWAAGRRHH",
+  short:"Sir Uwaaarghhhh",
+  blurb:"Something enormous has come down off the hill, and it is holding a torch.",
+  /* Worn down in four stages, by the share of his health still left. Listed
+     high to low; the first row whose `from` he is still above is the one drawn. */
+  phases: [
+    { from:0.75, src:"art/boss-uwaaargh-0.png", note:"barely marked" },
+    { from:0.50, src:"art/boss-uwaaargh-1.png", note:"bruised" },
+    { from:0.25, src:"art/boss-uwaaargh-2.png", note:"battered" },
+    { from:0.00, src:"art/boss-uwaaargh-3.png", note:"on his last legs" }
+  ],
+  /* Square frames, 364px, twelve of them. Slow on purpose: he is a thing that
+     looms rather than a pet that bustles. */
+  sprite: { frames:12, rows:1, fps:1.6, aspect:1, scale:1, dx:0, dy:0 },
+  battle: { pow:420, def:300, spd:140 }
+};
+/** The sheet for a boss with `frac` of his health left (1 = untouched). */
+function bossPhase(frac){
+  const f = Math.max(0, Math.min(1, Number(frac)));
+  for (const p of RAID_BOSS.phases) if (f > p.from) return p;
+  return RAID_BOSS.phases[RAID_BOSS.phases.length - 1];
+}
+function bossSpriteCfg(frac){
+  return Object.assign({}, RAID_BOSS.sprite, { src: bossPhase(frac).src });
+}
+
 function eggPhaseSrc(species, level){
   const phases = EGG_PHASES[species];
   if (!phases) return null;
