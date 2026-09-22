@@ -3534,13 +3534,20 @@ const DEFAULT_SPRITES = {
    back. */
 let previewPet = null;
 
-function spriteConfig(species, stage){
+/* `level` is whose pet this is, and it is only ever passed for somebody else's.
+   Without it this falls back to your own level, which is right for your pet and
+   wrong for everybody else's: a friend's egg was drawn at the phase YOUR level
+   had reached, so a level-4 friend showed an intact egg to a level-1 viewer and
+   the same friend showed a breaking one to a level-4 viewer. Same pet, two
+   drawings, neither of them theirs. */
+function spriteConfig(species, stage, level){
   const key = spriteKey(species, stage);
   const cfg = DEFAULT_SPRITES[key] || null;
   // the egg is the one shipped sheet that changes inside its own stage
   if (cfg && stage === 0 && EGG_PHASES[species]){
     const now = (typeof derived === "object" && derived) ? derived.level : 1;
-    const lv = (previewPet && previewPet.level != null) ? previewPet.level
+    const lv = level != null ? level
+             : (previewPet && previewPet.level != null) ? previewPet.level
              : pendingLevelUp ? pendingLevelFrom : now;
     return { ...cfg, src: eggPhaseSrc(species, lv) };
   }
@@ -3585,8 +3592,8 @@ function probeSprite(src){
   img.src = assetURL(src);
 }
 
-function spriteMarkup(species, stage, mood){
-  const cfg = spriteConfig(species, stage);
+function spriteMarkup(species, stage, mood, level){
+  const cfg = spriteConfig(species, stage, level);
   if (!cfg || !cfg.src) return null;
   if (spriteBroken[cfg.src]) return null;
   probeSprite(cfg.src);
@@ -3670,8 +3677,8 @@ function spriteHTML(cfg, mood, once){
 }
 
 /** Full pet markup for a species + stage, honouring any registered sprite. */
-function petMarkup(speciesId, stage, mood){
-  const sp = spriteMarkup(speciesId, stage, mood);
+function petMarkup(speciesId, stage, mood, level){
+  const sp = spriteMarkup(speciesId, stage, mood, level);
   if (sp) return sp;
   const art = (PET_ART[speciesId] || PET_ART.ember)[Math.max(0, Math.min(4, stage))];
   return `<svg viewBox="0 0 200 200" class="mood-${mood}" role="img" aria-label="${SPECIES[speciesId].stages[stage].name}">
@@ -3679,10 +3686,10 @@ function petMarkup(speciesId, stage, mood){
   </svg>`;
 }
 /** Paint a pet into a `.pet-holder` element. */
-function paintPet(el, speciesId, stage, mood){
+function paintPet(el, speciesId, stage, mood, level){
   if (!el) return;
   el.className = el.className.replace(/\bmood-\w+\b/g, "").trim() + " mood-" + mood;
-  el.innerHTML = petMarkup(speciesId, stage, mood);
+  el.innerHTML = petMarkup(speciesId, stage, mood, level);
 }
 </script>
 
@@ -5444,7 +5451,7 @@ function renderFriends(){
   for (const f of list){
     if (!f.card) continue;
     const el = body.querySelector(`[data-friend-art="${f.id}"]`);
-    if (el) paintPet(el, f.card.species, f.card.stage, "okay");
+    if (el) paintPet(el, f.card.species, f.card.stage, "okay", f.card.level);
   }
 }
 
@@ -5500,7 +5507,7 @@ function openFriend(id){
       </div>
       ${attackNote(c)}`
       : `<p class="desc">No pet on this code yet.</p>`,
-    onOpen: () => { if (c) paintPet($("#friend-big"), c.species, c.stage, "okay"); },
+    onOpen: () => { if (c) paintPet($("#friend-big"), c.species, c.stage, "okay", c.level); },
     actions: c && save.species && stravaLinked()
       ? [{ label:"Attack", cls:"primary", fn: () => attackFriend(id, c) },
          { label:"Done", cls:"ghost", fn: closeSheet }]
@@ -5887,8 +5894,8 @@ function startBattle(you, foe, opts){
   btShown = { a: battle.a.cur, b: battle.b.cur, turn: battle.no };
   $("#bt-end").hidden = true;
   go("battle");
-  paintPet($("#bt-you-pet"), you.species, stageForLevel(you.level), "okay");
-  paintPet($("#bt-foe-pet"), foe.species, stageForLevel(foe.level), "okay");
+  paintPet($("#bt-you-pet"), you.species, stageForLevel(you.level), "okay", you.level);
+  paintPet($("#bt-foe-pet"), foe.species, stageForLevel(foe.level), "okay", foe.level);
   $("#bt-you-nm").textContent = you.name;
   $("#bt-foe-nm").textContent = foe.name;
   $("#bt-you-lv").textContent = `Lv ${you.level} · ${SPECIES[you.species].stages[stageForLevel(you.level)].name}`;
@@ -5970,7 +5977,7 @@ function btRun(moveId){
     // The pet goes back to its idle, then the damage lands.
     if (sk && sk.sprite){
       const who = side === "a" ? battle.you : battle.foe;
-      paintPet($(`#bt-${actor}-pet`), who.species, stageForLevel(who.level), "okay");
+      paintPet($(`#bt-${actor}-pet`), who.species, stageForLevel(who.level), "okay", who.level);
     }
     if (ev.dmg) btLand(target, ev.dmg, false);
     if (ev.self) btLand(actor, ev.self, false);
