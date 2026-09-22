@@ -854,6 +854,27 @@ body::before{
 .friend .who .s{font-size:11px;color:var(--muted);font-weight:700;margin-top:5px;letter-spacing:.2px}
 .friend .go{color:var(--muted);flex:0 0 auto}
 .friend .go svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+/* The day's attacks. It sits above the list because it is the thing that
+   decides what you do on this screen: two is few enough that which pet you
+   spend them on is the whole decision, and a number buried in a sheet would
+   be found only after one was already gone. Pips rather than just a digit -
+   "one left of two" reads at a glance in a way that "1" does not. */
+.atk-bar{
+  display:flex;align-items:center;gap:12px;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);
+  padding:13px 15px;margin:2px 0 14px;
+}
+.atk-bar.spent{opacity:.66}
+.atk-bar .pips{display:flex;gap:6px;flex:0 0 auto}
+.atk-bar .pip{
+  width:15px;height:15px;border-radius:50%;
+  background:var(--accent);box-shadow:0 0 0 3px rgba(var(--glow),.16);
+}
+.atk-bar .pip.used{background:transparent;border:2px solid var(--line);box-shadow:none}
+.atk-bar .t{flex:1;min-width:0}
+.atk-bar .t .n{font-size:14.5px;font-weight:800}
+.atk-bar .t .h{font-size:11.5px;color:var(--muted);font-weight:700;margin-top:3px;line-height:1.45}
+.atk-bar .t .h.marked{color:var(--danger)}
 .code-box{
   display:flex;align-items:center;justify-content:center;gap:10px;
   font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
@@ -2756,6 +2777,9 @@ const DEFAULT_SAVE = {
   // [{ at, dir, who, chip, win, amt }] - the fights you were in, yours and
   // theirs, newest last. `dir` is "out" when you attacked.
   battles: [],
+  // the day's allowance as the broker last reported it. The broker is the one
+  // that counts; this is only what the Friends tab draws before it answers.
+  attacks: { left: null, perDay: 2, at: 0 },
 };
 
 let save = structuredCloneSafe(DEFAULT_SAVE);
@@ -5210,6 +5234,11 @@ async function refreshMarks(){
     .map(m => ({ at: Number(m.at) || 0, amt: Number(m.amt) || 0, by: String(m.by || "").slice(0, 24) }))
     .filter(m => m.at > 0 && m.amt > 0);
   save.battles = (r.battles || []).slice(-50);
+  save.attacks = {
+    left:   Number.isFinite(r.attacksLeft) ? r.attacksLeft : null,
+    perDay: Number(r.attacksPerDay) || 2,
+    at:     Date.now()
+  };
   persist();
 }
 
@@ -5314,6 +5343,37 @@ function shortAgo(ts){
 const esc = t => String(t == null ? "" : t)
   .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 
+/* The day's attacks, and what is currently being done to you. Both halves of
+   the same state: what you can spend, and what it has cost you. The second
+   line only appears when there is something to say, so a quiet day is one
+   line and not an apology for an empty number. */
+function attackBarHTML(){
+  const a    = save.attacks || {};
+  const per  = a.perDay || 2;
+  const left = Number.isFinite(a.left) ? Math.max(0, Math.min(per, a.left)) : null;
+  const pips = Array.from({ length: per },
+    (_, i) => `<span class="pip${left != null && i >= left ? " used" : ""}"></span>`).join("");
+
+  const head = left == null ? `Attacks today`
+             : left === 0   ? `No attacks left today`
+             : `${left} attack${left === 1 ? "" : "s"} left today`;
+
+  const pen = markPenalty(save.marks, Date.now());
+  const marked = pen > 0.005
+    ? `<div class="h marked">You are carrying \u2212${Math.round(pen * 100)}% XP from
+       ${(save.marks || []).length} attack${(save.marks || []).length === 1 ? "" : "s"} on your pet.</div>`
+    : "";
+
+  const note = left === 0
+    ? `They come back tomorrow. Nobody can be attacked twice in a day by the same player.`
+    : `Attacking somebody above you is what counts \u2014 the further up, the more it costs them.`;
+
+  return `<div class="atk-bar${left === 0 ? " spent" : ""}">
+    <div class="pips">${pips}</div>
+    <div class="t"><div class="n">${head}</div><div class="h">${note}</div>${marked}</div>
+  </div>`;
+}
+
 function renderFriends(){
   const body = $("#friends-body"), sub = $("#friends-sub");
   if (!body) return;
@@ -5342,6 +5402,7 @@ function renderFriends(){
     : "See how everyone's pet is doing";
 
   body.innerHTML = `
+    ${attackBarHTML()}
     <div class="section-title">Everyone playing</div>
     ${list.length ? list.map(friendRowHTML).join("") : `
       <div class="empty-state" style="padding:30px 18px">
@@ -5428,7 +5489,7 @@ function attackNote(c){
             : gap >= -1  ? "You are evenly matched, so a mark either way is a scratch."
             :              "They are below you. Nothing stops you, but the mark would be worth almost nothing.";
   return `<p class="muted" style="font-size:11px;font-weight:700;text-align:center;margin:14px 0 0">
-    ${how}<br><span style="opacity:.7">Worth about ${Math.round(worth * 100)}% of a full mark \u00b7 three attacks a day, one each</span></p>`;
+    ${how}<br><span style="opacity:.7">Worth about ${Math.round(worth * 100)}% of a full mark \u00b7 one attack each per day</span></p>`;
 }
 
 /* Claim the fight, then play it. The broker picks the seed and spends the
@@ -5438,6 +5499,10 @@ async function attackFriend(id, c){
   try {
     const r = await stravaCall("/battle/start", { method:"POST",
       body: JSON.stringify({ target: id }) });
+    // The claim is the moment it is spent, so record it now rather than
+    // waiting for the next refresh to notice.
+    if (Number.isFinite(r.left))
+      save.attacks = { left: r.left, perDay: (save.attacks || {}).perDay || 2, at: Date.now() };
     closeSheet();
     startBattle(
       { species: save.species, level: derived.level, name: save.petName || "Your pet" },
@@ -5955,10 +6020,14 @@ async function btReport(b){
 }
 
 function leaveBattle(){
+  // A real attack was launched from Friends, so Friends is where it ends -
+  // and the allowance bar there is a pip shorter than it was, which is the
+  // clearest possible statement of what the fight just cost.
+  const wasStaked = !!(battle && battle.stake);
   btClear();
   battle = null; btLock = false;
   $("#bt-end").hidden = true;
-  go("home");
+  go(wasStaked ? "friends" : "home");
 }
 
 /** Show what the tester is previewing, since the name under the pet is still yours. */

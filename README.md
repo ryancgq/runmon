@@ -1036,7 +1036,7 @@ mark   = 0.10 × chip × gapMul × (win ? 1.4 : 1)
 
 Marks from **distinct** attackers stack, cap at **−30%**, and each fades over
 its own 24 hours so a pile-on drains away through the following day rather than
-ending at a stroke. Three attacks a day, and never the same target twice.
+ending at a stroke. Two attacks a day, and never the same target twice.
 
 `gapMul` is the whole design in one curve. It pays for punching up and it does
 not pay for punching down, so nothing forbids attacking somebody below you — it
