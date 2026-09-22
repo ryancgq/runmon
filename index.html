@@ -682,6 +682,15 @@ body::before{
    holder - so the slot is inset from the screen edge by more than that
    overhang, or a Panda loses a paw to the bezel. */
 .bt-slot{position:relative;width:126px;height:126px;flex:0 0 126px;margin:0 6px}
+/* A raid is not a duel, so it is not laid out like one: he sits in the middle
+   at nearly twice the size, with his name and health above him rather than
+   beside him. A pet on one side and a thing that large on the other read as a
+   mistake. */
+.bt-row.boss{flex-direction:column;gap:6px}
+.bt-row.boss .bt-meta{width:100%;text-align:center}
+.bt-row.boss .bt-nm{justify-content:center}
+.bt-row.boss .bt-hpn{text-align:center}
+.bt-row.boss .bt-slot{width:216px;height:216px;flex:0 0 216px;margin:0}
 .bt-slot .pet-holder{width:100%;height:100%}
 .bt-slot.hit{animation:btHit .34s var(--ease)}
 @keyframes btHit{0%,100%{transform:translateX(0)}25%{transform:translateX(-7px)}
@@ -2683,6 +2692,26 @@ function btSide(speciesId, level, name){
     // does. Skills with no `battle` block are not fightable at all.
     kit: skillsFor(speciesId).filter(k =>
       k.battle && level >= k.level && stageForLevel(level) === k.stage)
+  };
+}
+
+/* Side b, when side b is not a pet. btSide() reads a species and a level off
+   the pet ladder and the boss has neither, so his side is assembled here and
+   dropped in after newBattle() has made an ordinary fight. Everything the
+   engine touches - pow, def, spd, cur, max, kit - has the same shape it would
+   for a pet, so btAct() cannot tell the difference and none of it needed
+   changing. `boss` is only for the screen, which does need to know. */
+function btBossSide(hpLeft){
+  const b = RAID_BOSS.battle;
+  const max = b.hp, cur = Math.max(0, Math.min(max, hpLeft == null ? max : hpLeft));
+  return {
+    name: RAID_BOSS.short, speciesId: null, level: 0, stage: 0,
+    pow: b.pow, def: b.def, spd: b.spd, max, cur,
+    powMul:1, spdMul:1, defMul:1,
+    stoke:null, burn:null, open:0, openPct:0, exposed:0,
+    charges:0, softens:0, gcd:0, cds:{}, used:{},
+    kit: RAID_BOSS.kit.slice(),
+    boss: true
   };
 }
 
@@ -6237,6 +6266,20 @@ function openAnimationTester(){
       animTestChip("fight", `Mirror ${dl > 0 ? "+" : ""}${dl}`, `data-dl="${dl}"`))
   ].join("");
 
+  /* The raid, before there is a raid. Every clip he has, and a real fight
+     against him at whatever health you want to see - which is the only way to
+     watch his artwork change, since the sheet is chosen from what is left. */
+  const raidChips = [
+    ...RAID_BOSS.phases.map((ph, i) =>
+      animTestChip("bossidle", `${["100%","75%","50%","25%"][i]} \u00b7 ${ph.note}`,
+                   `data-frac="${[1, 0.74, 0.49, 0.24][i]}"`)),
+    ...RAID_BOSS.kit.map(k =>
+      animTestChip("bossskill", `<span class="em">${k.ico}</span>${k.name}`, `data-sk="${k.id}"`)),
+    ...[[1,"Fight him, full health"], [0.5,"Fight him at 50%"], [0.02,"Fight him, nearly dead"]].map(
+      ([f, label]) => animTestChip("bossfight", `<span class="em">\u2694\uFE0F</span>${label}`,
+                                   `data-frac="${f}"`))
+  ].join("");
+
   openSheet({
     bare: true,
     title: "Test animations",
@@ -6249,6 +6292,7 @@ function openAnimationTester(){
       <div class="fj-label">Level-up celebrations</div><div class="anim-chips">${celebs}</div>
       <div class="fj-label">Level-up with no crack to show</div><div class="anim-chips">${wobbles}</div>
       <div class="fj-label">Battle \u2014 your pet against</div><div class="anim-chips">${fights}</div>
+      <div class="fj-label">Raid boss</div><div class="anim-chips">${raidChips}</div>
       <div class="fj-label">On their own</div><div class="anim-chips">
         ${animTestChip("confetti", `<span class="em">\u{1F389}</span>Confetti`, "")}
         ${animTestChip("caption", `<span class="em">\u2728</span>Level Up! caption`, "")}
@@ -6299,6 +6343,18 @@ function startBattle(you, foe, opts){
   btClear();
   battle = newBattle(you, foe,
     (o.seed != null ? o.seed : Math.random() * 0xFFFFFFFF) >>> 0);
+  /* A raid replaces the whole of side b. It is done after newBattle() rather
+     than inside it so the seeded rng, the initiative roll and everything else
+     stay exactly as they are for an ordinary fight. */
+  if (o.boss){
+    battle.b = btBossSide(o.hpLeft);
+    battle.boss = true;
+    battle.hpAtStart = battle.b.cur;
+    // He is faster than most pets, so re-roll who moves first against his
+    // speed rather than against the pet that was standing in for him.
+    const sa = battle.a.spd, sb = battle.b.spd;
+    battle.turn = battle.rng() < 0.5 + BT.TILT * (sa - sb) / (sa + sb) ? "a" : "b";
+  }
   battle.stake = o.stake || null;
   battle.you = you; battle.foe = foe;
   btLock = false;
@@ -6306,12 +6362,22 @@ function startBattle(you, foe, opts){
   $("#bt-end").hidden = true;
   go("battle");
   paintPet($("#bt-you-pet"), you.species, stageForLevel(you.level), "okay", you.level);
-  paintPet($("#bt-foe-pet"), foe.species, stageForLevel(foe.level), "okay", foe.level);
   $("#bt-you-nm").textContent = you.name;
-  $("#bt-foe-nm").textContent = foe.name;
   $("#bt-you-lv").textContent = `Lv ${you.level} · ${SPECIES[you.species].stages[stageForLevel(you.level)].name}`;
-  $("#bt-foe-lv").textContent = `Lv ${foe.level} · ${SPECIES[foe.species].stages[stageForLevel(foe.level)].name}`;
-  btSay(battle.turn === "a" ? `${you.name} moves first.` : `${foe.name} is quicker off the mark.`);
+
+  $(".bt-row.foe").classList.toggle("boss", !!battle.boss);
+  if (battle.boss){
+    btBossPhaseSrc = null;                 // force the first paint
+    btPaintBoss();
+    $("#bt-foe-nm").textContent = RAID_BOSS.name;
+    $("#bt-foe-lv").textContent = bossPhase(battle.b.cur / battle.b.max).note;
+  } else {
+    paintPet($("#bt-foe-pet"), foe.species, stageForLevel(foe.level), "okay", foe.level);
+    $("#bt-foe-nm").textContent = foe.name;
+    $("#bt-foe-lv").textContent = `Lv ${foe.level} · ${SPECIES[foe.species].stages[stageForLevel(foe.level)].name}`;
+  }
+  const foeName = battle.boss ? RAID_BOSS.short : foe.name;
+  btSay(battle.turn === "a" ? `${esc(you.name)} moves first.` : `${esc(foeName)} is quicker off the mark.`);
   renderBattle();
   if (battle.turn === "b") btWait(btFoeTurn, 900);
 }
@@ -6329,14 +6395,44 @@ function btBars(){
     bar.style.width = (pct * 100).toFixed(1) + "%";
     bar.classList.toggle("mid", pct <= 0.5 && pct > 0.22);
     bar.classList.toggle("low", pct <= 0.22);
-    $(`#bt-${id}-hpn`).textContent = `${cur} / ${max}`;
+    /* His pool is a raid's worth rather than a pet's, and the raw figure says
+       nothing useful - 3,914 of 4,000 is not a sentence anybody reads. A
+       percentage is, and it keeps the number small enough to stay honest
+       however big the pool gets. */
+    $(`#bt-${id}-hpn`).textContent = (battle.boss && key === "b")
+      ? `${(pct * 100).toFixed(1)}%`
+      : `${cur} / ${max}`;
   }
+  // his artwork changes as the raid wears him down, mid-fight included
+  if (battle.boss) btPaintBoss();
   $("#bt-turn").textContent = `Turn ${btShown.turn + 1}`;
 }
+/* His sheet is chosen from what is LEFT, so a blow that takes him past a mark
+   changes the drawing in the same beat the bar moves. */
+let btBossPhaseSrc = null;
+function btPaintBoss(){
+  const frac = Math.max(0, btShown.b) / battle.b.max;
+  const cfg = bossSpriteCfg(frac);
+  if (cfg.src === btBossPhaseSrc) return;     // only redraw when the sheet changes
+  btBossPhaseSrc = cfg.src;
+  $("#bt-foe-pet").innerHTML = spriteHTML(cfg, "okay");
+}
+
 /** The blow has landed: catch the bars up with what the engine already knows. */
 function btCatchUp(){
+  const before = battle.boss ? btShown.b / battle.b.max : 1;
   btShown = { a: battle.a.cur, b: battle.b.cur, turn: battle.no };
   btBars();
+  if (!battle.boss) return;
+  /* Said the moment the bar crosses, over whatever the fight was saying. One
+     blow can cross more than one mark, so the deepest is the one that gets
+     the line - "he drops to one knee" reads oddly after "he staggers". */
+  const crossed = raidCrossed(before, Math.max(0, battle.b.cur) / battle.b.max);
+  if (!crossed.length) return;
+  const m = crossed[crossed.length - 1];
+  btSay(`<b>${esc(m.title)}.</b> ${esc(m.line)}`);
+  $("#bt-foe-lv").textContent = bossPhase(Math.max(0, battle.b.cur) / battle.b.max).note;
+  battle.crossed = (battle.crossed || []).concat(crossed.map(x => x.at));
 }
 
 /* The move buttons. A move on cooldown stays on screen with its count rather
@@ -6495,6 +6591,27 @@ function playAnimTest(d, root){
   switch (d.anim){
     // A battle takes the whole screen, so it closes the tester on its way out
     // rather than leaving a sheet open behind it.
+    case "bossidle": {
+      previewPet = null;
+      $("#home-pet").innerHTML = spriteHTML(bossSpriteCfg(+d.frac), "okay");
+      animTestNote(`${RAID_BOSS.short} \u00b7 ${bossPhase(+d.frac).note}`);
+      return;
+    }
+    case "bossskill": {
+      previewPet = null;
+      const k = RAID_BOSS.kit.find(x => x.id === d.sk);
+      if (k){ $("#home-pet").innerHTML = spriteHTML(k.sprite, "okay"); animTestNote(k.name); }
+      return;
+    }
+    case "bossfight": {
+      closeSheet();
+      previewPet = null;
+      startBattle({ species: save.species, level: derived.level,
+                    name: save.petName || derived.species.name },
+                  { species: save.species, level: derived.level, name: RAID_BOSS.short },
+                  { boss:true, hpLeft: Math.round(RAID_BOSS.battle.hp * (+d.frac || 1)) });
+      return;
+    }
     case "fight": {
       closeSheet();
       previewPet = null;
