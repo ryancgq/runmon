@@ -2169,12 +2169,15 @@ const RAID_BOSS = {
      broker is expected to scale it per raid from the roster - a field that has
      levelled does an order of magnitude more damage than this one. At six
      players running 30km a week it is about four weeks at today's levels. It
-     has moved twice: 2000 before he had skills, 4000 once a guaranteed opening
-     roar more than doubled what everybody took off him, and 2300 now that the
-     roar is a one-in-three roll rather than a certainty. Each time the pool
-     followed the damage to keep the raid about the same length. Set high on purpose; it is easier to make him weaker later than
-     to explain why he died in a weekend. */
-  battle: { hp:2300, pow:420, def:25, spd:140 }
+     has moved three times: 2000 before he had skills, 4000 once a guaranteed
+     opening roar more than doubled what everybody took off him, 2300 once the
+     roar became a one-in-three roll rather than a certainty, and 2800 once a
+     roar stopped being able to buy him an extra turn on top of it. Each time
+     the pool followed the damage to keep the raid about the same length; his
+     health is not a difficulty dial on its own. Set high on purpose; it is
+     easier to make him weaker later than to explain why he died in a
+     weekend. */
+  battle: { hp:2800, pow:420, def:25, spd:140 }
 };
 /* One attempt for every 5 km run, banked - a 15 km long run is three swings at
    him. Attempts are the only thing a raid spends, and running is the only thing
@@ -2852,7 +2855,21 @@ function btAct(st, moveId){
     // simply never hands the turn back.
     const sx = x.spd * x.spdMul, sy = y.spd * y.spdMul;
     const p = Math.max(0, Math.min(BT.EXTRA, (sx - sy) / (sx + sy)));
-    if (st.rng() < p) ev.again = true; else st.turn = btOther(key);
+    /* ...and a move that did no damage never buys one. Spending your turn on
+       something other than an attack has to cost you the turn, or it is not a
+       cost at all. The raid is where this showed: the boss roars, which is the
+       only thing that lets a low-level pet act twice, and at spd 140 against a
+       pet's 30 he sat pinned at the 35% cap - so better than a third of the
+       time he roared and immediately swung anyway, and the one merciful thing
+       he does was not merciful.
+
+       The roll is still drawn either way, so the rng stream is unchanged and
+       an old seed plays the same fight it always did. Measured against the
+       three pairings at levels 18, 26 and 40: identical to the decimal,
+       because Nap is the only pet move with no damage and Verdant is the
+       slowest species, so it was never earning extra turns to lose. */
+    const extra = st.rng() < p;
+    if (extra && ev.dmg > 0) ev.again = true; else st.turn = btOther(key);
   }
   ev.over = st.over;
   st.log.push(ev);
@@ -3807,7 +3824,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-22 87b7243";
+const BUILD_ID = "2026-09-22 e1f00e9";
 const ART_VERSION = "23";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
