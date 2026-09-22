@@ -5906,6 +5906,63 @@ function nextSkill(d){
   // Nothing above the cap is reachable, so it is not "next" in any useful sense
   return d.skills.find(k => !k.known && k.stage >= d.stage && k.stage <= STAGE_CAP) || null;
 }
+/* A run typed in by hand, built the way the Strava importer builds one.
+
+   The sandbox has no broker and will soon have no tracker either, so without
+   this there is no way to feed a pet in here at all - and the sandbox exists
+   precisely so artwork and pacing can be looked at without going for a run.
+
+   Deliberately not marked `sim`: that puts a "· sim" tag in the history and
+   this is meant to stand in for a Strava import, not to look like a test row.
+   It carries the same `strava` and `manual` fields an imported run carries,
+   which in here can confuse nothing, because nothing in the sandbox ever talks
+   to a broker. */
+function openAddRunSheet(){
+  const km0 = 5, min0 = 30;
+  openSheet({
+    title:"Add a run",
+    desc:"Lands exactly as a run imported from Strava would, XP and all. Days ago moves it back in time, which is how to get at streaks and the mood ladder.",
+    body:`<div class="fj-label">Distance, time and when</div>
+      <div class="addrow" style="gap:10px;align-items:center;justify-content:space-between">
+        <label style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:800;color:var(--muted)">
+          <input class="inp num" id="ar-km" type="number" min="0.1" max="200" step="0.1" value="${km0}" inputmode="decimal"> km</label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:800;color:var(--muted)">
+          <input class="inp num" id="ar-min" type="number" min="1" max="1200" step="1" value="${min0}" inputmode="numeric"> min</label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:800;color:var(--muted)">
+          <input class="inp num" id="ar-days" type="number" min="0" max="400" step="1" value="0" inputmode="numeric"> days ago</label>
+      </div>`,
+    actions:[
+      { label:"Add it", cls:"primary", fn: () => {
+          const km   = Math.max(0.05, Math.min(200, Number($("#ar-km").value) || km0));
+          const mins = Math.max(1, Math.min(1200, Number($("#ar-min").value) || Math.round(km * 6)));
+          const days = Math.max(0, Math.min(400, Math.round(Number($("#ar-days").value) || 0)));
+          closeSheet();
+          addSandboxRun(km, mins, days);
+        } },
+      { label:"Cancel", cls:"ghost", fn: closeSheet }
+    ]
+  });
+}
+
+/* Shared by the sheet above and the one-tap "Log a run", so both land a run by
+   exactly the same route - including the celebration, which is the thing worth
+   being able to trigger on demand. */
+function addSandboxRun(km, mins, daysAgo){
+  const before = derived.level;
+  const t = Date.now() - (daysAgo || 0) * 86400000;
+  const run = makeRun(t, km, Math.round(mins * 60),
+                      { strava: "sandbox-" + Math.random().toString(36).slice(2, 10), manual: true });
+  save.runs.push(run);
+  save.runs.sort((a, b) => a.t - b.t);
+  recompute(); persist();
+  pendingLevelUp = derived.level > before && !!celebrationFor(save.species, derived.stage, derived.level);
+  pendingLevelFrom = before;
+  // A run dated in the past is history rather than news: it has already changed
+  // the totals, and a summary card for it would be claiming it just happened.
+  if (daysAgo > 0){ renderAll(); toast(`Added ${U.distStr(km, 2)} ${U.label}, ${daysAgo}d ago`, "good", "\u{1F3C3}"); return; }
+  showSummary(run, { celebrate:true });
+}
+
 function openDemoPanel(){
   const d = derived;
   openSheet({
@@ -5923,15 +5980,8 @@ function openDemoPanel(){
           <div class="lv">${i > STAGE_CAP ? "not drawn" : `Lv ${EVO_LEVELS[i]}`}</div>
         </button>`).join("")}</div>`,
     actions:[
-      { label:"Log a run", cls:"primary", fn: () => {
-          closeSheet();
-          const before = derived.level;
-          Runmon.addRun(5, 28, 0);
-          pendingLevelUp = derived.level > before && !!celebrationFor(save.species, derived.stage, derived.level);
-          pendingLevelFrom = before;
-          const r = save.runs[save.runs.length - 1];
-          showSummary(r, { celebrate:true });
-        } },
+      { label:"Log a 5 km run", cls:"primary", fn: () => { closeSheet(); addSandboxRun(5, 28, 0); } },
+      { label:"Add a run\u2026", cls:"ghost", fn: () => { closeSheet(); openAddRunSheet(); } },
       { label: nextSkill(d) ? `Learn ${nextSkill(d).name}` : "All skills learnt", cls:"ghost", fn: () => {
           const nx = nextSkill(derived);
           if (!nx){ toast("Every skill for this form is already learnt", "", "\u2728"); return; }
