@@ -2188,13 +2188,24 @@ const RAID_BOSS = {
      thing that ends every attempt; he is no longer the thing that ends it
      before you have played.
 
+     spd is a pet's, on purpose. At 140 he was faster than anything alive and
+     the extra-turn roll sat pinned at its cap, so 21% of his actions at level
+     26 came straight after another one of his, in runs of up to five - the
+     fight taking itself away from you. 60 is inside the pet range (a level-26
+     Verdant is 27, an Ember 67, a Nimbus 78), so who is quicker is a real
+     question again and a Nimbus genuinely out-paces him. He is a boss in
+     Power and health and in nothing else, which is the whole idea; btAct()
+     bars a boss from extra turns outright, because Speed alone did not close
+     it - the roll compares him to whoever is in front of him, and against a
+     Verdant even 60 is miles clear.
+
      hp is the pool, and it follows his damage rather than setting the
      difficulty - a longer attempt takes more off him, so the pool has to grow
-     just to hold the raid at the same length. It has moved six times: 2000
+     just to hold the raid at the same length. It has moved seven times: 2000
      before he had skills, 4000 once a guaranteed opening roar doubled what
      everybody took off him, 2300 once the roar became a one-in-three roll,
      2800 once a roar could no longer buy him an extra turn, 28000 with the
-     power cut, and 40000 now the pet always opens.
+     power cut, 40000 once the pet always opened, and 52000 now he alternates.
 
      The jump from 2800 is mostly not the power cut. Every figure before it
      was measured against level 3-5 pets, which is not where anybody is: a
@@ -2202,13 +2213,13 @@ const RAID_BOSS = {
      one, so 2800 was a raid that would have ended in a weekend.
 
      Measured on the engine at six players running 30km a week - 36 attempts -
-     40000 is 4.1 weeks against a level-26 field. The same pool is 13 weeks at
+     52000 is 4.0 weeks against a level-26 field. The same pool is 14 weeks at
      level 10 and 3.3 at level 30, and that spread is the whole argument for
      the broker scaling it per raid from the roster instead of shipping one
      number: no constant here can be right for two different fields. Set high
      on purpose meanwhile; it is easier to make him weaker later than to
      explain why he died in a weekend. */
-  battle: { hp:40000, pow:90, def:25, spd:140 }
+  battle: { hp:52000, pow:90, def:25, spd:60 }
 };
 /* One attempt for every 5 km run, banked - a 15 km long run is three swings at
    him. Attempts are the only thing a raid spends, and running is the only thing
@@ -2913,7 +2924,15 @@ function btAct(st, moveId){
        because Nap is the only pet move with no damage and Verdant is the
        slowest species, so it was never earning extra turns to lose. */
     const extra = st.rng() < p;
-    if (extra && ev.dmg > 0) ev.again = true; else st.turn = btOther(key);
+    /* ...and a boss never buys one at all. His edge is meant to be Power and
+       health, not the turn order: a pet that swings twice at him is a pet
+       having a good round, while a boss that swings twice is the fight taking
+       itself away from you. Dropping his Speed to a pet's was not enough on
+       its own - the roll compares him against whoever is in front of him, and
+       a Verdant is 27 where he is 60, so he was still pinned near the cap
+       against the slow species. Measured at spd 60: 12.5% of his actions were
+       still back to back, in runs of up to five. */
+    if (extra && ev.dmg > 0 && !x.boss) ev.again = true; else st.turn = btOther(key);
   }
   ev.over = st.over;
   st.log.push(ev);
@@ -3878,7 +3897,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-23 e19e717";
+const BUILD_ID = "2026-09-23 ea1300f";
 const ART_VERSION = "25";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -6427,8 +6446,7 @@ const BT_AFTER = 340;    // ...and the pause before the next side moves
    there is something to look at. The engine settled the fight the moment it
    was seeded, so none of this can change it; it only decides how long you get
    to see it. */
-const BT_OPEN     = 900;    // before anyone moves
-const BT_OPEN_BOSS= 2000;   // ...and longer against him: he fills the screen
+const BT_OPEN     = 900;    // before anyone moves, when it is not your move
 const BT_GAP      = 260;    // between one side finishing and the other starting
 const BT_GAP_BOSS = 620;
 const BT_END      = 420;    // the last blow, before the result covers it
@@ -6461,7 +6479,8 @@ function startBattle(you, foe, opts){
     battle.boss = true;
     battle.hpAtStart = battle.b.cur;
     /* You always get the first swing at him. Initiative was rolled against his
-       speed, and at 140 against a pet's 35 he won it most of the time - and
+       speed, and at the 140 he had then against a pet's 35 he won it most of
+       the time - and
        when he won it he could end the attempt there, so a run's worth of
        kilometres bought a screen you never played. It was 2% of attempts at
        level 26 and 16% at level 5, all of them on the branch where he moves
@@ -6469,7 +6488,10 @@ function startBattle(you, foe, opts){
        because there is no amount of health that makes losing before you act
        feel like anything other than a bug.
 
-       The rng draw stays, so an old seed still plays the fight it always did. */
+       His Speed has since come down to a pet's, which would have made the roll
+       fairer - but not certain, and "usually you get to play" is not a rule
+       worth having. The rng draw stays, so an old seed still plays the fight
+       it always did. */
     battle.rng();
     battle.turn = "a";
   }
@@ -6501,7 +6523,9 @@ function startBattle(you, foe, opts){
       : battle.turn === "a" ? `${esc(you.name)} moves first.`
       : `${esc(foeName)} is quicker off the mark.`);
   renderBattle();
-  if (battle.turn === "b") btWait(btFoeTurn, battle.boss ? BT_OPEN_BOSS : BT_OPEN);
+  // Never true of a raid any more - he cannot open one - so the raid's opening
+  // pause is now simply that nothing moves until you press something.
+  if (battle.turn === "b") btWait(btFoeTurn, BT_OPEN);
 }
 
 /* One child, always. The box centres with flex, and flex makes every text node
