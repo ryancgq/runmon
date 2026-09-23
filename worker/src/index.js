@@ -162,6 +162,19 @@ function markFor(chip, gap, win){
   const c = Math.max(0, Math.min(1, chip || 0));
   return MARK_UNIT * c * markGapMul(gap) * (win ? 1.4 : 1);
 }
+/* What the marks on a pet add up to right now. The same arithmetic as
+   markPenalty() in index.html, and here for the same reason the rest of this
+   block is: the roster hands every player's standing penalty to every other
+   player, and that number cannot come from the device it is about. Each mark
+   fades over its own day, so this is computed on read rather than stored. */
+function markPenalty(marks, now){
+  let sum = 0;
+  for (const m of marks || []){
+    const life = 1 - ((now || Date.now()) - (m.at || 0)) / (MARK_HOURS * 3600e3);
+    if (life > 0) sum += (m.amt || 0) * life;
+  }
+  return Math.min(MARK_CAP, Math.max(0, sum));
+}
 /* Two a day, and never the same target twice inside a day. The second rule is
    the one that matters: it is what makes a pile-on need other people. The
    first decides how much of a day's damage any one player can be responsible
@@ -306,7 +319,8 @@ export default {
           const { rows } = await r.json();
           const players = (rows || [])
             .filter(x => x.handle !== mine && x.pet)
-            .map(x => ({ id: x.handle, card: rosterCard(x), lastSeen: x.lastSeen || 0 }))
+            .map(x => ({ id: x.handle, card: rosterCard(x), lastSeen: x.lastSeen || 0,
+                         pen: markPenalty(x.marks) }))
             .sort((a, b) => (b.card.level - a.card.level) || (b.card.km - a.card.km))
             .slice(0, 200);
           return json(env, { players });
@@ -435,6 +449,13 @@ export default {
                         gap: c.gap, v: MARK_VERSION };
           await (await athleteStub(env, owner)).fetch("https://do/mark-add", {
             method:"POST", body: JSON.stringify(row) });
+          /* A second copy, on the roster row. The marks that matter to the pet
+             live with the pet, but the Rankings table shows everyone's standing
+             penalty at once, and fanning out to two hundred athlete objects to
+             draw one screen is not a read worth making. Only `at` and `amt` go
+             across - enough to price the fade, nothing about who did it. */
+          await rosterStub(env).fetch("https://do/roster-mark", { method:"POST",
+            body: JSON.stringify({ handle: c.target, at, amt }) });
           await stub.fetch("https://do/log-add", { method:"POST",
             body: JSON.stringify({ ...row, dir:"out", who: c.target }) });
           return json(env, { ok:true, amt, gap: c.gap });
@@ -638,10 +659,30 @@ export class Athlete {
         handle,
         ...(card ? rosterCard(card) : {}),
         ...(prev.pet && !card ? rosterCard(prev) : {}),   // a re-link keeps the pet
+        // rosterCard() names its fields, so anything not in it is dropped by
+        // this write. Marks are not part of a card and would go every time the
+        // pet saved - which is every run - taking the penalty with them.
+        marks: prev.marks || [],
         firstSeen: prev.firstSeen || Date.now(),
         lastSeen: Date.now()
       });
       return this.ok({ ok: true });
+    }
+    /* A mark landing on somebody, as the roster sees it. Written here rather
+       than read from the athlete object when the table is drawn, and dropped
+       once it has faded so a row does not grow a day's history it will never
+       show. A handle with no row is somebody who linked and never hatched:
+       nothing to mark, and nothing to create. */
+    if (path === "/roster-mark"){
+      const { handle, at, amt } = await request.json();
+      const key  = "row:" + handle;
+      const prev = await this.state.storage.get(key);
+      if (!prev) return this.ok({ ok:false });
+      const marks = (prev.marks || [])
+        .filter(m => Date.now() - (m.at || 0) < MARK_HOURS * 3600e3);
+      marks.push({ at: Number(at) || Date.now(), amt: Number(amt) || 0 });
+      await this.state.storage.put(key, { ...prev, marks: marks.slice(-40) });
+      return this.ok({ ok:true });
     }
     if (path === "/roster-list"){
       const map = await this.state.storage.list({ prefix: "row:", limit: 1000 });
