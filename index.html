@@ -910,7 +910,10 @@ body::before{
 .notice .em{flex:0 0 auto;font-size:16px;line-height:1.2}
 .notice .t{flex:1;min-width:0}
 .notice .t .n{font-size:13px;font-weight:800;color:#dbe1ef}
-.notice .t .h{font-size:11.5px;font-weight:700;color:var(--muted);margin-top:3px;line-height:1.5}
+/* pre-line so a notice can be written as lines. Most are one sentence and do
+   not care; his arrival is four beats and reads as a wall of text run together. */
+.notice .t .h{font-size:11.5px;font-weight:700;color:var(--muted);margin-top:3px;line-height:1.5;
+  white-space:pre-line}
 .notice .t .w{font-size:10.5px;font-weight:700;color:var(--muted);opacity:.7;margin-top:4px}
 .notice .x{
   flex:0 0 auto;width:26px;height:26px;border-radius:50%;
@@ -2268,6 +2271,36 @@ const attemptsForKm = km => Math.floor(Math.max(0, km) / KM_PER_ATTEMPT);
    changes on. Said on the battle screen by whoever lands the blow that crosses
    one, and kept afterwards as a notice on everybody's home screen - a thing
    the whole raid did is worth more than a line one person saw once. */
+/* His arrival, held back until there is somewhere to go and fight him.
+
+   Flip RAID_LIVE when the Raid button replaces Run. Everything below is ready
+   now and deliberately silent until then: an alert telling six people a boss
+   has appeared, when the only way to reach him is a chip inside the demo
+   sandbox, is worse than no alert at all.
+
+   The id carries RAID_EPOCH rather than a date, so this is minted once per
+   raid and not once per app open - and a second raid, whenever there is one,
+   mints its own. It is the closest thing to a spawn that exists while the pool
+   is local: the broker has to own the moment before every player can be told
+   about it at the same time rather than each on their next launch. */
+const RAID_LIVE  = false;
+const RAID_EPOCH = 1;
+const RAID_ARRIVAL = {
+  title: "An evil presence stirs in the darkness\u2026",
+  body: "The ground begins to tremble.\n"
+      + "A deafening roar echoes across the battlefield\u2014\n"
+      + "\u201CUWAAARGHHHH\u2026 UWAAGRRHHHH!!\u201D\n"
+      + "Sir UwaaarghhhhUWAAGRRHH has appeared."
+};
+/** Tell this player he is here, once. Silent until the raid is reachable. */
+function raidAnnounce(){
+  if (!RAID_LIVE) return false;
+  if (!noticeAdd({ id:`raid-${RAID_BOSS.id}-${RAID_EPOCH}-arrives`, kind:"raid",
+                   title:RAID_ARRIVAL.title, body:RAID_ARRIVAL.body })) return false;
+  persist();
+  return true;
+}
+
 const RAID_MILESTONES = [
   { at:0.75, title:"First blood",
     line:"Sir Uwaaarghhhh staggers. The moss on his shoulder has been knocked loose.",
@@ -3938,7 +3971,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-23 70e55e7";
+const BUILD_ID = "2026-09-23 1a736f8";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -7550,6 +7583,11 @@ function boot(){
   // nothing left to switch it off that would be a locked door.
   save.settings.simulate = DEMO;
   applyXpAnim();
+  /* Before the first render, so a player who already has a pet finds him
+     waiting rather than watching a card appear a beat later. Does nothing
+     until RAID_LIVE, and nothing at all on a device with no pet yet - the
+     home screen it would sit on is not the screen they are looking at. */
+  if (has) raidAnnounce();
   if (has){
     recompute();
     applyTheme(save.species);
