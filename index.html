@@ -2118,7 +2118,23 @@ const RAID_BOSS = {
   ],
   /* Square frames, 364px, twelve of them. Slow on purpose: he is a thing that
      looms rather than a pet that bustles. */
-  sprite: { frames:12, rows:1, fps:1.6, aspect:1, scale:1, dx:0, dy:0 },
+  /* All four phases share one frame size and one ground line, because they are
+     one animation that swaps sheet as his health falls - packed separately
+     they disagreed, and he hopped when he crossed a mark. The row that holds
+     the stomp was the worst of it: his feet sat 50px above where they sat in
+     the other two rows, so a third of the loop had him hovering. Measured on
+     screen, his ground line moved 25px through the loop and now moves 2.
+
+     scale is here for the same reason the clips have theirs. One geometry for
+     four phases means a frame big enough for every phase's widest and tallest
+     drawing - 448x427 where it used to be 364x364 - and a sprite-view maps the
+     slot's width onto the frame, so the same creature in a bigger frame draws
+     22% smaller. 1.278 is measured, not chosen: it puts him back at exactly
+     the 162px he was, centred and standing where he was.
+
+     He is the reference the three skill clips are fitted against, so if this
+     is ever repacked their numbers have to be re-solved with it. */
+  sprite: { frames:12, rows:1, fps:1.6, aspect:1.0492, scale:1.278, dx:-7.5, dy:1.9 },
 
   /* His three moves, and the ORDER IS THE DESIGN. btChoose takes the first
      move that is ready, so whatever sits at the top of this list is what he
@@ -2154,12 +2170,12 @@ const RAID_BOSS = {
       battle:{ dmg:0, cd:6, stoke:{ mult:1.6, hits:2 },
                charge:{ spd:0.08, pow:0.20, max:2 } },
       sprite:{ src:"art/boss-skill-warcry.png", frames:16, rows:1, fps:7,
-               aspect:1.6386, scale:1.651, dx:8.6, dy:19.9 } },
+               aspect:1.6386, scale:1.646, dx:8.7, dy:19.6 } },
     { id:"splitter", name:"Splitter", ico:"\u{1FAA8}",
       blurb:"Both hands overhead, then down. The ground goes first and you go second.",
       battle:{ dmg:2.2, pierce:0.7, cd:4 },
       sprite:{ src:"art/boss-skill-smash.png", frames:16, rows:1, fps:9,
-               aspect:1.1881, scale:1.321, dx:10.8, dy:5.0 } },
+               aspect:1.1881, scale:1.298, dx:10.7, dy:4.2 } },
     /* Repacked from a second export. The first arrived as RGB on solid white,
        and keying that left a pale rim on 45.8% of his outline - anti-aliasing
        had smeared the black edge into the background, and the greys it left
@@ -2170,7 +2186,7 @@ const RAID_BOSS = {
       blurb:"A flat, sweeping arc that takes everything at knee height with it.",
       battle:{ dmg:1.35, cd:2 },
       sprite:{ src:"art/boss-skill-swing.png", frames:16, rows:1, fps:9,
-               aspect:1.4433, scale:1.19, dx:0.9, dy:15.6 } }
+               aspect:1.4433, scale:1.192, dx:1.1, dy:15.6 } }
   ],
   /* Defence is low for a creature this size, and deliberately. It does not
      change how long anybody survives - that is entirely his power - it only
@@ -3897,8 +3913,8 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-23 ea1300f";
-const ART_VERSION = "25";
+const BUILD_ID = "2026-09-23 5fc9c0b";
+const ART_VERSION = "26";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
 }
