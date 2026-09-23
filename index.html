@@ -2429,7 +2429,15 @@ const RAID_ARRIVAL = {
 /** Tell this player he is here, once. Silent until the raid is reachable. */
 function raidAnnounce(){
   if (!RAID_UI) return false;
-  if (!noticeAdd({ id:`raid-${RAID_BOSS.id}-${RAID_EPOCH}-arrives`, kind:"raid",
+  /* A shared raid does not know which one it is until the broker has answered.
+     Announcing from the default epoch and then learning the real one mints two
+     notices under two ids - one boss, arriving twice - which is what a player
+     joining partway through a third raid was shown. Boot stays quiet and the
+     first refresh does it, which is the same moment for anybody linked. */
+  if (raidShared() && !(save.raid && save.raid.epoch)) return false;
+  // keyed by the epoch, so a boss brought back by the switch announces himself
+  // again rather than arriving in silence behind the last raid's notice
+  if (!noticeAdd({ id:`raid-${RAID_BOSS.id}-${raidEpoch()}-arrives`, kind:"raid",
                    title:RAID_ARRIVAL.title, body:RAID_ARRIVAL.body })) return false;
   persist();
   return true;
@@ -2991,7 +2999,9 @@ function btSide(speciesId, level, name){
    changing. `boss` is only for the screen, which does need to know. */
 function btBossSide(hpLeft){
   const b = RAID_BOSS.battle;
-  const max = b.hp, cur = Math.max(0, Math.min(max, hpLeft == null ? max : hpLeft));
+  // his pool for this raid, which a respawn can have set to something other
+  // than the number in the code - the bar is drawn against it
+  const max = raidMax(), cur = Math.max(0, Math.min(max, hpLeft == null ? max : hpLeft));
   return {
     name: RAID_BOSS.short, speciesId: null, level: 0, stage: 0,
     pow: b.pow, def: b.def, spd: b.spd, max, cur,
@@ -3003,12 +3013,27 @@ function btBossSide(hpLeft){
   };
 }
 
+/* Shared, or this device's own. The sandbox has no broker by design and an
+   unlinked player has nobody to share with, so both keep the pool that the
+   raid has always had - which is why nothing about the sandbox moves.
+
+   Everything below reads the same two fields either way. When the raid is
+   shared they are the broker's last answer rather than this device's opinion,
+   and the screen says so; when it is not, they are what they always were. */
+function raidShared(){ return stravaLinked(); }
+/* His pool for this raid, not the number in the code. A respawn can start him
+   at a different size - that is what the switch takes - and a bar drawn
+   against the constant would read wrong for the whole of that raid. */
+function raidMax(){
+  const m = save.raid && save.raid.max;
+  return m > 0 ? m : RAID_BOSS.battle.hp;
+}
 /* What he is standing at, and what an attempt leaves him on. A raid that
    healed between fights would be a boss you could never finish, so every
    attempt has to start where the last one stopped. */
 function raidHp(){
   const h = save.raid && save.raid.hp;
-  return h == null ? RAID_BOSS.battle.hp : Math.max(0, Math.min(RAID_BOSS.battle.hp, h));
+  return h == null ? raidMax() : Math.max(0, Math.min(raidMax(), h));
 }
 function raidSet(hp){
   if (!save.raid) save.raid = { hp: null, spent: 0, dealt: 0 };
@@ -3017,8 +3042,16 @@ function raidSet(hp){
 }
 /** Is he down? `null` is a raid nobody has touched, not a boss on no health. */
 function raidFelled(){
-  const h = save.raid && save.raid.hp;
-  return h != null && h <= 0;
+  const r = save.raid || {};
+  // the broker says so outright; locally it is the only thing zero can mean
+  return !!r.felledAt || (r.hp != null && r.hp <= 0);
+}
+/* Which raid this is. The broker counts epochs and a respawn moves it on;
+   locally there has only ever been one. It is in every raid notice's id, so
+   the alerts of a raid already fought cannot suppress the next one's. */
+function raidEpoch(){
+  const e = save.raid && save.raid.epoch;
+  return e > 0 ? e : RAID_EPOCH;
 }
 /* Orc Slayer: he is down, and you are one of the people who put him there.
    Both halves are needed - being present for the kill is not the badge, and
@@ -3032,11 +3065,24 @@ function raidSlain(){
   return raidFelled() && (save.raid.dealt || 0) > 0;
 }
 /* Attempts are earned by running and spent by swinging, so what is left is the
-   difference. Earned is recomputed from the kilometres rather than counted up
-   as runs arrive: a run that syncs twice, or arrives late, then cannot pay
-   twice. `spent` is the only thing that has to be remembered. */
+   difference.
+
+   Shared, the broker does this sum and the device's own kilometres are not
+   consulted at all: it counts the distance it read out of Strava itself, which
+   is the one thing in a raid that cannot be allowed to be a number typed on a
+   phone. What arrives here is its answer, cached so the screen draws before
+   the network does.
+
+   Locally it is the old sum. Earned is recomputed from the kilometres rather
+   than counted up as runs arrive - a run that syncs twice, or arrives late,
+   then cannot pay twice - and `spent` is the only thing remembered. */
 function raidAttempts(){
   const r = save.raid || {};
+  if (raidShared()){
+    const a = r.attempts || {};
+    return { earned: a.earned || 0, spent: a.spent || 0, left: Math.max(0, a.left || 0),
+             toNext: a.toNext == null ? KM_PER_ATTEMPT : a.toNext, brokered: true };
+  }
   const earned = attemptsForKm(derived ? derived.totalKm : 0);
   const spent  = Math.max(0, r.spent || 0);
   return { earned, spent, left: Math.max(0, earned - spent),
@@ -4172,7 +4218,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-23 040de91";
+const BUILD_ID = "2026-09-23 8d65870";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -5101,16 +5147,57 @@ function renderEvolve(){
       <div class="ico">${b.ico}</div><div class="nm">${b.name}</div></div>`).join("");
 }
 
-/* The raid screen. Sandbox-only for now (RAID_UI), because it is the half of
-   the feature that can be built without the broker: the boss, what is left of
-   him, what you have taken off him, and how many swings your running has
-   bought. What it cannot be yet is shared - the pool it draws is this device's
-   copy, so "everyone against one thing" is true of the design and not yet of
-   the data. */
+/* What the broker has to say about him: his health, your share of it, and the
+   swings your running has bought. Cached in the save so the screen draws from
+   the last answer rather than from a spinner, exactly as the roster and the
+   marks are - a raid figure a few seconds old is worth more than no screen.
+
+   It also raises the alerts for marks his health has passed, including the
+   ones somebody else's swing pushed him past, which is the half the local
+   version could never do: it only knew about blows this device landed. */
+async function refreshRaid(){
+  if (!raidShared()) return;
+  const r = await stravaCall("/raid");
+  const raid = (r && r.raid) || {}, you = (r && r.you) || {};
+  save.raid = Object.assign(save.raid || {}, {
+    epoch: Number(raid.epoch) || 1,
+    hp: Math.max(0, Number(raid.hp) || 0),
+    max: Number(raid.max) > 0 ? Number(raid.max) : RAID_BOSS.battle.hp,
+    felledAt: raid.felledAt || null,
+    dealt: Math.max(0, Number(you.dealt) || 0),
+    swings: Math.max(0, Number(you.swings) || 0),
+    attempts: r && r.attempts ? r.attempts : null,
+    at: Date.now()
+  });
+  persist();
+  // a raid that began since the last look announces itself before its marks do
+  raidAnnounce();
+  raidAlerts(raid.crossed || []);
+}
+
+/* The home-screen alerts for the marks a raid has passed. Given every mark the
+   epoch has crossed rather than the ones this swing crossed, so it is safe to
+   call with the same list twice: noticeAdd() is keyed by id and a dismissed
+   one stays dismissed. The epoch is in the id because a new raid crosses all
+   the same marks, and without it the second raid would pass three-quarters in
+   silence. */
+function raidAlerts(marks){
+  let any = false;
+  for (const at of (marks || []).slice().sort((x, y) => y - x)){
+    const m = RAID_MILESTONES.find(x => Math.abs(x.at - at) < 1e-9);
+    if (!m) continue;
+    any = noticeAdd({ id:`raid-${RAID_BOSS.id}-${raidEpoch()}-${Math.round(m.at * 100)}`,
+                      kind:"raid", title:m.heading || "Raid alert", body:m.note }) || any;
+  }
+  if (any){ persist(); renderNotices(); }
+}
+
+/* The raid screen: the boss, what is left of him, what you have taken off him,
+   and how many swings your running has bought. */
 function renderRaid(){
   const body = $("#raid-body");
   if (!body) return;
-  const hp = raidHp(), max = RAID_BOSS.battle.hp, frac = Math.max(0, hp / max);
+  const hp = raidHp(), max = raidMax(), frac = Math.max(0, hp / max);
   const a = raidAttempts();
   const dead = hp <= 0;
   const tier = frac <= 0.22 ? " low" : frac <= 0.5 ? " mid" : "";
@@ -5147,16 +5234,110 @@ function renderRaid(){
 
 /* One attempt: spend it, then fight him at whatever everybody has left him on.
    Spent before the fight rather than after, so quitting out of a battle cannot
-   hand the swing back. */
-function raidSwing(){
+   hand the swing back.
+
+   Shared, the spending is the broker's and so is the health the attempt opens
+   on: the claim answers with both, and the fight is set up from its answer
+   rather than from the cache. That matters more than it looks - the cache can
+   be a few minutes old, and opening an attempt on a boss somebody else has
+   already finished would be a swing spent on a fight that cannot count. */
+let raidBusy = false;
+async function raidSwing(){
+  if (raidBusy) return;
   const a = raidAttempts();
   if (!a.left || raidHp() <= 0) return;
-  save.raid.spent = a.spent + 1;
-  persist();
   const you = { species: save.species, level: derived.level,
                 name: save.petName || derived.species.name };
-  startBattle(you, { species: save.species, level: derived.level, name: RAID_BOSS.short },
-              { boss:true, raid:true });
+  const foe = { species: save.species, level: derived.level, name: RAID_BOSS.short };
+
+  if (!raidShared()){
+    save.raid.spent = a.spent + 1;
+    persist();
+    startBattle(you, foe, { boss:true, raid:true });
+    return;
+  }
+
+  raidBusy = true; renderRaid();
+  let c;
+  try { c = await stravaCall("/raid/claim", { method:"POST", body:"{}" }); }
+  catch (err){
+    // The swing is not spent unless the broker says it is, so there is nothing
+    // to give back here - only something to say.
+    toast(raidFail(err), "warn", "\u26A0\uFE0F");
+    raidBusy = false; renderRaid(); return;
+  } finally { raidBusy = false; }
+
+  if (!c || !c.ok){
+    await refreshRaid().catch(() => {});
+    renderRaid();
+    return toast((c && c.error) || "That swing did not go through", "warn", "\u26A0\uFE0F");
+  }
+  // the claim's figures, not the cache's, and the fight carries the epoch so
+  // the report cannot land in a raid that began after it
+  save.raid = Object.assign(save.raid || {}, {
+    epoch: c.epoch, hp: c.hp, max: c.max || raidMax(), attempts: c.attempts || null });
+  persist();
+  startBattle(you, foe, { boss:true, raid:true, seed: c.seed, hpLeft: c.hp, shared:true });
+}
+
+/* What the attempt took off him, sent once, after the fight rather than during
+   it: the broker's copy of the pool is the real one, and the battle screen has
+   been showing an attempt against the health the claim named.
+
+   The seed is passed in rather than read off `battle`, because by the time
+   this answers the player may have started another fight and `battle` is a
+   different object. Nothing on screen waits for it - the end card is already
+   up and the attempt is over either way - so a failure here costs the swing's
+   damage and says so, rather than holding up the screen to retry.
+
+   The answer is the pool after everybody's swings, not just this one, so the
+   cache and the alerts are both refreshed from it. */
+async function raidReport(seed, took){
+  try {
+    const r = await stravaCall("/raid/report", { method:"POST",
+      body: JSON.stringify({ seed, dealt: Math.round(took) }) });
+    if (!r || !r.ok) throw new Error((r && r.error) || "the raid did not take it");
+    const raid = r.raid || {};
+    save.raid = Object.assign(save.raid || {}, {
+      epoch: Number(raid.epoch) || raidEpoch(),
+      hp: Math.max(0, Number(raid.hp) || 0),
+      max: Number(raid.max) > 0 ? Number(raid.max) : raidMax(),
+      felledAt: raid.felledAt || null,
+      dealt: Math.max(0, (save.raid && save.raid.dealt || 0) + Math.max(0, r.took || 0)),
+      at: Date.now()
+    });
+    persist();
+    raidAlerts(r.crossed || []);
+    recompute();                       // the badge, if that swing was the last one
+    if (currentScreen === "raid") renderRaid();
+  } catch (err){
+    // Said rather than swallowed: the fight happened and the pool did not move,
+    // and a player who is told that will swing again rather than wonder why
+    // their share never changes.
+    toast(raidFail(err), "warn", "\u26A0\uFE0F");
+  }
+}
+
+/* Draw from the cache first so the screen is never blank, then go and freshen
+   it - the same order the Rankings tab uses, and for the same reason: a pool
+   from the last time you looked beats an error page, and a raid that somebody
+   else has been swinging at all morning is worth re-reading every time this
+   opens. */
+async function openRaidTab(){
+  renderRaid();
+  if (!raidShared()) return;
+  try { await refreshRaid(); }
+  catch (err){ toast(raidFail(err), "warn", "\u26A0\uFE0F"); }
+  recompute();                          // the badge, if he went down meanwhile
+  renderRaid();
+}
+
+/* A raid route answering 404 means this broker predates the raid, which is a
+   different thing from the raid being over or the network being out, and worth
+   saying plainly rather than showing whatever the fetch threw. */
+function raidFail(err){
+  const m = String(err && err.message || err || "");
+  return /\(404\)/.test(m) ? "The server has not been updated with the raid yet." : m;
 }
 
 /* --- master render ------------------------------------------------------- */
@@ -5202,7 +5383,7 @@ function go(name){
   if (name === "friends") { openFriendsTab(); }
   // Drawn on the way in, like the others: his health and your swings both move
   // while you are somewhere else.
-  if (name === "raid")    { renderRaid(); }
+  if (name === "raid")    { openRaidTab(); }
   if (name === "home")    {
     // A queued walk goes first and paints its own opening frame - the state
     // before the runs it is about to replay. renderHome() ahead of it would put
@@ -6889,8 +7070,12 @@ function startBattle(you, foe, opts){
      than inside it so the seeded rng, the initiative roll and everything else
      stay exactly as they are for an ordinary fight. */
   if (o.boss){
-    battle.b = btBossSide(o.raid ? raidHp() : o.hpLeft);
+    // `hpLeft` wins over the cached pool even for a raid: a shared attempt
+    // opens on the health the broker named when it took the swing, and the
+    // cache may be minutes old.
+    battle.b = btBossSide(o.hpLeft != null ? o.hpLeft : (o.raid ? raidHp() : null));
     battle.raid = !!o.raid;
+    battle.shared = !!o.shared;
     battle.boss = true;
     battle.hpAtStart = battle.b.cur;
     /* You always get the first swing at him. Initiative was rolled against his
@@ -7013,15 +7198,15 @@ function btCatchUp(){
 
      Only a real attempt does this. A look-in is the tester walking through his
      health to watch the artwork change, and it would raise an alert about a
-     raid nobody ran. When the broker owns the pool these are its to send, to
-     everyone in the raid rather than only to whoever landed the blow. */
-  if (battle.raid){
-    for (const x of crossed)
-      noticeAdd({ id:`raid-${RAID_BOSS.id}-${Math.round(x.at * 100)}`, kind:"raid",
-                  title:x.heading || "Raid alert", body:x.note });
-    persist();
-    renderNotices();
-  }
+     raid nobody ran.
+
+     And only an unshared one. When the pool is the broker's, the marks it has
+     crossed come back from /raid and /raid/report and are raised there - which
+     is the whole difference, because this line only ever knew about blows
+     landed on this device. Raising them here as well would be the same alert
+     from two places, agreeing until the moment somebody else's swing crossed a
+     mark first. */
+  if (battle.raid && !battle.shared) raidAlerts(crossed.map(x => x.at));
   return true;
 }
 
@@ -7191,8 +7376,11 @@ function btFinish(){
     // ...and what this attempt was worth, which is the only number on the raid
     // screen that is about you rather than about him.
     const took = Math.max(0, battle.hpAtStart - Math.max(0, battle.b.cur));
-    save.raid.dealt = Math.max(0, (save.raid.dealt || 0) + took);
-    raidSet(Math.max(0, battle.b.cur));
+    if (battle.shared) raidReport(battle.seed, took);
+    else {
+      save.raid.dealt = Math.max(0, (save.raid.dealt || 0) + took);
+      raidSet(Math.max(0, battle.b.cur));
+    }
   }
   $("#bt-end-ico").textContent = won ? "\u{1F3C6}" : "\u{1F4A4}";
   $("#bt-end-h").textContent = won ? "You win" : "You lost";
@@ -7496,6 +7684,16 @@ async function stravaSync(opts){
        than current ones. */
     const marksSeen = save.marksSeenAt || 0;
     try { await refreshMarks(); } catch (e){ /* an unpriced run beats no run */ }
+    /* And the raid, on the same round trip. Not for the screen - the Raid tab
+       fetches its own - but for the alerts: a boss somebody else pushed below
+       half is news to everybody in the raid, and a player who only ever syncs
+       would otherwise hear about it the next time they happened to open that
+       tab, or never. It is also where the run that just landed turns into a
+       swing, so the count is right before they go looking for it.
+
+       Guarded like the marks, and for a stronger reason: a raid that cannot be
+       reached must not be the thing that stops a run being logged. */
+    try { await refreshRaid(); } catch (e){ /* the raid can wait; the run cannot */ }
     // Anything that landed while they were away. The defender is never at the
     // fight - their pet is played for them - so without this the first they
     // hear of being attacked is a red row docking a run they have already
