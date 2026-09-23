@@ -1945,16 +1945,19 @@ const SKILLS = {
       blurb:"Rears up and lands hard enough to throw a ring of fire out around it.",
       // a shockwave goes under a guard rather than through it - and lands you
       // flat-footed for doing it
-      battle:{ dmg:1.05, pierce:0.50, cd:3, open:{ pct:0.25, turns:2 } },
+      battle:{ dmg:1.47, pierce:0.50, cd:3, open:{ pct:0.25, turns:2 } },
       sprite:{ src:"art/skill-flame-stomp.png",  frames:16, fps:12.5,
         // the rear-up hangs, the slam is quick, the ring spreads and fades
         durations:[160,150,140,130, 120,100,90,80, 100,120,130,140, 150,160,170,220],
         aspect:1.270, scale:1.98, dx:13, dy:-25 } },
     { id:"flying-swoop", name:"Flying Swoop", ico:"\u2604\uFE0F", stage:2, level:26,
       blurb:"Those wings finally earn their keep: a low, fast pass trailing fire.",
-      // a fast pass, not a heavy one: it hits for less than a plain attack and
-      // buys tempo instead
-      battle:{ dmg:0.85, cd:3, charge:{ spd:0.10, pow:0.06, max:3 } },
+      /* It was a fast pass rather than a heavy one - 0.85, less than a plain
+         attack, buying tempo instead. That is a good idea and the wrong one
+         here: it is the last skill the line learns, at 26, and a move you
+         wait eight levels for cannot be the weakest thing you own. It hits
+         hardest of the three now and still charges. */
+      battle:{ dmg:1.50, cd:3, charge:{ spd:0.10, pow:0.06, max:3 } },
       sprite:{ src:"art/skill-flying-swoop.png", frames:16, fps:14.3,
         // slow either end, but the pass stays fast or the dragon floats
         durations:[170,160,150, 130,110,90, 80,80,80,90,100, 120,140,160,180,220],
@@ -1978,8 +1981,12 @@ const SKILLS = {
         aspect:1.079, scale:1.139, dx:3.2, dy:-13.6 } },
     { id:"lightning-bolt", name:"Lightning Bolt", ico:"\u{1F329}\uFE0F", stage:2, level:18,
       blurb:"Asks the sky for help. The sky, this time, obliges.",
-      // the Zephyrite's only move, so it carries the whole form
-      battle:{ dmg:1.65, pierce:0.35, cd:3 },
+      /* Down from 1.65, and the only skill in the game that got weaker. It
+         was the Zephyrite's only move and carried the whole form; Arc Lash
+         arrived at 22 and now has to beat it, and lifting Arc Lash over a
+         1.65 Bolt put Nimbus 5 points clear of everybody. Some of the gap
+         comes down instead of all of it going up. */
+      battle:{ dmg:1.53, pierce:0.35, cd:3 },
       sprite:{ src:"art/skill-lightning-bolt.png", frames:12, fps:3,
         /* It gathers, the sky answers, and the bolt lands. The charge quickens
            the way the Sparky's does; the strike is four frames that grow, so
@@ -2007,7 +2014,7 @@ const SKILLS = {
          pet was paying twice and buying once. A second skill has to beat a
          basic attack on the turn it is used, or it is a liability however
          good its rider is. */
-      battle:{ dmg:1.05, cd:3, rattle:{ pct:0.40, turns:3 } },
+      battle:{ dmg:1.59, cd:3, rattle:{ pct:0.40, turns:3 } },
       sprite:{ src:"art/skill-arc-lash.png", frames:12, fps:4.2,
         /* The tail gathers over four frames, sweeps through two, and the flick
            itself is frames 7 and 8 - the fastest beats in the clip, because a
@@ -2122,8 +2129,13 @@ const SKILLS = {
          Tuning found the balance sits at a heavier hit paid for more dearly
          rather than a smaller one paid for lightly: at 0.95 damage on a
          4-turn cooldown the numbers came out the same, but a move called
-         Landslide that hits for less than a shove is not worth having. */
-      battle:{ dmg:1.25, pierce:0.35, cd:5, open:{ pct:0.50, turns:3 } },
+         Landslide that hits for less than a shove is not worth having.
+
+         1.25 -> 1.61 with the rest of the ladder. Verdant has one damaging
+         skill at this stage where Ember has three, so its single move has to
+         carry what their three carry between them, or the line that already
+         loses 62% of its fights against Ember loses more. */
+      battle:{ dmg:1.61, pierce:0.35, cd:5, open:{ pct:0.50, turns:3 } },
       sprite:{ src:"art/skill-landslide.png", frames:16, fps:5.4,
         /* Three seconds: a beat of sitting there before it commits, a tuck,
            then eleven frames accelerating from 190ms down to 98ms as the ball
@@ -4069,7 +4081,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-23 5979106";
+const BUILD_ID = "2026-09-23 2155f8e";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
