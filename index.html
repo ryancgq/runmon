@@ -3266,6 +3266,14 @@ function markPenalty(marks, now){
   }
   return Math.min(MARK_CAP, Math.max(0, sum));
 }
+/* How many are still standing. A faded mark is dropped by the broker on the
+   next touch rather than the moment it expires, so counting the list is not
+   the same as counting what markPenalty() added up - and a row that says
+   "-0% XP from 3 attacks" is worse than saying nothing. */
+function markCount(marks, now){
+  return (marks || []).filter(m =>
+    ((now || Date.now()) - (m.at || 0)) < MARK_HOURS * 3600e3).length;
+}
 
 /** ACSM running equation -> kilocalories. */
 function calories(km, seconds, weightKg){
@@ -4139,7 +4147,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-23 f5b52f9";
+const BUILD_ID = "2026-09-23 91f0832";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -5954,7 +5962,8 @@ async function refreshPlayers(){
     // that predates it sends nothing, which reads as nobody carrying a mark -
     // the right way round for a field that only ever adds a line to a row.
     .map(p => ({ id: String(p.id || "").slice(0, 24), card: safeCard(p.card),
-                 pen: Math.max(0, Math.min(MARK_CAP, Number(p.pen) || 0)) }))
+                 pen: Math.max(0, Math.min(MARK_CAP, Number(p.pen) || 0)),
+                 hits: Math.max(0, Math.min(99, Math.round(Number(p.hits) || 0))) }))
     .filter(p => p.id && p.card);
   save.roster = rows;
   persist();
@@ -6123,11 +6132,12 @@ function safeCard(c){
    got to first, and that changes who is worth attacking. */
 function rankingRows(){
   const rows = playerList()
-    .map(f => ({ id: f.id, card: safeCard(f.card), pen: f.pen || 0 }))
+    .map(f => ({ id: f.id, card: safeCard(f.card), pen: f.pen || 0, hits: f.hits || 0 }))
     .filter(r => r.card);
   if (save.species && derived && derived.species)
     rows.push({ id: null, me: true, card: safeCard(publicCard()),
-                pen: markPenalty(save.marks, Date.now()) });
+                pen: markPenalty(save.marks, Date.now()),
+                hits: markCount(save.marks, Date.now()) });
   rows.sort((a, b) => (b.card.level - a.card.level) || (b.card.km - a.card.km));
   return rows;
 }
@@ -6139,9 +6149,11 @@ function friendRowHTML(r, rank){
   if (!c) return "";                     // the broker only sends hatched pets
   const ago  = c.lastRun ? relDay(c.lastRun) : "no runs yet";
   // Half a percent rounds to nothing, and "-0% XP" reads as a bug rather than
-  // as a mark that has nearly faded.
+  // as a mark that has nearly faded. A broker that predates the count sends a
+  // penalty and no number, so the attacks go unnumbered rather than as zero.
   const pen  = r.pen > 0.005
-    ? `<div class="pen">\u2694\uFE0F \u2212${Math.round(r.pen * 100)}% XP from marks</div>` : "";
+    ? `<div class="pen">\u2694\uFE0F \u2212${Math.round(r.pen * 100)}% XP from
+       ${r.hits ? r.hits + " " : ""}attack${r.hits === 1 ? "" : "s"}</div>` : "";
   const tag  = r.me ? ` <span class="chip me">You</span>` : "";
   const art  = r.me ? "me" : r.id;
   const open = r.me ? "" : ` data-friend="${r.id}"`;
@@ -6195,9 +6207,13 @@ function attackBarHTML(){
              : `${left} attack${left === 1 ? "" : "s"} left today`;
 
   const pen = markPenalty(save.marks, Date.now());
+  // markCount() rather than the length: an expired mark is dropped on the next
+  // touch, not the moment it runs out, and this line and the one in the table
+  // have to agree about how many there are.
+  const hits = markCount(save.marks, Date.now());
   const marked = pen > 0.005
     ? `<div class="h marked">You are carrying \u2212${Math.round(pen * 100)}% XP from
-       ${(save.marks || []).length} attack${(save.marks || []).length === 1 ? "" : "s"} on your pet.</div>`
+       ${hits} attack${hits === 1 ? "" : "s"} on your pet.</div>`
     : "";
 
   const note = left === 0

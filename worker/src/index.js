@@ -175,6 +175,11 @@ function markPenalty(marks, now){
   }
   return Math.min(MARK_CAP, Math.max(0, sum));
 }
+/** How many of them are still standing - the count the app says it out loud in. */
+function markCount(marks, now){
+  return (marks || []).filter(m =>
+    ((now || Date.now()) - (m.at || 0)) < MARK_HOURS * 3600e3).length;
+}
 /* Two a day, and never the same target twice inside a day. The second rule is
    the one that matters: it is what makes a pile-on need other people. The
    first decides how much of a day's damage any one player can be responsible
@@ -320,7 +325,7 @@ export default {
           const players = (rows || [])
             .filter(x => x.handle !== mine && x.pet)
             .map(x => ({ id: x.handle, card: rosterCard(x), lastSeen: x.lastSeen || 0,
-                         pen: markPenalty(x.marks) }))
+                         pen: markPenalty(x.marks), hits: markCount(x.marks) }))
             .sort((a, b) => (b.card.level - a.card.level) || (b.card.km - a.card.km))
             .slice(0, 200);
           return json(env, { players });
