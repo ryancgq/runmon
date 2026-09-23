@@ -717,6 +717,14 @@ body::before{
   font-size:12.5px;font-weight:700;color:#c8d0e2;line-height:1.5;
   background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);padding:9px 12px;
 }
+/* Only ever on screen when a tap is what happens next - it is the affordance
+   for the one place in a fight that waits for the player rather than a timer. */
+.bt-tap{
+  text-align:center;font-size:10.5px;font-weight:800;letter-spacing:.6px;
+  color:var(--muted);margin-top:8px;animation:btTapPulse 1.7s var(--ease) infinite;
+}
+@keyframes btTapPulse{0%,100%{opacity:.4}50%{opacity:.95}}
+@media (prefers-reduced-motion:reduce){ .bt-tap{animation:none;opacity:.8} }
 .bt-moves{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:0 16px 22px}
 .bt-move{
   display:flex;align-items:center;gap:9px;padding:13px 12px;border-radius:var(--r-md);
@@ -1453,6 +1461,7 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
         </div>
 
         <div class="bt-say" id="bt-say">&nbsp;</div>
+        <div class="bt-tap" id="bt-tap" hidden>Tap to continue</div>
 
         <div class="bt-row you">
           <div class="bt-slot"><div class="pet-holder" id="bt-you-pet"></div></div>
@@ -3976,7 +3985,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-23 f3290dd";
+const BUILD_ID = "2026-09-23 deebcbd";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -6538,7 +6547,7 @@ const BT_END      = 420;    // the last blow, before the result covers it
 const BT_END_BOSS = 1500;   // the damage tag lives 1000ms; let it finish
 const BT_READ     = 1400;   // a milestone line, which nothing else will repeat
 
-function btClear(){ btTimers.forEach(clearTimeout); btTimers = []; }
+function btClear(){ btTimers.forEach(clearTimeout); btTimers = []; btArmTap(null); }
 function btWait(fn, ms){ btTimers.push(setTimeout(fn, ms)); }
 
 /* `opts.seed` makes the fight reproducible - the broker picks it when a battle
@@ -6764,8 +6773,11 @@ function btRun(moveId){
       // A blow that took him past a mark put a line on screen; it is the only
       // time it is said, so it gets read before anything replaces it.
       const read = crossed ? BT_READ : 0;
-      if (battle.over)
-        return btWait(btFinish, read + btFell() + (battle.boss ? BT_END_BOSS : BT_END));
+      if (battle.over){
+        // His ending is paced by the player from here, not by a timer.
+        if (btFell()) return;
+        return btWait(btFinish, read + (battle.boss ? BT_END_BOSS : BT_END));
+      }
       renderBattle();
       if (battle.turn === "b")
         btWait(btFoeTurn, read + (battle.boss ? BT_GAP_BOSS : BT_GAP));
@@ -6787,25 +6799,43 @@ function btWillFall(){
             && cfg && !spriteBroken[cfg.src]);
 }
 
+/* What a tap on the battle screen does next, or null when nothing is waiting
+   on one. Only his ending uses it: everywhere else the screen is paced by
+   timers, because everywhere else there is a move to choose and a tap that
+   advanced the fight would fight it for you. */
+let btTapNext = null;
+function btArmTap(fn){
+  btTapNext = fn;
+  const hint = $("#bt-tap");
+  if (hint) hint.hidden = !fn;
+}
+
+/* His ending, three beats long and each one held until the player is done
+   with it. He falls, and that stays on screen however long they want to look
+   at it; a tap says the fall is finished and names it; another brings up what
+   the raid cost and what it was worth. Returns true when it has taken the
+   ending over, so the caller does not also schedule one. */
 function btFell(){
-  if (!btWillFall()) return 0;
+  if (!btWillFall()) return false;
   const cfg = RAID_BOSS.death;
   battle.felled = true;
   // bossPhase() has no state below "on his last legs" - the last band runs
   // 25% to nothing - so the caption would still be calling him wounded.
   $("#bt-foe-lv").textContent = "felled";
   $("#bt-foe-pet").innerHTML = spriteHTML(cfg, "okay", true);
-  const ms = clipDurationMs(cfg);
-  /* Two lines, in the order the picture happens. btCatchUp() has just written
-     the milestone's "Felled" - true, but said before he has fallen - so the
-     fall gets described first and "Felled" comes back near the end of the
-     clip, over the frame where he is already down. */
-  if (cfg.say){
-    btSay(esc(cfg.say));
+  /* btCatchUp() would have written the milestone's "Felled" - true, but said
+     before he has fallen - so btWillFall() held it back and the fall is
+     described first instead. */
+  if (cfg.say) btSay(esc(cfg.say));
+  // Armed only once the clip has run: a tap during it would cut off the thing
+  // it is waiting on, and this is the one animation nobody should have to
+  // catch a second time.
+  btWait(() => btArmTap(() => {
     const m = RAID_MILESTONES[RAID_MILESTONES.length - 1];
-    btWait(() => btSay(`<b>${esc(m.title)}.</b> ${esc(m.line)}`), ms * 0.72);
-  }
-  return ms;
+    btSay(`<b>${esc(m.title)}.</b> ${esc(m.line)}`);
+    btArmTap(btFinish);
+  }), clipDurationMs(cfg));
+  return true;
 }
 
 function btLand(who, n, heal){
@@ -6827,6 +6857,7 @@ function btFoeTurn(){
 }
 
 function btFinish(){
+  btArmTap(null);
   const won = battle.winner === "a";
   const left = won ? battle.a.cur : battle.b.cur;
   const of   = won ? battle.a.max : battle.b.max;
@@ -7351,6 +7382,15 @@ function wire(){
   $("#bt-moves").addEventListener("click", e => {
     const m = e.target.closest("[data-move]");
     if (m && battle && battle.turn === "a") btRun(m.dataset.move);
+  });
+  /* A tap anywhere on the field advances his ending. The X still leaves, and
+     the result card is its own buttons, so neither is swallowed by this. */
+  $("#screen-battle").addEventListener("click", e => {
+    if (!btTapNext) return;
+    if (e.target.closest("#bt-quit, .bt-end-card")) return;
+    const go = btTapNext;
+    btArmTap(null);
+    go();
   });
   $("#bt-quit").addEventListener("click", leaveBattle);
   $("#bt-done").addEventListener("click", leaveBattle);
