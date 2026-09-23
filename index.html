@@ -945,6 +945,34 @@ body::before{
   font-variant-numeric:tabular-nums;
 }
 .friend.me .rank{color:var(--accent);border-color:rgba(var(--glow),.45)}
+/* The top three carry their places rather than stating them. First is a crown
+   and no number at all - the one row where the position is the whole point, so
+   it should read before the name does - and second and third keep their digit
+   in silver and bronze.
+
+   After the `.me` rule on purpose. When the leader is you, both apply, and the
+   medal is the one that should win the colour: which pet is yours is already
+   said twice over by the accent edge on the row and the "You" chip beside the
+   name, and gold saying "first" is worth more there than a third reminder.
+
+   Literal hex rather than a token, because these are metals: they mean gold,
+   silver and bronze and not "accent", and a theme change should not quietly
+   turn the podium purple. */
+.friend .rank.gold{
+  color:#1a1206;background:linear-gradient(160deg,#ffd96b,#e0a72e);
+  border-color:#f0c44e;box-shadow:0 0 10px rgba(240,196,78,.30);
+}
+.friend .rank.silver{
+  color:#161a20;background:linear-gradient(160deg,#e8edf5,#aeb8c7);
+  border-color:#d2dae6;
+}
+.friend .rank.bronze{
+  color:#1d1108;background:linear-gradient(160deg,#e3a877,#b06c38);
+  border-color:#d09a63;
+}
+/* The crown is drawn, not written, so it needs the size the digit had and none
+   of the chevron's stroke rules. */
+.friend .rank svg{width:13px;height:13px;display:block;fill:currentColor;stroke:none}
 /* A line of its own, and only on the pets that have one. It is the thing you
    are looking for when you read this table - a pet already down 20% has been
    got to, and that decides where the day's two attacks go - so it does not
@@ -4219,7 +4247,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-23 76de333";
+const BUILD_ID = "2026-09-23 eaa5b0c";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -6355,6 +6383,22 @@ function rankingRows(){
   return rows;
 }
 
+/* The place badge. The top three get their metal, and the leader gets a crown
+   instead of a digit - the position is the whole of what that row is saying,
+   and a crown says it without being read.
+
+   The crown carries the place as a label rather than leaving it as a picture:
+   an icon nobody can read out is a worse first place than a "1". */
+const RANK_METAL = { 1:"gold", 2:"silver", 3:"bronze" };
+const CROWN = `<svg viewBox="0 0 24 24" aria-hidden="true"><path
+  d="M3 8l4.5 3.5L12 5l4.5 6.5L21 8l-1.6 9.5H4.6z"/></svg>`;
+function rankBadge(rank){
+  const metal = RANK_METAL[rank] ? ` ${RANK_METAL[rank]}` : "";
+  return rank === 1
+    ? `<span class="rank${metal}" title="1st" aria-label="1st place">${CROWN}</span>`
+    : `<span class="rank${metal}">${rank}</span>`;
+}
+
 /** One place in the table. The pet is drawn with the same art the pet screen
     uses, so a friend's Panda is the Panda. */
 function friendRowHTML(r, rank){
@@ -6373,7 +6417,7 @@ function friendRowHTML(r, rank){
   return `<${r.me ? "div" : "button"} class="friend${r.me ? " me" : ""}"${open}>
       <div class="mug">
         <div class="pet-holder mood-okay" data-friend-art="${art}"></div>
-        <span class="rank">${rank}</span>
+        ${rankBadge(rank)}
       </div>
       <div class="who">
         <div class="n">${esc(c.pet)} <span class="chip">LV ${c.level}</span>${tag}</div>
