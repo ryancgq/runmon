@@ -653,7 +653,16 @@ body::before{
    Battle
    ============================================================ */
 /* The screen is already a flex column; it just must not scroll, and the field
-   between the two pets is the one part allowed to take the slack. */
+   between the two pets is the one part allowed to take the slack.
+
+   Which only works if the things IN it take the slack too. They did not: the
+   slots were a fixed 126px and 216px, so on a short screen the field shrank
+   past its own contents and the rows carried on where the box stopped, over
+   the move buttons. It surfaced at four buttons - a pet with three skills -
+   because that is what finally made the buttons tall enough to squeeze it,
+   and on a phone whose address bar takes the bottom hundred pixels. The slots
+   are sized off the viewport now, so the field always has slack left to give
+   and nothing has to overflow to fit. */
 #screen-battle{overflow:hidden;padding-top:0}
 #screen-battle>.bt-field{flex:1 1 auto;min-height:0}
 .bt-top{display:flex;align-items:center;gap:10px;padding:14px 16px 0}
@@ -681,7 +690,8 @@ body::before{
 /* The art overruns its box by design - a sprite is scaled up inside the
    holder - so the slot is inset from the screen edge by more than that
    overhang, or a Panda loses a paw to the bezel. */
-.bt-slot{position:relative;width:126px;height:126px;flex:0 0 126px;margin:0 6px}
+.bt-slot{position:relative;--slot:clamp(84px,15vh,126px);
+  width:var(--slot);height:var(--slot);flex:0 0 var(--slot);margin:0 6px}
 /* A raid is not a duel, so it is not laid out like one: he sits in the middle
    at nearly twice the size, with his name and health above him rather than
    beside him. A pet on one side and a thing that large on the other read as a
@@ -695,7 +705,7 @@ body::before{
    read - so he gets the percentage beside it rather than instead of it. */
 .bt-row.boss .bt-hpn{display:flex;justify-content:space-between;gap:10px;text-align:left}
 .bt-row.boss .bt-hpn .pc{color:#dbe1ef;flex:0 0 auto}
-.bt-row.boss .bt-slot{width:216px;height:216px;flex:0 0 216px;margin:0}
+.bt-row.boss .bt-slot{--slot:clamp(132px,25vh,216px);margin:0}
 .bt-slot .pet-holder{width:100%;height:100%}
 .bt-slot.hit{animation:btHit .34s var(--ease)}
 @keyframes btHit{0%,100%{transform:translateX(0)}25%{transform:translateX(-7px)}
@@ -743,6 +753,25 @@ body::before{
 .raid-fig span{display:block;font-size:10.5px;font-weight:800;color:var(--muted);
   letter-spacing:.4px;margin-top:2px}
 .bt-moves{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:0 16px 22px}
+/* A fight has to fit on the screen without scrolling, and the tallest one is
+   a raid against a pet with three skills: he is 216px on his own and there
+   are four buttons under him. On a short viewport everything gives a little
+   rather than the layout giving way in one place. */
+@media (max-height:720px){
+  .bt-field{gap:10px;padding:12px 16px 8px}
+  .bt-say{min-height:40px;padding:7px 12px}
+  .bt-moves{gap:7px;padding:0 16px 14px}
+  .bt-move{padding:10px 12px}
+}
+/* An SE-sized screen, in a raid, against a pet with every skill it can have:
+   the tightest the app gets. The slots come down harder and the field keeps a
+   little more under the bottom row, because the art overruns its slot by
+   design and that overhang is what actually reaches the buttons. */
+@media (max-height:620px){
+  .bt-slot{--slot:clamp(72px,13vh,126px)}
+  .bt-row.boss .bt-slot{--slot:clamp(112px,21vh,216px)}
+  .bt-field{padding-bottom:14px}
+}
 .bt-move{
   display:flex;align-items:center;gap:9px;padding:13px 12px;border-radius:var(--r-md);
   background:var(--card);border:1px solid var(--line);font-size:13px;font-weight:800;
@@ -4040,7 +4069,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-23 24b89d1";
+const BUILD_ID = "2026-09-23 5979106";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
