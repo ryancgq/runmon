@@ -689,7 +689,12 @@ body::before{
 .bt-row.boss{flex-direction:column;gap:6px}
 .bt-row.boss .bt-meta{width:100%;text-align:center}
 .bt-row.boss .bt-nm{justify-content:center}
-.bt-row.boss .bt-hpn{text-align:center}
+/* His count and his share, one at each end of the bar. A pet shows what is
+   left over what it started with and that is all anybody needs; at a raid's
+   scale the count alone says nothing - 27,912 of 39,000 is not a figure you
+   read - so he gets the percentage beside it rather than instead of it. */
+.bt-row.boss .bt-hpn{display:flex;justify-content:space-between;gap:10px;text-align:left}
+.bt-row.boss .bt-hpn .pc{color:#dbe1ef;flex:0 0 auto}
 .bt-row.boss .bt-slot{width:216px;height:216px;flex:0 0 216px;margin:0}
 .bt-slot .pet-holder{width:100%;height:100%}
 .bt-slot.hit{animation:btHit .34s var(--ease)}
@@ -3971,7 +3976,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-23 1a736f8";
+const BUILD_ID = "2026-09-23 f3290dd";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -6621,13 +6626,15 @@ function btBars(){
     bar.style.width = (pct * 100).toFixed(1) + "%";
     bar.classList.toggle("mid", pct <= 0.5 && pct > 0.22);
     bar.classList.toggle("low", pct <= 0.22);
-    /* His pool is a raid's worth rather than a pet's, and the raw figure says
-       nothing useful - 3,914 of 4,000 is not a sentence anybody reads. A
-       percentage is, and it keeps the number small enough to stay honest
-       however big the pool gets. */
-    $(`#bt-${id}-hpn`).textContent = (battle.boss && key === "b")
-      ? `${(pct * 100).toFixed(1)}%`
-      : `${cur} / ${max}`;
+    /* Both, for him. The count is the same thing a pet shows; the percentage
+       is the only figure that means anything at a raid's scale, and it is what
+       the narration and the artwork are keyed to. Thousands separated, because
+       39000 is a number you have to count the digits of. */
+    const el = $(`#bt-${id}-hpn`);
+    if (battle.boss && key === "b")
+      el.innerHTML = `<span>${nf(cur)} / ${nf(max)}</span>`
+                   + `<span class="pc">${(pct * 100).toFixed(1)}%</span>`;
+    else el.textContent = `${nf(cur)} / ${nf(max)}`;
   }
   // his artwork changes as the raid wears him down, mid-fight included
   if (battle.boss) btPaintBoss();
