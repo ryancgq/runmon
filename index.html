@@ -3913,7 +3913,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-23 5fc9c0b";
+const BUILD_ID = "2026-09-23 46772f9";
 const ART_VERSION = "26";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -6399,7 +6399,13 @@ function openAnimationTester(){
     animTestChip("bossraid",
       `<span class="em">\u2694\uFE0F</span>Take a swing at him \u00b7 he is on ${
         (raidHp() / RAID_BOSS.battle.hp * 100).toFixed(1)}%`),
-    ...[[1,"Look in at full health"], [0.5,"Look in at 50%"], [0.02,"Look in, nearly dead"]].map(
+    /* Just above each mark, not on it: one attempt takes about 0.7% off him,
+       so a raid crosses a mark roughly once in fifty attempts and the
+       narration is otherwise unreachable without running fifty. The margin is
+       0.1% - about 50 health - which even a level-5 pet gets through in one
+       go. These do not touch the pool. */
+    ...[[1,"Look in at full health"], [0.751,"Fight him onto the 75% mark"],
+        [0.501,"...onto 50%"], [0.251,"...onto 25%"], [0.004,"...onto nothing"]].map(
       ([f, label]) => animTestChip("bossfight", `<span class="em">\u{1F441}\uFE0F</span>${label}`,
                                    `data-frac="${f}"`)),
     animTestChip("bossreset", `<span class="em">\u21BA</span>Put him back to full`)
@@ -6599,6 +6605,22 @@ function btCatchUp(){
   btSay(`<b>${esc(m.title)}.</b> ${esc(m.line)}`);
   $("#bt-foe-lv").textContent = bossPhase(Math.max(0, battle.b.cur) / battle.b.max).note;
   battle.crossed = (battle.crossed || []).concat(crossed.map(x => x.at));
+  /* ...and it goes on the home screen as well, because the line on the battle
+     screen is said once to one person. Every mark gets its own, deepest last,
+     and the id is the mark rather than the moment so a raid cannot mint the
+     same alert twice and crossing one out keeps it out.
+
+     Only a real attempt does this. A look-in is the tester walking through his
+     health to watch the artwork change, and it would raise an alert about a
+     raid nobody ran. When the broker owns the pool these are its to send, to
+     everyone in the raid rather than only to whoever landed the blow. */
+  if (battle.raid){
+    for (const x of crossed)
+      noticeAdd({ id:`raid-${RAID_BOSS.id}-${Math.round(x.at * 100)}`, kind:"raid",
+                  title:"Raid alert", body:x.note });
+    persist();
+    renderNotices();
+  }
   return true;
 }
 
