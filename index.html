@@ -2190,22 +2190,25 @@ const RAID_BOSS = {
 
      hp is the pool, and it follows his damage rather than setting the
      difficulty - a longer attempt takes more off him, so the pool has to grow
-     just to hold the raid at the same length. It has moved five times: 2000
+     just to hold the raid at the same length. It has moved six times: 2000
      before he had skills, 4000 once a guaranteed opening roar doubled what
      everybody took off him, 2300 once the roar became a one-in-three roll,
-     2800 once a roar could no longer buy him an extra turn, and 28000 now.
+     2800 once a roar could no longer buy him an extra turn, 28000 with the
+     power cut, and 40000 now the pet always opens.
 
-     That last jump is two corrections at once and only one of them is the
-     power cut. The other is that every figure before it was measured against
-     level 3-5 pets, which is not where anybody is: at level 22 a pet takes
-     three times as much off him per attempt, so 2800 was a raid that would
-     have ended in a week. Measured on the engine at six players running 30km
-     a week - 36 attempts - 28000 is 4.0 weeks against a level-22 field. The
-     same pool is 6.9 weeks at level 15 and 2.8 at level 30, which is the real
-     argument for the broker scaling it per raid from the roster rather than
-     shipping one number. Set high on purpose meanwhile; it is easier to make
-     him weaker later than to explain why he died in a weekend. */
-  battle: { hp:28000, pow:90, def:25, spd:140 }
+     The jump from 2800 is mostly not the power cut. Every figure before it
+     was measured against level 3-5 pets, which is not where anybody is: a
+     level-26 pet takes ten times as much off him per attempt as a level-5
+     one, so 2800 was a raid that would have ended in a weekend.
+
+     Measured on the engine at six players running 30km a week - 36 attempts -
+     40000 is 4.1 weeks against a level-26 field. The same pool is 13 weeks at
+     level 10 and 3.3 at level 30, and that spread is the whole argument for
+     the broker scaling it per raid from the roster instead of shipping one
+     number: no constant here can be right for two different fields. Set high
+     on purpose meanwhile; it is easier to make him weaker later than to
+     explain why he died in a weekend. */
+  battle: { hp:40000, pow:90, def:25, spd:140 }
 };
 /* One attempt for every 5 km run, banked - a 15 km long run is three swings at
    him. Attempts are the only thing a raid spends, and running is the only thing
@@ -3875,7 +3878,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-23 d6f6adf";
+const BUILD_ID = "2026-09-23 e19e717";
 const ART_VERSION = "25";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -6457,10 +6460,18 @@ function startBattle(you, foe, opts){
     battle.raid = !!o.raid;
     battle.boss = true;
     battle.hpAtStart = battle.b.cur;
-    // He is faster than most pets, so re-roll who moves first against his
-    // speed rather than against the pet that was standing in for him.
-    const sa = battle.a.spd, sb = battle.b.spd;
-    battle.turn = battle.rng() < 0.5 + BT.TILT * (sa - sb) / (sa + sb) ? "a" : "b";
+    /* You always get the first swing at him. Initiative was rolled against his
+       speed, and at 140 against a pet's 35 he won it most of the time - and
+       when he won it he could end the attempt there, so a run's worth of
+       kilometres bought a screen you never played. It was 2% of attempts at
+       level 26 and 16% at level 5, all of them on the branch where he moves
+       first; this deletes the branch rather than making his opener survivable,
+       because there is no amount of health that makes losing before you act
+       feel like anything other than a bug.
+
+       The rng draw stays, so an old seed still plays the fight it always did. */
+    battle.rng();
+    battle.turn = "a";
   }
   battle.stake = o.stake || null;
   battle.you = you; battle.foe = foe;
@@ -6484,7 +6495,11 @@ function startBattle(you, foe, opts){
     $("#bt-foe-lv").textContent = `Lv ${foe.level} · ${SPECIES[foe.species].stages[stageForLevel(foe.level)].name}`;
   }
   const foeName = battle.boss ? RAID_BOSS.short : foe.name;
-  btSay(battle.turn === "a" ? `${esc(you.name)} moves first.` : `${esc(foeName)} is quicker off the mark.`);
+  // A raid always opens the same way now, so it gets a line that says why
+  // rather than one that reads like a coin came down your way again.
+  btSay(battle.boss ? `${esc(RAID_BOSS.short)} is slow to rouse. Get a hit in.`
+      : battle.turn === "a" ? `${esc(you.name)} moves first.`
+      : `${esc(foeName)} is quicker off the mark.`);
   renderBattle();
   if (battle.turn === "b") btWait(btFoeTurn, battle.boss ? BT_OPEN_BOSS : BT_OPEN);
 }
