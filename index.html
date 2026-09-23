@@ -1719,10 +1719,17 @@ const STRAVA_ON  = !DEMO && !!RUNMON_API;
    the tracker there would be no way to feed a pet in there at all. Its GPS is
    simulated anyway. */
 const NATIVE_RUN = DEMO;
-/* The Raid button, in the sandbox only. It replaces Run there, which is what
-   it will do everywhere once the broker owns the pool - until then a player
-   given this button would be grinding down a boss nobody else can see. */
-const RAID_UI = DEMO;
+/* Is there anywhere to fight him? The sandbox always has the Raid button;
+   everyone gets it when RAID_LIVE goes true, which is the one switch that
+   ships the feature. Until then a player given this button would be grinding
+   down a boss nobody else can see.
+
+   His arrival notice reads the same flag rather than a second one of its own.
+   It had one, and the result was an announcement that stayed silent after the
+   button it was waiting for had already arrived - two switches for one
+   question, and I only remembered to throw one of them. */
+const RAID_LIVE = false;
+const RAID_UI   = DEMO || RAID_LIVE;
 const SESSION_KEY = "runmon.strava.session";
 /* Saves written before the app was renamed. Read once, copied to SAVE_KEY, and
    deliberately left in place as a backup — but cleared on reset, or a "new game"
@@ -2327,19 +2334,14 @@ const attemptsForKm = km => Math.floor(Math.max(0, km) / KM_PER_ATTEMPT);
    changes on. Said on the battle screen by whoever lands the blow that crosses
    one, and kept afterwards as a notice on everybody's home screen - a thing
    the whole raid did is worth more than a line one person saw once. */
-/* His arrival, held back until there is somewhere to go and fight him.
-
-   Flip RAID_LIVE when the Raid button replaces Run. Everything below is ready
-   now and deliberately silent until then: an alert telling six people a boss
-   has appeared, when the only way to reach him is a chip inside the demo
-   sandbox, is worse than no alert at all.
+/* His arrival, wherever there is somewhere to go and fight him - RAID_UI, the
+   same flag the Raid button reads.
 
    The id carries RAID_EPOCH rather than a date, so this is minted once per
    raid and not once per app open - and a second raid, whenever there is one,
    mints its own. It is the closest thing to a spawn that exists while the pool
    is local: the broker has to own the moment before every player can be told
    about it at the same time rather than each on their next launch. */
-const RAID_LIVE  = false;
 const RAID_EPOCH = 1;
 const RAID_ARRIVAL = {
   title: "An evil presence stirs in the darkness\u2026",
@@ -2350,7 +2352,7 @@ const RAID_ARRIVAL = {
 };
 /** Tell this player he is here, once. Silent until the raid is reachable. */
 function raidAnnounce(){
-  if (!RAID_LIVE) return false;
+  if (!RAID_UI) return false;
   if (!noticeAdd({ id:`raid-${RAID_BOSS.id}-${RAID_EPOCH}-arrives`, kind:"raid",
                    title:RAID_ARRIVAL.title, body:RAID_ARRIVAL.body })) return false;
   persist();
@@ -4038,7 +4040,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-23 777f572";
+const BUILD_ID = "2026-09-23 24b89d1";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -6358,6 +6360,10 @@ function hatch(){
   save.species = obSpecies;
   save.petName = name;
   save.createdAt = Date.now();
+  // A new pet meets him too. boot() only announces to a device that already
+  // had a save, so without this a player who hatched would not hear about him
+  // until their next launch.
+  raidAnnounce();
   persist();
   renderAll();
   $("#onboard").classList.remove("show");
