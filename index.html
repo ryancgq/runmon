@@ -725,6 +725,23 @@ body::before{
 }
 @keyframes btTapPulse{0%,100%{opacity:.4}50%{opacity:.95}}
 @media (prefers-reduced-motion:reduce){ .bt-tap{animation:none;opacity:.8} }
+.raid-hero{position:relative;display:grid;place-items:center;padding:6px 0 2px}
+.raid-hero .pet-holder{width:min(74vw,268px);height:auto;aspect-ratio:1.0492}
+.raid-nm{text-align:center;font-size:17px;font-weight:900;margin-top:2px}
+.raid-cond{text-align:center;font-size:11.5px;font-weight:800;color:var(--muted);
+  letter-spacing:.4px;margin-top:2px}
+/* The bar is the battle screen's own .bt-hp, not a copy of it: the same thing
+   measured the same way should not be able to drift into two looks. */
+.raid-hp{margin-top:12px}
+.raid-hpn{display:flex;justify-content:space-between;gap:10px;margin-top:5px;
+  font-size:10.5px;font-weight:800;color:var(--muted);letter-spacing:.4px}
+.raid-hpn .pc{color:#dbe1ef}
+.raid-figs{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}
+.raid-fig{background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);
+  padding:11px 12px}
+.raid-fig b{display:block;font-size:19px;font-weight:900}
+.raid-fig span{display:block;font-size:10.5px;font-weight:800;color:var(--muted);
+  letter-spacing:.4px;margin-top:2px}
 .bt-moves{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:0 16px 22px}
 .bt-move{
   display:flex;align-items:center;gap:9px;padding:13px 12px;border-radius:var(--r-md);
@@ -1440,6 +1457,15 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
       <div class="screen-pad"></div>
     </section>
 
+    <!-- ===================== RAID ===================== -->
+    <section class="screen" id="screen-raid">
+      <div class="hdr">
+        <div><h2>Raid</h2><div class="sub" id="raid-sub">Everyone against one thing</div></div>
+      </div>
+      <div id="raid-body"></div>
+      <div class="screen-pad"></div>
+    </section>
+
     <!-- ===================== SETTINGS ===================== -->
     <!-- ===================== BATTLE ===================== -->
     <section class="screen flush no-nav" id="screen-battle">
@@ -1693,6 +1719,10 @@ const STRAVA_ON  = !DEMO && !!RUNMON_API;
    the tracker there would be no way to feed a pet in there at all. Its GPS is
    simulated anyway. */
 const NATIVE_RUN = DEMO;
+/* The Raid button, in the sandbox only. It replaces Run there, which is what
+   it will do everywhere once the broker owns the pool - until then a player
+   given this button would be grinding down a boss nobody else can see. */
+const RAID_UI = DEMO;
 const SESSION_KEY = "runmon.strava.session";
 /* Saves written before the app was renamed. Read once, copied to SAVE_KEY, and
    deliberately left in place as a backup — but cleared on reset, or a "new game"
@@ -2871,9 +2901,20 @@ function raidHp(){
   return h == null ? RAID_BOSS.battle.hp : Math.max(0, Math.min(RAID_BOSS.battle.hp, h));
 }
 function raidSet(hp){
-  if (!save.raid) save.raid = { hp: null };
+  if (!save.raid) save.raid = { hp: null, spent: 0, dealt: 0 };
   save.raid.hp = Math.max(0, Math.round(hp));
   persist();
+}
+/* Attempts are earned by running and spent by swinging, so what is left is the
+   difference. Earned is recomputed from the kilometres rather than counted up
+   as runs arrive: a run that syncs twice, or arrives late, then cannot pay
+   twice. `spent` is the only thing that has to be remembered. */
+function raidAttempts(){
+  const r = save.raid || {};
+  const earned = attemptsForKm(derived ? derived.totalKm : 0);
+  const spent  = Math.max(0, r.spent || 0);
+  return { earned, spent, left: Math.max(0, earned - spent),
+           toNext: KM_PER_ATTEMPT - ((derived ? derived.totalKm : 0) % KM_PER_ATTEMPT) };
 }
 
 function newBattle(you, foe, seed){
@@ -3215,7 +3256,7 @@ const DEFAULT_SAVE = {
      own private copy of him - but that route does not exist yet and a raid
      that forgets the last fight is not a raid to play against. When the broker
      lands, this becomes its cache the way `marks` and `attacks` already are. */
-  raid: { hp: null },
+  raid: { hp: null, spent: 0, dealt: 0 },
 };
 
 let save = structuredCloneSafe(DEFAULT_SAVE);
@@ -3997,7 +4038,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-23 ef8cd85";
+const BUILD_ID = "2026-09-23 777f572";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -4926,11 +4967,70 @@ function renderEvolve(){
       <div class="ico">${b.ico}</div><div class="nm">${b.name}</div></div>`).join("");
 }
 
+/* The raid screen. Sandbox-only for now (RAID_UI), because it is the half of
+   the feature that can be built without the broker: the boss, what is left of
+   him, what you have taken off him, and how many swings your running has
+   bought. What it cannot be yet is shared - the pool it draws is this device's
+   copy, so "everyone against one thing" is true of the design and not yet of
+   the data. */
+function renderRaid(){
+  const body = $("#raid-body");
+  if (!body) return;
+  const hp = raidHp(), max = RAID_BOSS.battle.hp, frac = Math.max(0, hp / max);
+  const a = raidAttempts();
+  const dead = hp <= 0;
+  const tier = frac <= 0.22 ? " low" : frac <= 0.5 ? " mid" : "";
+  $("#raid-sub").textContent = dead
+    ? "He is down. That was everybody's."
+    : `One swing for every ${KM_PER_ATTEMPT} km you run`;
+  body.innerHTML = `
+    <div class="raid-hero">
+      <div class="pet-holder">${spriteHTML(bossSpriteCfg(frac), "okay")}</div>
+    </div>
+    <div class="raid-nm">${esc(RAID_BOSS.name)}</div>
+    <div class="raid-cond">${dead ? "felled" : esc(bossPhase(frac).note)}</div>
+    <div class="bt-hp raid-hp"><i class="${tier}" style="width:${(frac * 100).toFixed(1)}%"></i></div>
+    <div class="raid-hpn">
+      <span>${nf(Math.max(0, hp))} / ${nf(max)}</span>
+      <span class="pc">${(frac * 100).toFixed(1)}%</span>
+    </div>
+    <div class="raid-figs">
+      <div class="raid-fig"><b>${dead ? "\u2014" : a.left}</b><span>${
+        a.left === 1 ? "SWING LEFT" : "SWINGS LEFT"}</span></div>
+      <div class="raid-fig"><b>${(save.raid && save.raid.dealt
+        ? save.raid.dealt / max * 100 : 0).toFixed(1)}%</b><span>YOUR SHARE</span></div>
+    </div>
+    <button class="btn primary" id="raid-go" style="margin-top:12px" ${
+      dead || !a.left ? "disabled" : ""}>${
+      dead ? "Nothing left to fight"
+           : a.left ? "Take a swing at him"
+                    : `Run ${a.toNext.toFixed(1)} km for another swing`}</button>
+    <div class="muted" style="font-size:11px;font-weight:700;margin-top:8px;text-align:center">${
+      dead ? "" : `${a.spent} of ${a.earned} swings used`}</div>`;
+  const go = $("#raid-go");
+  if (go) go.addEventListener("click", raidSwing);
+}
+
+/* One attempt: spend it, then fight him at whatever everybody has left him on.
+   Spent before the fight rather than after, so quitting out of a battle cannot
+   hand the swing back. */
+function raidSwing(){
+  const a = raidAttempts();
+  if (!a.left || raidHp() <= 0) return;
+  save.raid.spent = a.spent + 1;
+  persist();
+  const you = { species: save.species, level: derived.level,
+                name: save.petName || derived.species.name };
+  startBattle(you, { species: save.species, level: derived.level, name: RAID_BOSS.short },
+              { boss:true, raid:true });
+}
+
 /* --- master render ------------------------------------------------------- */
 function renderAll(){
   recompute();
   applyTheme(save.species);
   renderNotices();
+  if (RAID_UI && currentScreen === "raid") renderRaid();
   renderHome();
   renderHistory();
   renderEvolve();
@@ -4966,6 +5066,9 @@ function go(name){
   if (name === "history") { renderHistory(); }
   if (name === "evolve")  { renderEvolve(); }
   if (name === "friends") { openFriendsTab(); }
+  // Drawn on the way in, like the others: his health and your swings both move
+  // while you are somewhere else.
+  if (name === "raid")    { renderRaid(); }
   if (name === "home")    {
     // A queued walk goes first and paints its own opening frame - the state
     // before the runs it is about to replay. renderHome() ahead of it would put
@@ -6878,7 +6981,13 @@ function btFinish(){
      whether you won or lost - a loss that chipped him still counts, and is
      the normal way he goes down. A win leaves him on nothing rather than
      starting a fresh one: when the raid ends is not this screen's decision. */
-  if (battle.raid) raidSet(Math.max(0, battle.b.cur));
+  if (battle.raid){
+    // ...and what this attempt was worth, which is the only number on the raid
+    // screen that is about you rather than about him.
+    const took = Math.max(0, battle.hpAtStart - Math.max(0, battle.b.cur));
+    save.raid.dealt = Math.max(0, (save.raid.dealt || 0) + took);
+    raidSet(Math.max(0, battle.b.cur));
+  }
   $("#bt-end-ico").textContent = won ? "\u{1F3C6}" : "\u{1F4A4}";
   $("#bt-end-h").textContent = won ? "You win" : "You lost";
   /* A raid is scored on what you took off him, not on what is left of him -
@@ -6940,10 +7049,14 @@ function leaveBattle(){
   // and the allowance bar there is a pip shorter than it was, which is the
   // clearest possible statement of what the fight just cost.
   const wasStaked = !!(battle && battle.stake);
+  const wasRaid   = !!(battle && battle.raid);
   btClear();
   battle = null; btLock = false;
   $("#bt-end").hidden = true;
-  go(wasStaked ? "friends" : "home");
+  // Back where the fight was started from: an attempt begins on the raid
+  // screen, and that is where the swing you just spent is counted.
+  if (wasRaid && RAID_UI){ renderRaid(); go("raid"); }
+  else go(wasStaked ? "friends" : "home");
 }
 
 /** Show what the tester is previewing, since the name under the pet is still yours. */
@@ -7382,7 +7495,18 @@ function wire(){
   // The run button, and the notch in the tab bar that exists to make room for
   // it. Both go together: a floating button over a gap reads as a missing
   // control, and a gap with nothing over it reads as a bug.
-  $("#fab").addEventListener("click", () => go("track"));
+  $("#fab").addEventListener("click", () => go(RAID_UI ? "raid" : "track"));
+  if (RAID_UI){
+    const fab = $("#fab");
+    fab.setAttribute("aria-label", "Raid");
+    // Crossed swords. The first attempt was two strokes that met in the middle,
+    // which on a large round button is the close icon with extra steps.
+    fab.innerHTML = `<svg viewBox="0 0 24 24">`
+      + `<polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/>`
+      + `<path d="M13 19l6-6"/><path d="M16 16l4 4"/><path d="M19 21l2-2"/>`
+      + `<polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5"/>`
+      + `<path d="M5 14l4 4"/><path d="M7 17l-3 3"/><path d="M3 19l2 2"/></svg>`;
+  }
   document.addEventListener("click", e => {
     const fj = e.target.closest("[data-form]");
     if (fj) demoJumpToForm(+fj.dataset.form);
