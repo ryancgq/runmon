@@ -2181,19 +2181,31 @@ const RAID_BOSS = {
      the gap you can see, and by 25 the returns have nearly run out - dropping
      it further to 8 buys only another 23%.
 
-     hp is the pool for a raid at the levels this was tuned against, and the
-     broker is expected to scale it per raid from the roster - a field that has
-     levelled does an order of magnitude more damage than this one. At six
-     players running 30km a week it is about four weeks at today's levels. It
-     has moved three times: 2000 before he had skills, 4000 once a guaranteed
-     opening roar more than doubled what everybody took off him, 2300 once the
-     roar became a one-in-three roll rather than a certainty, and 2800 once a
-     roar stopped being able to buy him an extra turn on top of it. Each time
-     the pool followed the damage to keep the raid about the same length; his
-     health is not a difficulty dial on its own. Set high on purpose; it is
-     easier to make him weaker later than to explain why he died in a
-     weekend. */
-  battle: { hp:2800, pow:420, def:25, spd:140 }
+     pow decides how long an attempt lasts, and at 420 the answer was: not long
+     enough to be a fight. A level-22 pet survived 2.3 turns and landed 0.9
+     blows - one swing, usually, and then the result card. At 90 the same pet
+     gets 6.5 turns and 2.4 blows, a level-5 one 3.7 and 1.4. He is still the
+     thing that ends every attempt; he is no longer the thing that ends it
+     before you have played.
+
+     hp is the pool, and it follows his damage rather than setting the
+     difficulty - a longer attempt takes more off him, so the pool has to grow
+     just to hold the raid at the same length. It has moved five times: 2000
+     before he had skills, 4000 once a guaranteed opening roar doubled what
+     everybody took off him, 2300 once the roar became a one-in-three roll,
+     2800 once a roar could no longer buy him an extra turn, and 28000 now.
+
+     That last jump is two corrections at once and only one of them is the
+     power cut. The other is that every figure before it was measured against
+     level 3-5 pets, which is not where anybody is: at level 22 a pet takes
+     three times as much off him per attempt, so 2800 was a raid that would
+     have ended in a week. Measured on the engine at six players running 30km
+     a week - 36 attempts - 28000 is 4.0 weeks against a level-22 field. The
+     same pool is 6.9 weeks at level 15 and 2.8 at level 30, which is the real
+     argument for the broker scaling it per raid from the roster rather than
+     shipping one number. Set high on purpose meanwhile; it is easier to make
+     him weaker later than to explain why he died in a weekend. */
+  battle: { hp:28000, pow:90, def:25, spd:140 }
 };
 /* One attempt for every 5 km run, banked - a 15 km long run is three swings at
    him. Attempts are the only thing a raid spends, and running is the only thing
@@ -2737,6 +2749,19 @@ function btBossSide(hpLeft){
   };
 }
 
+/* What he is standing at, and what an attempt leaves him on. A raid that
+   healed between fights would be a boss you could never finish, so every
+   attempt has to start where the last one stopped. */
+function raidHp(){
+  const h = save.raid && save.raid.hp;
+  return h == null ? RAID_BOSS.battle.hp : Math.max(0, Math.min(RAID_BOSS.battle.hp, h));
+}
+function raidSet(hp){
+  if (!save.raid) save.raid = { hp: null };
+  save.raid.hp = Math.max(0, Math.round(hp));
+  persist();
+}
+
 function newBattle(you, foe, seed){
   const st = {
     seed: seed >>> 0,
@@ -3059,6 +3084,16 @@ const DEFAULT_SAVE = {
   // from state rather than delivered once - without this, dismissing the one
   // about being attacked would simply mint it again on the next sync.
   noticesGone: [],
+  /* What is left of him, which is the whole point of a raid: he does not heal
+     between attempts, so an attempt that takes 2% off him leaves the next
+     person a boss on 98%. `hp` null means nobody has swung at him yet.
+
+     This is a local pool, and it is a placeholder. A raid is shared - the
+     broker has to be the one that counts, or six people each grind down their
+     own private copy of him - but that route does not exist yet and a raid
+     that forgets the last fight is not a raid to play against. When the broker
+     lands, this becomes its cache the way `marks` and `attacks` already are. */
+  raid: { hp: null },
 };
 
 let save = structuredCloneSafe(DEFAULT_SAVE);
@@ -3840,7 +3875,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-23 4ca0c1e";
+const BUILD_ID = "2026-09-23 d6f6adf";
 const ART_VERSION = "25";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -6323,9 +6358,13 @@ function openAnimationTester(){
                    `data-frac="${[1, 0.74, 0.49, 0.24][i]}"`)),
     ...RAID_BOSS.kit.map(k =>
       animTestChip("bossskill", `<span class="em">${k.ico}</span>${k.name}`, `data-sk="${k.id}"`)),
-    ...[[1,"Fight him, full health"], [0.5,"Fight him at 50%"], [0.02,"Fight him, nearly dead"]].map(
-      ([f, label]) => animTestChip("bossfight", `<span class="em">\u2694\uFE0F</span>${label}`,
-                                   `data-frac="${f}"`))
+    animTestChip("bossraid",
+      `<span class="em">\u2694\uFE0F</span>Take a swing at him \u00b7 he is on ${
+        (raidHp() / RAID_BOSS.battle.hp * 100).toFixed(1)}%`),
+    ...[[1,"Look in at full health"], [0.5,"Look in at 50%"], [0.02,"Look in, nearly dead"]].map(
+      ([f, label]) => animTestChip("bossfight", `<span class="em">\u{1F441}\uFE0F</span>${label}`,
+                                   `data-frac="${f}"`)),
+    animTestChip("bossreset", `<span class="em">\u21BA</span>Put him back to full`)
   ].join("");
 
   openSheet({
@@ -6400,7 +6439,11 @@ function btWait(fn, ms){ btTimers.push(setTimeout(fn, ms)); }
    is claimed, so the result reported back belongs to a fight it knows about.
    `opts.stake` carries that claim, and its presence is what separates a real
    attack from the animation tester: no stake, nothing is reported and nobody
-   is marked. */
+   is marked.
+
+   `opts.raid` is the same distinction for the boss. An attempt carries the
+   pool forward and writes back what it took off him; `opts.hpLeft` on its own
+   is the tester dropping you in at a chosen health to look at him. */
 function startBattle(you, foe, opts){
   const o = opts || {};
   btClear();
@@ -6410,7 +6453,8 @@ function startBattle(you, foe, opts){
      than inside it so the seeded rng, the initiative roll and everything else
      stay exactly as they are for an ordinary fight. */
   if (o.boss){
-    battle.b = btBossSide(o.hpLeft);
+    battle.b = btBossSide(o.raid ? raidHp() : o.hpLeft);
+    battle.raid = !!o.raid;
     battle.boss = true;
     battle.hpAtStart = battle.b.cur;
     // He is faster than most pets, so re-roll who moves first against his
@@ -6605,6 +6649,11 @@ function btFinish(){
   const left = won ? battle.a.cur : battle.b.cur;
   const of   = won ? battle.a.max : battle.b.max;
   const turns = `${battle.no} turn${battle.no === 1 ? "" : "s"}`;
+  /* What the attempt took off him is the raid's only record of it, written
+     whether you won or lost - a loss that chipped him still counts, and is
+     the normal way he goes down. A win leaves him on nothing rather than
+     starting a fresh one: when the raid ends is not this screen's decision. */
+  if (battle.raid) raidSet(Math.max(0, battle.b.cur));
   $("#bt-end-ico").textContent = won ? "\u{1F3C6}" : "\u{1F4A4}";
   $("#bt-end-h").textContent = won ? "You win" : "You lost";
   /* A raid is scored on what you took off him, not on what is left of him -
@@ -6699,6 +6748,19 @@ function playAnimTest(d, root){
       if (k){ $("#home-pet").innerHTML = spriteHTML(k.sprite, "okay"); animTestNote(k.name); }
       return;
     }
+    /* Two different things, and they were one before. A raid attempt carries
+       the pool: he starts where the last attempt left him and the damage is
+       kept. The three look-ins do not touch it - they exist to watch his
+       artwork change, which only happens as his health falls. */
+    case "bossraid": {
+      closeSheet();
+      previewPet = null;
+      startBattle({ species: save.species, level: derived.level,
+                    name: save.petName || derived.species.name },
+                  { species: save.species, level: derived.level, name: RAID_BOSS.short },
+                  { boss:true, raid:true });
+      return;
+    }
     case "bossfight": {
       closeSheet();
       previewPet = null;
@@ -6706,6 +6768,11 @@ function playAnimTest(d, root){
                     name: save.petName || derived.species.name },
                   { species: save.species, level: derived.level, name: RAID_BOSS.short },
                   { boss:true, hpLeft: Math.round(RAID_BOSS.battle.hp * (+d.frac || 1)) });
+      return;
+    }
+    case "bossreset": {
+      raidSet(RAID_BOSS.battle.hp);
+      animTestNote(`${RAID_BOSS.short} is back on his feet, on 100%.`);
       return;
     }
     case "fight": {
@@ -7103,8 +7170,16 @@ function wire(){
   });
   $("#bt-quit").addEventListener("click", leaveBattle);
   $("#bt-done").addEventListener("click", leaveBattle);
+  /* Carry the fight's own terms into the rematch. Passing only the two pets
+     dropped `boss`, so a second go at the raid was a fight with the stand-in
+     object a raid is started against - which is a copy of your own pet at your
+     own level, wearing his name. And it has to resume at his current health:
+     he does not heal because you lost. */
   $("#bt-again").addEventListener("click", () => {
-    if (battle) startBattle(battle.you, battle.foe);
+    if (!battle) return;
+    startBattle(battle.you, battle.foe, battle.boss
+      ? { boss:true, raid:battle.raid, hpLeft:Math.max(0, battle.b.cur) }
+      : undefined);
   });
 
   // the pet itself is the most obvious thing to poke
