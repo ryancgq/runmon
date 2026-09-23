@@ -2163,6 +2163,18 @@ const RAID_BOSS = {
      24% size difference that is really two different shapes. */
   death: { src:"art/boss-death.png", frames:16, rows:1, fps:6,
            aspect:1.2281, scale:1.237, dx:6.8, dy:6.8,
+           /* Paced rather than played at a flat rate, because a fall is not a
+              flat thing. At an even 6fps the whole of it went by in 2.7s and
+              the shape was lost: the beat before he goes, the torch coming
+              apart, the drop, and then the long settle while the embers give
+              out. So the frames either side of the shatter are held, the
+              shatter and the drop are quick, and the last four run slowest -
+              nothing moves there but smoke, and it is the part that says he
+              is not getting up. 4.5s in total against 2.7. fps is kept as the
+              fallback the timing code uses if this list ever stops matching
+              the frame count. */
+           durations:[320,200,200,360, 140,140,220,260,
+                      200,180,300,340, 380,400,420,460],
            /* Said over the fall, while it is happening. The milestone's own
               line lands afterwards, near the end of the clip, so the last
               thing on screen before the result card is "Felled." */
@@ -3985,7 +3997,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-23 deebcbd";
+const BUILD_ID = "2026-09-23 ef8cd85";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
