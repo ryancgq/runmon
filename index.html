@@ -2231,13 +2231,18 @@ const RAID_BOSS = {
      it - the roll compares him to whoever is in front of him, and against a
      Verdant even 60 is miles clear.
 
-     hp is the pool, and it follows his damage rather than setting the
-     difficulty - a longer attempt takes more off him, so the pool has to grow
-     just to hold the raid at the same length. It has moved seven times: 2000
-     before he had skills, 4000 once a guaranteed opening roar doubled what
-     everybody took off him, 2300 once the roar became a one-in-three roll,
-     2800 once a roar could no longer buy him an extra turn, 28000 with the
-     power cut, 40000 once the pet always opened, and 52000 now he alternates.
+     hp is the pool. Every move of it up to 52000 followed his damage rather
+     than setting the difficulty - a longer attempt takes more off him, so the
+     pool had to grow just to hold the raid at the same length. Seven of those:
+     2000 before he had skills, 4000 once a guaranteed opening roar doubled
+     what everybody took off him, 2300 once the roar became a one-in-three
+     roll, 2800 once a roar could no longer buy him an extra turn, 28000 with
+     the power cut, 40000 once the pet always opened, and 52000 once he
+     alternated.
+
+     39000 is the first one that is not bookkeeping: a quarter off, asked for,
+     to make him easier to kill. Nothing about a fight with him changed, only
+     how many of them it takes.
 
      The jump from 2800 is mostly not the power cut. Every figure before it
      was measured against level 3-5 pets, which is not where anybody is: a
@@ -2245,13 +2250,12 @@ const RAID_BOSS = {
      one, so 2800 was a raid that would have ended in a weekend.
 
      Measured on the engine at six players running 30km a week - 36 attempts -
-     52000 is 4.0 weeks against a level-26 field. The same pool is 14 weeks at
-     level 10 and 3.3 at level 30, and that spread is the whole argument for
-     the broker scaling it per raid from the roster instead of shipping one
-     number: no constant here can be right for two different fields. Set high
-     on purpose meanwhile; it is easier to make him weaker later than to
-     explain why he died in a weekend. */
-  battle: { hp:52000, pow:90, def:25, spd:60 }
+     39000 is 3.0 weeks against a level-26 field, down from 4.0. The same pool
+     is 10.8 weeks at level 10 and 2.4 at level 30, and that spread is the
+     whole argument for the broker scaling it per raid from the roster instead
+     of shipping one number: no constant here can be right for two different
+     fields. */
+  battle: { hp:39000, pow:90, def:25, spd:60 }
 };
 /* One attempt for every 5 km run, banked - a 15 km long run is three swings at
    him. Attempts are the only thing a raid spends, and running is the only thing
@@ -3934,7 +3938,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-23 47bdf5c";
+const BUILD_ID = "2026-09-23 70e55e7";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
