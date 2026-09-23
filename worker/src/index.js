@@ -202,7 +202,7 @@ function markCount(marks, now){
    ------------------------------------------------------------------------- */
 const RAID_VERSION = 1;
 const RAID_ID      = "uwaaargh";
-const RAID_HP      = 35100;
+const RAID_HP      = 25000;
 const RAID_KM_PER_SWING = 5;
 /* He does not come back on his own. When his health reaches zero the epoch
    closes and stays closed - no timer, no respawn - and everything about it is
@@ -1043,9 +1043,13 @@ export class Athlete {
     if (path === "/raid-respawn"){
       const { hp } = await request.json().catch(() => ({}));
       const old  = await this.raidState({});
+      const chosen = Number(hp) > 0;
       const raid = {
-        id: RAID_ID, epoch: old.epoch + 1, max: Number(hp) > 0 ? Math.round(hp) : RAID_HP,
-        hp: Number(hp) > 0 ? Math.round(hp) : RAID_HP,
+        id: RAID_ID, epoch: old.epoch + 1,
+        max: chosen ? Math.round(hp) : RAID_HP,
+        hp:  chosen ? Math.round(hp) : RAID_HP,
+        // a health named at the switch is never revised by a later deploy
+        sized: chosen,
         startedAt: Date.now(), felledAt: null, crossed: [], v: RAID_VERSION
       };
       await this.state.storage.put("raid", raid);
@@ -1063,14 +1067,34 @@ export class Athlete {
      there is no moment before this object exists when something could have
      written it. `max` is stored on the epoch rather than read from RAID_HP
      each time, so changing his health in the code does not silently resize a
-     raid that is already half fought. */
+     raid that is already half fought.
+
+     With one exception, and it is here because it was needed: an epoch that
+     nobody has swung at yet is not yet a raid, so if it still carries the
+     default health it takes the current one. GET /raid mints on first touch,
+     and the app was calling it on every sync before the feature shipped, so
+     the live raid got started at the health the broker happened to be carrying
+     by people who could not see it existed. Without this, shipping a different
+     number would have needed a respawn by hand to take effect.
+
+     `sized` marks an epoch whose health was chosen at the switch. Those are
+     left alone at any cost: somebody who starts a raid at 8,000 for a small
+     field means it, and a later deploy must not quietly undo them. */
   async raidState(){
     const have = await this.state.storage.get("raid");
-    if (have) return have;
-    const raid = { id: RAID_ID, epoch: 1, max: RAID_HP, hp: RAID_HP,
-                   startedAt: Date.now(), felledAt: null, crossed: [], v: RAID_VERSION };
-    await this.state.storage.put("raid", raid);
-    return raid;
+    if (!have){
+      const raid = { id: RAID_ID, epoch: 1, max: RAID_HP, hp: RAID_HP, sized: false,
+                     startedAt: Date.now(), felledAt: null, crossed: [], v: RAID_VERSION };
+      await this.state.storage.put("raid", raid);
+      return raid;
+    }
+    const untouched = have.hp === have.max && !have.felledAt && !(have.crossed || []).length;
+    if (!have.sized && untouched && have.max !== RAID_HP){
+      const raid = { ...have, max: RAID_HP, hp: RAID_HP, startedAt: Date.now() };
+      await this.state.storage.put("raid", raid);
+      return raid;
+    }
+    return have;
   }
 
   /* Both sides of a fight keep a copy: yours says what you did, theirs says

@@ -2382,9 +2382,9 @@ const RAID_BOSS = {
      alternated.
 
      39000 was the first one that is not bookkeeping: a quarter off, asked for,
-     to make him easier to kill. 35100 takes a further tenth off for the same
-     reason. Nothing about a fight with him changed, only how many of them it
-     takes.
+     to make him easier to kill. 35100 took a further tenth off, and 25000 is
+     where he ships. Nothing about a fight with him changed, only how many of
+     them it takes.
 
      The jump from 2800 is mostly not the power cut. Every figure before it
      was measured against level 3-5 pets, which is not where anybody is: a
@@ -2392,12 +2392,13 @@ const RAID_BOSS = {
      one, so 2800 was a raid that would have ended in a weekend.
 
      Measured on the engine at six players running 30km a week - 36 attempts -
-     39000 was 3.0 weeks against a level-26 field, down from 4.0, and 35100 is
-     2.7. The same pool is 9.7 weeks at level 10 and 2.2 at level 30, and that
-     spread is the whole argument for the broker scaling it per raid from the
-     roster instead of shipping one number: no constant here can be right for
-     two different fields. */
-  battle: { hp:35100, pow:90, def:25, spd:60 }
+     25000 is 1.7 weeks against a level-26 field. The same pool is 6.8 weeks at
+     level 10 and 11.1 at level 5, and that spread is the whole argument for
+     the broker scaling it per raid from the roster instead of shipping one
+     number: no constant here can be right for two different fields. Until it
+     does, the switch takes an hp, so a raid can be sized to the field it is
+     actually being fought by. */
+  battle: { hp:25000, pow:90, def:25, spd:60 }
 };
 /* One attempt for every 5 km run, banked - a 15 km long run is three swings at
    him. Attempts are the only thing a raid spends, and running is the only thing
@@ -4218,7 +4219,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-23 8d65870";
+const BUILD_ID = "2026-09-23 76de333";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -5156,7 +5157,13 @@ function renderEvolve(){
    ones somebody else's swing pushed him past, which is the half the local
    version could never do: it only knew about blows this device landed. */
 async function refreshRaid(){
-  if (!raidShared()) return;
+  /* RAID_UI as well as a link. Without it this ran on every sync for every
+     player while the Raid button was still hidden - a round trip nobody could
+     see the result of, and worse than wasted: GET /raid mints the epoch on
+     first touch, so the raid was quietly being started by people who had no
+     way to know it existed, at whatever health the broker was carrying at the
+     time. Nothing reads a feature that is not shipped. */
+  if (!RAID_UI || !raidShared()) return;
   const r = await stravaCall("/raid");
   const raid = (r && r.raid) || {}, you = (r && r.you) || {};
   save.raid = Object.assign(save.raid || {}, {
