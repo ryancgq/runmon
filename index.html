@@ -4147,7 +4147,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-23 91f0832";
+const BUILD_ID = "2026-09-23 f0fdddd";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -6334,8 +6334,21 @@ async function openFriendsTab(){
   renderFriends();
   if (!stravaLinked()) return;
   try {
-    await Promise.all([refreshPlayers(), refreshMarks()]);
-    friendsNote = null;
+    /* In this order, and not in parallel. Reading the marks is also what
+       repairs the roster's copy of them - yours, and those of anyone you have
+       attacked - and a roster fetched alongside that read is answered from
+       before the repair lands. Run together, the penalties appeared on the
+       second open of the tab and never on the first, which looks exactly like
+       the feature not working.
+
+       Separately guarded, because ordering them must not make one the other's
+       single point of failure: Promise.all rejects on the first failure but
+       both calls have already been made, so a broken /battle/marks used to
+       leave the roster refreshed anyway. */
+    let failed = null;
+    try { await refreshMarks(); }   catch (err){ failed = err; }
+    try { await refreshPlayers(); } catch (err){ failed = failed || err; }
+    friendsNote = failed ? friendsFail(failed) : null;
   } catch (err){
     friendsNote = friendsFail(err);   // the cached roster still stands
   }

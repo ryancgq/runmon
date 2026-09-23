@@ -484,12 +484,35 @@ export default {
              ignored by both the penalty and the count, so a row whose marks
              have all run out needs no write to stop showing them - and a quiet
              day is most of them. */
+          const live = t => Date.now() - (Number(t) || 0) < MARK_HOURS * 3600e3;
+          const sync = (handle, marks) => rosterStub(env).fetch("https://do/roster-sync",
+            { method:"POST", body: JSON.stringify({ handle, marks }) });
+
           if ((data.marks || []).length){
             const handle = (await hmac(env.SESSION_SECRET, "roster:" + me)).slice(0, 12);
-            await rosterStub(env).fetch("https://do/roster-sync", { method:"POST",
-              body: JSON.stringify({ handle,
-                marks: data.marks.map(m => ({ at: m.at, amt: m.amt })) }) });
+            await sync(handle, data.marks.map(m => ({ at: m.at, amt: m.amt })));
           }
+
+          /* And the rows of everyone this player has attacked. Waiting for each
+             of them to open the app would be right if they were the only ones
+             who knew, but they are not: an outgoing row in this pet's own log
+             is the same at and amt that went onto the target, written in the
+             same breath. So the attacker repairs what the attacker did, and a
+             player who spent their two attacks this morning sees the result of
+             them the next time they look - rather than whenever the person
+             they hit happens to open Runmon.
+
+             Merged by the roster, so the copy the attack already wrote is not
+             counted twice, and only ever adds. A day's live rows is two. */
+          const out = (data.battles || []).filter(bt =>
+            bt && bt.dir === "out" && bt.who && live(bt.at) && bt.amt > 0);
+          const byTarget = new Map();
+          for (const bt of out){
+            if (!byTarget.has(bt.who)) byTarget.set(bt.who, []);
+            byTarget.get(bt.who).push({ at: bt.at, amt: bt.amt });
+          }
+          for (const [handle, marks] of byTarget) await sync(handle, marks);
+
           return json(env, data);
         });
 
