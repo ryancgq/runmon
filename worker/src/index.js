@@ -469,7 +469,29 @@ export default {
       /* What is standing on your own pet, and the fights it has been in. The
          app prices its runs from this. */
       if (path === "/battle/marks")
-        return await withAthlete(request, env, stub => stub.fetch("https://do/marks"));
+        return await withAthlete(request, env, async (stub, me) => {
+          const data = await (await stub.fetch("https://do/marks")).json();
+          /* And, while the list is in hand, the roster's copy of it is brought
+             up to date. Rankings shows every player's standing penalty, and
+             that copy is written by whoever lands the attack - so marks that
+             predate it, or any drift since, would never appear there and there
+             is nothing to migrate from: the roster cannot read into an athlete
+             object, and fanning out to two hundred of them to draw one screen
+             is the read the copy exists to avoid. Every player does this on
+             opening the tab, so the table fills itself in.
+
+             Skipped when there is nothing on the pet. An expired mark is
+             ignored by both the penalty and the count, so a row whose marks
+             have all run out needs no write to stop showing them - and a quiet
+             day is most of them. */
+          if ((data.marks || []).length){
+            const handle = (await hmac(env.SESSION_SECRET, "roster:" + me)).slice(0, 12);
+            await rosterStub(env).fetch("https://do/roster-sync", { method:"POST",
+              body: JSON.stringify({ handle,
+                marks: data.marks.map(m => ({ at: m.at, amt: m.amt })) }) });
+          }
+          return json(env, data);
+        });
 
       if (path === "/admin/summary"){
         const given = (request.headers.get("Authorization") || "").replace(/^Bearer /, "");
@@ -672,6 +694,24 @@ export class Athlete {
         lastSeen: Date.now()
       });
       return this.ok({ ok: true });
+    }
+    /* The pet's own marks, as the roster sees them. Merged rather than
+       replaced: an attack landing between the read that produced this list and
+       this write would otherwise be erased, and a mark is identified well
+       enough by the moment it was made and what it was worth. */
+    if (path === "/roster-sync"){
+      const { handle, marks } = await request.json();
+      const key  = "row:" + handle;
+      const prev = await this.state.storage.get(key);
+      if (!prev) return this.ok({ ok:false });
+      const seen = new Set();
+      const merged = [...(marks || []), ...(prev.marks || [])]
+        .filter(m => m && Date.now() - (m.at || 0) < MARK_HOURS * 3600e3)
+        .filter(m => { const k = m.at + ":" + m.amt;
+                       if (seen.has(k)) return false; seen.add(k); return true; })
+        .sort((a, b) => a.at - b.at);
+      await this.state.storage.put(key, { ...prev, marks: merged.slice(-40) });
+      return this.ok({ ok:true, marks: merged.length });
     }
     /* A mark landing on somebody, as the roster sees it. Written here rather
        than read from the athlete object when the table is drawn, and dropped
