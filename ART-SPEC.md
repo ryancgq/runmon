@@ -202,15 +202,37 @@ and the overhang comes with the frame it belongs to. The overhang is the
 animation, not an error to correct, so each frame goes back at its offset from
 its **even** cell origin and the whole sheet is widened to hold the largest.
 
-Size is the separate problem. Measured against a cell of his idle sheet he
-stands 279 px tall doing nothing, 268 mid-swing, 261 mid-smash and 215
-mid-roar, on canvases that are not all the same width. Nothing in the packing
-can tell: each sheet is internally consistent. It shows up only on screen,
-because a `sprite-view` is the slot's width and whatever height its `aspect`
-implies, so a shorter drawing renders a smaller creature. `scale`, `dx` and
-`dy` are what correct it, and they are measured rather than guessed - shoot
-the slot, difference it against the same slot holding nothing, and solve for
-the values that put the silhouette at the idle's height, centre and foot line.
+Size is the separate problem, and it has two halves.
+
+Within a sheet, the rows are not the same size. Registering the first frame
+against the last — both the same standing pose in all three of these — puts
+the swing's last row 4% smaller than its first and the smash's 12%, the same
+thing §7 records for the egg sheets. Nothing inside one row shows it, because
+each row is internally consistent to a pixel or two; it reads as the creature
+growing through the clip and snapping back at the loop. Alongside it his feet
+climb: 230, 230, 216, 194 down the warcry's four rows, with no scale drift at
+all there and no pose reason for it. So each row is scaled to agree with the
+others — down to the smallest, so nothing is ever resampled upwards — and then
+anchored by its ground line, **per row rather than per frame**, which leaves
+what he actually does inside a row intact. His lowest limb is the anchor: his
+skin reads about (170,178,86), his fur skirt cuts his legs off from his torso
+so every green piece over ~600px counts rather than just the largest, and that
+leaves out the leaves. On screen his feet went from wandering 56 px within one
+clip to 5.
+
+Between sheets, he is simply drawn at different sizes, and no packing can tell
+— each sheet is self-consistent. It shows up only on screen, because a
+`sprite-view` is the slot's width and whatever height its `aspect` implies, so
+a shorter drawing renders a smaller creature. `scale`, `dx` and `dy` correct
+that, measured rather than guessed: shoot the slot, difference it against the
+same slot holding nothing, and solve for the values that put the silhouette at
+the idle's height, centre and ground line.
+
+Two traps in the measuring itself. Colour-keying the creature is easy to get
+wrong — this one renders (189,189,82) on screen, near enough to his own club
+that any threshold loose enough for his arms takes the club too — so
+difference against an empty slot instead. And `getBoundingClientRect()`
+answers a different question: the slot is the same 216 px whatever is in it.
 
 ## 10. Generation prompts
 
