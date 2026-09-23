@@ -2145,7 +2145,12 @@ const RAID_BOSS = {
      last, and this one opens standing and ends face-down, so it "measured" a
      24% size difference that is really two different shapes. */
   death: { src:"art/boss-death.png", frames:16, rows:1, fps:6,
-           aspect:1.2281, scale:1.237, dx:6.8, dy:6.8 },
+           aspect:1.2281, scale:1.237, dx:6.8, dy:6.8,
+           /* Said over the fall, while it is happening. The milestone's own
+              line lands afterwards, near the end of the clip, so the last
+              thing on screen before the result card is "Felled." */
+           say:"His grip fails and the torch bursts apart. One knee, then the "
+             + "other, and the hill comes up to meet him." },
 
   /* His three moves, and the ORDER IS THE DESIGN. btChoose takes the first
      move that is ready, so whatever sits at the top of this list is what he
@@ -2269,9 +2274,14 @@ const RAID_MILESTONES = [
   { at:0.25, title:"On his last legs",
     line:"He drops to one knee. The roar is not what it was.",
     note:"A quarter left. He is nearly finished \u2014 do not let him rest." },
+  /* The last one carries its own notice heading. The other three are a raid
+     alert - something happened, keep running - and this one is the end of the
+     whole thing, so it says so rather than sitting under the same label. */
   { at:0.00, title:"Felled",
     line:"Sir UwaaarghhhhUWAAGRRHH goes down, and the hill is quiet.",
-    note:"He is down. Everyone who landed a blow gets the badge." }
+    heading:"Sir UwaaarghhhhUWAAGRRHH has fallen",
+    note:"Weeks of running brought him down. He was beaten by kilometres, not "
+       + "by luck \u2014 and every runner who landed a blow carries the badge." }
 ];
 /* Which marks a hit crossed, going from `before` to `after` health. Returns
    them high to low, because one very large hit can cross more than one. */
@@ -3924,7 +3934,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-23 60fe8dc";
+const BUILD_ID = "2026-09-23 47bdf5c";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -6617,7 +6627,9 @@ function btCatchUp(){
   const crossed = raidCrossed(before, Math.max(0, battle.b.cur) / battle.b.max);
   if (!crossed.length) return false;
   const m = crossed[crossed.length - 1];
-  btSay(`<b>${esc(m.title)}.</b> ${esc(m.line)}`);
+  // ...unless the blow was the last one: btFell() describes the fall first and
+  // brings this line back over the frame where he is already down.
+  if (!btWillFall()) btSay(`<b>${esc(m.title)}.</b> ${esc(m.line)}`);
   $("#bt-foe-lv").textContent = bossPhase(Math.max(0, battle.b.cur) / battle.b.max).note;
   battle.crossed = (battle.crossed || []).concat(crossed.map(x => x.at));
   /* ...and it goes on the home screen as well, because the line on the battle
@@ -6632,7 +6644,7 @@ function btCatchUp(){
   if (battle.raid){
     for (const x of crossed)
       noticeAdd({ id:`raid-${RAID_BOSS.id}-${Math.round(x.at * 100)}`, kind:"raid",
-                  title:"Raid alert", body:x.note });
+                  title:x.heading || "Raid alert", body:x.note });
     persist();
     renderNotices();
   }
@@ -6722,16 +6734,34 @@ function btRun(moveId){
    long it runs, so the result card waits for it rather than landing on the
    frame where he is still standing. Returns 0 for anything that is not a boss
    going down, including a pet losing an ordinary fight. */
-function btFell(){
-  if (!battle.boss || battle.b.cur > 0 || battle.felled) return 0;
+/* Is this blow the one he does not get up from, with a clip to show it? The
+   narration depends on the answer before the clip is played: btCatchUp() runs
+   first and must not say "Felled" over a boss who is still standing. */
+function btWillFall(){
   const cfg = RAID_BOSS.death;
-  if (!cfg || spriteBroken[cfg.src]) return 0;
+  return !!(battle.boss && battle.b.cur <= 0 && !battle.felled
+            && cfg && !spriteBroken[cfg.src]);
+}
+
+function btFell(){
+  if (!btWillFall()) return 0;
+  const cfg = RAID_BOSS.death;
   battle.felled = true;
   // bossPhase() has no state below "on his last legs" - the last band runs
   // 25% to nothing - so the caption would still be calling him wounded.
   $("#bt-foe-lv").textContent = "felled";
   $("#bt-foe-pet").innerHTML = spriteHTML(cfg, "okay", true);
-  return clipDurationMs(cfg);
+  const ms = clipDurationMs(cfg);
+  /* Two lines, in the order the picture happens. btCatchUp() has just written
+     the milestone's "Felled" - true, but said before he has fallen - so the
+     fall gets described first and "Felled" comes back near the end of the
+     clip, over the frame where he is already down. */
+  if (cfg.say){
+    btSay(esc(cfg.say));
+    const m = RAID_MILESTONES[RAID_MILESTONES.length - 1];
+    btWait(() => btSay(`<b>${esc(m.title)}.</b> ${esc(m.line)}`), ms * 0.72);
+  }
+  return ms;
 }
 
 function btLand(who, n, heal){
