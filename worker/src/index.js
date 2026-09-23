@@ -16,6 +16,9 @@
      POST /battle/start  claim an attack on somebody, and spend it
      POST /battle/report how the fight went; the mark is priced here
      GET  /battle/marks  what is standing on your own pet, and its fight log
+     GET  /raid          the shared pool, your share of it, and your swings
+     POST /raid/claim    spend a swing; answers with the seed and his health
+     POST /raid/report   what the swing took off him, clamped and applied
 
    The battle routes are the one place this stops being a pure broker: it
    prices a mark, because the attacker cannot be trusted to price their own.
@@ -111,6 +114,12 @@ async function lookupCode(env, code){
    the app already computes for Friends: a pet name, a form, a level, totals.
    Nothing from Strava beyond what the game has made its own. */
 const rosterStub = env => env.ATHLETE.get(env.ATHLETE.idFromName("roster:all"));
+/* The pool, as one object. Durable Objects serialise their own reads and
+   writes on a single thread, which is the whole reason the raid is one of
+   these rather than a row somewhere: forty people swinging at once is forty
+   read-modify-writes of the same number, and this is the only way to do that
+   without inventing a lock. */
+const raidStub = env => env.ATHLETE.get(env.ATHLETE.idFromName("raid:" + RAID_ID));
 
 /* A handle is an HMAC, so it cannot be turned back into an athlete id by
    arithmetic - which is the point, and also a problem the moment one player
@@ -180,6 +189,67 @@ function markCount(marks, now){
   return (marks || []).filter(m =>
     ((now || Date.now()) - (m.at || 0)) < MARK_HOURS * 3600e3).length;
 }
+/* --- the raid ------------------------------------------------------------
+   One boss, one pool, everybody against it. The pool cannot live on a device:
+   a raid whose health each phone keeps its own copy of is a boss everyone
+   kills separately, which is a single-player fight with a shared name.
+
+   Like the mark arithmetic above, his health is written down twice - here and
+   in RAID_BOSS.battle.hp - and for the same reason: the app draws him and
+   fights him, and this decides what a swing is worth. RAID_VERSION rides on
+   every report so a drift between the two shows up in the data rather than as
+   a raid that quietly stops adding up.
+   ------------------------------------------------------------------------- */
+const RAID_VERSION = 1;
+const RAID_ID      = "uwaaargh";
+const RAID_HP      = 35100;
+const RAID_KM_PER_SWING = 5;
+/* He does not come back on his own. When his health reaches zero the epoch
+   closes and stays closed - no timer, no respawn - and everything about it is
+   kept: the shares are stored per epoch, so felling him twice leaves two
+   records rather than overwriting the first. Bringing him back is a deliberate
+   act through /admin/raid, which is the switch and the only one. */
+const RAID_RESPAWNS = false;
+
+/* The most one attempt can take off him, by level. Measured on the real engine
+   at 3,600 seeds a level - three species, 1,200 each, every fight played to
+   the end against an effectively bottomless pool, because a swing is worth
+   what the pet can do before it dies and not what is left of him - and then
+   doubled. The observed worst case at level 26 was 811 and this allows 1,630.
+
+   Doubling rather than shaving the tail, because the cost of the two errors is
+   not symmetric: a clamp below an honest fight silently robs a real player of
+   a good attempt and they would never know why, while a clamp at twice the
+   luckiest possible fight still refuses the report that matters, which is the
+   one claiming the whole pool in a single swing.
+
+   It is worth being plain about what this does and does not do. It stops an
+   absurd report. It does not stop a determined cheat, because a determined
+   cheat does not need an absurd number - what actually bounds them is that a
+   swing costs five kilometres that Strava has to have seen. If one player ever
+   needs to be stopped from felling him alone, the rule for that is a cap on
+   one player's share of one epoch, and it belongs here too. */
+const RAID_SWING_CAP = [
+  [1, 200], [5, 320], [10, 500], [14, 610], [18, 990], [22, 1300], [26, 1630],
+  [30, 2110], [35, 2780], [40, 3430], [50, 4540], [60, 7130], [80, 10760], [99, 14650]
+];
+function raidSwingCap(level){
+  const lv = Math.max(1, Math.min(99, Number(level) || 1));
+  const t  = RAID_SWING_CAP;
+  if (lv <= t[0][0]) return t[0][1];
+  for (let i = 1; i < t.length; i++){
+    if (lv > t[i][0]) continue;
+    const [l0, c0] = t[i - 1], [l1, c1] = t[i];
+    return c0 + (c1 - c0) * (lv - l0) / (l1 - l0);
+  }
+  return t[t.length - 1][1];
+}
+/* The marks his health falls past, which are the app's RAID_MILESTONES. Held
+   here as well because the alert belongs to the raid and not to whoever
+   happened to land the blow: the app used to raise them on the attacker's own
+   device, so a boss dropping below half was news to one person. */
+const RAID_MARKS = [0.75, 0.5, 0.25, 0];
+
 /* Two a day, and never the same target twice inside a day. The second rule is
    the one that matters: it is what makes a pile-on need other people. The
    first decides how much of a day's damage any one player can be responsible
@@ -516,6 +586,117 @@ export default {
           return json(env, data);
         });
 
+      /* --- the raid ------------------------------------------------------
+         Three routes and one switch. Everything here needs a session: the pool
+         is what the players are doing to him together, not a public scoreboard
+         for anybody with the URL.
+
+         What he is on, what you have taken off him, and what your running has
+         bought. One call, because it is one screen. */
+      if (path === "/raid")
+        return await withAthlete(request, env, async (stub, me) => {
+          const handle = (await hmac(env.SESSION_SECRET, "roster:" + me)).slice(0, 12);
+          const [rs, sh, sw] = await Promise.all([
+            raidStub(env).fetch("https://do/raid-state", { method:"POST", body:"{}" }),
+            raidStub(env).fetch("https://do/raid-share", { method:"POST",
+              body: JSON.stringify({ handle }) }),
+            stub.fetch("https://do/raid-swings")
+          ]);
+          const { raid } = await rs.json();
+          const { share } = await sh.json();
+          const swings = await sw.json();
+          return json(env, { raid: { id: raid.id, epoch: raid.epoch, hp: raid.hp,
+                                     max: raid.max, crossed: raid.crossed || [],
+                                     felledAt: raid.felledAt || null,
+                                     startedAt: raid.startedAt || 0,
+                                     respawns: RAID_RESPAWNS, v: RAID_VERSION },
+                             you: { dealt: share.dealt || 0, swings: share.swings || 0,
+                                    // the badge's question, answered where it can be
+                                    slayer: !!raid.felledAt && (share.dealt || 0) > 0 },
+                             attempts: swings });
+        });
+
+      /* Spend a swing. Refused when he is down, so a raid cannot be fought
+         past its own end, and refused when the kilometres have not been run -
+         which is the only thing that limits a raid at all. */
+      if (path === "/raid/claim" && request.method === "POST")
+        return await withAthlete(request, env, async (stub) => {
+          const r = await raidStub(env).fetch("https://do/raid-state", { method:"POST", body:"{}" });
+          const { raid } = await r.json();
+          if (raid.hp <= 0) return json(env, { error:"he is already down", raid }, 409);
+
+          const seed = crypto.getRandomValues(new Uint32Array(1))[0];
+          const gate = await stub.fetch("https://do/raid-claim", { method:"POST",
+            body: JSON.stringify({ epoch: raid.epoch, seed, at: Date.now() }) });
+          const g = await gate.json();
+          if (!g.ok) return json(env, { error: g.why, attempts: g }, 429);
+          return json(env, { ok:true, seed, epoch: raid.epoch, hp: raid.hp, max: raid.max,
+                             attempts: { earned: g.earned, spent: g.spent, left: g.left } });
+        });
+
+      /* How the swing went. `dealt` is the client's account of its own fight,
+         so it is clamped here against what a pet of that level could possibly
+         do - and the level is read off the roster, never off the request, the
+         same rule an attack follows. */
+      if (path === "/raid/report" && request.method === "POST")
+        return await withAthlete(request, env, async (stub, me) => {
+          const body = await request.json().catch(() => ({}));
+          const seed = (Number(body.seed) || 0) >>> 0;
+
+          const c = await (await stub.fetch("https://do/raid-close", { method:"POST",
+            body: JSON.stringify({ seed }) })).json();
+          if (!c.ok) return json(env, { error: c.why }, 409);
+
+          const handle = (await hmac(env.SESSION_SECRET, "roster:" + me)).slice(0, 12);
+          const rr = await rosterStub(env).fetch("https://do/roster-list");
+          const { rows } = await rr.json();
+          const mine = (rows || []).find(x => x.handle === handle);
+          const cap  = raidSwingCap(mine && mine.level);
+          const dealt = Math.max(0, Math.min(cap, Math.round(Number(body.dealt) || 0)));
+
+          const ap = await raidStub(env).fetch("https://do/raid-apply", { method:"POST",
+            body: JSON.stringify({ handle, epoch: c.epoch, dealt }) });
+          const a = await ap.json();
+          if (!a.ok) return json(env, { error: a.why, raid: a.raid }, 409);
+          return json(env, { ok:true, took: a.took, crossed: a.crossed,
+                             capped: dealt < Math.round(Number(body.dealt) || 0),
+                             raid: { epoch: a.raid.epoch, hp: a.raid.hp, max: a.raid.max,
+                                     felledAt: a.raid.felledAt || null } });
+        });
+
+      /* The switch. He does not come back on his own; this is what brings him
+         back, and it is behind the admin token like the summary - a wrong
+         token gets the same 404 a missing route would, so it does not
+         advertise itself.
+
+           curl -H "Authorization: Bearer $ADMIN_TOKEN" .../admin/raid
+           curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
+                -H 'Content-Type: application/json' -d '{"hp":35100}' .../admin/raid
+
+         GET reads an epoch and who is owed a badge for it - ?epoch=N for one
+         that is already over, which is the question an Orc Slayer raises
+         months later - and POST starts the next one. Nothing is deleted
+         either way. */
+      if (path === "/admin/raid"){
+        const given = (request.headers.get("Authorization") || "").replace(/^Bearer /, "");
+        if (!await adminOk(env, given)) return json(env, { error:"no such endpoint" }, 404);
+        if (request.method === "POST"){
+          const body = await request.json().catch(() => ({}));
+          const r = await raidStub(env).fetch("https://do/raid-respawn", { method:"POST",
+            body: JSON.stringify({ hp: body.hp }) });
+          return json(env, await r.json());
+        }
+        const want = url.searchParams.get("epoch");
+        const r = await raidStub(env).fetch("https://do/raid-roll", { method:"POST",
+          body: JSON.stringify({ epoch: want == null ? null : Number(want) }) });
+        const { epoch, roll, raid } = await r.json();
+        const names = new Map(((await (await rosterStub(env)
+          .fetch("https://do/roster-list")).json()).rows || [])
+          .map(x => [x.handle, x.pet]));
+        return json(env, { raid, epoch,
+          roll: roll.map(x => ({ ...x, pet: names.get(x.handle) || "" })) });
+      }
+
       if (path === "/admin/summary"){
         const given = (request.headers.get("Authorization") || "").replace(/^Bearer /, "");
         if (!await adminOk(env, given)) return json(env, { error:"no such endpoint" }, 404);
@@ -686,6 +867,47 @@ export class Athlete {
       return this.ok({ ok:true, left: ATTACKS_PER_DAY - used - 1 });
     }
 
+    /* --- swings at the raid ----------------------------------------------
+       Earned from kilometres this broker has seen, spent by swinging. Spent is
+       one lifetime counter rather than one per epoch: a raid that gave
+       everybody their whole running history back as swings the moment a new
+       boss arrived would be felled the same afternoon by kilometres run
+       against the last one.
+
+       Claimed before the fight and closed after, the same two round trips an
+       attack takes and for the same reason - with one call a bad attempt could
+       be abandoned and retried until it went well, and every swing would land
+       its best case. */
+    if (path === "/raid-claim"){
+      const { epoch, seed, at } = await request.json();
+      const km     = await this.state.storage.get("kmSeen") || 0;
+      const earned = Math.floor(km / RAID_KM_PER_SWING);
+      const spent  = await this.state.storage.get("raidSpent") || 0;
+      if (spent >= earned)
+        return this.ok({ ok:false, why:"no swings left", earned, spent,
+                         km, toNext: RAID_KM_PER_SWING - (km % RAID_KM_PER_SWING) });
+      await this.state.storage.put({ raidSpent: spent + 1,
+                                     raidPending: { epoch, seed, at } });
+      return this.ok({ ok:true, left: earned - spent - 1, earned, spent: spent + 1 });
+    }
+    if (path === "/raid-close"){
+      const { seed } = await request.json();
+      const p = await this.state.storage.get("raidPending");
+      if (!p) return this.ok({ ok:false, why:"no swing was started" });
+      if ((p.seed >>> 0) !== (seed >>> 0)) return this.ok({ ok:false, why:"that is not the swing that was started" });
+      if (Date.now() - p.at > 3600e3) return this.ok({ ok:false, why:"that swing took too long" });
+      await this.state.storage.delete("raidPending");
+      return this.ok({ ok:true, epoch: p.epoch });
+    }
+    /* What this pet has banked, for the screen rather than for a decision. */
+    if (path === "/raid-swings"){
+      const km     = await this.state.storage.get("kmSeen") || 0;
+      const earned = Math.floor(km / RAID_KM_PER_SWING);
+      const spent  = await this.state.storage.get("raidSpent") || 0;
+      return this.ok({ km, earned, spent, left: Math.max(0, earned - spent),
+                       toNext: RAID_KM_PER_SWING - (km % RAID_KM_PER_SWING) });
+    }
+
     /* Close it against the claim. An hour is long enough for the longest fight
        anybody will sit through and short enough that a claim cannot be banked
        and spent against a level that has since moved. */
@@ -752,11 +974,103 @@ export class Athlete {
       await this.state.storage.put(key, { ...prev, marks: marks.slice(-40) });
       return this.ok({ ok:true });
     }
+    /* --- the raid pool ---------------------------------------------------
+       One object for the whole raid. `raid` is the live epoch; a share is a
+       row of its own, keyed by epoch and handle, so felling him and starting
+       again leaves the old epoch's contributors intact rather than clearing
+       them. That is what makes an Orc Slayer badge answerable months later. */
+    if (path === "/raid-state"){
+      return this.ok({ raid: await this.raidState(await request.json().catch(() => ({}))) });
+    }
+    /* What one attempt took off him. The damage arrives already clamped - the
+       cap is a game rule and belongs with the other ones, not in here - and
+       this decides only what it does to the pool, which is the one question
+       that has to be answered by a single thread.
+
+       Reported against an epoch. An attempt claimed before he fell and
+       reported after is refused rather than reopening him: the fight happened,
+       but what it was a fight for is over. */
+    if (path === "/raid-apply"){
+      const { handle, epoch, dealt } = await request.json();
+      const raid = await this.raidState({});
+      if (epoch !== raid.epoch) return this.ok({ ok:false, why:"that raid is over", raid });
+      if (raid.hp <= 0)         return this.ok({ ok:false, why:"he is already down", raid });
+
+      const before = raid.hp;
+      const took   = Math.max(0, Math.min(before, Math.round(Number(dealt) || 0)));
+      raid.hp = before - took;
+
+      // the marks his health has just fallen past, so the alert is the raid's
+      // to tell rather than the attacker's to have witnessed
+      const f0 = before / raid.max, f1 = raid.hp / raid.max;
+      const crossed = RAID_MARKS.filter(m => f0 > m && f1 <= m);
+      if (crossed.length) raid.crossed = [...new Set([...(raid.crossed || []), ...crossed])];
+      if (raid.hp <= 0 && !raid.felledAt) raid.felledAt = Date.now();
+
+      const key  = `share:${raid.epoch}:${handle}`;
+      const prev = await this.state.storage.get(key) || { dealt: 0, swings: 0 };
+      await this.state.storage.put({
+        raid,
+        [key]: { dealt: prev.dealt + took, swings: prev.swings + 1, at: Date.now() }
+      });
+      return this.ok({ ok:true, took, crossed, raid });
+    }
+    /* One player's part in an epoch. Absent means they never landed a blow,
+       which is the question the badge asks. */
+    if (path === "/raid-share"){
+      const { handle, epoch } = await request.json();
+      const raid = await this.raidState({});
+      const row  = await this.state.storage.get(`share:${epoch == null ? raid.epoch : epoch}:${handle}`);
+      return this.ok({ share: row || { dealt: 0, swings: 0 } });
+    }
+    /* Everyone who landed a blow on an epoch, deepest first. Who the badge is
+       owed to, and the only list that says so. */
+    if (path === "/raid-roll"){
+      const { epoch } = await request.json();
+      const raid = await this.raidState({});
+      const ep   = epoch == null ? raid.epoch : epoch;
+      const map  = await this.state.storage.list({ prefix: `share:${ep}:`, limit: 1000 });
+      const roll = [...map.entries()]
+        .map(([k, v]) => ({ handle: k.slice(`share:${ep}:`.length), ...v }))
+        .filter(x => x.dealt > 0)
+        .sort((a, b) => b.dealt - a.dealt);
+      return this.ok({ epoch: ep, roll, raid });
+    }
+    /* The switch. He does not come back on his own and nothing here is on a
+       timer; this is the only way a new epoch begins, and it is behind the
+       admin token at the edge. The epoch number only ever goes up, so the
+       shares of every raid before it keep their own keys. */
+    if (path === "/raid-respawn"){
+      const { hp } = await request.json().catch(() => ({}));
+      const old  = await this.raidState({});
+      const raid = {
+        id: RAID_ID, epoch: old.epoch + 1, max: Number(hp) > 0 ? Math.round(hp) : RAID_HP,
+        hp: Number(hp) > 0 ? Math.round(hp) : RAID_HP,
+        startedAt: Date.now(), felledAt: null, crossed: [], v: RAID_VERSION
+      };
+      await this.state.storage.put("raid", raid);
+      return this.ok({ ok:true, raid, was: old });
+    }
+
     if (path === "/roster-list"){
       const map = await this.state.storage.list({ prefix: "row:", limit: 1000 });
       return this.ok({ rows: [...map.values()] });
     }
     return new Response("no", { status: 404 });
+  }
+
+  /* The live epoch, minted on the first touch rather than by a migration -
+     there is no moment before this object exists when something could have
+     written it. `max` is stored on the epoch rather than read from RAID_HP
+     each time, so changing his health in the code does not silently resize a
+     raid that is already half fought. */
+  async raidState(){
+    const have = await this.state.storage.get("raid");
+    if (have) return have;
+    const raid = { id: RAID_ID, epoch: 1, max: RAID_HP, hp: RAID_HP,
+                   startedAt: Date.now(), felledAt: null, crossed: [], v: RAID_VERSION };
+    await this.state.storage.put("raid", raid);
+    return raid;
   }
 
   /* Both sides of a fight keep a copy: yours says what you did, theirs says
@@ -863,6 +1177,36 @@ export class Athlete {
         seen.anyAtAll = recent.length;
         if (recent.length) seen.latestStart = Date.parse(recent[0].start_date) || null;
       }
+    }
+    /* Kilometres this broker has seen for itself, which is what a swing at the
+       raid is bought with. The card carries a `km` and it is written by the
+       device, so pricing the raid off it would make the swing budget a number
+       the player types. This counter only ever grows by distances read out of
+       Strava's own answer.
+
+       Counted against a high-water mark of start time rather than against
+       `imported`. `imported` is the obvious candidate and it is the wrong one:
+       it is written by commit() on the round trip that follows, so syncing
+       twice without ever committing hands the same activities over twice, and
+       an earlier version of this counted them twice - which is unlimited
+       swings for anybody willing to call /sync in a loop, the exact hole this
+       counter exists to close. The mark makes it idempotent on its own, and
+       costs one number rather than a list that grows forever.
+
+       Ties fail closed: two activities starting in the same second would count
+       once. Under-counting somebody's kilometres is a swing they have to run
+       again for, which is the cheaper of the two mistakes.
+
+       It starts at zero for everybody, including players who have been running
+       for months. Seeding it from the stored save would undo the point of
+       having it, so the alternative was picked: the raid starts when this
+       does. */
+    const kmAfter = await s.get("kmAfter") || 0;
+    const counting = activities.filter(a => a.t > kmAfter);
+    if (counting.length){
+      const km = counting.reduce((t, a) => t + (Number(a.km) || 0), 0);
+      await s.put({ kmSeen: (await s.get("kmSeen") || 0) + km,
+                    kmAfter: Math.max(kmAfter, ...counting.map(a => a.t)) });
     }
     return this.ok({ save, activities, seen });
   }

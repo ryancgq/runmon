@@ -2381,9 +2381,10 @@ const RAID_BOSS = {
      the power cut, 40000 once the pet always opened, and 52000 once he
      alternated.
 
-     39000 is the first one that is not bookkeeping: a quarter off, asked for,
-     to make him easier to kill. Nothing about a fight with him changed, only
-     how many of them it takes.
+     39000 was the first one that is not bookkeeping: a quarter off, asked for,
+     to make him easier to kill. 35100 takes a further tenth off for the same
+     reason. Nothing about a fight with him changed, only how many of them it
+     takes.
 
      The jump from 2800 is mostly not the power cut. Every figure before it
      was measured against level 3-5 pets, which is not where anybody is: a
@@ -2391,12 +2392,12 @@ const RAID_BOSS = {
      one, so 2800 was a raid that would have ended in a weekend.
 
      Measured on the engine at six players running 30km a week - 36 attempts -
-     39000 is 3.0 weeks against a level-26 field, down from 4.0. The same pool
-     is 10.8 weeks at level 10 and 2.4 at level 30, and that spread is the
-     whole argument for the broker scaling it per raid from the roster instead
-     of shipping one number: no constant here can be right for two different
-     fields. */
-  battle: { hp:39000, pow:90, def:25, spd:60 }
+     39000 was 3.0 weeks against a level-26 field, down from 4.0, and 35100 is
+     2.7. The same pool is 9.7 weeks at level 10 and 2.2 at level 30, and that
+     spread is the whole argument for the broker scaling it per raid from the
+     roster instead of shipping one number: no constant here can be right for
+     two different fields. */
+  battle: { hp:35100, pow:90, def:25, spd:60 }
 };
 /* One attempt for every 5 km run, banked - a 15 km long run is three swings at
    him. Attempts are the only thing a raid spends, and running is the only thing
@@ -2735,7 +2736,15 @@ const BADGES = [
   { id:"teen",      ico:"✨", name:"Teenager",     test:s=>s.stage>=2 },
   { id:"adult",     ico:"🛡️", name:"Fully Grown", test:s=>s.stage>=3 },
   { id:"final",     ico:"💎", name:"Final Form",   test:s=>s.stage>=4 },
-  { id:"speedy",    ico:"💨", name:"Sub-5 Pace",   test:s=>s.runs.some(r=>r.km>=1 && (r.sec/60)/r.km < 5) }
+  { id:"speedy",    ico:"💨", name:"Sub-5 Pace",   test:s=>s.runs.some(r=>r.km>=1 && (r.sec/60)/r.km < 5) },
+  /* The only badge that is not about your own running, and the only one that
+     can be earned while you are not looking: it lands when he falls, which is
+     usually somebody else's swing. Landing a blow is the whole requirement -
+     a raid is meant to be won by a crowd, so a badge that went to whoever
+     happened to strike last would be a lottery ticket rather than a record of
+     having been there. Sticky like the rest, and once his epoch closes there
+     is no second chance at it. */
+  { id:"orcslayer",  ico:"🪓", name:"Orc Slayer",   test:s=>s.raidSlain }
 ];
 
 /* ---------------------------------------------------------------------------
@@ -3005,6 +3014,22 @@ function raidSet(hp){
   if (!save.raid) save.raid = { hp: null, spent: 0, dealt: 0 };
   save.raid.hp = Math.max(0, Math.round(hp));
   persist();
+}
+/** Is he down? `null` is a raid nobody has touched, not a boss on no health. */
+function raidFelled(){
+  const h = save.raid && save.raid.hp;
+  return h != null && h <= 0;
+}
+/* Orc Slayer: he is down, and you are one of the people who put him there.
+   Both halves are needed - being present for the kill is not the badge, and
+   neither is chipping him and wandering off while he is still standing.
+
+   Read from the pool rather than asked of the broker, because the pool is the
+   broker's answer once the raid is shared: save.raid becomes the cache of
+   /raid, `dealt` is the share it reports back, and this reads the same two
+   fields either way. In the sandbox they are simply this device's own. */
+function raidSlain(){
+  return raidFelled() && (save.raid.dealt || 0) > 0;
 }
 /* Attempts are earned by running and spent by swinging, so what is left is the
    difference. Earned is recomputed from the kilometres rather than counted up
@@ -3475,7 +3500,7 @@ function recompute(){
   };
 
   // badges — sticky once earned
-  const ctx = { runs, totalKm, bestStreak: sk.best, stage };
+  const ctx = { runs, totalKm, bestStreak: sk.best, stage, raidSlain: raidSlain() };
   for (const b of BADGES){
     if (!save.badges[b.id] && b.test(ctx)) save.badges[b.id] = Date.now();
   }
@@ -4147,7 +4172,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-23 f0fdddd";
+const BUILD_ID = "2026-09-23 040de91";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
