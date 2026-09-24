@@ -2154,6 +2154,33 @@ const SKILLS = {
         durations:[340, 310, 280, 250, 220, 190,  600,  560, 480, 620,
                    240, 240, 300, 360],
         aspect:1.348, scale:0.986, dx:1.9, dy:-0.5 } },
+    /* The Bamboo Cub's second move, and the first thing it owns that simply
+       hits: Green Gale does more damage than an attack but hands the cub's own
+       guard over for it. This costs nothing but the snack.
+
+       1.30, and learnt at 12, both measured. It is a damage move, so it has to
+       climb the ladder over Green Gale's 1.042 - 1.30 is worth 1.050, and less
+       would sit inside the noise. The level is where it does least harm: the
+       cub was already 54% down to the Sparky at 12 and a hair ahead of the
+       Cinderling at 11, so at 11 it pulled Ember v Verdant to 44 while
+       fixing the other; at 12 every pairing from 12 to 14 lands within three
+       points of even and 11 is left as it was. */
+    { id:"bamboo-toss", name:"Bamboo Toss", ico:"\u{1F38B}", stage:1, level:12,
+      blurb:"Parts with a perfectly good snack to make a point. The point is sharp.",
+      battle:{ dmg:1.30, cd:3 },
+      sprite:{ src:"art/skill-bamboo-toss.png", frames:16, fps:4.5,
+        /* Hold, wind up, throw, and the pleased look after. The wind-up
+           quickens, the throw is the fastest beats in the clip - the release
+           at 100ms, because a toss you can follow is a lob - and the bamboo's
+           flight gets two frames before the leaves scatter. Then it watches,
+           grins, blinks and settles back into the idle pose.
+
+           A wide sheet on purpose: the bamboo leaves the frame to the right,
+           so the cub sits in its left third and the scale is large to bring it
+           to the idle's size. */
+        durations:[320, 280, 240, 200, 120, 100, 110, 130,
+                   220, 260, 240, 300, 220, 220, 260, 340],
+        aspect:2.8724, scale:2.381, dx:16.15, dy:-2.96 } },
     /* The Panda had nothing at all, which made it the only third form with an
        empty skill row - something a player reads as a bug rather than as a
        gap. Nap fills it and suits the creature: it does no damage, it takes a
@@ -4295,7 +4322,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-24 ff05c53";
+const BUILD_ID = "2026-09-24 4c86ffc";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
