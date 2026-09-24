@@ -4322,7 +4322,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-24 4c86ffc";
+const BUILD_ID = "2026-09-24 cff6da9";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -5446,6 +5446,12 @@ async function openRaidTab(){
   catch (err){ toast(raidFail(err), "warn", "\u26A0\uFE0F"); }
   recompute();                          // the badge, if he went down meanwhile
   renderRaid();
+}
+
+/** Is there a swing to take? Both halves: one left to spend, and something to
+    spend it on. */
+function raidCanSwing(){
+  return raidAttempts().left > 0 && raidHp() > 0;
 }
 
 /* A raid route answering 404 means this broker predates the raid, which is a
@@ -7539,8 +7545,9 @@ function btFinish(){
   /* A real attack is spent. Offering a rematch here would read as a way to
      improve on the result, and it is not one. Nor is there anything to fight
      once he is down: the pool is on nothing, so "Fight again" would start a
-     boss who is already dead. */
-  $("#bt-again").hidden = !!battle.stake || !!battle.felled;
+     boss who is already dead. And a raid attempt costs a swing like any
+     other, so with none left there is no second go to offer. */
+  $("#bt-again").hidden = !!battle.stake || !!battle.felled || (battle.raid && !raidCanSwing());
   renderBattle();
   if (battle.stake) btReport(battle);
 }
@@ -8070,11 +8077,27 @@ function wire(){
      dropped `boss`, so a second go at the raid was a fight with the stand-in
      object a raid is started against - which is a copy of your own pet at your
      own level, wearing his name. And it has to resume at his current health:
-     he does not heal because you lost. */
-  $("#bt-again").addEventListener("click", () => {
+     he does not heal because you lost.
+
+     A raid attempt is the one exception, and it goes through raidSwing() like
+     the Raid screen's own button. It used to be started here directly, which
+     cost no swing at all - and on a shared raid it never claimed one either,
+     so the broker never heard about the fight and its damage went into this
+     device's cache instead: the pool read lower here than it was, and enough
+     rematches would have put the cache on zero and handed out an Orc Slayer
+     the broker never agreed to. The swing button spends, claims and reports;
+     there should be one way into a raid fight, and that is it. */
+  $("#bt-again").addEventListener("click", async () => {
     if (!battle) return;
+    if (battle.raid){
+      const was = battle;
+      await raidSwing();
+      // refused - out of swings after all, or he fell to somebody else meanwhile
+      if (battle === was) $("#bt-again").hidden = !raidCanSwing();
+      return;
+    }
     startBattle(battle.you, battle.foe, battle.boss
-      ? { boss:true, raid:battle.raid, hpLeft:Math.max(0, battle.b.cur) }
+      ? { boss:true, raid:false, hpLeft:Math.max(0, battle.b.cur) }
       : undefined);
   });
 
