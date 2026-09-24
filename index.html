@@ -4239,17 +4239,27 @@ const DEFAULT_SPRITES = {
     frames:12, rows:1, fps:2, aspect:1.199, scale:1.2, dx:0.9, dy:-11.3
   },
   "verdant:1": {
-    src:"art/verdant-bamboo-cub.png",
-    // 12-frame loop: bamboo drops in, the cub catches it, the cub eats. Its
-    // rows sit 41px and 78px high in the pack, so each frame is pinned to the
-    // ground line of its row's least-occluded frame - the bamboo is meant to
-    // move, the cub is not.
-    // The cub is drawn chunkier here than on its skill sheet - rounder cheeks,
-    // a bigger eye - so at a matched silhouette it still read as the larger
-    // animal when the two swapped on the same spot. Taken down 4% to sit with
-    // the skill; dx and dy move with it so the ground line does not, which is
-    // what every other sheet was fitted against.
-    frames:12, rows:1, fps:2, aspect:0.900, scale:0.947, dx:3.3, dy:-14.2
+    src:"art/verdant-bamboo-cub-v2.png",
+    /* 12-frame loop: the cub lies about, blinks, spots bamboo falling, waves at
+       it, catches it and eats. The second drawing of this idle; the file has a
+       new name rather than the old one with ART_VERSION bumped, because a bump
+       sends every player back for every sheet in the game to replace one.
+
+       Cut on its own gutters, which were clean on every side this time. The
+       cub is pinned and the bamboo moves: the cub is found by its black -
+       ears, eye patches, limbs - with anything green-dominant left out, since
+       the bamboo's shading is dark too. Feet on one line in all twelve, paws
+       within a pixel.
+
+       Fitted to the old idle, not to a number. The old one had been tuned by
+       eye to sit with Green Gale and the level-up - taken down 4% because the
+       cub read as the bigger animal when the two swapped on the spot - and
+       matching it keeps both of those hand-offs as they were. The new sheet
+       draws the cub 13% smaller in pixels, width and height agreeing to 1%,
+       so the scale comes up; on screen, over every frame of both, the new one
+       lands within a device pixel at the feet and at 100% of the old one's
+       width and height. */
+    frames:12, rows:1, fps:2, aspect:0.9542, scale:1.068, dx:4.86, dy:-14.33
   }
 };
 /* What the animation tester is showing instead of your own pet: a form, a mood
@@ -4285,7 +4295,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-24 3079706";
+const BUILD_ID = "2026-09-24 ff05c53";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
