@@ -129,6 +129,9 @@ body::before{
 .hdr{display:flex;align-items:center;gap:12px;margin-bottom:14px;min-height:38px}
 .hdr h2{font-size:22px}
 .hdr .sub{font-size:12px;color:var(--muted);font-weight:700;margin-top:2px}
+/* The raid's line is a sentence rather than a caption, so it wraps - given
+   room to breathe between its lines rather than the single-line default. */
+.hdr .sub.raid-tag{line-height:1.45;margin-top:4px}
 .hdr-spacer{flex:1}
 
 /* The streak strip. One quiet line under the greeting: whether a streak is
@@ -1551,7 +1554,7 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
     <!-- ===================== RAID ===================== -->
     <section class="screen" id="screen-raid">
       <div class="hdr">
-        <div><h2>Raid</h2><div class="sub" id="raid-sub">Everyone against one thing</div></div>
+        <div><h2>Raid</h2><div class="sub raid-tag" id="raid-sub">One boss. One shared fight. Every attack brings him closer to defeat. Band together, earn your swings, and take him down!</div></div>
       </div>
       <div id="raid-body"></div>
       <div class="screen-pad"></div>
@@ -4247,7 +4250,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-23 eaa5b0c";
+const BUILD_ID = "2026-09-24 c874716";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -5236,9 +5239,15 @@ function renderRaid(){
   const a = raidAttempts();
   const dead = hp <= 0;
   const tier = frac <= 0.22 ? " low" : frac <= 0.5 ? " mid" : "";
+  /* The rallying line while he stands, and the epitaph once he falls - "take
+     him down!" is a call to arms, and read over a boss already on the ground
+     it would be asking for something that has happened. How a swing is earned
+     is not lost with the old line: the button says how many kilometres the
+     next one is whenever there are none left, which is the only moment the
+     number is needed. */
   $("#raid-sub").textContent = dead
     ? "He is down. That was everybody's."
-    : `One swing for every ${KM_PER_ATTEMPT} km you run`;
+    : "One boss. One shared fight. Every attack brings him closer to defeat. Band together, earn your swings, and take him down!";
   body.innerHTML = `
     <div class="raid-hero">
       <div class="pet-holder">${spriteHTML(bossSpriteCfg(frac), "okay")}</div>
