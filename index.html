@@ -2044,6 +2044,40 @@ const SKILLS = {
         durations:[400, 380, 350, 320, 290, 250, 210, 170,
                    100, 100, 90, 90,  300, 300, 340, 420],
         aspect:1.079, scale:1.139, dx:3.2, dy:-13.6 } },
+    /* The Sparky's second move, and the only stage-1 move in the game that
+       reaches into the other pet's guard. Arc Lash is the grown-up version -
+       the Zephyrite learns that at 22 - and this is the small one: a shade
+       under a third off their Defence for two of their turns, against Arc
+       Lash's two fifths for three.
+
+       Its damage is a plain attack's, on purpose. It is the only species with
+       two stage-1 moves, and the balance was measured with both in the kit:
+       at 1.00 Nimbus comes out within a point of where it stood at every
+       level from 11 to 14. At 1.05 it was already beating Verdant 58% of the
+       time at 12, and at 1.15 62%. The rider is the move; the hit is there so
+       the move is never worse than an attack on the turn it is used, which is
+       the Arc Lash lesson - a second move shares the cooldown with the first,
+       and one weaker than an attack is paid for twice.
+
+       That means it is worth less than Spark on the ladder, and it is exempt
+       from it for the same reason Nap is: the ladder asks which move does more
+       damage, and this one's job is not damage. */
+    { id:"static-shock", name:"Static Shock", ico:"\u{1F4AB}", stage:1, level:11,
+      blurb:"Bottles up every spark it has and goes off like a flashbulb. Whatever it hits forgets how to block.",
+      battle:{ dmg:1.00, cd:3, rattle:{ pct:0.30, turns:2 } },
+      sprite:{ src:"art/skill-static-shock.png", frames:16, fps:5,
+        /* Wind-up, flash, and the dazed look after. The charge quickens over
+           eight frames as the bolts pile up, the three flash frames are the
+           shortest and the last of them held a beat so the light lands, then
+           the aftermath - wide-eyed in its own crackle - settles back to the
+           idle pose at the pace it wound up.
+
+           The flash frames drew the squirrel at 80% of its size elsewhere, to
+           fit the light in the cell; they are scaled back up in the sheet so
+           it does not shrink for three frames and snap back. */
+        durations:[300, 260, 230, 210, 190, 170, 150, 130,
+                   120, 120, 170,  250,  200, 200, 230, 320],
+        aspect:1.1699, scale:1.562, dx:5.9, dy:-1.0 } },
     { id:"lightning-bolt", name:"Lightning Bolt", ico:"\u{1F329}\uFE0F", stage:2, level:18,
       blurb:"Asks the sky for help. The sky, this time, obliges.",
       /* Down from 1.65, and the only skill in the game that got weaker. It
@@ -2066,8 +2100,9 @@ const SKILLS = {
        to a row of buttons. */
     { id:"arc-lash", name:"Arc Lash", ico:"\u{1F300}", stage:2, level:22,
       blurb:"Cracks its tail like a whip. Whatever is downrange gets the storm.",
-      /* The first move in the game that reaches into somebody else's guard
-         rather than its own. It hits for a shade over a plain attack and
+      /* The big version of what Static Shock does at 11: it reaches into
+         somebody else's guard rather than its own. It hits for a shade over a
+         plain attack and
          leaves the opponent's Defence down 40% for three of their turns,
          which is worth more to a pet that gets extra turns than to anybody
          else: Nimbus is built to act again, and this makes the second act
@@ -4250,7 +4285,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-24 c874716";
+const BUILD_ID = "2026-09-24 3079706";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;

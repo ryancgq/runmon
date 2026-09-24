@@ -186,6 +186,7 @@ Real problems from the first two rounds, worth avoiding:
 | Feet not on a common baseline | The pet hops 34 px between frames — still visible today |
 | Uneven frame widths, or gutters | Frames land half-and-half; you see two half-pets at once |
 | Soft or anti-aliased edges | Fringing once the app renders it pixelated |
+| Some frames of one sheet drawn smaller to fit a big effect in the cell | It shrinks for those frames and snaps back — Static Shock's three flash frames drew the squirrel at 80% |
 | Figures drawn over their cell's edges | A cut on the even grid went through four frames of a skill |
 | Sheets of one creature drawn at different sizes | It shrinks whenever it uses that skill |
 
