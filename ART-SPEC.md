@@ -189,6 +189,7 @@ Real problems from the first two rounds, worth avoiding:
 | Some frames of one sheet drawn smaller to fit a big effect in the cell | It shrinks for those frames and snaps back — Static Shock's three flash frames drew the squirrel at 80% |
 | Figures drawn over their cell's edges | A cut on the even grid went through four frames of a skill |
 | Sheets of one creature drawn at different sizes | It shrinks whenever it uses that skill |
+| Sheet delivered on solid black instead of transparent | The outline is the same near-black as the field, so no brightness cut separates them - Ring of Fire had to be keyed by colour, and the fire's dim glow dropped, or it shows as a brown smudge |
 
 The last two are what the raid boss's four sheets arrived as, and they are
 worth reading together because the fix for one is not the fix for the other.

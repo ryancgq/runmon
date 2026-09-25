@@ -2002,6 +2002,47 @@ const SKILLS = {
         durations:[380, 300,270,245, 225,205,185, 160,145,130, 185,150,150,270,
                    150,230,260,180,190,260,170,170,190,280],
         aspect:1.3125, scale:1.23, dx:-5, dy:-4.2 } },
+    /* The Cinderling's second move, and the first it has that is not a joke:
+       the tail flame whipped all the way round into a ring, close enough that
+       the dragon catches some of it too.
+
+       A burn, because that is what the line does, and a smaller one than
+       Fireball's: the ladder puts it above Fizzle (1.078 against 1.067) and
+       below the Fireball the Blazewyrm learns at 18 (1.090), so the grown-up
+       version is still the bigger move. Every burn on its own pushed Ember v
+       Verdant from 48 to 55-60 at 12-14, whatever the split between hit and
+       burn: the Cub is slow and soft, and a burn lands on it for two turns it
+       cannot answer. The singe is what pays for that, and it is measured
+       rather than flavour. Hurting yourself does not show on the ladder,
+       which counts only damage dealt, so it costs the move nothing there,
+       while the 5% it takes off the Cinderling brings every pairing from 10
+       to 14 to within four points of even - 46 at the worst, Ember v Nimbus
+       at 11, which was 45 before, the level Static Shock arrives. At 4% the
+       Cub lost 53-47 at 12; at 6% the Cinderling lost to it at every level.
+
+       Learnt at 10, the Cinderling's weakest level: at 10 and 11 it was 45-46%
+       against the Cub, and the move brings those to 49. After Fizzle (8), and
+       before Static Shock (11) and Bamboo Toss (12). */
+    { id:"ring-of-fire", name:"Ring of Fire", ico:"\u2B55", stage:1, level:10,
+      blurb:"Whips its tail flame round in a full circle. Whatever is close gets burnt - and so, a little, does the Cinderling.",
+      battle:{ dmg:1.05, self:0.05, cd:3, burn:{ pct:0.20, turns:2 } },
+      sprite:{ src:"art/skill-ring-of-fire.png", frames:16, fps:5,
+        /* Stoke, swing, ring, and back. The tail flame builds for four frames
+           and the swing quickens through three; frame 7, the ring closed all
+           the way round, is the peak and held a beat. It sweeps across the
+           front for two quick frames, then burns down over five to the idle
+           pose, the last longest.
+
+           The sheet came on solid black rather than transparent, and the
+           dragon's outline is the same near-black as the field, so it was
+           keyed by colour rather than brightness: the dragon by everything
+           that is not flame-hued, the fire by brightness. Frame 7 drew the
+           dragon 10% smaller to fit the ring in its cell and is grown back;
+           the frames are registered on the body, because the ring hides the
+           claws in 7-9. */
+        durations:[260, 230, 200, 180, 140, 120, 110, 240,
+                   120, 140, 180, 220, 240, 260, 280, 340],
+        aspect:1.6452, scale:1.50, dx:-26.38, dy:-7.99 } },
     { id:"fireball", name:"Fireball", ico:"\u{1F525}", stage:2, level:18,
       blurb:"Draws a breath, then spits a packed ball of flame down the road ahead.",
       battle:{ dmg:1.10, cd:3, burn:{ pct:0.20, turns:2 } },
@@ -4338,7 +4379,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-25 e6a3df4";
+const BUILD_ID = "2026-09-25 42075db";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
