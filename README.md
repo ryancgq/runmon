@@ -659,16 +659,19 @@ use them.
 
 A form is not the end of a stage, it is the start of one: a pet keeps learning
 inside the form it grew into. The Cinderling, the Sparky and the Bamboo Cub
-have one move each, all at level 8; the Blazewyrm learns all three of its own
-between level 15, where the form arrives, and level 30, where the next one
-does; and the Zephyrite has the first of its own at 18, the same level the
-Blazewyrm starts.
+have two moves each, the first at level 8 and the second at 10 to 12; the
+Blazewyrm learns all three of its own between level 15, where the form
+arrives, and level 30, where the next one does; and the Zephyrite has the
+first of its own at 18, the same level the Blazewyrm starts.
 
 | Skill | Form | Learns at | What it does |
 | --- | --- | --- | --- |
 | 🔥 fireball | Cinderling | Level 8 | Sold as the strongest fire you will ever see. Three seconds of winding up, then a cough and some smoke. |
+| ⭕ Cinder Sweep | Cinderling | Level 10 | Whips its tail flame round in a full circle. Whatever is close gets burnt - and so, a little, does the Cinderling. |
 | ⚡ Spark | Sparky | Level 8 | Guaranteed to leave something scorched. The something is the squirrel. |
+| 💫 Static Shock | Sparky | Level 11 | Bottles up every spark it has and goes off like a flashbulb. Whatever it hits forgets how to block. |
 | 🍃 Green Gale | Bamboo Cub | Level 8 | The forest's strength, gathered and released. Out of the wrong end. |
+| 🎋 Bamboo Toss | Bamboo Cub | Level 12 | Parts with a perfectly good snack to make a point. The point is sharp. |
 | 🔥 Fireball | Blazewyrm | Level 18 | Draws a breath and spits a packed ball of flame |
 | 💥 Flame Stomp | Blazewyrm | Level 22 | Lands hard enough to throw a ring of fire out around it |
 | ☄️ Flying Swoop | Blazewyrm | Level 26 | A low, fast pass trailing fire |
