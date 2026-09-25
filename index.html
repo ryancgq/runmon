@@ -2023,10 +2023,10 @@ const SKILLS = {
        Learnt at 10, the Cinderling's weakest level: at 10 and 11 it was 45-46%
        against the Cub, and the move brings those to 49. After Fizzle (8), and
        before Static Shock (11) and Bamboo Toss (12). */
-    { id:"ring-of-fire", name:"Ring of Fire", ico:"\u2B55", stage:1, level:10,
+    { id:"cinder-sweep", name:"Cinder Sweep", ico:"\u2B55", stage:1, level:10,
       blurb:"Whips its tail flame round in a full circle. Whatever is close gets burnt - and so, a little, does the Cinderling.",
       battle:{ dmg:1.05, self:0.05, cd:3, burn:{ pct:0.20, turns:2 } },
-      sprite:{ src:"art/skill-ring-of-fire.png", frames:16, fps:5,
+      sprite:{ src:"art/skill-cinder-sweep.png", frames:16, fps:5,
         /* Stoke, swing, ring, and back. The tail flame builds for four frames
            and the swing quickens through three; frame 7, the ring closed all
            the way round, is the peak and held a beat. It sweeps across the
@@ -4379,7 +4379,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-25 42075db";
+const BUILD_ID = "2026-09-25 0470815";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
