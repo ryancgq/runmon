@@ -175,13 +175,14 @@ function markFor(chip, gap, win){
    markPenalty() in index.html, and here for the same reason the rest of this
    block is: the roster hands every player's standing penalty to every other
    player, and that number cannot come from the device it is about. Each mark
-   fades over its own day, so this is computed on read rather than stored. */
+   counts in full for its own 24 hours and then not at all - they used to fade,
+   and no longer do - so this is still computed on read rather than stored:
+   the moment one runs out is the moment the row has to change. */
 function markPenalty(marks, now){
+  const t = now || Date.now();
   let sum = 0;
-  for (const m of marks || []){
-    const life = 1 - ((now || Date.now()) - (m.at || 0)) / (MARK_HOURS * 3600e3);
-    if (life > 0) sum += (m.amt || 0) * life;
-  }
+  for (const m of marks || [])
+    if (t - (m.at || 0) < MARK_HOURS * 3600e3) sum += (m.amt || 0);
   return Math.min(MARK_CAP, Math.max(0, sum));
 }
 /** How many of them are still standing - the count the app says it out loud in. */
@@ -528,7 +529,8 @@ export default {
              live with the pet, but the Rankings table shows everyone's standing
              penalty at once, and fanning out to two hundred athlete objects to
              draw one screen is not a read worth making. Only `at` and `amt` go
-             across - enough to price the fade, nothing about who did it. */
+             across - enough to know what it is worth and when it ends, nothing
+             about who did it. */
           await rosterStub(env).fetch("https://do/roster-mark", { method:"POST",
             body: JSON.stringify({ handle: c.target, at, amt }) });
           await stub.fetch("https://do/log-add", { method:"POST",
@@ -832,11 +834,11 @@ export class Athlete {
         .filter(k => Date.now() - hits[k] < MARK_HOURS * 3600e3);
       /* And when each of those was, because "you have attacked them" is only
          half an answer - the other half is when you can again. The lock runs
-         24 hours from the claim, which is also when a mark starts fading, but
-         the mark drops off the Rankings row as soon as it fades under half a
-         percent, hours before the lock lifts. Without the time the app could
-         only say no when somebody tapped Attack. `hitToday` stays for any app
-         that predates this. */
+         24 hours from the claim, and so does the mark it left - but a mark under
+         half a percent, which is what a swing at somebody below you leaves,
+         never shows on their row at all, so the row alone cannot tell you.
+         Without the time the app could only say no when somebody tapped
+         Attack. `hitToday` stays for any app that predates this. */
       const hitAt = {};
       for (const k of spent) hitAt[k] = hits[k];
       return this.ok({ marks, battles: await this.state.storage.get("battles") || [],
@@ -969,7 +971,7 @@ export class Athlete {
     }
     /* A mark landing on somebody, as the roster sees it. Written here rather
        than read from the athlete object when the table is drawn, and dropped
-       once it has faded so a row does not grow a day's history it will never
+       once it has run out so a row does not grow a day's history it will never
        show. A handle with no row is somebody who linked and never hatched:
        nothing to mark, and nothing to create. */
     if (path === "/roster-mark"){

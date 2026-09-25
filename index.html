@@ -3402,7 +3402,7 @@ function btChoose(st, key){
    is worth having for the record rather than for this. */
 const MARK_UNIT  = 0.10;      // one attack's worth, before chip and the gap
 const MARK_CAP   = 0.30;      // ...and the most everybody together can stack
-const MARK_HOURS = 24;        // how long one mark takes to fade to nothing
+const MARK_HOURS = 24;        // how long one mark stands, at full value throughout
 
 /* How much a mark is worth, by how far above you the target was. Continuous at
    parity - both branches give 0.2 - rising to full value five levels up and
@@ -3423,19 +3423,32 @@ function markFor(chip, gap, win){
   return MARK_UNIT * c * markGapMul(gap) * (win ? 1.4 : 1);
 }
 
-/* What the marks currently on you add up to. Each fades over its own day
-   rather than all of them expiring together, so a pile-on drains away through
-   the day after instead of ending at a stroke. */
+/* What the marks currently on you add up to. Each counts in full for its own
+   24 hours and then not at all.
+
+   They used to fade - each one sliding to nothing across its day, so a
+   pile-on drained away rather than ending at a stroke - and that was taken
+   out, asked for: a penalty that is 3% when somebody looks and 1% an hour
+   later reads as the number being wrong rather than as time passing, and a
+   mark that shrank off the Rankings row while its attacker was still locked
+   out of a second go made the two look like they disagreed. It also means a
+   mark now costs its full value for the whole day, which is twice what a
+   fading one averaged.
+
+   Each mark still has its own day, so three marks from three players at three
+   times still end at three different moments. The cap is unchanged.
+
+   The broker adds these up the same way for the Rankings row. Change one and
+   change the other. */
 function markPenalty(marks, now){
+  const t = now || Date.now();
   let sum = 0;
-  for (const m of marks || []){
-    const life = 1 - ((now || Date.now()) - (m.at || 0)) / (MARK_HOURS * 3600e3);
-    if (life > 0) sum += (m.amt || 0) * life;
-  }
+  for (const m of marks || [])
+    if (t - (m.at || 0) < MARK_HOURS * 3600e3) sum += (m.amt || 0);
   return Math.min(MARK_CAP, Math.max(0, sum));
 }
-/* How many are still standing. A faded mark is dropped by the broker on the
-   next touch rather than the moment it expires, so counting the list is not
+/* How many are still standing. An expired mark is dropped by the broker on the
+   next touch rather than the moment it runs out, so counting the list is not
    the same as counting what markPenalty() added up - and a row that says
    "-0% XP from 3 attacks" is worse than saying nothing. */
 function markCount(marks, now){
@@ -3504,9 +3517,9 @@ const DEFAULT_SAVE = {
   // [{ id, card }] - everybody the broker knows about, cached for the same
   // reason. While the game is small this is what the Friends tab shows.
   roster: [],
-  // [{ at, amt, by }] - what other players have done to you, each fading over
-  // its own day. The broker is the record; this is the copy the run summary
-  // reads, so a run still prices itself correctly with no connection.
+  // [{ at, amt, by }] - what other players have done to you, each standing at
+  // full value for its own day. The broker is the record; this is the copy the
+  // run summary reads, so a run still prices itself correctly with no connection.
   marks: [],
   // [{ at, dir, who, chip, win, amt }] - the fights you were in, yours and
   // theirs, newest last. `dir` is "out" when you attacked.
@@ -4325,7 +4338,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-25 a272ed5";
+const BUILD_ID = "2026-09-25 e6a3df4";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -5985,8 +5998,8 @@ function makeRun(at, km, sec, extra){
   const streakOn = streakAt(withThis, at).live;
   const mood = moodIfRunNow(at);
   // What other players have taken off this run. It is read once, here, and
-  // then written into the run: a mark fades, and a run logged under one should
-  // keep reading the way it did on the day rather than quietly healing.
+  // then written into the run: a mark runs out after a day, and a run logged
+  // under one should keep reading the way it did rather than quietly healing.
   const pen = markPenalty(save.marks, at);
   const by  = (save.marks || []).filter(m =>
     at - (m.at || 0) < MARK_HOURS * 3600e3).length;
@@ -6385,7 +6398,7 @@ async function refreshMarks(){
   /* Who you have attacked in the last day, and when. The broker has always
      sent the who and the app threw it away, so the only way to find out was
      to tap Attack and be told no - on a row whose -XP% line had already gone,
-     because that line is their fading penalty and not your lock. Kept apart
+     because that line is their penalty and not your lock. Kept apart
      from save.attacks, which attackFriend() rewrites whole. A broker that
      predates the times sends only the handles; those are kept as known-but-
      undated, and attackLock() falls back to the fight log for the when. */
@@ -6401,10 +6414,11 @@ async function refreshMarks(){
 
 /* Whether you can attack this player yet, and if not, until when. The lock is
    24 hours from the moment the attack was claimed - one per player per day -
-   and is yours, not theirs: their -XP% line is the fading total of everybody's
-   marks, drawn only while it is over half a percent, so it can be gone for
-   hours before this lifts, and never appear at all after a small mark on
-   somebody below you.
+   and is yours, not theirs: their -XP% line is the total of everybody's marks,
+   drawn only while it is over half a percent. Marks no longer fade, so the two
+   now end within minutes of each other - the lock from the claim, the mark
+   from the report - except after a small mark on somebody below you, which
+   never shows on their row at all.
 
    `until` is 0 when the time is not known: listed by an older broker, with no
    fight of yours against them in the log - which is an attack claimed and then
@@ -6540,7 +6554,7 @@ function friendRowHTML(r, rank){
   if (!c) return "";                     // the broker only sends hatched pets
   const ago  = c.lastRun ? relDay(c.lastRun) : "no runs yet";
   // Half a percent rounds to nothing, and "-0% XP" reads as a bug rather than
-  // as a mark that has nearly faded. A broker that predates the count sends a
+  // as a mark too small to matter. A broker that predates the count sends a
   // penalty and no number, so the attacks go unnumbered rather than as zero.
   const pen  = r.pen > 0.005
     ? `<div class="pen">\u2694\uFE0F \u2212${Math.round(r.pen * 100)}% XP from
@@ -6637,7 +6651,7 @@ function agoShort(ts){
 /* Who has been fighting whom. Incoming rows are the ones that were asked for -
    being attacked is the half you cannot see happen - and outgoing ones come
    free with the same list, which makes it a record of the feud rather than a
-   list of grievances. A fight whose mark has faded still shows: the XP is gone
+   list of grievances. A fight whose mark has run out still shows: the XP is gone
    either way and this is the only place that says where it went. */
 function battleLogHTML(){
   const log = (save.battles || []).slice().sort((a, b) => b.at - a.at).slice(0, 12);
@@ -6788,14 +6802,16 @@ function openFriend(id){
 }
 
 /* In place of what an attack would be worth, when you cannot make one: when
-   you did, and when you can again - and why their row may show no penalty,
-   which is the part that reads as a contradiction if it is not said. */
+   you did, and when you can again - and why their row may show no penalty
+   even so. Marks no longer fade, so that is down to one case: a mark small
+   enough to round to nothing, which is what a swing at somebody below you
+   leaves. */
 function lockNote(c, lock){
   const when = lock.at ? agoShort(lock.at) : "today";
   const again = lock.until ? `You can attack them again ${untilShort(lock.until)}.` : "You can attack them again tomorrow.";
   return `<p class="muted" style="font-size:11px;font-weight:700;text-align:center;margin:14px 0 0">
-    You attacked ${esc(c.pet)} ${when}. ${again}<br><span style="opacity:.7">One attack per player a day. Their
-    \u2212XP% fades on its own clock and can be gone before this lifts.</span></p>`;
+    You attacked ${esc(c.pet)} ${when}. ${again}<br><span style="opacity:.7">One attack per player a day.
+    A mark under half a percent does not show on their row, but it still counts.</span></p>`;
 }
 
 /* What attacking them is worth, in words rather than arithmetic. Saying it
@@ -7985,7 +8001,7 @@ async function stravaSync(opts){
       const newest = freshMarks.reduce((hi, m) => Math.max(hi, m.at || 0), 0);
       noticeAdd({ id:"hit:" + newest, kind:"hit",
                   title:`${who} attacked your pet`,
-                  body:`\u2212${pen}% XP while the marks last. They fade over a day.`,
+                  body:`\u2212${pen}% XP while the marks last. Each one lasts a day.`,
                   at:newest || Date.now() });
       renderNotices();
       // Stamped from the marks themselves, not from this device's clock. `at`
