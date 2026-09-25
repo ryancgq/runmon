@@ -985,6 +985,9 @@ body::before{
   margin-top:5px;letter-spacing:.2px;
 }
 .friend .chip.me{background:var(--card-2);color:var(--muted);border-color:var(--line)}
+/* Your lock on them. Muted rather than red: it is not something wrong with the
+   pet, it is where your day's attacks have already gone. */
+.friend .hit{font-size:11px;font-weight:800;color:var(--muted);margin-top:4px;letter-spacing:.2px}
 .friend .pet-holder{width:60px;height:60px;flex:0 0 60px}
 .friend .pet-holder svg{filter:none}
 .friend .who{flex:1;min-width:0}
@@ -4322,7 +4325,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-24 cff6da9";
+const BUILD_ID = "2026-09-25 a272ed5";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -6379,7 +6382,51 @@ async function refreshMarks(){
     perDay: Number(r.attacksPerDay) || 2,
     at:     Date.now()
   };
+  /* Who you have attacked in the last day, and when. The broker has always
+     sent the who and the app threw it away, so the only way to find out was
+     to tap Attack and be told no - on a row whose -XP% line had already gone,
+     because that line is their fading penalty and not your lock. Kept apart
+     from save.attacks, which attackFriend() rewrites whole. A broker that
+     predates the times sends only the handles; those are kept as known-but-
+     undated, and attackLock() falls back to the fight log for the when. */
+  const hitAt = {};
+  if (r.hitAt && typeof r.hitAt === "object"){
+    for (const [h, t] of Object.entries(r.hitAt)) if (Number(t) > 0) hitAt[nm(h)] = Number(t);
+  } else {
+    for (const h of r.hitToday || []) hitAt[nm(h)] = 0;
+  }
+  save.hitAt = hitAt;
   persist();
+}
+
+/* Whether you can attack this player yet, and if not, until when. The lock is
+   24 hours from the moment the attack was claimed - one per player per day -
+   and is yours, not theirs: their -XP% line is the fading total of everybody's
+   marks, drawn only while it is over half a percent, so it can be gone for
+   hours before this lifts, and never appear at all after a small mark on
+   somebody below you.
+
+   `until` is 0 when the time is not known: listed by an older broker, with no
+   fight of yours against them in the log - which is an attack claimed and then
+   abandoned. The log's own time is the report's, a few minutes after the
+   claim, so where it is used it errs on the side of waiting. */
+function attackLock(handle){
+  const DAY = MARK_HOURS * 3600e3, now = Date.now();
+  const hits = save.hitAt || {};
+  if (hits[handle] > 0)
+    return hits[handle] + DAY > now ? { locked:true, at:hits[handle], until:hits[handle] + DAY }
+                                    : { locked:false };
+  const fought = (save.battles || []).filter(b => b.dir === "out" && b.who === handle)
+    .reduce((m, b) => Math.max(m, b.at), 0);
+  if (fought && fought + DAY > now) return { locked:true, at:fought, until:fought + DAY };
+  if (handle in hits) return { locked:true, at:0, until:0 };
+  return { locked:false };
+}
+/** "in 5h", "in 40m" - how long until a lock lifts, sized for a row. */
+function untilShort(ts){
+  const mins = Math.max(1, Math.ceil((ts - Date.now()) / 60000));
+  if (mins < 60) return `in ${mins}m`;
+  return `in ${Math.ceil(mins / 60)}h`;
 }
 
 /** Refresh every friend's card in one round trip. Cards are cached in the save,
@@ -6499,6 +6546,11 @@ function friendRowHTML(r, rank){
     ? `<div class="pen">\u2694\uFE0F \u2212${Math.round(r.pen * 100)}% XP from
        ${r.hits ? r.hits + " " : ""}attack${r.hits === 1 ? "" : "s"}</div>` : "";
   const tag  = r.me ? ` <span class="chip me">You</span>` : "";
+  // your own lock on them, which is a different thing from their penalty line
+  // above it and outlives it: shown so the answer is on the row, not in a toast
+  const lock = r.me ? { locked:false } : attackLock(r.id);
+  const hit  = lock.locked
+    ? `<div class="hit">You attacked them \u00b7 again ${lock.until ? untilShort(lock.until) : "tomorrow"}</div>` : "";
   const art  = r.me ? "me" : r.id;
   const open = r.me ? "" : ` data-friend="${r.id}"`;
   return `<${r.me ? "div" : "button"} class="friend${r.me ? " me" : ""}"${open}>
@@ -6510,7 +6562,7 @@ function friendRowHTML(r, rank){
         <div class="n">${esc(c.pet)} <span class="chip">LV ${c.level}</span>${tag}</div>
         <div class="h">${esc(c.form)} \u00b7 Stage ${c.stage + 1} of 5</div>
         <div class="s">${U.distStr(c.km, c.km >= 100 ? 0 : 1)} ${U.label} \u00b7 ${c.runs} run${c.runs === 1 ? "" : "s"} \u00b7 ${ago}</div>
-        ${pen}
+        ${pen}${hit}
       </div>
       ${r.me ? "" : `<span class="go"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>`}
     </${r.me ? "div" : "button"}>`;
@@ -6704,6 +6756,7 @@ function openFriend(id){
   const f = playerList().find(x => x.id === id);
   if (!f) return;
   const c = safeCard(f.card);
+  const lock = attackLock(id);
   openSheet({
     title: c ? esc(c.pet) : "Their pet",
     desc: c ? `${esc(c.form)} \u00b7 Level ${c.level}` : "",
@@ -6722,14 +6775,27 @@ function openFriend(id){
         <div class="stat"><div class="v">${c.best}</div><div class="k">Best streak</div></div>
         <div class="stat"><div class="v">${c.lastRun ? shortAgo(c.lastRun) : "\u2014"}</div><div class="k">Last run</div></div>
       </div>
-      ${attackNote(c)}`
+      ${lock.locked ? lockNote(c, lock) : attackNote(c)}`
       : `<p class="desc">No pet on this code yet.</p>`,
     onOpen: () => { if (c) paintPet($("#friend-big"), c.species, c.stage, "okay", c.level); },
-    actions: c && save.species && stravaLinked()
+    // no Attack button for somebody you have already hit today: the broker
+    // would refuse it, and a button that exists to be refused is the bug
+    actions: c && save.species && stravaLinked() && !lock.locked
       ? [{ label:"Attack", cls:"primary", fn: () => attackFriend(id, c) },
          { label:"Done", cls:"ghost", fn: closeSheet }]
       : [{ label:"Done", cls:"ghost", fn: closeSheet }]
   });
+}
+
+/* In place of what an attack would be worth, when you cannot make one: when
+   you did, and when you can again - and why their row may show no penalty,
+   which is the part that reads as a contradiction if it is not said. */
+function lockNote(c, lock){
+  const when = lock.at ? agoShort(lock.at) : "today";
+  const again = lock.until ? `You can attack them again ${untilShort(lock.until)}.` : "You can attack them again tomorrow.";
+  return `<p class="muted" style="font-size:11px;font-weight:700;text-align:center;margin:14px 0 0">
+    You attacked ${esc(c.pet)} ${when}. ${again}<br><span style="opacity:.7">One attack per player a day. Their
+    \u2212XP% fades on its own clock and can be gone before this lifts.</span></p>`;
 }
 
 /* What attacking them is worth, in words rather than arithmetic. Saying it
@@ -6757,6 +6823,8 @@ async function attackFriend(id, c){
     // waiting for the next refresh to notice.
     if (Number.isFinite(r.left))
       save.attacks = { left: r.left, perDay: (save.attacks || {}).perDay || 2, at: Date.now() };
+    // they are locked from this moment, not from the next refresh
+    save.hitAt = Object.assign({}, save.hitAt, { [id]: Date.now() });
     closeSheet();
     startBattle(
       { species: save.species, level: derived.level, name: save.petName || "Your pet" },

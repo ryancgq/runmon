@@ -830,9 +830,18 @@ export class Athlete {
       const hits = await this.state.storage.get("atkHits") || {};
       const spent = Object.keys(hits)
         .filter(k => Date.now() - hits[k] < MARK_HOURS * 3600e3);
+      /* And when each of those was, because "you have attacked them" is only
+         half an answer - the other half is when you can again. The lock runs
+         24 hours from the claim, which is also when a mark starts fading, but
+         the mark drops off the Rankings row as soon as it fades under half a
+         percent, hours before the lock lifts. Without the time the app could
+         only say no when somebody tapped Attack. `hitToday` stays for any app
+         that predates this. */
+      const hitAt = {};
+      for (const k of spent) hitAt[k] = hits[k];
       return this.ok({ marks, battles: await this.state.storage.get("battles") || [],
                        attacksLeft: Math.max(0, ATTACKS_PER_DAY - used),
-                       attacksPerDay: ATTACKS_PER_DAY, hitToday: spent });
+                       attacksPerDay: ATTACKS_PER_DAY, hitToday: spent, hitAt });
     }
     if (path === "/log-add"){
       await this.logAdd(await request.json());
