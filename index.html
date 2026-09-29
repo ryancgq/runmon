@@ -2168,10 +2168,16 @@ const SKILLS = {
            The frames watching it fly drew the squirrel 10% smaller than the
            rest and are grown back; the frames are registered on its paws,
            because the tail swinging over its head pulls any whole-body
-           match off. */
+           match off.
+
+           Sized by the whole squirrel, not its eyes. Both new sheets draw
+           the Sparky with bigger eyes for its body than the idle does, so
+           matching the eye span left the body 8-11% small next to it. The
+           scale now matches the idle's fur area on the resting frame, with
+           the paws and the face's front edge where the idle has them. */
         durations:[300, 260, 240, 260, 180, 150,  90, 110,
                    150, 170, 190, 240, 200, 220, 300, 340],
-        aspect:1.4822, scale:1.297, dx:15.88, dy:-6.58 } },
+        aspect:1.4822, scale:1.439, dx:13.05, dy:-12.87 } },
     /* The last thing the Sparky learns before it becomes the Zephyrite, and
        a pocket-sized Lightning Bolt on purpose: a bolt out of its own little
        cloud, smaller than the one the Zephyrite calls down at 18 and with a
@@ -2190,10 +2196,11 @@ const SKILLS = {
 
            The five strike frames drew the squirrel about 10% smaller to fit
            the bolt, and the two after them 5% and 4%; all are grown back so
-           it does not shrink under its own storm. */
+           it does not shrink under its own storm. Sized to the idle by fur
+           area, not eye span, for the reason given at Acorn Flick. */
         durations:[300, 260, 240, 220, 200, 190, 180, 320,
                    110, 100, 110, 100, 180, 260, 300, 360],
-        aspect:1.3464, scale:1.288, dx:21.00, dy:1.48 } },
+        aspect:1.3464, scale:1.388, dx:19.43, dy:-1.93 } },
     { id:"lightning-bolt", name:"Lightning Bolt", ico:"\u{1F329}\uFE0F", stage:2, level:18,
       blurb:"Asks the sky for help. The sky, this time, obliges.",
       /* Down from 1.65 when Arc Lash arrived at 22 and had to beat it -
@@ -4468,7 +4475,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-29 bccb3bf";
+const BUILD_ID = "2026-09-29 c776f2d";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
