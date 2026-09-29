@@ -727,7 +727,7 @@ a dashed chip that says so when tapped, and the Evolution screen reads
 
 **Arc Lash is the first move that reaches into somebody else's guard.** Every
 other effect in the game is something a pet does to itself; this drops the
-opponent's Defence 40% for three of their turns, which is worth more to Nimbus
+opponent's Defence 25% for three of their turns, which is worth more to Nimbus
 than to anybody — a pet built to act twice makes the second act land harder.
 Two sources of the same problem take the longer and deeper of the pair rather
 than overwriting each other.
@@ -1007,24 +1007,33 @@ ended because the engine gave up at eighty turns.
 
 ### How balanced it actually is
 
-Within three points of even at every level and every pairing. Mirror matches
-are fair to within a fifth of a point over 30,000 fights each, so there is no
-advantage in being the one who sent the challenge.
+Every pairing at every level from 8 to 40 lands between 42% and 55%, with
+both pets played the way the game plays a pet on auto: **any move it has ready,
+at random**, and a Nap only once it is hurt. Mirror matches are fair to within
+a fifth of a point over 30,000 fights each, so there is no advantage in being
+the one who sent the challenge.
 
 | Row wins | Verdant v Ember | Verdant v Nimbus | Ember v Nimbus |
 | --- | --- | --- | --- |
-| Level 12 | 50% | 48% | 49% |
-| Level 26 | 49% | 51% | 50% |
-| Level 99 | 51% | 52% | 49% |
+| Level 12 | 48% | 52% | 45% |
+| Level 26 | 45% | 56% | 48% |
+| Level 40 | 46% | 53% | 47% |
+
+A pet on auto used to take the first move it had ready, in the order it
+learnt them. Every number was tuned on that order, and some of it depended
+on it: the Cinderling's Fizzle is a wind-up for the move after it, and with
+the order random the Cinderling fell from 53% to 40% against the Sparky. The
+Sparky's third and fourth moves, meanwhile, were never reached on auto at
+all. Random picking came with a retune of nine moves together, measured on
+the game's own picker.
 
 Capping evolution is what made this reachable. While moves carried forward a
 form's kit kept growing, and the three species drifted into a 40–61% triangle
 that no amount of tuning closed; with each form holding its own moves the worst
 pairing came in from 20 points out to 3.
 
-The one dent is **levels 18 to 21**, where the Zephyrite has its Lightning
-Bolt and the Blazewyrm has only the first of three: Ember takes 44–46% there
-until it learns Flame Stomp at 22.
+The weakest spots are Ember against Nimbus at 13, 14 and 22 (42–44%) and
+Nimbus against Verdant from 18 to 26 (43–45%).
 
 ### Pile-on marks
 

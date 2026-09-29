@@ -1982,6 +1982,32 @@ function levelUpBeats(beats, gather, burst){
   ];
 }
 
+/* Every number in here was retuned at once when pets on auto started picking
+   among their ready moves at random, rather than taking the first in the
+   list. Everything before had been balanced on that fixed order, and some of
+   it depended on the order outright: the Cinderling opening with Fizzle won
+   50% against the Sparky and opening with Cinder Sweep won 31%, because the
+   stoke was meant to land on the move after it. Random picking also meant the
+   Sparky's third and fourth moves were used for the first time.
+
+   Measured with both sides on btChoose() itself - the rigs before had used
+   their own first-ready pick, which let the Panda Nap at full health, a thing
+   the real picker never does. On the real picker the live game already ran
+   37-63 at 18 and up, the Panda on top; random picking alone made it 33-51.
+   After the retune every pairing at every level from 8 to 40 lands between
+   42 and 55.
+
+   What moved: Cinder Sweep 1.05 -> 1.20, Bamboo Toss 1.30 -> 1.40, Acorn
+   Flick 1.66 -> 1.50 without its singe, Pocket Storm 1.58 -> 1.40, Fireball
+   1.10 -> 1.20, Flame Stomp 1.47 -> 1.40 and flat-footed 25% -> 15%, Arc
+   Lash 1.59 -> 1.50 and its rattle 40% -> 25%, Nap's heal 32% -> 26%.
+
+   The ladder - a move learnt later worth more over six turns than the one
+   before it - was a rule for the first-ready picker, which always reached for
+   the earliest move; it no longer holds everywhere (Flame Stomp sits under
+   Fireball, Arc Lash under Lightning Bolt, Acorn Flick under Spark), and
+   whole-fight balance is what is measured now. The comments on individual
+   moves below that quote older numbers describe how each was first set. */
 const SKILLS = {
   ember: [
     // the id stays "fizzle" - the Blazewyrm's real one already owns "fireball",
@@ -2006,13 +2032,12 @@ const SKILLS = {
        the tail flame whipped all the way round into a ring, close enough that
        the dragon catches some of it too.
 
-       A burn, because that is what the line does, and a smaller one than
-       Fireball's: the ladder puts it above Fizzle (1.078 against 1.067) and
-       below the Fireball the Blazewyrm learns at 18 (1.090), so the grown-up
-       version is still the bigger move. Every burn on its own pushed Ember v
-       Verdant from 48 to 55-60 at 12-14, whatever the split between hit and
-       burn: the Cub is slow and soft, and a burn lands on it for two turns it
-       cannot answer. The singe is what pays for that, and it is measured
+       A burn, because that is what the line does. First set at 1.05, and
+       raised to 1.20 when pets on auto began picking at random - see the note
+       over SKILLS; what follows is how the singe was sized. Every burn on its
+       own pushed Ember v Verdant from 48 to 55-60 at 12-14, whatever the split
+       between hit and burn: the Cub is slow and soft, and a burn lands on it
+       for two turns it cannot answer. The singe is what pays for that, and it is measured
        rather than flavour. Hurting yourself does not show on the ladder,
        which counts only damage dealt, so it costs the move nothing there,
        while the 5% it takes off the Cinderling brings every pairing from 10
@@ -2025,7 +2050,7 @@ const SKILLS = {
        before Static Shock (11) and Bamboo Toss (12). */
     { id:"cinder-sweep", name:"Cinder Sweep", ico:"\u2B55", stage:1, level:10,
       blurb:"Whips its tail flame round in a full circle. Whatever is close gets burnt - and so, a little, does the Cinderling.",
-      battle:{ dmg:1.05, self:0.05, cd:3, burn:{ pct:0.20, turns:2 } },
+      battle:{ dmg:1.20, self:0.05, cd:3, burn:{ pct:0.20, turns:2 } },
       sprite:{ src:"art/skill-cinder-sweep.png", frames:16, fps:5,
         /* Stoke, swing, ring, and back. The tail flame builds for four frames
            and the swing quickens through three; frame 7, the ring closed all
@@ -2045,7 +2070,7 @@ const SKILLS = {
         aspect:1.6452, scale:1.50, dx:-26.38, dy:-7.99 } },
     { id:"fireball", name:"Fireball", ico:"\u{1F525}", stage:2, level:18,
       blurb:"Draws a breath, then spits a packed ball of flame down the road ahead.",
-      battle:{ dmg:1.10, cd:3, burn:{ pct:0.20, turns:2 } },
+      battle:{ dmg:1.20, cd:3, burn:{ pct:0.20, turns:2 } },
       sprite:{ src:"art/skill-fireball.png",     frames:16, fps:12.5,
         // the breath holds, the release is sharp, the ball carries on out
         durations:[150,150,140,130, 120,110,100, 90,90,90, 110,110,120,130,140,200],
@@ -2054,7 +2079,7 @@ const SKILLS = {
       blurb:"Rears up and lands hard enough to throw a ring of fire out around it.",
       // a shockwave goes under a guard rather than through it - and lands you
       // flat-footed for doing it
-      battle:{ dmg:1.47, pierce:0.50, cd:3, open:{ pct:0.25, turns:2 } },
+      battle:{ dmg:1.40, pierce:0.50, cd:3, open:{ pct:0.15, turns:2 } },
       sprite:{ src:"art/skill-flame-stomp.png",  frames:16, fps:12.5,
         // the rear-up hangs, the slam is quick, the ring spreads and fades
         durations:[160,150,140,130, 120,100,90,80, 100,120,130,140, 150,160,170,220],
@@ -2122,31 +2147,18 @@ const SKILLS = {
         durations:[300, 260, 230, 210, 190, 170, 150, 130,
                    120, 120, 170,  250,  200, 200, 230, 320],
         aspect:1.1699, scale:1.562, dx:5.9, dy:-1.0 } },
-    /* The Sparky's third and fourth moves, and the two that are there to be
-       pressed rather than to run the fight. A pet on auto - defending, or a
-       fight settled away from the screen - takes the first move it has
-       ready, and Spark and Static Shock between them fill every window the
-       shared cooldown leaves: both 3 turns, GCD 2, so they alternate and
-       nothing listed after them is ever reached. That makes these two
-       neutral to every auto-played fight by construction, and what they are
-       worth is decided by the ladder alone: each is worth pressing over
-       what came before it and neither jumps past the Zephyrite's Bolt.
-
-       Ladder, six turns at 14: Spark 1.109, Acorn Flick 1.110, Pocket
-       Storm 1.117, then Lightning Bolt 1.121 at 18 - which is why the Bolt
-       came back up from 1.53, see there.
-
-       Acorn Flick is one big swat, and it has to be to clear Spark: Spark's
-       worth is a charge that lasts the whole fight, and a single hit only
-       matches it at 1.66 of an attack. Fights at this level are five turns,
-       so a player opening with that was winning 57% where Sparky wins 50 on
-       auto. The singe is what pays for it, as it does for the Cinderling's
-       Cinder Sweep: at 5% of its own health, a Sparky that opens with it by
-       hand wins 50 and 49 at 12 and 13, where on auto it wins 50 and 48.
-       The ladder counts only damage dealt, so it costs nothing there. */
+    /* The Sparky's third and fourth moves. They shipped at a time when a pet
+       on auto only ever reached the first two moves it knew, so they were
+       balanced as moves a player presses: Acorn Flick at 1.66 with a 5%
+       singe, Pocket Storm at 1.58. Once defending pets picked among every
+       ready move at random, both were used on auto for the first time and
+       came down - Acorn Flick to 1.50 with the singe taken off, since
+       swatting an acorn does not hurt the one swatting it, and Pocket Storm
+       to 1.40, still through 30% of the guard, so it stays the harder of the
+       two. See the note over SKILLS. */
     { id:"acorn-flick", name:"Acorn Flick", ico:"\u{1F330}", stage:1, level:12,
       blurb:"Winds its whole tail round and swats the acorn at them. It will want that acorn back.",
-      battle:{ dmg:1.66, self:0.05, cd:5 },
+      battle:{ dmg:1.50, cd:5 },
       sprite:{ src:"art/skill-acorn-flick.png", frames:16, fps:5,
         /* Sits with the acorn, narrows its eyes, winds the tail up over two
            frames and swats - the contact at 90ms, the fastest beat, and the
@@ -2162,13 +2174,13 @@ const SKILLS = {
         aspect:1.4822, scale:1.297, dx:15.88, dy:-6.58 } },
     /* The last thing the Sparky learns before it becomes the Zephyrite, and
        a pocket-sized Lightning Bolt on purpose: a bolt out of its own little
-       cloud, a hair smaller than the one the Zephyrite calls down at 18 and
-       with a shallower pierce, so the move you grow into is still the bigger
-       one. Six turns to call the cloud back - once a fight, twice if it runs
-       long - because the storm is the event, not the rhythm. */
+       cloud, smaller than the one the Zephyrite calls down at 18 and with a
+       shallower pierce. Six turns to call the cloud back - once a fight,
+       twice if it runs long - because the storm is the event, not the
+       rhythm. */
     { id:"pocket-storm", name:"Pocket Storm", ico:"\u26C8\uFE0F", stage:1, level:14,
       blurb:"Brews a thundercloud the size of a teacup and points it at them. It is a very angry teacup.",
-      battle:{ dmg:1.58, pierce:0.30, cd:6 },
+      battle:{ dmg:1.40, pierce:0.30, cd:6 },
       sprite:{ src:"art/skill-pocket-storm.png", frames:16, fps:5,
         /* A sparkle, a bolt, then the cloud gathering round it over four
            frames and a pleased squint underneath it - held, the calm before.
@@ -2191,8 +2203,7 @@ const SKILLS = {
 
          Back up to 1.58 when the Sparky learnt Acorn Flick and Pocket Storm.
          Spark was worth 1.109 on the ladder and a 1.53 Bolt 1.112, which left
-         no room for two moves between them; at 1.58 it is 1.121, still under
-         Arc Lash's 1.134. It also closes most of that gap: at 26 Nimbus v
+         no room for two moves between them; at 1.58 it is 1.121. It also closes most of that gap: at 26 Nimbus v
          Verdant goes 44 -> 46 and Ember v Nimbus 52 -> 50. At 40, where Nimbus
          was already level, Ember v Nimbus goes 49 -> 48 and Nimbus v Verdant
          48.5 -> 49. The cost is at 18-21, the gap before the Blazewyrm has
@@ -2213,9 +2224,10 @@ const SKILLS = {
     { id:"arc-lash", name:"Arc Lash", ico:"\u{1F300}", stage:2, level:22,
       blurb:"Cracks its tail like a whip. Whatever is downrange gets the storm.",
       /* The big version of what Static Shock does at 11: it reaches into
-         somebody else's guard rather than its own. It hits for a shade over a
-         plain attack and
-         leaves the opponent's Defence down 40% for three of their turns,
+         somebody else's guard rather than its own. It hits for half as much
+         again as a plain attack and leaves the opponent's Defence down 25%
+         for three of their turns (40% until pets on auto picked at random -
+         see the note over SKILLS),
          which is worth more to a pet that gets extra turns than to anybody
          else: Nimbus is built to act again, and this makes the second act
          land harder.
@@ -2226,7 +2238,7 @@ const SKILLS = {
          pet was paying twice and buying once. A second skill has to beat a
          basic attack on the turn it is used, or it is a liability however
          good its rider is. */
-      battle:{ dmg:1.59, cd:3, rattle:{ pct:0.40, turns:3 } },
+      battle:{ dmg:1.50, cd:3, rattle:{ pct:0.25, turns:3 } },
       sprite:{ src:"art/skill-arc-lash.png", frames:12, fps:4.2,
         /* The tail gathers over four frames, sweeps through two, and the flick
            itself is frames 7 and 8 - the fastest beats in the clip, because a
@@ -2270,7 +2282,8 @@ const SKILLS = {
        hits: Green Gale does more damage than an attack but hands the cub's own
        guard over for it. This costs nothing but the snack.
 
-       1.30, and learnt at 12, both measured. It is a damage move, so it has to
+       1.30, and learnt at 12, both measured - and 1.40 since pets on auto
+       pick at random, see the note over SKILLS. It is a damage move, so it has to
        climb the ladder over Green Gale's 1.042 - 1.30 is worth 1.050, and less
        would sit inside the noise. The level is where it does least harm: the
        cub was already 54% down to the Sparky at 12 and a hair ahead of the
@@ -2279,7 +2292,7 @@ const SKILLS = {
        points of even and 11 is left as it was. */
     { id:"bamboo-toss", name:"Bamboo Toss", ico:"\u{1F38B}", stage:1, level:12,
       blurb:"Parts with a perfectly good snack to make a point. The point is sharp.",
-      battle:{ dmg:1.30, cd:3 },
+      battle:{ dmg:1.40, cd:3 },
       sprite:{ src:"art/skill-bamboo-toss.png", frames:16, fps:4.5,
         /* Hold, wind up, throw, and the pleased look after. The wind-up
            quickens, the throw is the fastest beats in the clip - the release
@@ -2308,7 +2321,7 @@ const SKILLS = {
          Pandas with a repeatable 30% heal out-heal each other's damage
          forever, and the fight only ends because the engine gives up at
          eighty turns. You do not lie down twice in the same fight. */
-      battle:{ dmg:0, cd:4, heal:0.32, expose:1.6, at:0.50, once:true },
+      battle:{ dmg:0, cd:4, heal:0.26, expose:1.6, at:0.50, once:true },
       sprite:{ src:"art/skill-nap.png", frames:16, fps:3.4,
         /* The longest clip in the game, at 4.65s, because the joke is that it
            takes its time: three frames of getting drowsy, two of a yawn held
@@ -3460,9 +3473,9 @@ function btAct(st, moveId){
 
 /** What the other pet does. Battles are not accepted, they are simply had -
     the defender is not present and was never asked - so their pet picks for
-    itself: the first move it has ready, and a Nap only once it is hurt enough
-    to be worth the turn. It is also what plays the attacker's side when a
-    fight is settled away from the screen. */
+    itself: any move it has ready, at random, and a Nap only once it is hurt
+    enough to be worth the turn. It is also what plays the attacker's side
+    when a fight is settled away from the screen. */
 function btChoose(st, key){
   const s = st[key];
   const ready = [];
@@ -3470,19 +3483,27 @@ function btChoose(st, key){
     if ((s.cds[k.id] || 0) > 0 || s.gcd > 0) continue;
     if (k.battle.once && s.used[k.id]) continue;
     if (k.battle.heal && s.cur > s.max * (k.battle.at || 0.55)) continue;
-    if (!s.boss) return k.id;      // a pet takes the first thing it has ready
     ready.push(k.id);
   }
   if (!ready.length) return "attack";
-  /* A raid boss picks among what is ready instead, so no two attempts on him
-     open the same way. It is the difference between a rule and a roll: his
-     roar costs him a turn and is the only thing that lets a low-level pet act
-     twice, so whether it comes out first is the luck of the attempt. About one
-     in three.
+  /* A pet used to take the first move it had ready, in the order it learnt
+     them. With two 3-turn moves under the 2-turn shared cooldown that is a
+     strict alternation of the first two, and the Sparky's third and fourth
+     moves were never reached at all - a defending pet only ever used what it
+     knew at 11. Now every ready move is equally likely, so a pet defends
+     with its whole kit.
+
+     A pet with only one move ready takes it without a roll, so a fight in
+     which nobody has a choice draws exactly what it drew before. The raid
+     boss always rolled, even with one move ready, and still does: his health
+     and his swing cap were measured on that sequence. His roar costs him a
+     turn and is the only thing that lets a low-level pet act twice, so
+     whether it comes out first is the luck of the attempt. About one in
+     three.
 
      Drawn from st.rng() and never from Math.random(), or the engine stops
-     being a pure function of its seed and a replay on another device disagrees
-     with the fight it is replaying. */
+     being a pure function of its seed. */
+  if (ready.length === 1 && !s.boss) return ready[0];
   return ready[Math.floor(st.rng() * ready.length)];
 }
 
@@ -4447,7 +4468,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-29 994fda3";
+const BUILD_ID = "2026-09-29 bccb3bf";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
