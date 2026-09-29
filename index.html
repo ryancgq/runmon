@@ -2122,14 +2122,82 @@ const SKILLS = {
         durations:[300, 260, 230, 210, 190, 170, 150, 130,
                    120, 120, 170,  250,  200, 200, 230, 320],
         aspect:1.1699, scale:1.562, dx:5.9, dy:-1.0 } },
+    /* The Sparky's third and fourth moves, and the two that are there to be
+       pressed rather than to run the fight. A pet on auto - defending, or a
+       fight settled away from the screen - takes the first move it has
+       ready, and Spark and Static Shock between them fill every window the
+       shared cooldown leaves: both 3 turns, GCD 2, so they alternate and
+       nothing listed after them is ever reached. That makes these two
+       neutral to every auto-played fight by construction, and what they are
+       worth is decided by the ladder alone: each is worth pressing over
+       what came before it and neither jumps past the Zephyrite's Bolt.
+
+       Ladder, six turns at 14: Spark 1.109, Acorn Flick 1.110, Pocket
+       Storm 1.117, then Lightning Bolt 1.121 at 18 - which is why the Bolt
+       came back up from 1.53, see there.
+
+       Acorn Flick is one big swat, and it has to be to clear Spark: Spark's
+       worth is a charge that lasts the whole fight, and a single hit only
+       matches it at 1.66 of an attack. Fights at this level are five turns,
+       so a player opening with that was winning 57% where Sparky wins 50 on
+       auto. The singe is what pays for it, as it does for the Cinderling's
+       Cinder Sweep: at 5% of its own health, a Sparky that opens with it by
+       hand wins 50 and 49 at 12 and 13, where on auto it wins 50 and 48.
+       The ladder counts only damage dealt, so it costs nothing there. */
+    { id:"acorn-flick", name:"Acorn Flick", ico:"\u{1F330}", stage:1, level:12,
+      blurb:"Winds its whole tail round and swats the acorn at them. It will want that acorn back.",
+      battle:{ dmg:1.66, self:0.05, cd:5 },
+      sprite:{ src:"art/skill-acorn-flick.png", frames:16, fps:5,
+        /* Sits with the acorn, narrows its eyes, winds the tail up over two
+           frames and swats - the contact at 90ms, the fastest beat, and the
+           launch right after it. Then four frames watching it go, the tail
+           settling back with a swish, a pleased blink, and the idle pose.
+
+           The frames watching it fly drew the squirrel 10% smaller than the
+           rest and are grown back; the frames are registered on its paws,
+           because the tail swinging over its head pulls any whole-body
+           match off. */
+        durations:[300, 260, 240, 260, 180, 150,  90, 110,
+                   150, 170, 190, 240, 200, 220, 300, 340],
+        aspect:1.4822, scale:1.297, dx:15.88, dy:-6.58 } },
+    /* The last thing the Sparky learns before it becomes the Zephyrite, and
+       a pocket-sized Lightning Bolt on purpose: a bolt out of its own little
+       cloud, a hair smaller than the one the Zephyrite calls down at 18 and
+       with a shallower pierce, so the move you grow into is still the bigger
+       one. Six turns to call the cloud back - once a fight, twice if it runs
+       long - because the storm is the event, not the rhythm. */
+    { id:"pocket-storm", name:"Pocket Storm", ico:"\u26C8\uFE0F", stage:1, level:14,
+      blurb:"Brews a thundercloud the size of a teacup and points it at them. It is a very angry teacup.",
+      battle:{ dmg:1.58, pierce:0.30, cd:6 },
+      sprite:{ src:"art/skill-pocket-storm.png", frames:16, fps:5,
+        /* A sparkle, a bolt, then the cloud gathering round it over four
+           frames and a pleased squint underneath it - held, the calm before.
+           The strike is five frames of the bolt jumping about, flickered at
+           100-110ms, the last and biggest held longer. Then the cloud breaks
+           into puffs, it waves, and settles.
+
+           The five strike frames drew the squirrel about 10% smaller to fit
+           the bolt, and the two after them 5% and 4%; all are grown back so
+           it does not shrink under its own storm. */
+        durations:[300, 260, 240, 220, 200, 190, 180, 320,
+                   110, 100, 110, 100, 180, 260, 300, 360],
+        aspect:1.3464, scale:1.288, dx:21.00, dy:1.48 } },
     { id:"lightning-bolt", name:"Lightning Bolt", ico:"\u{1F329}\uFE0F", stage:2, level:18,
       blurb:"Asks the sky for help. The sky, this time, obliges.",
-      /* Down from 1.65, and the only skill in the game that got weaker. It
-         was the Zephyrite's only move and carried the whole form; Arc Lash
-         arrived at 22 and now has to beat it, and lifting Arc Lash over a
-         1.65 Bolt put Nimbus 5 points clear of everybody. Some of the gap
-         comes down instead of all of it going up. */
-      battle:{ dmg:1.53, pierce:0.35, cd:3 },
+      /* Down from 1.65 when Arc Lash arrived at 22 and had to beat it -
+         lifting Arc Lash over a 1.65 Bolt put Nimbus 5 points clear of
+         everybody - and cut to 1.53, which overshot: it left the Zephyrite
+         the weakest form in the game, 44% against the Panda at 26.
+
+         Back up to 1.58 when the Sparky learnt Acorn Flick and Pocket Storm.
+         Spark was worth 1.109 on the ladder and a 1.53 Bolt 1.112, which left
+         no room for two moves between them; at 1.58 it is 1.121, still under
+         Arc Lash's 1.134. It also closes most of that gap: at 26 Nimbus v
+         Verdant goes 44 -> 46 and Ember v Nimbus 52 -> 50. At 40, where Nimbus
+         was already level, Ember v Nimbus goes 49 -> 48 and Nimbus v Verdant
+         48.5 -> 49. The cost is at 18-21, the gap before the Blazewyrm has
+         Flame Stomp: Ember v Nimbus there goes from 46-47 to 44-46. */
+      battle:{ dmg:1.58, pierce:0.35, cd:3 },
       sprite:{ src:"art/skill-lightning-bolt.png", frames:12, fps:3,
         /* It gathers, the sky answers, and the bolt lands. The charge quickens
            the way the Sparky's does; the strike is four frames that grow, so
@@ -4379,7 +4447,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-25 0470815";
+const BUILD_ID = "2026-09-29 994fda3";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;

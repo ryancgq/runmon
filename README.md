@@ -658,8 +658,9 @@ use them.
 ## Skills
 
 A form is not the end of a stage, it is the start of one: a pet keeps learning
-inside the form it grew into. The Cinderling, the Sparky and the Bamboo Cub
-have two moves each, the first at level 8 and the second at 10 to 12; the
+inside the form it grew into. The Cinderling and the Bamboo Cub have two
+moves each, the first at level 8 and the second at 10 or 12; the Sparky has
+four, the last of them, Pocket Storm, at 14, the level before it evolves; the
 Blazewyrm learns all three of its own between level 15, where the form
 arrives, and level 30, where the next one does; and the Zephyrite has the
 first of its own at 18, the same level the Blazewyrm starts.
@@ -670,6 +671,8 @@ first of its own at 18, the same level the Blazewyrm starts.
 | ⭕ Cinder Sweep | Cinderling | Level 10 | Whips its tail flame round in a full circle. Whatever is close gets burnt - and so, a little, does the Cinderling. |
 | ⚡ Spark | Sparky | Level 8 | Guaranteed to leave something scorched. The something is the squirrel. |
 | 💫 Static Shock | Sparky | Level 11 | Bottles up every spark it has and goes off like a flashbulb. Whatever it hits forgets how to block. |
+| 🌰 Acorn Flick | Sparky | Level 12 | Winds its whole tail round and swats the acorn at them. It will want that acorn back. |
+| ⛈️ Pocket Storm | Sparky | Level 14 | Brews a thundercloud the size of a teacup and points it at them. It is a very angry teacup. |
 | 🍃 Green Gale | Bamboo Cub | Level 8 | The forest's strength, gathered and released. Out of the wrong end. |
 | 🎋 Bamboo Toss | Bamboo Cub | Level 12 | Parts with a perfectly good snack to make a point. The point is sharp. |
 | 🔥 Fireball | Blazewyrm | Level 18 | Draws a breath and spits a packed ball of flame |
@@ -1019,9 +1022,9 @@ form's kit kept growing, and the three species drifted into a 40–61% triangle
 that no amount of tuning closed; with each form holding its own moves the worst
 pairing came in from 20 points out to 3.
 
-The one dent is **level 18**, where the Zephyrite has its Lightning Bolt and
-the Blazewyrm has only the first of three: Ember takes 41% there until it
-learns Flame Stomp at 22.
+The one dent is **levels 18 to 21**, where the Zephyrite has its Lightning
+Bolt and the Blazewyrm has only the first of three: Ember takes 44–46% there
+until it learns Flame Stomp at 22.
 
 ### Pile-on marks
 
