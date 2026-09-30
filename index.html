@@ -3644,9 +3644,9 @@ const DEFAULT_SAVE = {
   petName: "",
   createdAt: null,
   runs: [],
-  // XP given or taken by the admin dashboard, on top of what the runs earned,
-  // and the last queued change and restore already applied - see applyAdmin().
-  adminXp: 0, adminRev: 0, restoreRev: 0,
+  // XP and distance set by the admin dashboard, on top of what the runs come
+  // to, and the last queued change already applied - see applyAdmin().
+  adminXp: 0, adminKm: 0, adminRev: 0,
   badges: {},           // id -> timestamp first earned
   seenStage: 0,         // highest evolution stage already celebrated
   settings: { units:"km", weightKg:70, simulate:DEMO, simSpeed:DEMO ? 10 : 1, wakeLock:true,
@@ -3762,6 +3762,7 @@ function recompute(){
   // an admin adjustment sits on top of the runs rather than in them, so the
   // run log still says what each run earned
   totalXp = Math.max(0, totalXp + (Number(save.adminXp) || 0));
+  totalKm = Math.max(0, totalKm + (Number(save.adminKm) || 0));
 
   const days = [...new Set(runs.map(r=>dayKey(r.t)))].sort();
   const sk = streakAt(runs, Date.now());
@@ -4481,7 +4482,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-30 aa489e3";
+const BUILD_ID = "2026-09-30 8dba052";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -8029,21 +8030,18 @@ function stravaForget(){
    numbered change instead, and this applies the ones not yet seen and lets
    persist() push the result back up.
 
-   A restore takes the broker's copy over this one, keeping only the device's
-   own settings. A level sets the pet to the start of that level, whatever
-   its runs had earned; an XP change adds to or takes from it. Neither
-   touches a run. */
+   A level sets the pet to the start of that level, whatever its runs had
+   earned; an XP change adds to or takes from it. A restore puts back what a
+   backup kept - species, name, level, XP and lifetime distance - made up on
+   top of whatever this phone's runs now come to. Backups keep no runs (they
+   are Strava's data, and a backup outlives the seven days Strava allows), so
+   the difference is carried in adminXp and adminKm rather than as runs.
+   Nothing here touches a run. */
 function applyAdmin(res){
   if (!res || !save.species) return;
   let note = null;
-  if (res.restore && res.save && res.save.species && res.restore.rev > (save.restoreRev || 0)){
-    const keep = save.settings;
-    save = Object.assign(structuredCloneSafe(DEFAULT_SAVE), res.save);
-    save.settings = keep;
-    save.restoreRev = res.restore.rev;
-    note = "Your pet was restored from a backup";
-  }
   const runXp = () => save.runs.reduce((t, r) => t + (Number(r.xp) || 0), 0);
+  const runKm = () => save.runs.reduce((t, r) => t + (Number(r.km) || 0), 0);
   for (const a of (res.adjust || []).slice().sort((x, y) => x.rev - y.rev)){
     if (!(a.rev > (save.adminRev || 0))) continue;
     if (a.kind === "level"){
@@ -8053,6 +8051,20 @@ function applyAdmin(res){
     } else if (a.kind === "xp"){
       save.adminXp = Math.max(-runXp(), (Number(save.adminXp) || 0) + Math.round(a.value));
       note = `${a.value >= 0 ? "+" : "\u2212"}${nf(Math.abs(a.value))} XP for ${save.petName || "your pet"}`;
+    } else if (a.kind === "restore" && a.snap){
+      const b = a.snap;
+      if (SPECIES[b.species]) save.species = b.species;
+      if (b.pet) save.petName = b.pet;
+      const lv = Math.max(1, Math.min(MAX_LEVEL, Math.round(b.level) || 1));
+      // the backup's own XP if it has it and it agrees with its level; the
+      // start of the level otherwise
+      const xp = b.xp != null && levelFromXp(b.xp).level === lv ? b.xp : xpAtLevel(lv);
+      save.adminXp = xp - runXp();
+      if (b.km != null) save.adminKm = Math.max(-runKm(), b.km - runKm());
+      // what it had already celebrated, so a restored Blazewyrm does not
+      // hatch all over again
+      save.seenStage = Math.max(save.seenStage || 0, stageForLevel(lv));
+      note = `${save.petName || "Your pet"} was restored from a backup`;
     }
     save.adminRev = a.rev;
   }

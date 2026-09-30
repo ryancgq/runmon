@@ -1314,9 +1314,12 @@ before saving to keep `localStorage` small.
 ### The admin dashboard
 
 `admin.html`, served beside the app at `/runmon/admin.html`, and useless
-without `ADMIN_TOKEN`: you type it into the page, it is kept only for that
-tab, and the page will only talk to the broker whose address is written into
-it. From it you can:
+without the admin password. The password is the `ADMIN_TOKEN` repository
+secret, never anything written in the code, so it is not in this public
+repository; change it by changing the secret and re-running the deploy. You
+type it into the page, it is kept only for that tab, and the page will only
+talk to the broker whose address is written into it. Five wrong passwords from
+one address lock that address out for fifteen minutes. From it you can:
 
 - see every connected player, their pet, form and level, and when they last
   ran and last opened the app;
@@ -1329,15 +1332,17 @@ it. From it you can:
   adjustment sits on top of what their runs earned (`adminXp` in the save);
   no run is rewritten;
 - **back up** one player or everyone, and **restore** a player from a backup
-  file. A restore takes over the phone's copy on its next sync, keeping only
-  the phone's own settings, and does not replay changes queued after the
-  backup;
+  file. A backup keeps each pet's name, species, level, XP and lifetime
+  distance — and none of their runs. A restore puts those back on the
+  player's next sync, on top of whatever runs their phone has now;
 - **disconnect** a player, which revokes Strava's grant and deletes their
   pet, their Rankings row and their friend code from the broker;
 - see the raid and respawn the boss.
 
-A backup holds each player's runs, which are Strava data. Keep it private and
-do not keep it longer than you need; see the review of Strava's terms.
+Backups leave the runs out on purpose. Strava's API Policy (section 6.2)
+allows its data to be kept for seven days, and a backup is kept for longer; a
+level and an XP total are the game's own, and the one Strava figure left in
+it is a single lifetime distance.
 
 ### The private roster
 

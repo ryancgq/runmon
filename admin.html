@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex, nofollow">
 <!-- The page talks to the broker and nothing else. The broker address is fixed
      here on purpose: a dashboard that took it from the URL could be pointed at
-     somebody else's server by a link, and the admin token would go with it. -->
+     somebody else's server by a link, and the password would go with it. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://runmon-strava.runmon-gq.workers.dev; img-src data:; base-uri 'none'; form-action 'none'">
 <title>Runmon Admin</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230a0c13'/%3E%3Cpath d='M50 20 C64 38 64 52 50 62 C36 52 36 38 50 20 Z' fill='%23ff6b35'/%3E%3Cpath d='M50 34 C57 44 57 52 50 58 C43 52 43 44 50 34 Z' fill='%23ffd23f'/%3E%3Ccircle cx='34' cy='76' r='7' fill='%234ade80'/%3E%3Ccircle cx='66' cy='76' r='7' fill='%237cd4fd'/%3E%3C/svg%3E">
@@ -89,9 +89,9 @@ input:focus{border-color:var(--accent)}
 
   <section class="gate card" id="gate">
     <h1>Runmon Admin</h1>
-    <p class="muted">Enter the admin token you set as <code>ADMIN_TOKEN</code> on the broker. It stays in this tab and is forgotten when you close it.</p>
+    <p class="muted">Enter the admin password. It stays in this tab and is forgotten when you close it.</p>
     <div class="act">
-      <input type="password" id="tok" placeholder="Admin token" autocomplete="off" spellcheck="false">
+      <input type="password" id="tok" placeholder="Password" autocomplete="off" spellcheck="false">
       <button class="btn primary" id="go">Open</button>
     </div>
     <p class="small muted" id="gate-err"></p>
@@ -137,7 +137,7 @@ input:focus{border-color:var(--accent)}
 <script>
 "use strict";
 const API = "https://runmon-strava.runmon-gq.workers.dev";
-const KEY = "runmon.admin.token";
+const KEY = "runmon.admin.password";
 const EMOJI = { ember:"\u{1F525}", nimbus:"⚡", verdant:"\u{1F33F}" };
 const $ = s => document.querySelector(s);
 const esc = v => String(v == null ? "" : v).replace(/[&<>"']/g, c =>
@@ -161,9 +161,9 @@ function say(text, bad){
 async function call(path, opts){
   const r = await fetch(API + path, { ...(opts || {}),
     headers: { Authorization: "Bearer " + token, ...(opts && opts.body ? { "Content-Type":"application/json" } : {}) } });
-  if (r.status === 404 && path === "/admin/users") throw Object.assign(new Error("That token was not accepted."), { gate: true });
+  if (r.status === 404 && path === "/admin/users") throw Object.assign(new Error("That password was not accepted."), { gate: true });
   const body = await r.json().catch(() => ({}));
-  if (!r.ok || body.error) throw new Error(body.error || ("The broker answered " + r.status));
+  if (!r.ok || body.error) throw Object.assign(new Error(body.error || ("The broker answered " + r.status)), { gate: r.status === 429 });
   return body;
 }
 
@@ -239,7 +239,7 @@ async function show(handle, quiet){
   const s = u.save;
   const applied = s ? s.adminRev : 0;
   const hist = (u.adjust || []).slice().reverse().map(a => `<div>
-      <span>${a.kind === "level" ? "Set to level " + a.value : (a.value >= 0 ? "+" : "−") + Math.abs(a.value).toLocaleString() + " XP"}${a.note ? " · " + esc(a.note) : ""}</span>
+      <span>${a.kind === "level" ? "Set to level " + a.value : a.kind === "restore" ? "Restored to level " + a.value + (a.snap && a.snap.km != null ? ", " + a.snap.km + " km" : "") : (a.value >= 0 ? "+" : "−") + Math.abs(a.value).toLocaleString() + " XP"}${a.note ? " · " + esc(a.note) : ""}</span>
       <span class="muted">${a.rev <= applied ? "done" : "waiting for the app"} · ${ago(a.at)}</span></div>`).join("");
   d.innerHTML = `
     <div class="top" style="margin-bottom:10px">
@@ -252,12 +252,13 @@ async function show(handle, quiet){
         <dt>Level</dt><dd>${r.level || "—"}</dd>
         <dt>XP from runs</dt><dd>${s ? s.runXp.toLocaleString() : "—"}</dd>
         <dt>XP from you</dt><dd>${s ? (s.adminXp >= 0 ? "+" : "−") + Math.abs(s.adminXp).toLocaleString() : "—"}</dd>
+        <dt>Distance</dt><dd>${s ? (s.runKm + s.adminKm).toFixed(1) + " km" : "—"}</dd>
         <dt>Runs</dt><dd>${s ? s.runs : (r.runs || 0)}</dd>
         <dt>Streak / best</dt><dd>${r.streak || 0} / ${r.best || 0}</dd>
         <dt>Badges</dt><dd>${s ? s.badges : "—"}</dd>
       </dl>
       <dl class="kv">
-        <dt>Strava</dt><dd>${u.linked ? "connected" : "<span style='color:var(--danger)'>no token</span>"}</dd>
+        <dt>Strava</dt><dd>${u.linked ? "connected" : "<span style='color:var(--danger)'>not connected</span>"}</dd>
         <dt>Connected</dt><dd>${when(u.connectedAt)}</dd>
         <dt>Last sync</dt><dd>${when(u.lastSync)}</dd>
         <dt>Last save</dt><dd>${when(r.lastSeen)}</dd>
@@ -280,7 +281,7 @@ async function show(handle, quiet){
     ${hist ? `<div class="hist">${hist}</div>` : ""}` : `<p class="muted">No pet saved yet, so there is nothing to adjust.</p>`}
     <hr class="sep">
     <h3>Backup</h3>
-    <p class="small muted" style="margin:4px 0 0">A backup is their whole save. Restoring puts it back and the app takes it over its own on their next sync.</p>
+    <p class="small muted" style="margin:4px 0 0">A backup keeps their pet, species, level, XP and total distance, and none of their runs. Restoring sets those back on their next sync; their runs stay as they are.</p>
     <div class="act">
       <button class="btn" id="dl">Download backup</button>
       <label class="btn">Restore from file…<input type="file" id="up" accept="application/json,.json" hidden></label>
@@ -324,16 +325,19 @@ async function download(path, name){
 $("#backup-all").onclick = () => download("/admin/backup", `runmon-backup-${new Date().toISOString().slice(0,10)}.json`);
 
 /* A file from either button: a one-player backup or everyone's. Only this
-   player's save is taken from it, matched by handle, so restoring the wrong
+   player's entry is taken from it, matched by handle, so restoring the wrong
    file cannot put somebody else's pet on them. */
 async function restore(handle, file){
   if (!file) return;
   try {
     const data = JSON.parse(await file.text());
+    if (data.runmon !== "backup" || data.v !== 2) throw new Error("That is not a Runmon backup from this dashboard.");
     const hit = (data.users || []).find(u => u.handle === handle);
-    if (!hit || !hit.save) throw new Error("That file has no save for this player.");
-    if (!confirm(`Restore ${hit.pet || "this pet"} to level ${hit.level || "?"} from ${new Date(data.at).toLocaleString()}? Anything they have done since is replaced.`)) return;
-    await call("/admin/restore", { method:"POST", body: JSON.stringify({ handle, save: hit.save }) });
+    if (!hit || !hit.species || !hit.level) throw new Error("That file has no backup of this player.");
+    const km = hit.km != null ? `, ${hit.km} km` : "";
+    if (!confirm(`Restore ${hit.pet || "this pet"} to level ${hit.level}${km} from ${new Date(data.at).toLocaleString()}? Their level and distance go back to what the backup says.`)) return;
+    await call("/admin/restore", { method:"POST", body: JSON.stringify({ handle,
+      snap: { pet: hit.pet, species: hit.species, level: hit.level, xp: hit.xp, km: hit.km } }) });
     say("Restore queued — it lands when they next open the app");
     show(handle, true);
   } catch (e){ say(e.message, true); }

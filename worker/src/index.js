@@ -273,9 +273,9 @@ const RAID_MARKS = [0.75, 0.5, 0.25, 0];
    first decides how much of a day's damage any one player can be responsible
    for, and two makes choosing a target a real decision rather than a sweep. */
 const ATTACKS_PER_DAY = 2;
-/* The admin token is compared as a digest, not as a string. An early-exit
-   string compare hands the token over a character at a time to anybody willing
-   to time the responses. */
+/* The admin password is the ADMIN_TOKEN secret, and it is compared as a
+   digest, not as a string: an early-exit string compare hands it over a
+   character at a time to anybody willing to time the responses. */
 async function adminOk(env, given){
   if (!env.ADMIN_TOKEN || !given) return false;
   const [a, b] = await Promise.all([
@@ -283,6 +283,26 @@ async function adminOk(env, given){
     hmac(env.SESSION_SECRET, "admin:" + env.ADMIN_TOKEN)
   ]);
   return a === b;
+}
+/* The password is short enough to guess, so guessing is made slow. Five wrong
+   tries from one address inside fifteen minutes lock that address out for
+   fifteen - and a locked address is refused even the right password, or the
+   sixth guess would simply be allowed to land. Counted per address, in an
+   object of its own, so somebody hammering the page from elsewhere cannot
+   lock the owner out of it. A wrong password answers the same 404 as a path
+   that does not exist; only a lockout says what it is, so the owner knows to
+   wait rather than to doubt the password. */
+const GATE_TRIES = 5, GATE_MS = 15 * 60e3;
+async function adminGate(request, env){
+  const given = (request.headers.get("Authorization") || "").replace(/^Bearer /, "");
+  const ip = request.headers.get("CF-Connecting-IP") || "local";
+  const gate = env.ATHLETE.get(env.ATHLETE.idFromName("admin-gate:" + ip));
+  const { lockedUntil } = await (await gate.fetch("https://do/gate-check")).json();
+  if (lockedUntil > Date.now())
+    return json(env, { error:`Too many wrong passwords. Try again in ${Math.ceil((lockedUntil - Date.now()) / 60e3)} minutes.` }, 429);
+  if (await adminOk(env, given)){ await gate.fetch("https://do/gate-ok", { method:"POST" }); return null; }
+  await gate.fetch("https://do/gate-fail", { method:"POST" });
+  return json(env, { error:"no such endpoint" }, 404);
 }
 
 /** Every authenticated route is the same three lines, so they live here. */
@@ -698,8 +718,7 @@ export default {
          months later - and POST starts the next one. Nothing is deleted
          either way. */
       if (path === "/admin/raid"){
-        const given = (request.headers.get("Authorization") || "").replace(/^Bearer /, "");
-        if (!await adminOk(env, given)) return json(env, { error:"no such endpoint" }, 404);
+        { const refused = await adminGate(request, env); if (refused) return refused; }
         if (request.method === "POST"){
           const body = await request.json().catch(() => ({}));
           const r = await raidStub(env).fetch("https://do/raid-respawn", { method:"POST",
@@ -718,8 +737,7 @@ export default {
       }
 
       if (path === "/admin/summary"){
-        const given = (request.headers.get("Authorization") || "").replace(/^Bearer /, "");
-        if (!await adminOk(env, given)) return json(env, { error:"no such endpoint" }, 404);
+        { const refused = await adminGate(request, env); if (refused) return refused; }
         const r = await rosterStub(env).fetch("https://do/roster-list");
         const { rows } = await r.json();
         rows.sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0));
@@ -737,8 +755,7 @@ export default {
          an HMAC, not their Strava id - and the handle directory turns it back
          into the athlete id when something has to be done to them. */
       if (path.startsWith("/admin/") && path !== "/admin/raid" && path !== "/admin/summary"){
-        const given = (request.headers.get("Authorization") || "").replace(/^Bearer /, "");
-        if (!await adminOk(env, given)) return json(env, { error:"no such endpoint" }, 404);
+        { const refused = await adminGate(request, env); if (refused) return refused; }
         const body = request.method === "POST" ? await request.json().catch(() => ({})) : {};
         const handle = String(body.handle || url.searchParams.get("handle") || "").slice(0, 24);
         const who = async () => {
@@ -778,31 +795,36 @@ export default {
         if (path === "/admin/disconnect" && request.method === "POST")
           return json(env, await forgetAthlete(env, await who()));
 
-        /* Every pet's save, for keeping somewhere safe. A save carries the
-           runs it was built from, which are Strava data: the file is for you
-           and nobody else, and it is not a thing to keep for ever - see the
-           review of Strava's terms. */
+        /* A backup of every pet, or one: name, species, level, XP and
+           lifetime distance, and nothing run by run - see adminSnapshot(). */
         if (path === "/admin/backup"){
           const { rows } = await (await rosterStub(env).fetch("https://do/roster-list")).json();
           const pick = handle ? rows.filter(r => r.handle === handle) : rows;
           const users = [];
           for (const r of pick){
             const id = await lookupHandle(env, r.handle);
-            let save = null;
-            if (id){
-              const stub = await athleteStub(env, id);
-              save = (await (await stub.fetch("https://do/admin-save")).json()).save;
-            }
-            users.push({ handle: r.handle, pet: r.pet || "", level: r.level || 0, reachable: !!id, save });
+            const snap = id ? (await (await (await athleteStub(env, id)).fetch("https://do/admin-snapshot")).json()).snap : null;
+            users.push({ handle: r.handle, ...(snap || { pet: r.pet || "", species: r.species || null,
+              level: r.level || null, xp: null, km: null }), reachable: !!id });
           }
-          return new Response(JSON.stringify({ runmon: "backup", v: 1, at: Date.now(), users }, null, 1), {
+          return new Response(JSON.stringify({ runmon: "backup", v: 2, at: Date.now(), users }, null, 1), {
             headers: { "Content-Type":"application/json", "Cache-Control":"no-store", ...cors(env),
               "Content-Disposition": `attachment; filename="runmon-backup-${new Date().toISOString().slice(0,10)}${handle ? "-" + handle : ""}.json"` } });
         }
 
+        /* Put a backed-up pet back. Queued like any other change, so the app
+           applies it on its next sync: species, name, and level, XP and
+           distance made up on top of whatever its runs now come to. */
         if (path === "/admin/restore" && request.method === "POST"){
-          const r = await (await athleteStub(env, await who())).fetch("https://do/admin-restore",
-            { method:"POST", body: JSON.stringify({ save: body.save }) });
+          const b = body.snap || {};
+          const species = ["ember","nimbus","verdant"].includes(b.species) ? b.species : null;
+          const level = Math.round(Number(b.level));
+          if (!species || !(level >= 1 && level <= 99)) return json(env, { error:"That is not a Runmon backup of this player." }, 400);
+          const num = (v, max) => v == null || !Number.isFinite(Number(v)) ? null : Math.max(0, Math.min(max, Number(v)));
+          const snap = { species, pet: String(b.pet || "").slice(0, 24), level,
+                         xp: num(b.xp, 1e9), km: num(b.km, 1e7) };
+          const r = await (await athleteStub(env, await who())).fetch("https://do/admin-adjust",
+            { method:"POST", body: JSON.stringify({ kind:"restore", value: level, snap, note: body.note || "restored from backup" }) });
           return json(env, await r.json());
         }
         return json(env, { error:"no such endpoint" }, 404);
@@ -890,9 +912,8 @@ export class Athlete {
     // the friend code without minting one, which /code would do
     if (path === "/code-peek") return this.ok({ code: await this.state.storage.get("friendCode") || null });
     if (path === "/admin-peek")    return this.adminPeek();
-    if (path === "/admin-save")    return this.ok({ save: await this.state.storage.get("save") || null });
     if (path === "/admin-adjust")  return this.adminAdjust(await request.json());
-    if (path === "/admin-restore") return this.adminRestore(await request.json());
+    if (path === "/admin-snapshot") return this.adminSnapshot();
     // a directory entry, or anything else, emptied - for a disconnect
     if (path === "/dir-clear"){ await this.state.storage.deleteAll(); return this.ok({ ok:true }); }
     // the same class standing in as a directory entry, keyed by a friend code
@@ -903,6 +924,19 @@ export class Athlete {
     }
     if (path === "/dir-get")
       return this.ok({ athleteId: await this.state.storage.get("owner") || null });
+    /* An admin-gate object: failed passwords from one address, and when it is
+       locked until. */
+    if (path === "/gate-check")
+      return this.ok({ lockedUntil: await this.state.storage.get("lockedUntil") || 0 });
+    if (path === "/gate-ok"){ await this.state.storage.deleteAll(); return this.ok({ ok:true }); }
+    if (path === "/gate-fail"){
+      const now = Date.now();
+      const fails = (await this.state.storage.get("fails") || []).filter(t => now - t < GATE_MS);
+      fails.push(now);
+      await this.state.storage.put(fails.length >= GATE_TRIES
+        ? { fails: [], lockedUntil: now + GATE_MS } : { fails });
+      return this.ok({ ok:true });
+    }
     /* Write only when there is nothing there. Decided inside the object so the
        check and the write are one round trip rather than two. */
     if (path === "/dir-ensure"){
@@ -1360,9 +1394,8 @@ export class Athlete {
        back on every sync, numbered, and the app applies what it has not seen
        yet and pushes the result. Sent every time rather than once, because a
        sync whose reply is lost would otherwise lose the adjustment with it. */
-    const adjust  = await s.get("adjust") || [];
-    const restore = await s.get("restore") || null;
-    return this.ok({ save, activities, seen, adjust, restore });
+    const adjust = await s.get("adjust") || [];
+    return this.ok({ save, activities, seen, adjust });
   }
 
   /** What the admin dashboard shows for one pet. The save is summarised
@@ -1370,9 +1403,9 @@ export class Athlete {
       for. */
   async adminPeek(){
     const s = this.state.storage;
-    const [save, card, connectedAt, lastSync, refresh, friendCode, adjust, restore, imported, battles] =
+    const [save, card, connectedAt, lastSync, refresh, friendCode, adjust, imported, battles] =
       await Promise.all(["save","card","connectedAt","lastSync","refresh","friendCode",
-                         "adjust","restore","imported","battles"].map(k => s.get(k)));
+                         "adjust","imported","battles"].map(k => s.get(k)));
     const runs = (save && save.runs) || [];
     return this.ok({
       linked: !!refresh, connectedAt: connectedAt || null, lastSync: lastSync || null,
@@ -1381,12 +1414,13 @@ export class Athlete {
         petName: save.petName || "", species: save.species || null,
         runs: runs.length,
         runXp: runs.reduce((t, r) => t + (Number(r.xp) || 0), 0),
-        adminXp: Number(save.adminXp) || 0, adminRev: Number(save.adminRev) || 0,
-        restoreRev: Number(save.restoreRev) || 0,
+        runKm: runs.reduce((t, r) => t + (Number(r.km) || 0), 0),
+        adminXp: Number(save.adminXp) || 0, adminKm: Number(save.adminKm) || 0,
+        adminRev: Number(save.adminRev) || 0,
         badges: Object.keys(save.badges || {}).length,
         createdAt: save.createdAt || null, syncedAt: save.stravaSyncedAt || null
       } : null,
-      adjust: adjust || [], restore: restore || null,
+      adjust: adjust || [],
       imported: (imported || []).length, battles: (battles || []).length
     });
   }
@@ -1394,36 +1428,35 @@ export class Athlete {
   /** Queue a change to this pet's level or XP. Kept to the last fifty: the app
       applies every one it has not seen, in order, so the queue is history as
       much as instructions, and fifty is more than a pet will ever need. */
-  async adminAdjust({ kind, value, note }){
+  async adminAdjust({ kind, value, note, snap }){
     const s = this.state.storage;
-    if (!(await s.get("save"))) return this.ok({ error:"This player has no pet saved yet." });
+    if (!(await s.get("save"))) return this.ok({ error:"This player has no pet saved yet - they need to open the app (and hatch an egg, on a new phone) first." });
     const list = await s.get("adjust") || [];
     const rev = (list.length ? list[list.length - 1].rev : 0) + 1;
-    list.push({ rev, kind, value, note: String(note || "").slice(0, 120), at: Date.now() });
+    list.push({ rev, kind, value, ...(snap ? { snap } : {}), note: String(note || "").slice(0, 120), at: Date.now() });
     await s.put("adjust", list.slice(-50));
     return this.ok({ ok:true, rev });
   }
 
-  /** Put a backed-up save back, and tell the app to take it over its own. The
-      rev only ever climbs - it carries on from the save's own count, since the
-      object may have been wiped and re-made since - so a restore is applied
-      once and never replayed over newer play. */
-  async adminRestore({ save }){
+  /** What a backup keeps of this pet: the game's own state and one running
+      total, and none of the runs. Strava's API Policy (6.2) allows its data
+      to be kept for seven days, and a backup is kept for longer than that,
+      so the activities themselves - dates, times, distances run by run - stay
+      out of it. Level and XP are the game's; the lifetime distance is the one
+      figure from Strava in it, as a total, because it is what the distance
+      badges and the Lifetime line are measured against. */
+  async adminSnapshot(){
     const s = this.state.storage;
-    if (!save || typeof save !== "object" || !save.species)
-      return this.ok({ error:"That is not a Runmon save." });
-    const had = await s.get("restore");
-    const rev = Math.max(had ? had.rev : 0, Number(save.restoreRev) || 0) + 1;
-    // runs already on the pet must not come back through /sync as new
-    const seen = new Set(await s.get("imported") || []);
-    for (const r of save.runs || []) if (r && r.strava) seen.add(String(r.strava));
-    // and adjustments queued since the backup was taken are not replayed over
-    // it: the restore is the state asked for
-    const queue = await s.get("adjust") || [];
-    const adminRev = queue.length ? queue[queue.length - 1].rev : 0;
-    await s.put({ save: { ...save, restoreRev: rev - 1, adminRev }, restore: { rev, at: Date.now() },
-                  imported: [...seen] });
-    return this.ok({ ok:true, rev });
+    const [save, card] = await Promise.all([s.get("save"), s.get("card")]);
+    if (!save) return this.ok({ snap: null });
+    const runs = save.runs || [];
+    const xp = runs.reduce((t, r) => t + (Number(r.xp) || 0), 0) + (Number(save.adminXp) || 0);
+    const km = runs.reduce((t, r) => t + (Number(r.km) || 0), 0) + (Number(save.adminKm) || 0);
+    return this.ok({ snap: {
+      pet: String(save.petName || "").slice(0, 24), species: save.species || null,
+      level: (card && Number(card.level)) || null,
+      xp: Math.max(0, Math.round(xp)), km: Math.max(0, Math.round(km * 10) / 10)
+    } });
   }
 
   /** This athlete's friend code, minted once and kept. */
