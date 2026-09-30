@@ -217,14 +217,34 @@ async function retention(env){
       continue;
     }
     if (!id) continue;
-    const f = await (await (await athleteStub(env, id)).fetch("https://do/retention", { method:"POST" })).json();
+    const stub = await athleteStub(env, id);
+    const f = await (await stub.fetch("https://do/retention", { method:"POST" })).json();
     if (f.folded) out.folded++;
+    await fillCard(env, stub, r.handle);
   }
   await rosterStub(env).fetch("https://do/roster-scrub", { method:"POST" });
+  // a parked pet's card is filled the same way - the dashboard lists it
+  for (const r of rows) if (r.disconnected && !(Number(r.xp) > 0)){
+    const id = await lookupHandle(env, r.handle);
+    if (id) await fillCard(env, await athleteStub(env, id), r.handle);
+  }
   const { rows: dels } = await (await deletedStub(env).fetch("https://do/del-list")).json();
   for (const d of dels) if (now - (d.at || now) >= GRACE_MS){ await eraseDeleted(env, d); out.deletedErased++; }
   await backupStub(env).fetch("https://do/bk-scrub", { method:"POST", body: "{}" });
   return out;
+}
+
+/* XP and a badge count for a card that has none. Cards gained both when
+   distance came off them, and a card is written by the player's own app -
+   so everyone who had not opened the new version read "0 XP" in Rankings,
+   however long they had played. The save the broker already holds has what
+   the card is missing, and this puts it there, and on the roster row, without
+   touching when the player was last seen. The app's next push replaces it
+   with its own. */
+async function fillCard(env, stub, handle){
+  const { card } = await (await stub.fetch("https://do/card-fill", { method:"POST" })).json();
+  if (card) await rosterStub(env).fetch("https://do/roster-card", { method:"POST",
+    body: JSON.stringify({ handle, card }) });
 }
 
 /* The server's copy of a save, folded the way the app folds its own. The app
@@ -1266,6 +1286,7 @@ export class Athlete {
     if (path === "/pet-intent") return this.petIntent();
     if (path === "/pet-delete") return this.petDelete(await request.json());
     if (path === "/purge")      return this.purge();
+    if (path === "/card-fill")  return this.cardFill();
     if (path === "/retention")  return this.retention();
     if (path === "/verify-revoked") return this.verifyRevoked();
     if (path === "/activity-gone")  return this.activityGone(await request.json());
@@ -1680,6 +1701,13 @@ export class Athlete {
         firstSeen: prev.firstSeen || Date.now(), lastSeen: Date.now() });
       return this.ok({ ok:true });
     }
+    /* A card's fields refreshed on a row and nothing else - see fillCard(). */
+    if (path === "/roster-card"){
+      const { handle, card } = await request.json();
+      const prev = await this.state.storage.get("row:" + handle);
+      if (prev && prev.pet) await this.state.storage.put("row:" + handle, { ...prev, ...rosterCard(card) });
+      return this.ok({ ok:true });
+    }
     if (path === "/roster-drop"){
       const { handle } = await request.json();
       await this.state.storage.delete("row:" + handle);
@@ -2039,6 +2067,21 @@ export class Athlete {
     if (token) await fetch(STRAVA(this.env) + "/oauth/deauthorize", {
       method:"POST", headers:{ Authorization:`Bearer ${token}` } }).catch(() => {});
     return false;
+  }
+
+  /** A card with no XP given it from the save - see fillCard(). */
+  async cardFill(){
+    const s = this.state.storage;
+    const [card, save] = await Promise.all([s.get("card"), s.get("save")]);
+    if (!card || !save || Number(card.xp) > 0) return this.ok({ card: null });
+    const runs = (save.runs || []).filter(r => r && !r.folded);
+    const xp = Math.max(0, Math.round(runs.reduce((t, r) => t + (Number(r.xp) || 0), 0)
+      + (Number(save.adminXp) || 0) + (Number(save.past && save.past.xp) || 0)));
+    const badges = Object.keys(save.badges || {}).length;
+    if (!xp && !badges) return this.ok({ card: null });
+    const filled = gameCard({ ...card, xp, badges: Math.max(badges, Number(card.badges) || 0) });
+    await s.put("card", filled);
+    return this.ok({ card: filled });
   }
 
   /** Everything this object holds, gone - see purgeAthlete(). */
