@@ -123,6 +123,13 @@ input:focus{border-color:var(--accent)}
     <section class="detail card" id="detail" hidden></section>
 
     <section class="card" style="margin-top:14px">
+      <div class="top" style="margin:0"><h2>Automatic backups</h2>
+        <button class="btn" id="auto-now">Take one now</button></div>
+      <p class="small muted" style="margin:6px 0 0">One every night, kept for 14 days: each pet's name, species, level, XP and total distance, and none of their runs. To put a player back, open them and pick a day under Backup.</p>
+      <div class="hist" id="auto-list" style="max-height:none"></div>
+    </section>
+
+    <section class="card" style="margin-top:14px">
       <h2>Raid</h2>
       <p class="small muted" id="raid-line" style="margin:6px 0 0"></p>
       <div class="act">
@@ -201,6 +208,7 @@ async function load(){
     : "No raid has started.";
   $("#raid-hp").value = raid.max || "";
   draw();
+  loadAuto();
 }
 function draw(){
   const q = $("#q").value.trim().toLowerCase();
@@ -286,6 +294,12 @@ async function show(handle, quiet){
       <button class="btn" id="dl">Download backup</button>
       <label class="btn">Restore from file…<input type="file" id="up" accept="application/json,.json" hidden></label>
     </div>
+    <div class="act">
+      ${autoDays.length ? `<select id="auto-day" class="btn" style="font-weight:700">${autoDays.map(d =>
+        `<option value="${esc(d.day)}">${esc(d.day)}</option>`).join("")}</select>
+      <button class="btn" id="auto-restore">Restore from that night</button>`
+      : `<span class="small muted">No automatic backups yet &mdash; the first is taken tonight.</span>`}
+    </div>
     <hr class="sep">
     <h3>Disconnect</h3>
     <p class="small muted" style="margin:4px 0 0">Revokes Runmon's access at Strava and deletes their pet, their Rankings row and their friend code from the broker. Their phone keeps its own copy until they reset it. Download a backup first if you may want it back.</p>
@@ -299,6 +313,7 @@ async function show(handle, quiet){
   }
   $("#dl").onclick = () => download("/admin/backup?handle=" + encodeURIComponent(handle), `runmon-${handle}.json`);
   $("#up").onchange = e => restore(handle, e.target.files[0]);
+  if ($("#auto-restore")) $("#auto-restore").onclick = () => restoreAuto(handle, $("#auto-day").value);
   $("#kill").onclick = () => disconnect(handle, r.pet);
 }
 
@@ -329,19 +344,45 @@ $("#backup-all").onclick = () => download("/admin/backup", `runmon-backup-${new 
    file cannot put somebody else's pet on them. */
 async function restore(handle, file){
   if (!file) return;
+  try { await restoreFrom(handle, JSON.parse(await file.text())); }
+  catch (e){ say(e.message, true); }
+}
+async function restoreAuto(handle, day){
   try {
-    const data = JSON.parse(await file.text());
-    if (data.runmon !== "backup" || data.v !== 2) throw new Error("That is not a Runmon backup from this dashboard.");
-    const hit = (data.users || []).find(u => u.handle === handle);
-    if (!hit || !hit.species || !hit.level) throw new Error("That file has no backup of this player.");
-    const km = hit.km != null ? `, ${hit.km} km` : "";
-    if (!confirm(`Restore ${hit.pet || "this pet"} to level ${hit.level}${km} from ${new Date(data.at).toLocaleString()}? Their level and distance go back to what the backup says.`)) return;
-    await call("/admin/restore", { method:"POST", body: JSON.stringify({ handle,
-      snap: { pet: hit.pet, species: hit.species, level: hit.level, xp: hit.xp, km: hit.km } }) });
-    say("Restore queued — it lands when they next open the app");
-    show(handle, true);
+    const r = await fetch(`${API}/admin/backups?day=${encodeURIComponent(day)}&handle=${encodeURIComponent(handle)}`,
+      { headers: { Authorization: "Bearer " + token } });
+    const data = await r.json();
+    if (!r.ok || data.error) throw new Error(data.error || "That backup could not be read.");
+    await restoreFrom(handle, data);
   } catch (e){ say(e.message, true); }
 }
+async function restoreFrom(handle, data){
+  if (data.runmon !== "backup" || data.v !== 2) throw new Error("That is not a Runmon backup from this dashboard.");
+  const hit = (data.users || []).find(u => u.handle === handle);
+  if (!hit || !hit.species || !hit.level) throw new Error("That file has no backup of this player.");
+  const km = hit.km != null ? `, ${hit.km} km` : "";
+  if (!confirm(`Restore ${hit.pet || "this pet"} to level ${hit.level}${km} from ${new Date(data.at).toLocaleString()}? Their level and distance go back to what the backup says.`)) return;
+  await call("/admin/restore", { method:"POST", body: JSON.stringify({ handle,
+    snap: { pet: hit.pet, species: hit.species, level: hit.level, xp: hit.xp, km: hit.km } }) });
+  say("Restore queued — it lands when they next open the app");
+  show(handle, true);
+}
+
+/* --- the nightly backups --------------------------------------------------- */
+let autoDays = [];
+async function loadAuto(){
+  try { autoDays = (await call("/admin/backups")).days || []; } catch (e){ autoDays = []; }
+  $("#auto-list").innerHTML = autoDays.length ? autoDays.map(d => `<div>
+      <span>${esc(d.day)} \u00b7 ${d.players} player${d.players === 1 ? "" : "s"}</span>
+      <button class="btn ghost" style="padding:3px 10px" data-auto="${esc(d.day)}">Download</button></div>`).join("")
+    : `<span class="muted">None yet &mdash; the first is taken tonight, or press Take one now.</span>`;
+}
+$("#auto-list").onclick = e => { const b = e.target.closest("[data-auto]");
+  if (b) download("/admin/backups?day=" + encodeURIComponent(b.dataset.auto), `runmon-auto-${b.dataset.auto}.json`); };
+$("#auto-now").onclick = async () => {
+  try { const r = await call("/admin/backups", { method:"POST" }); say(`Backed up ${r.users} player${r.users === 1 ? "" : "s"}`); loadAuto(); }
+  catch (e){ say(e.message, true); }
+};
 
 async function disconnect(handle, pet){
   const name = pet || handle;

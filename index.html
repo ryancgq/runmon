@@ -4482,7 +4482,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-30 8dba052";
+const BUILD_ID = "2026-09-30 0e51719";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -8071,12 +8071,72 @@ function applyAdmin(res){
   if (note){ recompute(); persist(); toast(note, "", "\u2728"); }
 }
 
+/* Two different pets on one Strava account. The broker's copy is only taken
+   by a phone with no pet at all, and every sync pushes the phone's save back
+   up - so a player whose phone lost its storage, who tapped "Not now" and
+   hatched a fresh egg before connecting, would have that egg's first upload
+   quietly replace the pet they had spent months on. Now the sync stops
+   before it uploads anything and asks which one to keep.
+
+   "Different" is decided by createdAt, stamped once when a pet hatches and
+   carried by every copy of it since: the same pet on two phones is the same
+   pet, and is left to the usual last-upload-wins. It only asks when the
+   saved pet has something to lose - a run, or XP from the admin dashboard -
+   and uploads stay held until the player chooses, including if they close
+   the sheet without choosing. */
+let stravaConflict = null, stravaKeptOver = null;   // the saved pet the player chose to replace
+const saveXp = s => (s.runs || []).reduce((t, r) => t + (Number(r.xp) || 0), 0) + (Number(s.adminXp) || 0);
+function isOtherPet(theirs){
+  if (!theirs || !theirs.species || !save.species) return false;
+  if ((theirs.createdAt || 0) === (save.createdAt || 0)) return false;
+  if (stravaKeptOver != null && theirs.createdAt === stravaKeptOver) return false;
+  return (theirs.runs || []).length > 0 || (Number(theirs.adminXp) || 0) > 0;
+}
+function petLine(s){
+  const lv = levelFromXp(Math.max(0, saveXp(s))).level;
+  const sp = SPECIES[s.species];
+  const form = sp ? sp.stages[stageForLevel(lv)].name : "pet";
+  return { name: s.petName || (sp ? sp.name : "Your pet"), lv, form };
+}
+function askWhichPet(theirs){
+  const a = petLine(theirs), b = petLine(save);
+  openSheet({
+    title: "Which pet do you want to keep?",
+    desc: `Your Strava account already has <b>${esc(a.name)}</b>, a level ${a.lv} ${esc(a.form)}, saved from before.
+      This phone has <b>${esc(b.name)}</b>, a level ${b.lv} ${esc(b.form)}. Only one can stay on your account &mdash;
+      the other is gone for good.`,
+    actions: [
+      { label: `Keep ${esc(a.name)} (level ${a.lv})`, cls: "primary", fn: () => {
+          const keep = save.settings;
+          save = Object.assign(structuredCloneSafe(DEFAULT_SAVE), theirs);
+          save.settings = keep;
+          stravaConflict = null; closeSheet();
+          recompute(); persist(); renderAll();
+          toast(`Welcome back, ${esc(a.name)}`, "", "\u{1F43E}");
+          stravaSync();
+        } },
+      { label: `Keep ${esc(b.name)}`, cls: "ghost", fn: () => {
+          stravaKeptOver = theirs.createdAt || 0;
+          stravaConflict = null; closeSheet();
+          stravaSync();
+        } }
+    ]
+  });
+}
+
 async function stravaSync(opts){
   if (!stravaLinked() || stravaBusy) return;
   stravaBusy = true; stravaLastError = null;
   if (opts && opts.loud) renderStravaPanel();
   try {
     const res = await stravaCall("/sync", { method:"POST" });
+    // before anything is imported or uploaded - see askWhichPet()
+    if (isOtherPet(res.save)){
+      stravaConflict = res.save;
+      stravaBusy = false;
+      askWhichPet(res.save);
+      return;
+    }
     // the server's save wins on first contact: it is the one that followed you
     // here from whatever device you last played on
     if (res.save && !save.species && res.save.species){
@@ -8261,13 +8321,14 @@ function publicCard(){
 }
 
 async function stravaPush(imported){
-  if (!stravaLinked()) return;
+  // nothing goes up while a saved pet is waiting on the player's choice
+  if (!stravaLinked() || stravaConflict) return;
   await stravaCall("/save", { method:"PUT",
     body: JSON.stringify({ save, imported: imported || [], card: publicCard() }) });
 }
 /** Called on every persist(); coalesced, because persist() is called a lot. */
 function stravaSchedulePush(){
-  if (!stravaLinked()) return;
+  if (!stravaLinked() || stravaConflict) return;
   clearTimeout(savePushTimer);
   savePushTimer = setTimeout(() => stravaPush([]).catch(()=>{}), 1200);
 }

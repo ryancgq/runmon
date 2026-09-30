@@ -160,6 +160,37 @@ async function forgetAthlete(env, athleteId){
   if (code) await codeStub(env, code).fetch("https://do/dir-clear", { method:"POST" });
   return { ok:true, handle };
 }
+/* Every pet's backup entry, or one: what adminSnapshot() keeps - name,
+   species, level, XP and lifetime distance - and no runs. Shared by the
+   dashboard's download and the nightly copy, so the two can never disagree
+   about what a backup is. */
+async function snapshotUsers(env, handle){
+  const { rows } = await (await rosterStub(env).fetch("https://do/roster-list")).json();
+  const pick = handle ? rows.filter(r => r.handle === handle) : rows;
+  const users = [];
+  for (const r of pick){
+    const id = await lookupHandle(env, r.handle);
+    const snap = id ? (await (await (await athleteStub(env, id)).fetch("https://do/admin-snapshot")).json()).snap : null;
+    users.push({ handle: r.handle, ...(snap || { pet: r.pet || "", species: r.species || null,
+      level: r.level || null, xp: null, km: null }), reachable: !!id });
+  }
+  return users;
+}
+/* The nightly copy, kept on the broker so there is always a recent one
+   without anybody remembering to press a button. Fourteen days of them: long
+   enough to notice a lost pet and put it back, and no longer, since the one
+   Strava figure in a backup - lifetime distance - is still Strava's. One
+   object holds them all, a key a day. */
+const AUTO_KEEP_DAYS = 14;
+const backupStub = env => env.ATHLETE.get(env.ATHLETE.idFromName("backups:auto"));
+async function autoBackup(env){
+  const users = await snapshotUsers(env);
+  const day = new Date().toISOString().slice(0, 10);
+  await backupStub(env).fetch("https://do/bk-put", { method:"POST",
+    body: JSON.stringify({ day, backup: { runmon:"backup", v:2, at: Date.now(), auto: true, users },
+                           keep: AUTO_KEEP_DAYS }) });
+  return { day, users: users.length };
+}
 async function rosterPut(env, athleteId, card){
   const handle = (await hmac(env.SESSION_SECRET, "roster:" + athleteId)).slice(0, 12);
   await rosterStub(env).fetch("https://do/roster-put", { method:"POST",
@@ -313,6 +344,11 @@ async function withAthlete(request, env, fn){
 }
 
 export default {
+  /* Cloudflare's cron (wrangler.toml [triggers]) - once a night. */
+  async scheduled(event, env, ctx){
+    ctx.waitUntil(autoBackup(env));
+  },
+
   async fetch(request, env){
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/+$/, "") || "/";
@@ -797,19 +833,24 @@ export default {
 
         /* A backup of every pet, or one: name, species, level, XP and
            lifetime distance, and nothing run by run - see adminSnapshot(). */
-        if (path === "/admin/backup"){
-          const { rows } = await (await rosterStub(env).fetch("https://do/roster-list")).json();
-          const pick = handle ? rows.filter(r => r.handle === handle) : rows;
-          const users = [];
-          for (const r of pick){
-            const id = await lookupHandle(env, r.handle);
-            const snap = id ? (await (await (await athleteStub(env, id)).fetch("https://do/admin-snapshot")).json()).snap : null;
-            users.push({ handle: r.handle, ...(snap || { pet: r.pet || "", species: r.species || null,
-              level: r.level || null, xp: null, km: null }), reachable: !!id });
-          }
-          return new Response(JSON.stringify({ runmon: "backup", v: 2, at: Date.now(), users }, null, 1), {
-            headers: { "Content-Type":"application/json", "Cache-Control":"no-store", ...cors(env),
-              "Content-Disposition": `attachment; filename="runmon-backup-${new Date().toISOString().slice(0,10)}${handle ? "-" + handle : ""}.json"` } });
+        const fileOf = (backup, name) => new Response(JSON.stringify(backup, null, 1), {
+          headers: { "Content-Type":"application/json", "Cache-Control":"no-store", ...cors(env),
+            "Content-Disposition": `attachment; filename="${name}.json"` } });
+        if (path === "/admin/backup")
+          return fileOf({ runmon: "backup", v: 2, at: Date.now(), users: await snapshotUsers(env, handle) },
+            `runmon-backup-${new Date().toISOString().slice(0,10)}${handle ? "-" + handle : ""}`);
+
+        /* The nightly copies: the list, or one day's as a file (just one
+           player's entry, with ?handle=, for a restore). POST takes one now. */
+        if (path === "/admin/backups"){
+          if (request.method === "POST") return json(env, { ok:true, ...(await autoBackup(env)) });
+          const day = url.searchParams.get("day");
+          if (!day) return json(env, await (await backupStub(env).fetch("https://do/bk-list")).json());
+          const { backup } = await (await backupStub(env).fetch("https://do/bk-get", { method:"POST",
+            body: JSON.stringify({ day }) })).json();
+          if (!backup) return json(env, { error:"There is no automatic backup for that day." }, 404);
+          if (handle) backup.users = backup.users.filter(u => u.handle === handle);
+          return fileOf(backup, `runmon-auto-${day}${handle ? "-" + handle : ""}`);
         }
 
         /* Put a backed-up pet back. Queued like any other change, so the app
@@ -924,6 +965,23 @@ export class Athlete {
     }
     if (path === "/dir-get")
       return this.ok({ athleteId: await this.state.storage.get("owner") || null });
+    /* The nightly backups' object: one key a day, oldest dropped past `keep`. */
+    if (path === "/bk-put"){
+      const { day, backup, keep } = await request.json();
+      await this.state.storage.put("day:" + day, backup);
+      const days = [...(await this.state.storage.list({ prefix:"day:" })).keys()].sort();
+      if (days.length > keep) await this.state.storage.delete(days.slice(0, days.length - keep));
+      return this.ok({ ok:true });
+    }
+    if (path === "/bk-list"){
+      const map = await this.state.storage.list({ prefix:"day:" });
+      return this.ok({ days: [...map.entries()].map(([k, v]) => ({ day: k.slice(4), at: v.at,
+        players: (v.users || []).length })).sort((a, b) => b.day.localeCompare(a.day)) });
+    }
+    if (path === "/bk-get"){
+      const { day } = await request.json();
+      return this.ok({ backup: await this.state.storage.get("day:" + day) || null });
+    }
     /* An admin-gate object: failed passwords from one address, and when it is
        locked until. */
     if (path === "/gate-check")

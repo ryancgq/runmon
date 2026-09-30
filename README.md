@@ -1335,9 +1335,19 @@ one address lock that address out for fifteen minutes. From it you can:
   file. A backup keeps each pet's name, species, level, XP and lifetime
   distance — and none of their runs. A restore puts those back on the
   player's next sync, on top of whatever runs their phone has now;
+- restore a player from any of the **automatic backups**: one taken every
+  night at 03:17 UTC by a Cloudflare cron, kept for fourteen days, in the
+  same no-runs format as a manual one; download any of them, or take one now;
 - **disconnect** a player, which revokes Strava's grant and deletes their
   pet, their Rankings row and their friend code from the broker;
 - see the raid and respawn the boss.
+
+**One pet per account, and the app asks before replacing one.** If a phone
+with a freshly hatched pet connects to a Strava account whose saved pet has
+real progress — a player whose phone lost its storage and started again
+before reconnecting — the sync stops before uploading anything and asks which
+pet to keep. Until they choose, nothing is uploaded. The same pet on two
+phones (same hatch time) is not asked about.
 
 Backups leave the runs out on purpose. Strava's API Policy (section 6.2)
 allows its data to be kept for seven days, and a backup is kept for longer; a
