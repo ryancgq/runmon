@@ -658,9 +658,10 @@ use them.
 ## Skills
 
 A form is not the end of a stage, it is the start of one: a pet keeps learning
-inside the form it grew into. The Cinderling and the Bamboo Cub have two
-moves each, the first at level 8 and the second at 10 or 12; the Sparky has
-four, the last of them, Pocket Storm, at 14, the level before it evolves; the
+inside the form it grew into. The Cinderling and the Sparky have four moves
+each, the last of them - Cinder Sweep and Pocket Storm - at 14, the level
+before they evolve; the Bamboo Cub has two for now, at 8 and 12, with more
+being drawn; the
 Blazewyrm learns all three of its own between level 15, where the form
 arrives, and level 30, where the next one does; and the Zephyrite has the
 first of its own at 18, the same level the Blazewyrm starts.
@@ -668,7 +669,9 @@ first of its own at 18, the same level the Blazewyrm starts.
 | Skill | Form | Learns at | What it does |
 | --- | --- | --- | --- |
 | 🔥 fireball | Cinderling | Level 8 | Sold as the strongest fire you will ever see. Three seconds of winding up, then a cough and some smoke. |
-| ⭕ Cinder Sweep | Cinderling | Level 10 | Whips its tail flame round in a full circle. Whatever is close gets burnt - and so, a little, does the Cinderling. |
+| 💢 Horn Rush | Cinderling | Level 10 | Lowers its horns and charges. It never quite works out how to stop, so it hits hard - and then sees stars. |
+| 💨 Tail Swipe | Cinderling | Level 12 | Spins round and cracks its tail like a whip. The gust knocks their guard wide open. |
+| ⭕ Cinder Sweep | Cinderling | Level 14 | Whips its tail flame round in a full circle. Whatever is close gets burnt - and so, a little, does the Cinderling. |
 | ⚡ Spark | Sparky | Level 8 | Guaranteed to leave something scorched. The something is the squirrel. |
 | 💫 Static Shock | Sparky | Level 11 | Bottles up every spark it has and goes off like a flashbulb. Whatever it hits forgets how to block. |
 | 🌰 Acorn Flick | Sparky | Level 12 | Winds its whole tail round and swats the acorn at them. It will want that acorn back. |

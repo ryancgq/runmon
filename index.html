@@ -2036,7 +2036,10 @@ function levelUpBeats(beats, gather, burst){
    the earliest move; it no longer holds everywhere (Flame Stomp sits under
    Fireball, Arc Lash under Lightning Bolt, Acorn Flick under Spark), and
    whole-fight balance is what is measured now. The comments on individual
-   moves below that quote older numbers describe how each was first set. */
+   moves below that quote older numbers describe how each was first set.
+
+   Since then the Cinderling has gained Horn Rush (10) and Tail Swipe (12),
+   and Cinder Sweep moved to 14 as its last and strongest move - see there. */
 const SKILLS = {
   ember: [
     // the id stays "fizzle" - the Blazewyrm's real one already owns "fireball",
@@ -2057,29 +2060,83 @@ const SKILLS = {
         durations:[380, 300,270,245, 225,205,185, 160,145,130, 185,150,150,270,
                    150,230,260,180,190,260,170,170,190,280],
         aspect:1.3125, scale:1.23, dx:-5, dy:-4.2 } },
-    /* The Cinderling's second move, and the first it has that is not a joke:
-       the tail flame whipped all the way round into a ring, close enough that
-       the dragon catches some of it too.
+    /* The Cinderling's second move: head down, horns first, and no idea how
+       to stop. It hits for a quarter more than an attack and leaves the
+       Cinderling seeing stars - flat-footed, its guard down 15% for one of the
+       other pet's turns (a flat-footed count runs down at the end of the
+       pet's own turn, so that is `turns:2`, as Flame Stomp's is) - which is
+       the bill for a charge that ends in the other pet's face. Learnt at 10, the level Cinder Sweep used to arrive
+       at, where the Cinderling was weakest.
 
-       A burn, because that is what the line does. First set at 1.05, and
-       raised to 1.20 when pets on auto began picking at random - see the note
-       over SKILLS; what follows is how the singe was sized. Every burn on its
-       own pushed Ember v Verdant from 48 to 55-60 at 12-14, whatever the split
-       between hit and burn: the Cub is slow and soft, and a burn lands on it
-       for two turns it cannot answer. The singe is what pays for that, and it is measured
-       rather than flavour. Hurting yourself does not show on the ladder,
-       which counts only damage dealt, so it costs the move nothing there,
-       while the 5% it takes off the Cinderling brings every pairing from 10
-       to 14 to within four points of even - 46 at the worst, Ember v Nimbus
-       at 11, which was 45 before, the level Static Shock arrives. At 4% the
-       Cub lost 53-47 at 12; at 6% the Cinderling lost to it at every level.
+       Balanced with all four stage-1 moves in the kit, on the real engine with
+       both sides on btChoose(), 2,500 fights a pairing a level: see Cinder
+       Sweep below for the table. */
+    { id:"horn-rush", name:"Horn Rush", ico:"\u{1F4A2}", stage:1, level:10,
+      blurb:"Lowers its horns and charges. It never quite works out how to stop, so it hits hard - and then sees stars.",
+      battle:{ dmg:1.25, cd:3, open:{ pct:0.15, turns:2 } },
+      sprite:{ src:"art/skill-horn-rush.png", frames:16, fps:5,
+        /* A glare, a squint to brace, a flash of excitement, then the charge:
+           speed lines from frame 5, quickening to the lowest, angriest frame
+           at 90ms. The bonk is two frames of the star on its horns - the
+           first quick, the second held, since that is the joke - then a
+           dazed blink and a happy settle back to the idle pose.
 
-       Learnt at 10, the Cinderling's weakest level: at 10 and 11 it was 45-46%
-       against the Cub, and the move brings those to 49. After Fizzle (8), and
-       before Static Shock (11) and Bamboo Toss (12). */
-    { id:"cinder-sweep", name:"Cinder Sweep", ico:"\u2B55", stage:1, level:10,
+           Cut by which opaque shape holds each dragon's pink, registered to
+           frame 0 on the pink; the frames are all drawn at the idle's scale,
+           and fitted to the idle on screen by the pink body on the resting
+           frames, to within a pixel. */
+        durations:[300, 260, 240, 200, 180, 140, 120, 100,
+                    90,  90, 240, 260, 220, 240, 280, 340],
+        aspect:1.2074, scale:1.009, dx:-17.75, dy:2.63 } },
+    /* The third: it spins round and cracks its tail through the air, and the
+       gust knocks the other pet's guard aside - a fifth off their Defence for
+       two of their turns, Static Shock's trick with more behind it. The same
+       quarter more than an attack as Horn Rush, and worth more over a fight
+       for the guard it opens rather than its own. */
+    { id:"tail-swipe", name:"Tail Swipe", ico:"\u{1F4A8}", stage:1, level:12,
+      blurb:"Spins round and cracks its tail like a whip. The gust knocks their guard wide open.",
+      battle:{ dmg:1.25, cd:3, rattle:{ pct:0.20, turns:2 } },
+      sprite:{ src:"art/skill-tail-swipe.png", frames:16, fps:5,
+        /* Cheerful, then not; the tail starts to swish, and the dragon turns
+           its back for eight frames while the arc builds - quickening to the
+           crack, frame 7, the star at the tip, held a beat. It follows
+           through, settles, flicks once more on the way back round, and ends
+           on a smug blink and the idle pose.
+
+           The eight turned frames face away from frame 0, so they were
+           registered against frame 0 mirrored - the same body seen from the
+           other side - rather than on the plain match, which put them 20-50px
+           off. Fitted to the idle by the pink body on the resting frames. */
+        durations:[280, 240, 180, 150, 130, 110, 100, 240,
+                   120, 150, 170, 180, 160, 200, 280, 340],
+        aspect:1.6071, scale:1.454, dx:-11.03, dy:14.14 } },
+    /* The last thing the Cinderling learns, at 14, the level before it
+       becomes the Blazewyrm, and the strongest of its four: the tail flame
+       whipped all the way round into a ring, close enough that the dragon
+       catches some of it too. It first came at 10 as a 1.05 hit with a 6%
+       singe, and was 1.20 with 5% from the random-picking retune until the
+       Cinderling had four moves; now it is 1.30, with the same two turns of
+       a fifth of the hit as a burn and the same 5% singe.
+
+       Worth over six turns, the ladder's measure at 14: Horn Rush 1.042,
+       Tail Swipe 1.050, Cinder Sweep 1.137 - rising, and this one well
+       clear. Fizzle sits at 1.066 on the stoke it sets up for whatever comes
+       next, as it always has.
+
+       Win rates, Cinderling first, levels 8-14, both sides on btChoose():
+                        8     9    10    11    12    13    14
+         v Bamboo Cub  49.8  47.2  52.4  52.4  54.9  55.1  56.2
+         v Sparky      49.2  51.0  48.5  48.2  50.0  48.2  50.3
+       Before, with Cinder Sweep at 10: v Cub 55 55 52 53 50 from 10, and v
+       Sparky 48.8 46.6 45.4 43.8 42.6 - the Sparky had four moves and the
+       Cinderling two. The Cub is the one left short now, with two moves to
+       the others' four; more are being drawn for it, and it should be
+       balanced against these when they land. Pushing the new moves hard
+       enough to rank above Fizzle on the ladder put the Cinderling at 60-67%
+       against everybody, which is why they do not. */
+    { id:"cinder-sweep", name:"Cinder Sweep", ico:"\u2B55", stage:1, level:14,
       blurb:"Whips its tail flame round in a full circle. Whatever is close gets burnt - and so, a little, does the Cinderling.",
-      battle:{ dmg:1.20, self:0.05, cd:3, burn:{ pct:0.20, turns:2 } },
+      battle:{ dmg:1.30, self:0.05, cd:3, burn:{ pct:0.20, turns:2 } },
       sprite:{ src:"art/skill-cinder-sweep.png", frames:16, fps:5,
         /* Stoke, swing, ring, and back. The tail flame builds for four frames
            and the swing quickens through three; frame 7, the ring closed all
@@ -4644,7 +4701,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-30 29d1dea";
+const BUILD_ID = "2026-09-30 119bb7d";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
