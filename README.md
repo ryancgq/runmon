@@ -1321,8 +1321,9 @@ type it into the page, it is kept only for that tab, and the page will only
 talk to the broker whose address is written into it. Five wrong passwords from
 one address lock that address out for fifteen minutes. From it you can:
 
-- see every connected player, their pet, form and level, and when they last
-  ran and last opened the app;
+- see every player, their pet, form and level, and when they last ran and
+  last opened the app — in two groups, **connected to Strava** and
+  **disconnected**;
 - open a player to see where their XP comes from, whether their Strava link
   is still live, and their penalty;
 - **set their level, or give or take XP.** The phone's save is the real one
@@ -1337,10 +1338,33 @@ one address lock that address out for fifteen minutes. From it you can:
   player's next sync, on top of whatever runs their phone has now;
 - restore a player from any of the **automatic backups**: one taken every
   night at 03:17 UTC by a Cloudflare cron, kept for fourteen days, in the
-  same no-runs format as a manual one; download any of them, or take one now;
-- **disconnect** a player, which revokes Strava's grant and deletes their
-  pet, their Rankings row and their friend code from the broker;
+  same no-runs format as a manual one; download any of them, or take one now.
+  Every backup is split into connected players, disconnected players and
+  deleted pets;
+- **disconnect** a player, which revokes Strava's grant but **keeps their
+  pet** at its level (see below);
+- see **Deleted pets** — pets players deleted themselves, kept with the Strava
+  account they belonged to — and put one back on that account;
 - see the raid and respawn the boss.
+
+**Disconnecting keeps the pet.** From Settings or from the dashboard, a
+disconnect revokes Runmon's access at Strava and deletes what was read from
+it — the runs, the lifetime distance, other players' cached cards — within
+the 48 hours Strava's API Policy (6.3) allows, and the player's distance is
+taken out of the nightly backups too. What stays is the game's own: the pet's
+name, species, hatch time, XP (carried over as `adminXp`, so the level
+stands) and badges. The player drops out of other players' Rankings and
+cannot be attacked. Connecting again carries straight on, on the same phone
+or a new one; runs recorded while away do not count.
+
+**Deleting a pet is guarded, and archived.** "Delete my pet" in Settings takes
+three steps: a sheet saying exactly what is lost, with keeping the pet as the
+main button; typing the pet's name; and a ten-second countdown before the
+button wakes. The broker checks the name and the wait itself, so a tampered
+app cannot skip them. The pet is not destroyed: it moves to the athlete's own
+list of deleted pets, under their Strava id, game-only like a parked pet, and
+appears in the dashboard's Deleted pets, from which it can be restored to the
+same account (once the player has hatched a new egg for it to replace).
 
 **One pet per account, and the app asks before replacing one.** If a phone
 with a freshly hatched pet connects to a Strava account whose saved pet has

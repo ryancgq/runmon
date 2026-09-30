@@ -4482,7 +4482,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-30 0e51719";
+const BUILD_ID = "2026-09-30 6fc564c";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -7019,9 +7019,14 @@ function renderStravaPanel(){
        </div>${err}${why}
        <div class="row">
          <div class="t"><div class="n">Disconnect</div>
-           <div class="h">Revokes Runmon's access at Strava and deletes your pet from the server. This cannot be undone.</div></div>
+           <div class="h">Stops Runmon reading your Strava. Your pet is kept, at its level, and carries on when you connect again.</div></div>
          <button class="btn danger" style="width:auto;padding:9px 15px;font-size:13px" id="strava-off">Disconnect</button>
-       </div>`
+       </div>${save.species ? `
+       <div class="row">
+         <div class="t"><div class="n">Delete my pet</div>
+           <div class="h">Start again from an egg. Your pet is removed from your account and this phone.</div></div>
+         <button class="btn danger" style="width:auto;padding:9px 15px;font-size:13px" id="pet-delete">Delete</button>
+       </div>` : ""}`
     : `<div class="row">
          <div class="t"><div class="n">Connect Strava</div>
            <div class="h">Run with Strava as normal and your pet grows on its own. Runs from before you connect do not count — the pet starts from your next one.</div></div>
@@ -8014,6 +8019,8 @@ async function stravaCall(path, init){
     // more to whoever is reading it than the status code was.
     let why = "";
     try { why = ((await r.json()) || {}).error || ""; } catch (e){}
+    // disconnected elsewhere - from another phone, or by the admin
+    if (r.status === 409 && why === "disconnected"){ stravaForget(); throw new Error("This phone is no longer connected to Strava."); }
     throw new Error(why || "The Strava link is not answering (" + r.status + ").");
   }
   return r.json();
@@ -8121,6 +8128,76 @@ function askWhichPet(theirs){
           stravaSync();
         } }
     ]
+  });
+}
+
+/* Deleting the pet on this Strava account, which cannot be taken back by the
+   player. Three things stand in the way, and the broker checks two of them
+   itself so a tampered app cannot skip them:
+   1. a sheet saying exactly what is lost, with keeping the pet as the
+      obvious button;
+   2. the pet's name, typed - the broker compares it to the saved pet's;
+   3. a ten-second countdown before the button wakes, which the broker
+      enforces from the moment the intent was opened.
+   It needs the connection: nothing is removed from this phone until the
+   broker has archived the pet. Archived, not destroyed - the admin can put
+   it back. */
+function openDeletePet(){
+  if (!save.species) return;
+  const me = petLine(save);
+  openSheet({
+    title: `Delete ${esc(me.name)}?`,
+    desc: `This removes <b>${esc(me.name)}</b>, your level ${me.lv} ${esc(me.form)}, from your Strava account and from this phone,
+      and you start again with a new egg. You cannot undo this yourself. Your runs stay on Strava.`,
+    actions: [
+      { label: `Keep ${esc(me.name)}`, cls: "primary", fn: closeSheet },
+      { label: "Continue", cls: "danger", fn: async () => {
+          let intent;
+          try { intent = await stravaCall("/pet/delete-intent", { method:"POST" }); }
+          catch (err){ closeSheet(); toast("Could not reach Runmon: " + (err.message || err), "bad", "\u26A0\uFE0F"); return; }
+          if (!intent.ok){ closeSheet(); toast(intent.error || "Nothing to delete.", "bad", "\u26A0\uFE0F"); return; }
+          confirmDeletePet(intent, me);
+        } }
+    ]
+  });
+}
+function confirmDeletePet(intent, me){
+  const ready = Date.now() + (intent.waitMs || 10000);
+  let timer = null;
+  openSheet({
+    title: "Type your pet's name",
+    desc: `To delete <b>${esc(me.name)}</b> for good, type its name exactly.`,
+    body: `<input id="del-name" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
+      placeholder="${esc(me.name)}" style="width:100%;margin:6px 0 2px;padding:11px 13px;border-radius:12px;
+      border:1px solid var(--line);background:var(--bg-2);color:var(--text);font:700 15px Nunito,sans-serif">`,
+    actions: [
+      { label: "Cancel", cls: "ghost", fn: closeSheet },
+      { label: "Delete", cls: "danger", fn: async () => {
+          const name = $("#del-name").value;
+          if (name.trim().toLowerCase() !== (save.petName || "").trim().toLowerCase() || Date.now() < ready) return;
+          let r;
+          try { r = await stravaCall("/pet/delete", { method:"POST", body: JSON.stringify({ intent: intent.intent, name }) }); }
+          catch (err){ toast(err.message || String(err), "bad", "\u26A0\uFE0F"); return; }
+          closeSheet();
+          try { localStorage.removeItem(SAVE_KEY); } catch (e){}
+          save = structuredCloneSafe(DEFAULT_SAVE);
+          obSpecies = null; recompute(); showOnboarding();
+          toast(`${esc(me.name)} was deleted`, "", "\u{1F95A}");
+        } }
+    ],
+    onOpen: root => {
+      const btn = root.querySelector('[data-sheet-act="1"]'), box = root.querySelector("#del-name");
+      const tick = () => {
+        const left = Math.ceil((ready - Date.now()) / 1000);
+        const typed = box.value.trim().toLowerCase() === (save.petName || "").trim().toLowerCase();
+        btn.disabled = left > 0 || !typed;
+        btn.textContent = left > 0 ? `Delete in ${left}\u2026` : `Delete ${me.name} forever`;
+      };
+      box.addEventListener("input", tick);
+      tick(); timer = setInterval(tick, 250);
+      setTimeout(() => box.focus(), 50);
+    },
+    onClose: () => clearInterval(timer)
   });
 }
 
@@ -8548,23 +8625,28 @@ function wire(){
     }
     if (e.target.closest("#strava-sync")){ stravaSync({ loud:true }); return; }
     if (e.target.closest("#strava-off")){
+      /* A disconnect no longer costs the pet. The broker revokes its access
+         and deletes what it read from Strava - Strava's terms - but keeps the
+         pet at its level, and this phone keeps its copy too, so connecting
+         again carries straight on. Deleting the pet is its own, guarded
+         thing: see openDeletePet(). */
       openSheet({
         title:"Disconnect Strava?",
-        desc:"Runmon will lose access to your activities, and your pet and its run history will be deleted from the server. There is no undo.",
+        desc:"Runmon will stop reading your activities and removes your runs from its server. Your pet is kept at its level &mdash; connect again any time and it carries on. Runs you record while disconnected will not count.",
         actions:[
-          { label:"Keep it", cls:"ghost", fn: closeSheet },
+          { label:"Stay connected", cls:"ghost", fn: closeSheet },
           { label:"Disconnect", cls:"danger", fn: async () => {
               closeSheet();
-              try { await stravaCall("/disconnect", { method:"POST" }); } catch(e){}
-              stravaForget();
-              try { localStorage.removeItem(SAVE_KEY); } catch(e){}
-              save = structuredCloneSafe(DEFAULT_SAVE);
-              obSpecies = null; recompute(); showOnboarding();
+              try { await stravaCall("/disconnect", { method:"POST" }); }
+              catch (err){ toast("Could not disconnect: " + (err.message || err), "bad", "\u26A0\uFE0F"); return; }
+              stravaForget(); renderAll();
+              toast("Disconnected. Your pet is kept.", "", "\u{1F43E}");
             } }
         ]
       });
       return;
     }
+    if (e.target.closest("#pet-delete")){ openDeletePet(); return; }
   });
 
   $("#row-keepawake").addEventListener("click", () => {

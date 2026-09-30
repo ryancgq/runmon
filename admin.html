@@ -54,6 +54,8 @@ input:focus{border-color:var(--accent)}
 .row .lv{font:700 16px Fredoka,sans-serif}
 .row .dot{width:9px;height:9px;border-radius:50%;background:var(--good);justify-self:end}
 .row .dot.off{background:var(--muted-2)}
+.grp{margin:12px 2px 4px;font:700 13px Fredoka,sans-serif;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+.grp span{color:var(--muted-2);margin-left:4px}
 .head{display:grid;grid-template-columns:34px minmax(0,1.6fr) 60px 70px minmax(0,1fr) minmax(0,1fr) 22px;gap:10px;padding:0 12px 4px;
   color:var(--muted-2);font-size:11px;text-transform:uppercase;letter-spacing:.6px}
 .chip{display:inline-block;font-size:11px;font-weight:800;padding:2px 7px;border-radius:99px;background:var(--card-2);color:var(--muted);margin-left:6px}
@@ -121,6 +123,12 @@ input:focus{border-color:var(--accent)}
     <div class="list" id="list"></div>
 
     <section class="detail card" id="detail" hidden></section>
+
+    <section class="card" style="margin-top:14px">
+      <h2>Deleted pets</h2>
+      <p class="small muted" style="margin:6px 0 0">Pets players deleted themselves, kept with the Strava account they belonged to. Restoring one puts it back on that account the next time they open the app; they need a pet of their own first (any egg) for it to replace.</p>
+      <div class="hist" id="del-list" style="max-height:none"></div>
+    </section>
 
     <section class="card" style="margin-top:14px">
       <div class="top" style="margin:0"><h2>Automatic backups</h2>
@@ -196,7 +204,7 @@ async function load(){
   const data = await call("/admin/users");
   rows = data.rows.sort((a, b) => (b.level || 0) - (a.level || 0) || (b.lastSeen || 0) - (a.lastSeen || 0));
   $("#stamp").textContent = "Updated " + new Date(data.at).toLocaleTimeString();
-  $("#s-players").textContent = rows.length;
+  $("#s-players").textContent = rows.filter(r => !r.disconnected).length;
   $("#s-hatched").textContent = rows.filter(r => (r.stage || 0) > 0).length;
   $("#s-active").textContent = rows.filter(r => r.lastRun && Date.now() - r.lastRun < 7 * DAY).length;
   const raid = data.raid || {};
@@ -209,25 +217,34 @@ async function load(){
   $("#raid-hp").value = raid.max || "";
   draw();
   loadAuto();
+  loadDeleted();
 }
+/* Two groups: players connected to Strava now, and players who disconnected
+   - whose pets are kept, at their level, for when they come back. */
 function draw(){
   const q = $("#q").value.trim().toLowerCase();
   const show = rows.filter(r => !q || [r.pet, r.species, r.form, r.handle].some(v => String(v || "").toLowerCase().includes(q)));
-  $("#list").innerHTML = show.length ? show.map(r => {
-    const hatched = (r.stage || 0) > 0;
-    const pen = r.pen > 0.005 ? `<span class="chip bad">−${Math.round(r.pen * 100)}% XP</span>` : "";
-    const lost = r.reachable ? "" : `<span class="chip warn" title="Not seen since the directory was added; they need to open the app once">unreachable</span>`;
-    return `<button class="row${open === r.handle ? " on" : ""}" data-h="${esc(r.handle)}">
-      <span class="em">${EMOJI[r.species] || "\u{1F95A}"}</span>
-      <span style="min-width:0"><div class="name">${esc(r.pet || "No pet yet")}${pen}${lost}</div>
-        <div class="sub">${esc(hatched ? r.form : (r.form || "not hatched"))} · ${esc(r.handle)}</div></span>
-      <span class="lv">${r.level ? "Lv " + r.level : "—"}</span>
-      <span class="c-runs">${r.runs || 0}</span>
-      <span class="c-last sub">${ago(r.lastRun)}</span>
-      <span class="c-seen sub">${ago(r.lastSeen)}</span>
-      <span class="dot${r.reachable ? "" : " off"}"></span>
-    </button>`; }).join("")
+  const on = show.filter(r => !r.disconnected), off = show.filter(r => r.disconnected);
+  const group = (title, list, empty) => `<div class="grp">${title} <span>${list.length}</span></div>` +
+    (list.length ? list.map(rowHTML).join("") : `<div class="empty" style="padding:12px">${empty}</div>`);
+  $("#list").innerHTML = show.length
+    ? group("Connected to Strava", on, "Nobody here.") + group("Disconnected", off, "Nobody has disconnected.")
     : `<div class="empty">${rows.length ? "Nobody matches that." : "Nobody has connected yet."}</div>`;
+}
+function rowHTML(r){
+  const hatched = (r.stage || 0) > 0;
+  const pen = r.pen > 0.005 ? `<span class="chip bad">−${Math.round(r.pen * 100)}% XP</span>` : "";
+  const lost = r.reachable ? "" : `<span class="chip warn" title="Not seen since the directory was added; they need to open the app once">unreachable</span>`;
+  return `<button class="row${open === r.handle ? " on" : ""}" data-h="${esc(r.handle)}">
+    <span class="em">${EMOJI[r.species] || "\u{1F95A}"}</span>
+    <span style="min-width:0"><div class="name">${esc(r.pet || "No pet yet")}${pen}${lost}</div>
+      <div class="sub">${esc(hatched ? r.form : (r.form || "not hatched"))} · ${esc(r.handle)}</div></span>
+    <span class="lv">${r.level ? "Lv " + r.level : "—"}</span>
+    <span class="c-runs">${r.runs || 0}</span>
+    <span class="c-last sub">${ago(r.lastRun)}</span>
+    <span class="c-seen sub">${ago(r.lastSeen)}</span>
+    <span class="dot${r.reachable && !r.disconnected ? "" : " off"}"></span>
+  </button>`;
 }
 $("#q").oninput = draw;
 $("#list").onclick = e => { const b = e.target.closest(".row"); if (b) show(b.dataset.h); };
@@ -267,6 +284,7 @@ async function show(handle, quiet){
       </dl>
       <dl class="kv">
         <dt>Strava</dt><dd>${u.linked ? "connected" : "<span style='color:var(--danger)'>not connected</span>"}</dd>
+        <dt>Deleted pets</dt><dd>${u.deletedPets || 0}</dd>
         <dt>Connected</dt><dd>${when(u.connectedAt)}</dd>
         <dt>Last sync</dt><dd>${when(u.lastSync)}</dd>
         <dt>Last save</dt><dd>${when(r.lastSeen)}</dd>
@@ -301,9 +319,10 @@ async function show(handle, quiet){
       : `<span class="small muted">No automatic backups yet &mdash; the first is taken tonight.</span>`}
     </div>
     <hr class="sep">
+    ${u.parkedAt ? `<p class="small muted">Disconnected ${when(u.parkedAt)}. Their pet is kept at its level; their runs and distance were removed, as Strava requires. It carries on when they connect again.</p>` : `
     <h3>Disconnect</h3>
-    <p class="small muted" style="margin:4px 0 0">Revokes Runmon's access at Strava and deletes their pet, their Rankings row and their friend code from the broker. Their phone keeps its own copy until they reset it. Download a backup first if you may want it back.</p>
-    <div class="act"><button class="btn danger" id="kill">Disconnect ${esc(r.pet || "this player")}</button></div>`;
+    <p class="small muted" style="margin:4px 0 0">Revokes Runmon's access at Strava. Their pet is kept at its level and carries on if they connect again; their runs and distance are removed from the server, as Strava requires, and they drop out of other players' Rankings.</p>
+    <div class="act"><button class="btn danger" id="kill">Disconnect ${esc(r.pet || "this player")}</button></div>`}`;
 
   $("#close").onclick = () => { open = null; d.hidden = true; draw(); };
   const note = () => ($("#note") && $("#note").value.trim()) || "";
@@ -314,7 +333,7 @@ async function show(handle, quiet){
   $("#dl").onclick = () => download("/admin/backup?handle=" + encodeURIComponent(handle), `runmon-${handle}.json`);
   $("#up").onchange = e => restore(handle, e.target.files[0]);
   if ($("#auto-restore")) $("#auto-restore").onclick = () => restoreAuto(handle, $("#auto-day").value);
-  $("#kill").onclick = () => disconnect(handle, r.pet);
+  if ($("#kill")) $("#kill").onclick = () => disconnect(handle, r.pet);
 }
 
 async function adjust(handle, kind, value, note){
@@ -357,8 +376,8 @@ async function restoreAuto(handle, day){
   } catch (e){ say(e.message, true); }
 }
 async function restoreFrom(handle, data){
-  if (data.runmon !== "backup" || data.v !== 2) throw new Error("That is not a Runmon backup from this dashboard.");
-  const hit = (data.users || []).find(u => u.handle === handle);
+  if (data.runmon !== "backup" || !(data.v === 2 || data.v === 3)) throw new Error("That is not a Runmon backup from this dashboard.");
+  const hit = [...(data.users || []), ...(data.connected || []), ...(data.disconnected || [])].find(u => u.handle === handle);
   if (!hit || !hit.species || !hit.level) throw new Error("That file has no backup of this player.");
   const km = hit.km != null ? `, ${hit.km} km` : "";
   if (!confirm(`Restore ${hit.pet || "this pet"} to level ${hit.level}${km} from ${new Date(data.at).toLocaleString()}? Their level and distance go back to what the backup says.`)) return;
@@ -368,12 +387,36 @@ async function restoreFrom(handle, data){
   show(handle, true);
 }
 
+/* --- deleted pets ---------------------------------------------------------- */
+let deleted = [];
+async function loadDeleted(){
+  try { deleted = (await call("/admin/deleted")).rows || []; } catch (e){ deleted = []; }
+  $("#del-list").innerHTML = deleted.length ? deleted.map(d => {
+    const p = d.pet || {}, now = rows.find(r => r.handle === d.handle);
+    const owner = now ? (now.pet ? `now playing ${esc(now.pet)}` : "no pet yet") : "not on the roster";
+    return `<div style="align-items:center">
+      <span>${EMOJI[p.species] || "\u{1F95A}"} <b>${esc(p.pet || "?")}</b> \u00b7 Lv ${p.level || "?"} ${esc(p.form || "")}
+        <br><span class="muted">deleted ${ago(d.at)} by the player \u00b7 ${esc(d.handle)} (${owner})${d.restoredAt ? ` \u00b7 restored ${ago(d.restoredAt)}` : ""}</span></span>
+      <button class="btn ghost" style="padding:3px 10px" data-undel="${esc(d.id)}">Restore</button></div>`; }).join("")
+    : `<span class="muted">No pets have been deleted.</span>`;
+}
+$("#del-list").onclick = async e => {
+  const b = e.target.closest("[data-undel]"); if (!b) return;
+  const d = deleted.find(x => x.id === b.dataset.undel); if (!d) return;
+  const p = d.pet || {}, now = rows.find(r => r.handle === d.handle);
+  const over = now && now.pet ? ` Their current pet, ${now.pet} (level ${now.level || "?"}), is replaced by it.` : "";
+  if (!confirm(`Put ${p.pet} (level ${p.level}) back on ${d.handle}'s account?${over}`)) return;
+  try { await call("/admin/deleted/restore", { method:"POST", body: JSON.stringify({ id: d.id }) });
+        say("Restore queued \u2014 it lands when they next open the app"); loadDeleted(); }
+  catch (e){ say(e.message, true); }
+};
+
 /* --- the nightly backups --------------------------------------------------- */
 let autoDays = [];
 async function loadAuto(){
   try { autoDays = (await call("/admin/backups")).days || []; } catch (e){ autoDays = []; }
   $("#auto-list").innerHTML = autoDays.length ? autoDays.map(d => `<div>
-      <span>${esc(d.day)} \u00b7 ${d.players} player${d.players === 1 ? "" : "s"}</span>
+      <span>${esc(d.day)} \u00b7 ${d.connected} connected \u00b7 ${d.disconnected} disconnected \u00b7 ${d.deleted} deleted</span>
       <button class="btn ghost" style="padding:3px 10px" data-auto="${esc(d.day)}">Download</button></div>`).join("")
     : `<span class="muted">None yet &mdash; the first is taken tonight, or press Take one now.</span>`;
 }
@@ -386,7 +429,7 @@ $("#auto-now").onclick = async () => {
 
 async function disconnect(handle, pet){
   const name = pet || handle;
-  const typed = prompt(`This cannot be undone. Type ${name} to disconnect them.`);
+  const typed = prompt(`They will need to connect Strava again to keep playing. Type ${name} to disconnect them.`);
   if (typed == null) return;
   if (typed.trim() !== name) return say("That did not match, nothing was changed.", true);
   try {

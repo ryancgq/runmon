@@ -143,23 +143,47 @@ async function lookupHandle(env, handle){
   const { athleteId } = await r.json();
   return athleteId || null;
 }
-/* Everything the broker holds about one athlete, gone: Strava's grant revoked
-   and the pet deleted (the athlete object's own wipe), and the three things
-   kept elsewhere that point back at it - the roster row other players see,
-   the handle's way back to the id, and the friend code's. Before this the
-   player's own Disconnect wiped the pet and left the row, so a pet the
-   Settings screen said was deleted went on appearing in everybody's Rankings
-   with its distances on it. */
-async function forgetAthlete(env, athleteId){
+/* What of a pet the broker may keep once Strava has no part in it. Strava's
+   API Policy has its data deleted within 48 hours of a disconnect (6.3), so a
+   parked or archived pet keeps only what the game made: its name, species,
+   hatch time, XP, badges and what it has celebrated. The runs go - their
+   XP is carried over as adminXp, so the level stands - and so does the
+   lifetime distance, and every other player's card the save had cached. */
+function gameOnly(save){
+  const xp = (save.runs || []).reduce((t, r) => t + (Number(r.xp) || 0), 0) + (Number(save.adminXp) || 0);
+  return { ...save, runs: [], adminXp: Math.max(0, Math.round(xp)), adminKm: 0,
+    friends: (save.friends || []).map(f => ({ code: f.code, addedAt: f.addedAt })),
+    roster: [], notices: [], noticesGone: [], stravaSyncedAt: null };
+}
+/** A card with nothing from Strava on it: the pet and its level. */
+const gameCard = c => c ? { v: c.v || 1, pet: c.pet, species: c.species, stage: c.stage,
+  form: c.form, level: c.level, at: c.at } : null;
+
+/* A disconnect, from Settings or from the dashboard. It used to delete the
+   athlete outright; now the pet is parked. Strava's grant is revoked, its
+   tokens and everything read from it are deleted, and the save becomes
+   gameOnly(). The pet stays where it is, under the Strava id it belongs to,
+   so connecting again finds it at the same level - on the same phone, or on
+   a new one that has no pet of its own. The Rankings row stays for the admin
+   list, stripped and marked disconnected, and is hidden from players; the
+   friend code's directory entry goes so nobody finds a pet that is not
+   playing, and comes back the first time they ask for their code again. The
+   nightly backups lose this player's distance for the same 48-hour reason. */
+async function parkAthlete(env, athleteId){
   const stub = await athleteStub(env, athleteId);
-  const { code } = await (await stub.fetch("https://do/code-peek")).json().catch(() => ({}));
-  await stub.fetch("https://do/wipe", { method:"POST" });
+  const { code } = await (await stub.fetch("https://do/park", { method:"POST" })).json();
   const handle = (await hmac(env.SESSION_SECRET, "roster:" + athleteId)).slice(0, 12);
-  await rosterStub(env).fetch("https://do/roster-drop", { method:"POST", body: JSON.stringify({ handle }) });
-  await handleStub(env, handle).fetch("https://do/dir-clear", { method:"POST" });
+  await rosterStub(env).fetch("https://do/roster-park", { method:"POST", body: JSON.stringify({ handle }) });
   if (code) await codeStub(env, code).fetch("https://do/dir-clear", { method:"POST" });
+  await backupStub(env).fetch("https://do/bk-scrub", { method:"POST", body: JSON.stringify({ handle }) });
   return { ok:true, handle };
 }
+
+/* Pets a player deleted, kept for the admin to put back. One object indexes
+   them all, beside the copy in the athlete's own object - that copy is the
+   one tied to the Strava id; this one is what the dashboard lists. */
+const deletedStub = env => env.ATHLETE.get(env.ATHLETE.idFromName("deleted:all"));
+
 /* Every pet's backup entry, or one: what adminSnapshot() keeps - name,
    species, level, XP and lifetime distance - and no runs. Shared by the
    dashboard's download and the nightly copy, so the two can never disagree
@@ -167,14 +191,24 @@ async function forgetAthlete(env, athleteId){
 async function snapshotUsers(env, handle){
   const { rows } = await (await rosterStub(env).fetch("https://do/roster-list")).json();
   const pick = handle ? rows.filter(r => r.handle === handle) : rows;
-  const users = [];
+  const connected = [], disconnected = [];
   for (const r of pick){
     const id = await lookupHandle(env, r.handle);
     const snap = id ? (await (await (await athleteStub(env, id)).fetch("https://do/admin-snapshot")).json()).snap : null;
-    users.push({ handle: r.handle, ...(snap || { pet: r.pet || "", species: r.species || null,
-      level: r.level || null, xp: null, km: null }), reachable: !!id });
+    const entry = { handle: r.handle, ...(snap || { pet: r.pet || "", species: r.species || null,
+      level: r.level || null, xp: null, km: null }), reachable: !!id };
+    (r.disconnected ? disconnected : connected).push(entry);
   }
-  return users;
+  return { connected, disconnected };
+}
+/** A backup file's contents: players by whether they are connected, and the
+    pets deleted so far. The same shape for the download and the nightly one. */
+async function backupOf(env, handle){
+  const { connected, disconnected } = await snapshotUsers(env, handle);
+  let { rows: deleted } = await (await deletedStub(env).fetch("https://do/del-list")).json();
+  if (handle) deleted = deleted.filter(d => d.handle === handle);
+  deleted = deleted.map(({ athleteId, ...rest }) => rest);   // the id stays on the server
+  return { runmon: "backup", v: 3, at: Date.now(), connected, disconnected, deleted };
 }
 /* The nightly copy, kept on the broker so there is always a recent one
    without anybody remembering to press a button. Fourteen days of them: long
@@ -184,12 +218,13 @@ async function snapshotUsers(env, handle){
 const AUTO_KEEP_DAYS = 14;
 const backupStub = env => env.ATHLETE.get(env.ATHLETE.idFromName("backups:auto"));
 async function autoBackup(env){
-  const users = await snapshotUsers(env);
+  const backup = { ...(await backupOf(env)), auto: true };
   const day = new Date().toISOString().slice(0, 10);
   await backupStub(env).fetch("https://do/bk-put", { method:"POST",
-    body: JSON.stringify({ day, backup: { runmon:"backup", v:2, at: Date.now(), auto: true, users },
-                           keep: AUTO_KEEP_DAYS }) });
-  return { day, users: users.length };
+    body: JSON.stringify({ day, backup, keep: AUTO_KEEP_DAYS }) });
+  return { day, users: backup.connected.length + backup.disconnected.length,
+           connected: backup.connected.length, disconnected: backup.disconnected.length,
+           deleted: backup.deleted.length };
 }
 async function rosterPut(env, athleteId, card){
   const handle = (await hmac(env.SESSION_SECRET, "roster:" + athleteId)).slice(0, 12);
@@ -324,6 +359,10 @@ async function adminOk(env, given){
    that does not exist; only a lockout says what it is, so the owner knows to
    wait rather than to doubt the password. */
 const GATE_TRIES = 5, GATE_MS = 15 * 60e3;
+/* How long a player has to wait between asking to delete their pet and
+   confirming it. The app shows the same countdown; this is what makes it
+   real. */
+const DELETE_WAIT_MS = 10e3;
 async function adminGate(request, env){
   const given = (request.headers.get("Authorization") || "").replace(/^Bearer /, "");
   const ip = request.headers.get("CF-Connecting-IP") || "local";
@@ -423,17 +462,43 @@ export default {
         return await withAthlete(request, env, async (stub, id) => {
           const body = await request.text();
           const res = await stub.fetch("https://do/save", { method:"POST", body });
+          const out = await res.json();
+          // a parked athlete's old session is refused here, not just at /sync:
+          // a push already on its way would otherwise put runs back and
+          // un-park the Rankings row
+          if (!out.saved) return json(env, out, 409);
           // the roster row is a copy of the card, refreshed as the save lands
           try {
             const parsed = JSON.parse(body);
             if (parsed && parsed.card) await rosterPut(env, id, parsed.card);
           } catch (e){ /* a save that will not parse is the DO's problem, not the roster's */ }
-          return res;
+          return json(env, out);
         });
 
       if (path === "/disconnect" && request.method === "POST")
         return await withAthlete(request, env, async (stub, id) =>
-          json(env, { disconnected: true, ...(await forgetAthlete(env, id)) }));
+          json(env, { disconnected: true, ...(await parkAthlete(env, id)) }));
+
+      /* A player deleting their own pet. Two calls, on purpose, and both
+         checked here rather than trusted to the app: the first opens an
+         intent, the second has to arrive at least DELETE_WAIT_MS later and
+         within ten minutes, carrying the pet's name as the player typed it.
+         The pet is archived, not destroyed - see petDelete(). */
+      if (path === "/pet/delete-intent" && request.method === "POST")
+        return await withAthlete(request, env, async stub =>
+          json(env, await (await stub.fetch("https://do/pet-intent", { method:"POST" })).json()));
+      if (path === "/pet/delete" && request.method === "POST")
+        return await withAthlete(request, env, async (stub, id) => {
+          const body = await request.json().catch(() => ({}));
+          const r = await (await stub.fetch("https://do/pet-delete", { method:"POST",
+            body: JSON.stringify({ intent: body.intent, name: body.name }) })).json();
+          if (!r.ok) return json(env, r, 400);
+          const handle = (await hmac(env.SESSION_SECRET, "roster:" + id)).slice(0, 12);
+          await deletedStub(env).fetch("https://do/del-add", { method:"POST",
+            body: JSON.stringify({ ...r.entry, handle, athleteId: String(id) }) });
+          await rosterStub(env).fetch("https://do/roster-reset", { method:"POST", body: JSON.stringify({ handle }) });
+          return json(env, { ok:true, deleted: r.entry.pet });
+        });
 
       /* --- friends ---------------------------------------------------------
          A friend code is a random six characters, not anything derived from the
@@ -468,7 +533,7 @@ export default {
           const r = await rosterStub(env).fetch("https://do/roster-list");
           const { rows } = await r.json();
           const players = (rows || [])
-            .filter(x => x.handle !== mine && x.pet)
+            .filter(x => x.handle !== mine && x.pet && !x.disconnected)
             .map(x => ({ id: x.handle, card: rosterCard(x), lastSeen: x.lastSeen || 0,
                          pen: markPenalty(x.marks), hits: markCount(x.marks) }))
             .sort((a, b) => (b.card.level - a.card.level) || (b.card.km - a.card.km))
@@ -543,7 +608,7 @@ export default {
           const r = await rosterStub(env).fetch("https://do/roster-list");
           const { rows } = await r.json();
           const mine   = (rows || []).find(x => x.handle === myHandle);
-          const theirs = (rows || []).find(x => x.handle === target);
+          const theirs = (rows || []).find(x => x.handle === target && !x.disconnected);
           if (!theirs || !theirs.pet) return json(env, { error:"no such player" }, 404);
           // Listed in Friends but not reachable: their roster row predates the
           // directory. "No such player" was actively misleading - they are
@@ -829,7 +894,31 @@ export default {
         }
 
         if (path === "/admin/disconnect" && request.method === "POST")
-          return json(env, await forgetAthlete(env, await who()));
+          return json(env, await parkAthlete(env, await who()));
+
+        /* Pets players deleted: the list, and putting one back on the Strava
+           account it came from, as a restore queued like any other. The
+           account needs a pet of its own to write over - a player who
+           deleted theirs is asked to hatch an egg first. */
+        if (path === "/admin/deleted"){
+          const { rows } = await (await deletedStub(env).fetch("https://do/del-list")).json();
+          return json(env, { rows: rows.map(({ athleteId, ...rest }) => rest) });
+        }
+        if (path === "/admin/deleted/restore" && request.method === "POST"){
+          const { row } = await (await deletedStub(env).fetch("https://do/del-get", { method:"POST",
+            body: JSON.stringify({ id: body.id }) })).json();
+          if (!row) return json(env, { error:"No deleted pet with that id." }, 404);
+          const p = row.pet || {};
+          const r = await (await athleteStub(env, row.athleteId)).fetch("https://do/admin-adjust", { method:"POST",
+            body: JSON.stringify({ kind:"restore", value: p.level || 1,
+              snap: { species: p.species, pet: p.pet, level: p.level || 1, xp: p.xp, km: null },
+              note: "brought back from Deleted pets" }) });
+          const out = await r.json();
+          if (!out.ok) return json(env, { error: "They have no pet on their account right now. Once they hatch an egg, restore it again - it replaces that egg." }, 409);
+          await deletedStub(env).fetch("https://do/del-mark", { method:"POST",
+            body: JSON.stringify({ id: row.id, restoredAt: Date.now() }) });
+          return json(env, { ok:true, rev: out.rev });
+        }
 
         /* A backup of every pet, or one: name, species, level, XP and
            lifetime distance, and nothing run by run - see adminSnapshot(). */
@@ -837,7 +926,7 @@ export default {
           headers: { "Content-Type":"application/json", "Cache-Control":"no-store", ...cors(env),
             "Content-Disposition": `attachment; filename="${name}.json"` } });
         if (path === "/admin/backup")
-          return fileOf({ runmon: "backup", v: 2, at: Date.now(), users: await snapshotUsers(env, handle) },
+          return fileOf(await backupOf(env, handle),
             `runmon-backup-${new Date().toISOString().slice(0,10)}${handle ? "-" + handle : ""}`);
 
         /* The nightly copies: the list, or one day's as a file (just one
@@ -849,7 +938,8 @@ export default {
           const { backup } = await (await backupStub(env).fetch("https://do/bk-get", { method:"POST",
             body: JSON.stringify({ day }) })).json();
           if (!backup) return json(env, { error:"There is no automatic backup for that day." }, 404);
-          if (handle) backup.users = backup.users.filter(u => u.handle === handle);
+          if (handle) for (const k of ["users", "connected", "disconnected", "deleted"])
+            if (backup[k]) backup[k] = backup[k].filter(u => u.handle === handle);
           return fileOf(backup, `runmon-auto-${day}${handle ? "-" + handle : ""}`);
         }
 
@@ -947,7 +1037,9 @@ export class Athlete {
     if (path === "/open")  return this.open(await request.json());
     if (path === "/sync")  return this.sync();
     if (path === "/save")  return this.commit(await request.json());
-    if (path === "/wipe")  return this.wipe();
+    if (path === "/park")  return this.park();
+    if (path === "/pet-intent") return this.petIntent();
+    if (path === "/pet-delete") return this.petDelete(await request.json());
     if (path === "/code")  return this.code(await request.json());
     if (path === "/card")  return this.ok({ card: await this.state.storage.get("card") || null });
     // the friend code without minting one, which /code would do
@@ -976,11 +1068,47 @@ export class Athlete {
     if (path === "/bk-list"){
       const map = await this.state.storage.list({ prefix:"day:" });
       return this.ok({ days: [...map.entries()].map(([k, v]) => ({ day: k.slice(4), at: v.at,
-        players: (v.users || []).length })).sort((a, b) => b.day.localeCompare(a.day)) });
+        connected: (v.connected || v.users || []).length, disconnected: (v.disconnected || []).length,
+        deleted: (v.deleted || []).length,
+        players: (v.users || []).length + (v.connected || []).length + (v.disconnected || []).length }))
+        .sort((a, b) => b.day.localeCompare(a.day)) });
     }
     if (path === "/bk-get"){
       const { day } = await request.json();
       return this.ok({ backup: await this.state.storage.get("day:" + day) || null });
+    }
+    /* The deleted-pets index - see deletedStub(). */
+    if (path === "/del-add"){
+      const row = await request.json();
+      await this.state.storage.put("del:" + row.id, row);
+      return this.ok({ ok:true });
+    }
+    if (path === "/del-list"){
+      const map = await this.state.storage.list({ prefix:"del:" });
+      return this.ok({ rows: [...map.values()].sort((a, b) => b.at - a.at) });
+    }
+    if (path === "/del-get"){
+      const { id } = await request.json();
+      return this.ok({ row: await this.state.storage.get("del:" + id) || null });
+    }
+    if (path === "/del-mark"){
+      const { id, restoredAt } = await request.json();
+      const row = await this.state.storage.get("del:" + id);
+      if (row) await this.state.storage.put("del:" + id, { ...row, restoredAt });
+      return this.ok({ ok:true });
+    }
+    /* A disconnect takes the player's distance out of every nightly backup
+       already taken - Strava's 48 hours apply to those copies too. */
+    if (path === "/bk-scrub"){
+      const { handle } = await request.json();
+      const map = await this.state.storage.list({ prefix:"day:" });
+      for (const [k, b] of map){
+        let hit = false;
+        for (const key of ["users", "connected", "disconnected"])
+          for (const u of b[key] || []) if (u.handle === handle && u.km != null){ u.km = null; hit = true; }
+        if (hit) await this.state.storage.put(k, b);
+      }
+      return this.ok({ ok:true });
     }
     /* An admin-gate object: failed passwords from one address, and when it is
        locked until. */
@@ -1144,7 +1272,9 @@ export class Athlete {
         // pet saved - which is every run - taking the penalty with them.
         marks: prev.marks || [],
         firstSeen: prev.firstSeen || Date.now(),
-        lastSeen: Date.now()
+        lastSeen: Date.now(),
+        // only a connected athlete writes a row, so this is always a return
+        disconnected: false
       });
       return this.ok({ ok: true });
     }
@@ -1264,9 +1394,23 @@ export class Athlete {
       return this.ok({ ok:true, raid, was: old });
     }
 
-    if (path === "/roster-drop"){
+    /* A disconnect: the row stays, for the admin's list, with nothing from
+       Strava left on it - see parkAthlete(). */
+    if (path === "/roster-park"){
       const { handle } = await request.json();
-      await this.state.storage.delete("row:" + handle);
+      const prev = await this.state.storage.get("row:" + handle);
+      if (prev) await this.state.storage.put("row:" + handle, {
+        handle, pet: prev.pet, species: prev.species, form: prev.form, stage: prev.stage, level: prev.level,
+        marks: [], firstSeen: prev.firstSeen, lastSeen: prev.lastSeen,
+        disconnected: true, disconnectedAt: Date.now() });
+      return this.ok({ ok:true });
+    }
+    /* A pet deleted: the player is still here, with no pet until they hatch one. */
+    if (path === "/roster-reset"){
+      const { handle } = await request.json();
+      const prev = await this.state.storage.get("row:" + handle) || {};
+      await this.state.storage.put("row:" + handle, { handle, marks: [],
+        firstSeen: prev.firstSeen || Date.now(), lastSeen: Date.now() });
       return this.ok({ ok:true });
     }
     if (path === "/roster-list"){
@@ -1320,6 +1464,7 @@ export class Athlete {
 
   async open(tok){
     const s = this.state.storage;
+    await s.delete("parkedAt");
     await s.put({
       athleteId: tok.athleteId, refresh: tok.refresh, access: tok.access, expires: tok.expires,
       // Runs before this moment are somebody's training history, not this pet's
@@ -1461,9 +1606,9 @@ export class Athlete {
       for. */
   async adminPeek(){
     const s = this.state.storage;
-    const [save, card, connectedAt, lastSync, refresh, friendCode, adjust, imported, battles] =
+    const [save, card, connectedAt, lastSync, refresh, friendCode, adjust, imported, battles, parkedAt, deletedPets] =
       await Promise.all(["save","card","connectedAt","lastSync","refresh","friendCode",
-                         "adjust","imported","battles"].map(k => s.get(k)));
+                         "adjust","imported","battles","parkedAt","deletedPets"].map(k => s.get(k)));
     const runs = (save && save.runs) || [];
     return this.ok({
       linked: !!refresh, connectedAt: connectedAt || null, lastSync: lastSync || null,
@@ -1478,7 +1623,7 @@ export class Athlete {
         badges: Object.keys(save.badges || {}).length,
         createdAt: save.createdAt || null, syncedAt: save.stravaSyncedAt || null
       } : null,
-      adjust: adjust || [],
+      adjust: adjust || [], parkedAt: parkedAt || null, deletedPets: (deletedPets || []).length,
       imported: (imported || []).length, battles: (battles || []).length
     });
   }
@@ -1505,7 +1650,7 @@ export class Athlete {
       badges and the Lifetime line are measured against. */
   async adminSnapshot(){
     const s = this.state.storage;
-    const [save, card] = await Promise.all([s.get("save"), s.get("card")]);
+    const [save, card, parkedAt] = await Promise.all([s.get("save"), s.get("card"), s.get("parkedAt")]);
     if (!save) return this.ok({ snap: null });
     const runs = save.runs || [];
     const xp = runs.reduce((t, r) => t + (Number(r.xp) || 0), 0) + (Number(save.adminXp) || 0);
@@ -1513,7 +1658,9 @@ export class Athlete {
     return this.ok({ snap: {
       pet: String(save.petName || "").slice(0, 24), species: save.species || null,
       level: (card && Number(card.level)) || null,
-      xp: Math.max(0, Math.round(xp)), km: Math.max(0, Math.round(km * 10) / 10)
+      xp: Math.max(0, Math.round(xp)),
+      // nothing from Strava is kept for a parked pet - see gameOnly()
+      km: parkedAt ? null : Math.max(0, Math.round(km * 10) / 10)
     } });
   }
 
@@ -1535,6 +1682,7 @@ export class Athlete {
       working them out again here would be the same rules written twice. */
   async commit({ save, imported, card }){
     const s = this.state.storage;
+    if (await s.get("parkedAt")) return this.ok({ saved: false, error: "disconnected" });
     const seen = new Set(await s.get("imported") || []);
     for (const id of imported || []) seen.add(String(id));
     const write = { save, imported: [...seen] };
@@ -1543,12 +1691,63 @@ export class Athlete {
     return this.ok({ saved: true });
   }
 
-  async wipe(){
+  /** A disconnect - see parkAthlete(). */
+  async park(){
+    const s = this.state.storage;
     const token = await this.accessToken();
     if (token) await fetch(STRAVA(this.env) + "/oauth/deauthorize", {
       method:"POST", headers:{ Authorization:`Bearer ${token}` } }).catch(()=>{});
-    await this.state.storage.deleteAll();
-    return this.ok({ disconnected: true });
+    const [save, card] = await Promise.all([s.get("save"), s.get("card")]);
+    await s.delete(["refresh", "access", "expires", "connectedAt", "lastSync", "imported",
+                    "kmSeen", "kmAfter", "raidSpent", "raidPending", "deleteIntent"]);
+    const put = { parkedAt: Date.now() };
+    if (save) put.save = gameOnly(save);
+    if (card) put.card = gameCard(card);
+    await s.put(put);
+    return this.ok({ parked: true, code: await s.get("friendCode") || null });
+  }
+
+  /* Deleting a pet, step one: an intent, which the second step has to wait
+     for. Remembered here, so a second call from a tampered app that never
+     opened one - or opened it a moment ago - is refused. */
+  async petIntent(){
+    const s = this.state.storage;
+    const save = await s.get("save");
+    if (!save || !save.species) return this.ok({ ok:false, error:"There is no pet on your account to delete." });
+    const intent = { id: crypto.randomUUID(), at: Date.now() };
+    await s.put("deleteIntent", intent);
+    return this.ok({ ok:true, intent: intent.id, pet: save.petName || "", waitMs: DELETE_WAIT_MS });
+  }
+
+  /* Step two. The pet goes into this athlete's own list of deleted pets -
+     keyed, like everything in here, by their Strava id - as gameOnly() keeps
+     it, with the admin queue it had, and the live save, card and queue are
+     cleared so the next pet starts clean. Nothing is destroyed: the admin
+     can put it back from the dashboard. */
+  async petDelete({ intent, name }){
+    const s = this.state.storage;
+    const [save, card, had, queue] = await Promise.all(
+      [s.get("save"), s.get("card"), s.get("deleteIntent"), s.get("adjust")]);
+    if (!save || !save.species) return this.ok({ ok:false, error:"There is no pet on your account to delete." });
+    if (!had || had.id !== intent) return this.ok({ ok:false, error:"Start again from Settings - that confirmation has expired." });
+    const age = Date.now() - had.at;
+    if (age < DELETE_WAIT_MS) return this.ok({ ok:false, error:"Too quick - wait for the countdown." });
+    if (age > 10 * 60e3){ await s.delete("deleteIntent"); return this.ok({ ok:false, error:"That took too long - start again from Settings." }); }
+    const norm = t => String(t || "").trim().toLowerCase();
+    if (!norm(name) || norm(name) !== norm(save.petName)) return this.ok({ ok:false, error:"The name did not match your pet's." });
+
+    const kept = gameOnly(save);
+    const entry = { id: crypto.randomUUID(), at: Date.now(), by: "player",
+      pet: { pet: save.petName || "", species: save.species, createdAt: save.createdAt || null,
+             level: (card && Number(card.level)) || null, form: (card && card.form) || null,
+             xp: kept.adminXp, badges: Object.keys(save.badges || {}) },
+      save: kept, adjust: queue || [] };
+    const list = await s.get("deletedPets") || [];
+    list.push(entry);
+    await s.put("deletedPets", list);
+    await s.delete(["save", "card", "adjust", "deleteIntent", "marks"]);
+    const { save: _full, ...summary } = entry;
+    return this.ok({ ok:true, entry: summary });
   }
 
   ok(obj){
