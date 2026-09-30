@@ -1324,8 +1324,11 @@ Runmon follows Strava's [API Agreement](https://www.strava.com/legal/api) and
   stood are carried forward in `save.past`. Mood and streak replays start from
   there rather than the first run, so a pet's level, mood, streak and every
   later run's pay read exactly as if the run were still in the log (checked
-  against a whole random year in three time zones). The phone folds on every
-  load and sync; the broker folds its own copy nightly from the folds the app
+  against a whole random year in three time zones). A linked phone folds only
+  after it has synced, so a player back from weeks away has the runs from
+  those weeks priced first, streak and all, exactly as a daily player's
+  would be (checked at 3, 10 and 25 days away); if Strava cannot be reached,
+  it folds anyway. The phone folds on every load and sync; the broker folds its own copy nightly from the folds the app
   worked out ahead (`save.folds`), so a phone left closed does not keep the
   broker's copy past the week. Strava activity ids are let go after a week
   too, behind a start-time floor.

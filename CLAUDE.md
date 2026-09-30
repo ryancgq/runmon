@@ -63,7 +63,9 @@ has the full list; the ones easiest to break by accident:
   card, Rankings, the dashboard or a backup. Cards are `rosterCard()` fields only.
 - A run is folded into `save.past` after six full days (`foldOldRuns`); every
   replay of mood/streak must go through the seeded functions, and
-  `foldeq.mjs`-style equivalence (full log vs folded) must still hold.
+  `foldeq.mjs`-style equivalence (full log vs folded) must still hold. A
+  linked phone must sync *before* it folds: folding first misprices every run
+  from a player's absence and cuts their streak (it did, once).
 - Disconnected players and deleted pets are erased after `GRACE_DAYS` (28) —
   never "kept forever". Strava's limit is 30.
 - No lifetime distance anywhere. No Strava data, or anything derived from it,

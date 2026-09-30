@@ -4047,10 +4047,14 @@ function foldPast(past, runs, cut){
 /** Fold everything run before six days ago. True when anything changed. */
 function foldOldRuns(now){
   if (heldRuns) return false;          // not in the middle of a catch-up walk
-  const cut = daysBeforeKey(dayKey(now || Date.now()), RETAIN_DAYS);
-  if (save.past && save.past.through >= cut) return false;
+  let cut = daysBeforeKey(dayKey(now || Date.now()), RETAIN_DAYS);
   const old = activeRuns().filter(r => dayKey(r.t) < cut);
-  if (!old.length && !save.past) return false;
+  if (!old.length && (!save.past || save.past.through >= cut)) return false;
+  /* A run from before the last fold can still turn up: uploaded to Strava
+     long after it was run. It is folded all the same - its XP and count
+     kept - but the fold never moves back, so the mood and streak it would
+     have touched are left as they were. */
+  if (save.past && save.past.through > cut) cut = save.past.through;
   save.past = foldPast(save.past, old, cut);
   save.runs = save.runs
     .filter(r => r.folded || !(r.strava && dayKey(r.t) < cut))
@@ -4640,7 +4644,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-30 f77366e";
+const BUILD_ID = "2026-09-30 29d1dea";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -8679,6 +8683,9 @@ async function stravaSync(opts){
     if (opts && opts.loud) toast(stravaLastError, "bad", "\u26A0\uFE0F");
   } finally {
     stravaBusy = false;
+    // The success path has folded already; this is for a sync that failed or
+    // stopped short. A week-old run goes whether or not Strava answered.
+    if (save.species && foldOldRuns()){ recompute(); persist(); renderAll(); }
     renderStravaPanel();
   }
 }
@@ -9088,8 +9095,14 @@ function boot(){
      home screen it would sit on is not the screen they are looking at. */
   if (has) raidAnnounce();
   if (has && expireParked()) return;
-  // anything a week old is folded before it is drawn - see foldOldRuns()
-  if (has && foldOldRuns()) persist();
+  /* Anything a week old is folded - see foldOldRuns() - but not before the
+     sync, if there is one to come. A player back after a week away has runs
+     waiting on Strava from the days the app was shut, and they have to be
+     priced against the log as it stood then: fold first, and the fold walks
+     the mood down through days that were in fact run, and the streak that
+     should carry through them is cut. stravaSync() folds once they are in -
+     or, if Strava cannot be reached, anyway. */
+  if (has && !stravaLinked() && foldOldRuns()) persist();
   if (has){
     recompute();
     applyTheme(save.species);
@@ -9114,8 +9127,14 @@ function boot(){
   // who connected before Runmon said what it reads, ask once. After the sync,
   // because the sync can ask which pet to keep, and that question matters more.
   if (has && stravaLinked()) stravaSync().then(askConsentOnce, askConsentOnce);
-  // and a run that turns a week old while the app is open is folded then
-  setInterval(() => { if (save.species && foldOldRuns()){ recompute(); persist(); renderAll(); } }, 3600e3);
+  // and a run that turns a week old while the app is open is folded then -
+  // through a sync when linked, for the same reason as above: a phone left
+  // open in a drawer for a week wakes to a timer, and the runs come first
+  setInterval(() => {
+    if (!save.species) return;
+    if (stravaLinked()) stravaSync();
+    else if (foldOldRuns()){ recompute(); persist(); renderAll(); }
+  }, 3600e3);
   // and again when you come back to the tab, since that is when you check
   if (STRAVA_ON) document.addEventListener("visibilitychange", () => {
     if (!document.hidden && stravaLinked() && Date.now() - (save.stravaSyncedAt || 0) > 60000) stravaSync();
