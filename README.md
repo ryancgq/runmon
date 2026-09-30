@@ -1311,6 +1311,34 @@ Everything derives from the run log, so deleting a run correctly rolls back XP,
 level, evolution stage, streaks and badges. Routes are simplified to 320 points
 before saving to keep `localStorage` small.
 
+### The admin dashboard
+
+`admin.html`, served beside the app at `/runmon/admin.html`, and useless
+without `ADMIN_TOKEN`: you type it into the page, it is kept only for that
+tab, and the page will only talk to the broker whose address is written into
+it. From it you can:
+
+- see every connected player, their pet, form and level, and when they last
+  ran and last opened the app;
+- open a player to see where their XP comes from, whether their Strava link
+  is still live, and their penalty;
+- **set their level, or give or take XP.** The phone's save is the real one
+  and pushes itself up on every sync, so an edit made on the broker would be
+  overwritten. Changes are queued instead and applied by the app the next
+  time the player opens it — the page shows each one as waiting or done. The
+  adjustment sits on top of what their runs earned (`adminXp` in the save);
+  no run is rewritten;
+- **back up** one player or everyone, and **restore** a player from a backup
+  file. A restore takes over the phone's copy on its next sync, keeping only
+  the phone's own settings, and does not replay changes queued after the
+  backup;
+- **disconnect** a player, which revokes Strava's grant and deletes their
+  pet, their Rankings row and their friend code from the broker;
+- see the raid and respawn the boss.
+
+A backup holds each player's runs, which are Strava data. Keep it private and
+do not keep it longer than you need; see the review of Strava's terms.
+
 ### The private roster
 
 Durable Objects cannot be listed — there is no call that returns every object

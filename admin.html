@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<!-- The page talks to the broker and nothing else. The broker address is fixed
+     here on purpose: a dashboard that took it from the URL could be pointed at
+     somebody else's server by a link, and the admin token would go with it. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://runmon-strava.runmon-gq.workers.dev; img-src data:; base-uri 'none'; form-action 'none'">
+<title>Runmon Admin</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230a0c13'/%3E%3Cpath d='M50 20 C64 38 64 52 50 62 C36 52 36 38 50 20 Z' fill='%23ff6b35'/%3E%3Cpath d='M50 34 C57 44 57 52 50 58 C43 52 43 44 50 34 Z' fill='%23ffd23f'/%3E%3Ccircle cx='34' cy='76' r='7' fill='%234ade80'/%3E%3Ccircle cx='66' cy='76' r='7' fill='%237cd4fd'/%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0c13; --bg-2:#101420; --card:#161b28; --card-2:#1d2333; --line:#262d40;
+  --text:#eef1f8; --muted:#8791a8; --muted-2:#5d6478;
+  --danger:#ff5c7a; --good:#4ade80; --accent:#ff6b35; --accent-2:#ffd23f; --accent-ink:#1a0d05;
+  --r-lg:18px; --r-md:14px; --r-sm:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:600 14px/1.45 Nunito,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}
+.wrap{max-width:980px;margin:0 auto;padding:18px 16px 60px}
+h1,h2,h3{font-family:Fredoka,Nunito,sans-serif;font-weight:700;margin:0;letter-spacing:.2px}
+h1{font-size:22px} h2{font-size:17px} h3{font-size:15px}
+.top{display:flex;align-items:center;gap:12px;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap}
+.top .who{color:var(--muted);font-size:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px}
+.muted{color:var(--muted)} .small{font-size:12px}
+.btn{border:1px solid var(--line);background:var(--card-2);border-radius:var(--r-sm);padding:8px 13px;cursor:pointer;font-weight:800;white-space:nowrap}
+.btn:hover{border-color:var(--muted-2)}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{background:transparent;border-color:var(--danger);color:var(--danger)}
+.btn.ghost{background:transparent}
+input[type=text],input[type=password],input[type=number],input[type=search]{
+  background:var(--bg-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 11px;min-width:0;outline:none}
+input:focus{border-color:var(--accent)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);padding:12px}
+.stat .v{font:700 22px Fredoka,sans-serif} .stat .k{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.6px}
+.bar{height:8px;border-radius:99px;background:var(--bg-2);overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--danger),var(--accent))}
+.tools{display:flex;gap:8px;align-items:center;margin:0 0 10px;flex-wrap:wrap}
+.tools input{flex:1}
+.list{display:flex;flex-direction:column;gap:6px}
+.row{display:grid;grid-template-columns:34px minmax(0,1.6fr) 60px 70px minmax(0,1fr) minmax(0,1fr) 22px;gap:10px;align-items:center;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);padding:10px 12px;cursor:pointer;text-align:left;width:100%}
+.row:hover,.row.on{border-color:var(--accent)}
+.row .em{font-size:20px;text-align:center}
+.row .name{font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .sub{color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .lv{font:700 16px Fredoka,sans-serif}
+.row .dot{width:9px;height:9px;border-radius:50%;background:var(--good);justify-self:end}
+.row .dot.off{background:var(--muted-2)}
+.head{display:grid;grid-template-columns:34px minmax(0,1.6fr) 60px 70px minmax(0,1fr) minmax(0,1fr) 22px;gap:10px;padding:0 12px 4px;
+  color:var(--muted-2);font-size:11px;text-transform:uppercase;letter-spacing:.6px}
+.chip{display:inline-block;font-size:11px;font-weight:800;padding:2px 7px;border-radius:99px;background:var(--card-2);color:var(--muted);margin-left:6px}
+.chip.bad{color:var(--danger)} .chip.warn{color:var(--accent-2)}
+.detail{margin-top:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13px}
+.kv dt{color:var(--muted)} .kv dd{margin:0;text-align:right;font-weight:800}
+.act{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
+.act input[type=number]{width:96px}
+.act input[type=text]{flex:1;min-width:140px}
+.sep{border:0;border-top:1px solid var(--line);margin:14px 0}
+.hist{font-size:12px;display:flex;flex-direction:column;gap:4px;margin-top:8px;max-height:160px;overflow:auto}
+.hist div{display:flex;justify-content:space-between;gap:10px}
+.msg{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--card-2);border:1px solid var(--line);
+  border-radius:99px;padding:9px 16px;font-weight:800;display:none;max-width:calc(100% - 32px);z-index:5}
+.msg.bad{border-color:var(--danger);color:var(--danger)}
+.gate{max-width:420px;margin:12vh auto 0}
+.gate p{margin:8px 0 14px}
+.gate .act input{flex:1}
+.empty{padding:26px;text-align:center;color:var(--muted)}
+@media (max-width:640px){
+  .stats{grid-template-columns:1fr 1fr}
+  .head{display:none}
+  .row{grid-template-columns:30px minmax(0,1fr) auto 12px;row-gap:2px}
+  .row .c-runs,.row .c-last,.row .c-seen{display:none}
+  .grid2{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <section class="gate card" id="gate">
+    <h1>Runmon Admin</h1>
+    <p class="muted">Enter the admin token you set as <code>ADMIN_TOKEN</code> on the broker. It stays in this tab and is forgotten when you close it.</p>
+    <div class="act">
+      <input type="password" id="tok" placeholder="Admin token" autocomplete="off" spellcheck="false">
+      <button class="btn primary" id="go">Open</button>
+    </div>
+    <p class="small muted" id="gate-err"></p>
+  </section>
+
+  <main id="app" hidden>
+    <div class="top">
+      <div><h1>Runmon Admin</h1><div class="who" id="stamp"></div></div>
+      <div class="act" style="margin:0">
+        <button class="btn" id="refresh">Refresh</button>
+        <button class="btn" id="backup-all">Back up everyone</button>
+        <button class="btn ghost" id="out">Sign out</button>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="v" id="s-players">–</div><div class="k">Connected</div></div>
+      <div class="stat"><div class="v" id="s-hatched">–</div><div class="k">Hatched</div></div>
+      <div class="stat"><div class="v" id="s-active">–</div><div class="k">Ran this week</div></div>
+      <div class="stat"><div class="v" id="s-raid">–</div><div class="k">Raid boss HP</div><div class="bar"><i id="s-raid-bar" style="width:0"></i></div></div>
+    </div>
+
+    <div class="tools">
+      <input type="search" id="q" placeholder="Search pet, species or handle">
+    </div>
+    <div class="head"><span></span><span>Pet</span><span>Level</span><span class="c-runs">Runs</span><span class="c-last">Last run</span><span class="c-seen">Last seen</span><span></span></div>
+    <div class="list" id="list"></div>
+
+    <section class="detail card" id="detail" hidden></section>
+
+    <section class="card" style="margin-top:14px">
+      <h2>Raid</h2>
+      <p class="small muted" id="raid-line" style="margin:6px 0 0"></p>
+      <div class="act">
+        <input type="number" id="raid-hp" min="100" step="100" placeholder="HP">
+        <button class="btn" id="raid-respawn">Respawn the boss</button>
+      </div>
+    </section>
+  </main>
+</div>
+<div class="msg" id="msg"></div>
+
+<script>
+"use strict";
+const API = "https://runmon-strava.runmon-gq.workers.dev";
+const KEY = "runmon.admin.token";
+const EMOJI = { ember:"\u{1F525}", nimbus:"⚡", verdant:"\u{1F33F}" };
+const $ = s => document.querySelector(s);
+const esc = v => String(v == null ? "" : v).replace(/[&<>"']/g, c =>
+  ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+const DAY = 86400000;
+const ago = t => {
+  if (!t) return "—";
+  const d = Math.floor((Date.now() - t) / DAY);
+  return d <= 0 ? "today" : d === 1 ? "yesterday" : d < 30 ? d + " days ago" : new Date(t).toLocaleDateString();
+};
+const when = t => t ? new Date(t).toLocaleString() : "—";
+let token = "";
+try { token = sessionStorage.getItem(KEY) || ""; } catch (e){}
+let rows = [], open = null;
+
+function say(text, bad){
+  const m = $("#msg"); m.textContent = text; m.className = "msg" + (bad ? " bad" : "");
+  m.style.display = "block"; clearTimeout(say.t); say.t = setTimeout(() => m.style.display = "none", 3200);
+}
+
+async function call(path, opts){
+  const r = await fetch(API + path, { ...(opts || {}),
+    headers: { Authorization: "Bearer " + token, ...(opts && opts.body ? { "Content-Type":"application/json" } : {}) } });
+  if (r.status === 404 && path === "/admin/users") throw Object.assign(new Error("That token was not accepted."), { gate: true });
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok || body.error) throw new Error(body.error || ("The broker answered " + r.status));
+  return body;
+}
+
+/* --- sign in ----------------------------------------------------------- */
+async function enter(){
+  $("#gate-err").textContent = "";
+  try {
+    await load();
+    try { sessionStorage.setItem(KEY, token); } catch (e){}
+    $("#gate").hidden = true; $("#app").hidden = false;
+  } catch (e){
+    token = ""; try { sessionStorage.removeItem(KEY); } catch (x){}
+    $("#gate").hidden = false; $("#app").hidden = true;
+    $("#gate-err").textContent = e.message;
+  }
+}
+$("#go").onclick = () => { token = $("#tok").value.trim(); if (token) enter(); };
+$("#tok").onkeydown = e => { if (e.key === "Enter") $("#go").click(); };
+$("#out").onclick = () => { token = ""; try { sessionStorage.removeItem(KEY); } catch (e){} location.reload(); };
+
+/* --- the list ------------------------------------------------------------ */
+async function load(){
+  const data = await call("/admin/users");
+  rows = data.rows.sort((a, b) => (b.level || 0) - (a.level || 0) || (b.lastSeen || 0) - (a.lastSeen || 0));
+  $("#stamp").textContent = "Updated " + new Date(data.at).toLocaleTimeString();
+  $("#s-players").textContent = rows.length;
+  $("#s-hatched").textContent = rows.filter(r => (r.stage || 0) > 0).length;
+  $("#s-active").textContent = rows.filter(r => r.lastRun && Date.now() - r.lastRun < 7 * DAY).length;
+  const raid = data.raid || {};
+  $("#s-raid").textContent = raid.max ? `${Math.max(0, raid.hp).toLocaleString()}` : "—";
+  $("#s-raid-bar").style.width = raid.max ? Math.max(0, 100 * raid.hp / raid.max) + "%" : "0";
+  $("#raid-line").textContent = raid.max
+    ? (raid.felledAt ? `Felled ${when(raid.felledAt)} (round ${raid.epoch}). He stays down until you respawn him.`
+                     : `Round ${raid.epoch}: ${Math.max(0, raid.hp).toLocaleString()} of ${raid.max.toLocaleString()} HP left, started ${when(raid.startedAt)}.`)
+    : "No raid has started.";
+  $("#raid-hp").value = raid.max || "";
+  draw();
+}
+function draw(){
+  const q = $("#q").value.trim().toLowerCase();
+  const show = rows.filter(r => !q || [r.pet, r.species, r.form, r.handle].some(v => String(v || "").toLowerCase().includes(q)));
+  $("#list").innerHTML = show.length ? show.map(r => {
+    const hatched = (r.stage || 0) > 0;
+    const pen = r.pen > 0.005 ? `<span class="chip bad">−${Math.round(r.pen * 100)}% XP</span>` : "";
+    const lost = r.reachable ? "" : `<span class="chip warn" title="Not seen since the directory was added; they need to open the app once">unreachable</span>`;
+    return `<button class="row${open === r.handle ? " on" : ""}" data-h="${esc(r.handle)}">
+      <span class="em">${EMOJI[r.species] || "\u{1F95A}"}</span>
+      <span style="min-width:0"><div class="name">${esc(r.pet || "No pet yet")}${pen}${lost}</div>
+        <div class="sub">${esc(hatched ? r.form : (r.form || "not hatched"))} · ${esc(r.handle)}</div></span>
+      <span class="lv">${r.level ? "Lv " + r.level : "—"}</span>
+      <span class="c-runs">${r.runs || 0}</span>
+      <span class="c-last sub">${ago(r.lastRun)}</span>
+      <span class="c-seen sub">${ago(r.lastSeen)}</span>
+      <span class="dot${r.reachable ? "" : " off"}"></span>
+    </button>`; }).join("")
+    : `<div class="empty">${rows.length ? "Nobody matches that." : "Nobody has connected yet."}</div>`;
+}
+$("#q").oninput = draw;
+$("#list").onclick = e => { const b = e.target.closest(".row"); if (b) show(b.dataset.h); };
+$("#refresh").onclick = () => load().then(() => open && show(open, true)).catch(e => say(e.message, true));
+
+/* --- one player ---------------------------------------------------------- */
+async function show(handle, quiet){
+  open = handle; draw();
+  const d = $("#detail"); d.hidden = false;
+  if (!quiet) d.innerHTML = `<p class="muted">Loading…</p>`;
+  // on a phone the panel sits under the whole list, out of sight
+  if (!quiet) d.scrollIntoView({ behavior:"smooth", block:"start" });
+  let u;
+  try { u = await call("/admin/user?handle=" + encodeURIComponent(handle)); }
+  catch (e){ d.innerHTML = `<h2>${esc(handle)}</h2><p class="muted">${esc(e.message)}</p>`; return; }
+  const r = rows.find(x => x.handle === handle) || {};
+  const s = u.save;
+  const applied = s ? s.adminRev : 0;
+  const hist = (u.adjust || []).slice().reverse().map(a => `<div>
+      <span>${a.kind === "level" ? "Set to level " + a.value : (a.value >= 0 ? "+" : "−") + Math.abs(a.value).toLocaleString() + " XP"}${a.note ? " · " + esc(a.note) : ""}</span>
+      <span class="muted">${a.rev <= applied ? "done" : "waiting for the app"} · ${ago(a.at)}</span></div>`).join("");
+  d.innerHTML = `
+    <div class="top" style="margin-bottom:10px">
+      <div><h2>${EMOJI[r.species] || "\u{1F95A}"} ${esc(r.pet || (s && s.petName) || "No pet yet")}</h2>
+        <div class="who">${esc(r.form || "not hatched")} · handle ${esc(handle)}${u.friendCode ? " · friend code " + esc(u.friendCode) : ""}</div></div>
+      <button class="btn ghost" id="close">Close</button>
+    </div>
+    <div class="grid2">
+      <dl class="kv">
+        <dt>Level</dt><dd>${r.level || "—"}</dd>
+        <dt>XP from runs</dt><dd>${s ? s.runXp.toLocaleString() : "—"}</dd>
+        <dt>XP from you</dt><dd>${s ? (s.adminXp >= 0 ? "+" : "−") + Math.abs(s.adminXp).toLocaleString() : "—"}</dd>
+        <dt>Runs</dt><dd>${s ? s.runs : (r.runs || 0)}</dd>
+        <dt>Streak / best</dt><dd>${r.streak || 0} / ${r.best || 0}</dd>
+        <dt>Badges</dt><dd>${s ? s.badges : "—"}</dd>
+      </dl>
+      <dl class="kv">
+        <dt>Strava</dt><dd>${u.linked ? "connected" : "<span style='color:var(--danger)'>no token</span>"}</dd>
+        <dt>Connected</dt><dd>${when(u.connectedAt)}</dd>
+        <dt>Last sync</dt><dd>${when(u.lastSync)}</dd>
+        <dt>Last save</dt><dd>${when(r.lastSeen)}</dd>
+        <dt>Penalty now</dt><dd>${r.pen > 0.005 ? "−" + Math.round(r.pen * 100) + "% XP" : "none"}</dd>
+        <dt>Fights logged</dt><dd>${u.battles}</dd>
+      </dl>
+    </div>
+    <hr class="sep">
+    <h3>Level</h3>
+    <p class="small muted" style="margin:4px 0 0">Takes effect the next time they open the app. Setting a level puts the pet at the start of it; their runs keep counting on top.</p>
+    ${s ? `<div class="act">
+      <input type="number" id="lv" min="1" max="99" value="${r.level || 1}">
+      <button class="btn primary" id="set-lv">Set level</button>
+    </div>
+    <div class="act">
+      <input type="number" id="xp" step="50" placeholder="± XP">
+      <button class="btn" id="add-xp">Give / take XP</button>
+    </div>
+    <div class="act"><input type="text" id="note" maxlength="120" placeholder="Note for your records (optional)"></div>
+    ${hist ? `<div class="hist">${hist}</div>` : ""}` : `<p class="muted">No pet saved yet, so there is nothing to adjust.</p>`}
+    <hr class="sep">
+    <h3>Backup</h3>
+    <p class="small muted" style="margin:4px 0 0">A backup is their whole save. Restoring puts it back and the app takes it over its own on their next sync.</p>
+    <div class="act">
+      <button class="btn" id="dl">Download backup</button>
+      <label class="btn">Restore from file…<input type="file" id="up" accept="application/json,.json" hidden></label>
+    </div>
+    <hr class="sep">
+    <h3>Disconnect</h3>
+    <p class="small muted" style="margin:4px 0 0">Revokes Runmon's access at Strava and deletes their pet, their Rankings row and their friend code from the broker. Their phone keeps its own copy until they reset it. Download a backup first if you may want it back.</p>
+    <div class="act"><button class="btn danger" id="kill">Disconnect ${esc(r.pet || "this player")}</button></div>`;
+
+  $("#close").onclick = () => { open = null; d.hidden = true; draw(); };
+  const note = () => ($("#note") && $("#note").value.trim()) || "";
+  if (s){
+    $("#set-lv").onclick = () => adjust(handle, "level", Number($("#lv").value), note());
+    $("#add-xp").onclick = () => adjust(handle, "xp", Number($("#xp").value), note());
+  }
+  $("#dl").onclick = () => download("/admin/backup?handle=" + encodeURIComponent(handle), `runmon-${handle}.json`);
+  $("#up").onchange = e => restore(handle, e.target.files[0]);
+  $("#kill").onclick = () => disconnect(handle, r.pet);
+}
+
+async function adjust(handle, kind, value, note){
+  if (!Number.isFinite(value) || (kind === "xp" && !value)) return say("Enter a number first.", true);
+  try {
+    await call("/admin/adjust", { method:"POST", body: JSON.stringify({ handle, kind, value, note }) });
+    say(kind === "level" ? `Queued: level ${value}` : `Queued: ${value > 0 ? "+" : ""}${value} XP`);
+    show(handle, true);
+  } catch (e){ say(e.message, true); }
+}
+
+async function download(path, name){
+  try {
+    const r = await fetch(API + path, { headers: { Authorization: "Bearer " + token } });
+    if (!r.ok) throw new Error("The broker answered " + r.status);
+    const blob = await r.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    say("Backup downloaded");
+  } catch (e){ say(e.message, true); }
+}
+$("#backup-all").onclick = () => download("/admin/backup", `runmon-backup-${new Date().toISOString().slice(0,10)}.json`);
+
+/* A file from either button: a one-player backup or everyone's. Only this
+   player's save is taken from it, matched by handle, so restoring the wrong
+   file cannot put somebody else's pet on them. */
+async function restore(handle, file){
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    const hit = (data.users || []).find(u => u.handle === handle);
+    if (!hit || !hit.save) throw new Error("That file has no save for this player.");
+    if (!confirm(`Restore ${hit.pet || "this pet"} to level ${hit.level || "?"} from ${new Date(data.at).toLocaleString()}? Anything they have done since is replaced.`)) return;
+    await call("/admin/restore", { method:"POST", body: JSON.stringify({ handle, save: hit.save }) });
+    say("Restore queued — it lands when they next open the app");
+    show(handle, true);
+  } catch (e){ say(e.message, true); }
+}
+
+async function disconnect(handle, pet){
+  const name = pet || handle;
+  const typed = prompt(`This cannot be undone. Type ${name} to disconnect them.`);
+  if (typed == null) return;
+  if (typed.trim() !== name) return say("That did not match, nothing was changed.", true);
+  try {
+    await call("/admin/disconnect", { method:"POST", body: JSON.stringify({ handle }) });
+    say(`${name} was disconnected`);
+    open = null; $("#detail").hidden = true; load();
+  } catch (e){ say(e.message, true); }
+}
+
+$("#raid-respawn").onclick = async () => {
+  const hp = Math.round(Number($("#raid-hp").value));
+  if (!(hp >= 100)) return say("Give him at least 100 HP.", true);
+  if (!confirm(`Start a new round with the boss at ${hp.toLocaleString()} HP?`)) return;
+  try {
+    await call("/admin/raid", { method:"POST", body: JSON.stringify({ hp }) });
+    say("The boss is back"); load();
+  } catch (e){ say(e.message, true); }
+};
+
+if (token) enter();
+</script>
+</body>
+</html>
