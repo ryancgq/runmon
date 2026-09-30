@@ -1308,8 +1308,58 @@ nothing but a nag.
 ## Data
 
 Everything derives from the run log, so deleting a run correctly rolls back XP,
-level, evolution stage, streaks and badges. Routes are simplified to 320 points
-before saving to keep `localStorage` small.
+level, evolution stage, streaks and badges — everything from the last week,
+that is. Routes are simplified to 320 points before saving to keep
+`localStorage` small.
+
+### Strava's rules, and what they change
+
+Runmon follows Strava's [API Agreement](https://www.strava.com/legal/api) and
+[API Policy](https://www.strava.com/legal/api_policy) (both effective 1 June
+2026). What that means in the game, with the section each comes from:
+
+- **A run is kept for seven days (6.2), then folded into the pet.** The run's
+  details — time, distance, pace, device — are deleted from the phone and the
+  broker; its XP, one to the run count, and where the mood ladder and streak
+  stood are carried forward in `save.past`. Mood and streak replays start from
+  there rather than the first run, so a pet's level, mood, streak and every
+  later run's pay read exactly as if the run were still in the log (checked
+  against a whole random year in three time zones). The phone folds on every
+  load and sync; the broker folds its own copy nightly from the folds the app
+  worked out ahead (`save.folds`), so a phone left closed does not keep the
+  broker's copy past the week. Strava activity ids are let go after a week
+  too, behind a start-time floor.
+- **Nobody sees another player's Strava data (2.3).** A card — what Rankings,
+  friend codes and the dashboard show — carries the pet, form, level, XP,
+  streak and badge count, and no distance, run count or run time. Rankings
+  break a level tie on XP.
+- **No lifetime distance.** The three distance badges became 10,000, 50,000
+  and 100,000 XP (the same distance at the flat rate; ids kept, so badges won
+  stay won). The Lifetime tile is Total XP; the profile's distance is the last
+  seven days. Raid swings are banked as swings, not as kilometres.
+- **Disconnecting (2.5, 7.4).** Runs are deleted at once and Strava's grant is
+  revoked through `oauth/revoke`. The pet is kept for **28 days** in case the
+  player comes back — then the broker erases everything about them, including
+  from every nightly backup, and the phone's copy goes the first time the app
+  is opened after that. Strava's limit is 30 days; the erase runs nightly.
+- **A deleted pet** is archived for the same 28 days, restorable from the
+  dashboard, then erased.
+- **Webhooks (6.3).** Strava tells the broker when a player removes Runmon on
+  Strava's own site (treated as a disconnect) or deletes or hides a run
+  (removed within Strava's 48 hours, XP and all). Events are unsigned, so
+  nothing is taken on their word: the broker asks Strava first, only acts on
+  runs it holds, and ignores repeats. Subscribe once from the dashboard.
+- **Consent (2.1, 7.3).** The Connect step, and a one-time sheet for players
+  who connected earlier, say what is read, how, how long, how to stop and how
+  to delete. [`privacy.html`](privacy.html) is the privacy policy and terms.
+  Settings links it, and has Download my data (2.2), contact, and the
+  player's Strava app settings (2.4).
+- **Branding.** Strava's own Connect with Strava button and Powered by Strava
+  logo, unmodified, from its brand guidelines; "View on Strava" on every run;
+  the recording device named, which is how Garmin's attribution rule (4.4) is
+  met.
+- **No AI (5.3)** — nothing Strava sent, or derived from it, goes into any AI
+  system, including chat assistants used to work on this code.
 
 ### The admin dashboard
 
@@ -1321,9 +1371,10 @@ type it into the page, it is kept only for that tab, and the page will only
 talk to the broker whose address is written into it. Five wrong passwords from
 one address lock that address out for fifteen minutes. From it you can:
 
-- see every player, their pet, form and level, and when they last ran and
-  last opened the app — in two groups, **connected to Strava** and
-  **disconnected**;
+- see every player, their pet, form, level, XP and streak, and when they last
+  opened the app — in two groups, **connected to Strava** and
+  **disconnected** (with the day each disconnected one is erased). No
+  distances: the dashboard is somebody other than the player;
 - open a player to see where their XP comes from, whether their Strava link
   is still live, and their penalty;
 - **set their level, or give or take XP.** The phone's save is the real one
@@ -1333,38 +1384,24 @@ one address lock that address out for fifteen minutes. From it you can:
   adjustment sits on top of what their runs earned (`adminXp` in the save);
   no run is rewritten;
 - **back up** one player or everyone, and **restore** a player from a backup
-  file. A backup keeps each pet's name, species, level, XP and lifetime
-  distance — and none of their runs. A restore puts those back on the
-  player's next sync, on top of whatever runs their phone has now;
+  file. A backup keeps each pet's name, species, level and XP — no runs and no
+  distances. A restore puts those back on the player's next sync;
 - restore a player from any of the **automatic backups**: one taken every
   night at 03:17 UTC by a Cloudflare cron, kept for fourteen days, in the
-  same no-runs format as a manual one; download any of them, or take one now.
-  Every backup is split into connected players, disconnected players and
-  deleted pets;
-- **disconnect** a player, which revokes Strava's grant but **keeps their
-  pet** at its level (see below);
-- see **Deleted pets** — pets players deleted themselves, kept with the Strava
-  account they belonged to — and put one back on that account;
+  same format; download any of them, or take one now. Every backup is split
+  into connected players, disconnected players and deleted pets;
+- **disconnect** a player (kept 28 days, then erased — see above), or
+  **erase** one now, for a player who asks to be forgotten;
+- see **Deleted pets**, put one back on the account it came from, or erase it
+  now;
+- turn on the **Strava webhook**;
 - see the raid and respawn the boss.
 
-**Disconnecting keeps the pet.** From Settings or from the dashboard, a
-disconnect revokes Runmon's access at Strava and deletes what was read from
-it — the runs, the lifetime distance, other players' cached cards — within
-the 48 hours Strava's API Policy (6.3) allows, and the player's distance is
-taken out of the nightly backups too. What stays is the game's own: the pet's
-name, species, hatch time, XP (carried over as `adminXp`, so the level
-stands) and badges. The player drops out of other players' Rankings and
-cannot be attacked. Connecting again carries straight on, on the same phone
-or a new one; runs recorded while away do not count.
-
-**Deleting a pet is guarded, and archived.** "Delete my pet" in Settings takes
-three steps: a sheet saying exactly what is lost, with keeping the pet as the
-main button; typing the pet's name; and a ten-second countdown before the
-button wakes. The broker checks the name and the wait itself, so a tampered
-app cannot skip them. The pet is not destroyed: it moves to the athlete's own
-list of deleted pets, under their Strava id, game-only like a parked pet, and
-appears in the dashboard's Deleted pets, from which it can be restored to the
-same account (once the player has hatched a new egg for it to replace).
+**Deleting a pet is guarded.** "Delete my pet" in Settings takes three steps:
+a sheet saying exactly what is lost, with keeping the pet as the main button;
+typing the pet's name; and a ten-second countdown before the button wakes.
+The broker checks the name and the wait itself, so a tampered app cannot skip
+them.
 
 **One pet per account, and the app asks before replacing one.** If a phone
 with a freshly hatched pet connects to a Strava account whose saved pet has
@@ -1372,11 +1409,6 @@ real progress — a player whose phone lost its storage and started again
 before reconnecting — the sync stops before uploading anything and asks which
 pet to keep. Until they choose, nothing is uploaded. The same pet on two
 phones (same hatch time) is not asked about.
-
-Backups leave the runs out on purpose. Strava's API Policy (section 6.2)
-allows its data to be kept for seven days, and a backup is kept for longer; a
-level and an XP total are the game's own, and the one Strava figure left in
-it is a single lifetime distance.
 
 ### The private roster
 
@@ -1392,17 +1424,16 @@ curl -H "Authorization: Bearer $ADMIN_TOKEN" \
 ```
 
 ```
-Runmon · 2026-09-18 04:40 UTC
+Runmon · 2026-09-30 04:40 UTC
 
 Connected to Strava   4
+Disconnected          1
 Hatched               3
-Ran in the last week  3
-Lifetime              457.8 km over 78 runs
 
-HANDLE        PET  SPECIES  FORM         LV  KM     WEEK  RUNS  STREAK  LAST RUN  LINKED
-------------  ---  -------  -----------  --  -----  ----  ----  ------  --------  ------
-QHk6bPEhPaHM  Ash  ember    Blazewyrm    15  180.0  45.0  30    3       1 day     today
-aaaaaaaaaaaa  —    —        not hatched  —   0.0    0.0   0     0       —         today
+HANDLE        PET  SPECIES  FORM         LV  XP     STREAK  SEEN   LINKED
+------------  ---  -------  -----------  --  -----  ------  -----  ------
+QHk6bPEhPaHM  Ash  ember    Blazewyrm    15  41280  3       today  today
+aaaaaaaaaaaa  —    —        not hatched  —   0      0       today  today
 ```
 
 Add `?format=json` for anything that wants to parse it.

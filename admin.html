@@ -112,29 +112,36 @@ input:focus{border-color:var(--accent)}
     <div class="stats">
       <div class="stat"><div class="v" id="s-players">–</div><div class="k">Connected</div></div>
       <div class="stat"><div class="v" id="s-hatched">–</div><div class="k">Hatched</div></div>
-      <div class="stat"><div class="v" id="s-active">–</div><div class="k">Ran this week</div></div>
+      <div class="stat"><div class="v" id="s-active">–</div><div class="k">Disconnected</div></div>
       <div class="stat"><div class="v" id="s-raid">–</div><div class="k">Raid boss HP</div><div class="bar"><i id="s-raid-bar" style="width:0"></i></div></div>
     </div>
 
     <div class="tools">
       <input type="search" id="q" placeholder="Search pet, species or handle">
     </div>
-    <div class="head"><span></span><span>Pet</span><span>Level</span><span class="c-runs">Runs</span><span class="c-last">Last run</span><span class="c-seen">Last seen</span><span></span></div>
+    <div class="head"><span></span><span>Pet</span><span>Level</span><span class="c-runs">XP</span><span class="c-last">Streak</span><span class="c-seen">Last seen</span><span></span></div>
     <div class="list" id="list"></div>
 
     <section class="detail card" id="detail" hidden></section>
 
     <section class="card" style="margin-top:14px">
       <h2>Deleted pets</h2>
-      <p class="small muted" style="margin:6px 0 0">Pets players deleted themselves, kept with the Strava account they belonged to. Restoring one puts it back on that account the next time they open the app; they need a pet of their own first (any egg) for it to replace.</p>
+      <p class="small muted" style="margin:6px 0 0">Pets players deleted themselves, kept with the Strava account they belonged to for four weeks and then erased for good &mdash; Strava's rules give 30 days. Restoring one puts it back on that account the next time they open the app; they need a pet of their own first (any egg) for it to replace.</p>
       <div class="hist" id="del-list" style="max-height:none"></div>
     </section>
 
     <section class="card" style="margin-top:14px">
       <div class="top" style="margin:0"><h2>Automatic backups</h2>
         <button class="btn" id="auto-now">Take one now</button></div>
-      <p class="small muted" style="margin:6px 0 0">One every night, kept for 14 days: each pet's name, species, level, XP and total distance, and none of their runs. To put a player back, open them and pick a day under Backup.</p>
+      <p class="small muted" style="margin:6px 0 0">One every night, kept for 14 days: each pet's name, species, level and XP &mdash; no runs and no distances. A player who is erased is taken out of every one of them. To put a player back, open them and pick a day under Backup.</p>
       <div class="hist" id="auto-list" style="max-height:none"></div>
+    </section>
+
+    <section class="card" style="margin-top:14px">
+      <div class="top" style="margin:0"><h2>Strava webhook</h2>
+        <button class="btn" id="wh-make">Subscribe</button></div>
+      <p class="small muted" style="margin:6px 0 0">Strava tells Runmon when a player removes it on Strava's own site, or deletes or hides a run, so both are cleared within Strava's 48 hours. Press Subscribe once; it stays on.</p>
+      <p class="small" id="wh-line" style="margin:8px 0 0"></p>
     </section>
 
     <section class="card" style="margin-top:14px">
@@ -164,6 +171,7 @@ const ago = t => {
   return d <= 0 ? "today" : d === 1 ? "yesterday" : d < 30 ? d + " days ago" : new Date(t).toLocaleDateString();
 };
 const when = t => t ? new Date(t).toLocaleString() : "—";
+const day = t => t ? new Date(t).toLocaleDateString([], { day:"numeric", month:"short" }) : "—";
 let token = "";
 try { token = sessionStorage.getItem(KEY) || ""; } catch (e){}
 let rows = [], open = null;
@@ -206,7 +214,7 @@ async function load(){
   $("#stamp").textContent = "Updated " + new Date(data.at).toLocaleTimeString();
   $("#s-players").textContent = rows.filter(r => !r.disconnected).length;
   $("#s-hatched").textContent = rows.filter(r => (r.stage || 0) > 0).length;
-  $("#s-active").textContent = rows.filter(r => r.lastRun && Date.now() - r.lastRun < 7 * DAY).length;
+  $("#s-active").textContent = rows.filter(r => r.disconnected).length;
   const raid = data.raid || {};
   $("#s-raid").textContent = raid.max ? `${Math.max(0, raid.hp).toLocaleString()}` : "—";
   $("#s-raid-bar").style.width = raid.max ? Math.max(0, 100 * raid.hp / raid.max) + "%" : "0";
@@ -218,9 +226,11 @@ async function load(){
   draw();
   loadAuto();
   loadDeleted();
+  loadWebhook();
 }
 /* Two groups: players connected to Strava now, and players who disconnected
-   - whose pets are kept, at their level, for when they come back. */
+   - whose pets are kept, at their level, for four weeks in case they come
+   back, and then erased. */
 function draw(){
   const q = $("#q").value.trim().toLowerCase();
   const show = rows.filter(r => !q || [r.pet, r.species, r.form, r.handle].some(v => String(v || "").toLowerCase().includes(q)));
@@ -240,8 +250,8 @@ function rowHTML(r){
     <span style="min-width:0"><div class="name">${esc(r.pet || "No pet yet")}${pen}${lost}</div>
       <div class="sub">${esc(hatched ? r.form : (r.form || "not hatched"))} · ${esc(r.handle)}</div></span>
     <span class="lv">${r.level ? "Lv " + r.level : "—"}</span>
-    <span class="c-runs">${r.runs || 0}</span>
-    <span class="c-last sub">${ago(r.lastRun)}</span>
+    <span class="c-runs">${(r.xp || 0).toLocaleString()}</span>
+    <span class="c-last sub">${r.disconnected && r.eraseAt ? "erased " + day(r.eraseAt) : (r.streak || 0) + " days"}</span>
     <span class="c-seen sub">${ago(r.lastSeen)}</span>
     <span class="dot${r.reachable && !r.disconnected ? "" : " off"}"></span>
   </button>`;
@@ -264,7 +274,7 @@ async function show(handle, quiet){
   const s = u.save;
   const applied = s ? s.adminRev : 0;
   const hist = (u.adjust || []).slice().reverse().map(a => `<div>
-      <span>${a.kind === "level" ? "Set to level " + a.value : a.kind === "restore" ? "Restored to level " + a.value + (a.snap && a.snap.km != null ? ", " + a.snap.km + " km" : "") : (a.value >= 0 ? "+" : "−") + Math.abs(a.value).toLocaleString() + " XP"}${a.note ? " · " + esc(a.note) : ""}</span>
+      <span>${a.kind === "level" ? "Set to level " + a.value : a.kind === "restore" ? "Restored to level " + a.value : a.kind === "unrun" ? "A run removed" : (a.value >= 0 ? "+" : "−") + Math.abs(a.value).toLocaleString() + " XP"}${a.note ? " · " + esc(a.note) : ""}</span>
       <span class="muted">${a.rev <= applied ? "done" : "waiting for the app"} · ${ago(a.at)}</span></div>`).join("");
   d.innerHTML = `
     <div class="top" style="margin-bottom:10px">
@@ -275,10 +285,9 @@ async function show(handle, quiet){
     <div class="grid2">
       <dl class="kv">
         <dt>Level</dt><dd>${r.level || "—"}</dd>
-        <dt>XP from runs</dt><dd>${s ? s.runXp.toLocaleString() : "—"}</dd>
+        <dt>XP from runs</dt><dd>${s ? (s.runXp + (s.pastXp || 0)).toLocaleString() : "—"}</dd>
         <dt>XP from you</dt><dd>${s ? (s.adminXp >= 0 ? "+" : "−") + Math.abs(s.adminXp).toLocaleString() : "—"}</dd>
-        <dt>Distance</dt><dd>${s ? (s.runKm + s.adminKm).toFixed(1) + " km" : "—"}</dd>
-        <dt>Runs</dt><dd>${s ? s.runs : (r.runs || 0)}</dd>
+        <dt>Runs this week</dt><dd>${s ? s.runs : "—"}</dd>
         <dt>Streak / best</dt><dd>${r.streak || 0} / ${r.best || 0}</dd>
         <dt>Badges</dt><dd>${s ? s.badges : "—"}</dd>
       </dl>
@@ -307,7 +316,7 @@ async function show(handle, quiet){
     ${hist ? `<div class="hist">${hist}</div>` : ""}` : `<p class="muted">No pet saved yet, so there is nothing to adjust.</p>`}
     <hr class="sep">
     <h3>Backup</h3>
-    <p class="small muted" style="margin:4px 0 0">A backup keeps their pet, species, level, XP and total distance, and none of their runs. Restoring sets those back on their next sync; their runs stay as they are.</p>
+    <p class="small muted" style="margin:4px 0 0">A backup keeps their pet, species, level and XP &mdash; no runs, no distances. Restoring sets those back on their next sync; their runs stay as they are.</p>
     <div class="act">
       <button class="btn" id="dl">Download backup</button>
       <label class="btn">Restore from file…<input type="file" id="up" accept="application/json,.json" hidden></label>
@@ -319,10 +328,14 @@ async function show(handle, quiet){
       : `<span class="small muted">No automatic backups yet &mdash; the first is taken tonight.</span>`}
     </div>
     <hr class="sep">
-    ${u.parkedAt ? `<p class="small muted">Disconnected ${when(u.parkedAt)}. Their pet is kept at its level; their runs and distance were removed, as Strava requires. It carries on when they connect again.</p>` : `
+    ${u.parkedAt ? `<p class="small muted">Disconnected ${when(u.parkedAt)}. Their runs were deleted then. Their pet is kept at its level until <b>${when(u.eraseAt)}</b>, and carries on if they connect before that; after it, everything about them is erased.</p>` : `
     <h3>Disconnect</h3>
-    <p class="small muted" style="margin:4px 0 0">Revokes Runmon's access at Strava. Their pet is kept at its level and carries on if they connect again; their runs and distance are removed from the server, as Strava requires, and they drop out of other players' Rankings.</p>
-    <div class="act"><button class="btn danger" id="kill">Disconnect ${esc(r.pet || "this player")}</button></div>`}`;
+    <p class="small muted" style="margin:4px 0 0">Revokes Runmon's access at Strava and deletes their runs. Their pet is kept at its level for four weeks and carries on if they connect again inside that; after it, everything about them is erased. They drop out of other players' Rankings straight away.</p>
+    <div class="act"><button class="btn danger" id="kill">Disconnect ${esc(r.pet || "this player")}</button></div>`}
+    <hr class="sep">
+    <h3>Erase now</h3>
+    <p class="small muted" style="margin:4px 0 0">For a player who asks to be forgotten. Revokes Strava, and deletes their pet, runs, archived pets, Rankings row and every backup entry at once. This cannot be undone &mdash; email them to confirm it is done.</p>
+    <div class="act"><button class="btn danger" id="erase">Erase ${esc(r.pet || "this player")} now</button></div>`;
 
   $("#close").onclick = () => { open = null; d.hidden = true; draw(); };
   const note = () => ($("#note") && $("#note").value.trim()) || "";
@@ -334,6 +347,7 @@ async function show(handle, quiet){
   $("#up").onchange = e => restore(handle, e.target.files[0]);
   if ($("#auto-restore")) $("#auto-restore").onclick = () => restoreAuto(handle, $("#auto-day").value);
   if ($("#kill")) $("#kill").onclick = () => disconnect(handle, r.pet);
+  $("#erase").onclick = () => erase(handle, r.pet);
 }
 
 async function adjust(handle, kind, value, note){
@@ -379,10 +393,9 @@ async function restoreFrom(handle, data){
   if (data.runmon !== "backup" || !(data.v === 2 || data.v === 3)) throw new Error("That is not a Runmon backup from this dashboard.");
   const hit = [...(data.users || []), ...(data.connected || []), ...(data.disconnected || [])].find(u => u.handle === handle);
   if (!hit || !hit.species || !hit.level) throw new Error("That file has no backup of this player.");
-  const km = hit.km != null ? `, ${hit.km} km` : "";
-  if (!confirm(`Restore ${hit.pet || "this pet"} to level ${hit.level}${km} from ${new Date(data.at).toLocaleString()}? Their level and distance go back to what the backup says.`)) return;
+  if (!confirm(`Restore ${hit.pet || "this pet"} to level ${hit.level} from ${new Date(data.at).toLocaleString()}? Their level goes back to what the backup says.`)) return;
   await call("/admin/restore", { method:"POST", body: JSON.stringify({ handle,
-    snap: { pet: hit.pet, species: hit.species, level: hit.level, xp: hit.xp, km: hit.km } }) });
+    snap: { pet: hit.pet, species: hit.species, level: hit.level, xp: hit.xp } }) });
   say("Restore queued — it lands when they next open the app");
   show(handle, true);
 }
@@ -396,11 +409,20 @@ async function loadDeleted(){
     const owner = now ? (now.pet ? `now playing ${esc(now.pet)}` : "no pet yet") : "not on the roster";
     return `<div style="align-items:center">
       <span>${EMOJI[p.species] || "\u{1F95A}"} <b>${esc(p.pet || "?")}</b> \u00b7 Lv ${p.level || "?"} ${esc(p.form || "")}
-        <br><span class="muted">deleted ${ago(d.at)} by the player \u00b7 ${esc(d.handle)} (${owner})${d.restoredAt ? ` \u00b7 restored ${ago(d.restoredAt)}` : ""}</span></span>
-      <button class="btn ghost" style="padding:3px 10px" data-undel="${esc(d.id)}">Restore</button></div>`; }).join("")
+        <br><span class="muted">deleted ${ago(d.at)} by the player \u00b7 erased ${day(d.eraseAt)} \u00b7 ${esc(d.handle)} (${owner})${d.restoredAt ? ` \u00b7 restored ${ago(d.restoredAt)}` : ""}</span></span>
+      <span style="display:flex;gap:6px"><button class="btn ghost" style="padding:3px 10px" data-undel="${esc(d.id)}">Restore</button>
+      <button class="btn ghost" style="padding:3px 10px" data-delerase="${esc(d.id)}">Erase now</button></span></div>`; }).join("")
     : `<span class="muted">No pets have been deleted.</span>`;
 }
 $("#del-list").onclick = async e => {
+  const x = e.target.closest("[data-delerase]");
+  if (x){
+    const d = deleted.find(v => v.id === x.dataset.delerase); if (!d) return;
+    if (!confirm(`Erase ${(d.pet || {}).pet || "this pet"} for good? It cannot be restored after this.`)) return;
+    try { await call("/admin/deleted/erase", { method:"POST", body: JSON.stringify({ id: d.id }) }); say("Erased"); loadDeleted(); }
+    catch (err){ say(err.message, true); }
+    return;
+  }
   const b = e.target.closest("[data-undel]"); if (!b) return;
   const d = deleted.find(x => x.id === b.dataset.undel); if (!d) return;
   const p = d.pet || {}, now = rows.find(r => r.handle === d.handle);
@@ -429,7 +451,7 @@ $("#auto-now").onclick = async () => {
 
 async function disconnect(handle, pet){
   const name = pet || handle;
-  const typed = prompt(`They will need to connect Strava again to keep playing. Type ${name} to disconnect them.`);
+  const typed = prompt(`They will need to connect Strava again within four weeks to keep their pet. Type ${name} to disconnect them.`);
   if (typed == null) return;
   if (typed.trim() !== name) return say("That did not match, nothing was changed.", true);
   try {
@@ -438,6 +460,36 @@ async function disconnect(handle, pet){
     open = null; $("#detail").hidden = true; load();
   } catch (e){ say(e.message, true); }
 }
+
+/* Everything about one player, now - see purgeAthlete() in the broker. */
+async function erase(handle, pet){
+  const name = pet || handle;
+  const typed = prompt(`This deletes everything about ${name} and cannot be undone. Type ERASE to go ahead.`);
+  if (typed == null) return;
+  if (typed.trim() !== "ERASE") return say("That did not match, nothing was changed.", true);
+  try {
+    await call("/admin/erase", { method:"POST", body: JSON.stringify({ handle }) });
+    say(`${name} was erased`);
+    open = null; $("#detail").hidden = true; load();
+  } catch (e){ say(e.message, true); }
+}
+
+/* --- the webhook ------------------------------------------------------------ */
+async function loadWebhook(){
+  const line = $("#wh-line");
+  try {
+    const w = await call("/admin/webhook");
+    const mine = (w.strava || []).find(x => x.callback_url === w.callback);
+    line.innerHTML = mine ? `<span style="color:var(--good)">On</span> &middot; subscription ${esc(mine.id)}`
+      : w.strava ? `<span style="color:var(--danger)">Off</span> &middot; press Subscribe`
+      : `Strava did not answer the check just now.`;
+    $("#wh-make").hidden = !!mine;
+  } catch (e){ line.textContent = e.message; }
+}
+$("#wh-make").onclick = async () => {
+  try { const r = await call("/admin/webhook", { method:"POST" }); say(r.adopted ? "Already subscribed - remembered it" : "Subscribed"); loadWebhook(); }
+  catch (e){ say(e.message, true); }
+};
 
 $("#raid-respawn").onclick = async () => {
   const hp = Math.round(Number($("#raid-hp").value));

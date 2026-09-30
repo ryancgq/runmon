@@ -618,6 +618,24 @@ body::before{
 .sum-hero .dist{font-family:"Fredoka One","Fredoka",sans-serif;font-size:60px;line-height:1;margin-top:6px;letter-spacing:-1px}
 .sum-hero .dist small{font-size:19px;color:var(--muted);margin-left:4px}
 .sum-hero .when{font-size:12px;color:var(--muted);font-weight:700;margin-top:8px}
+/* Where a run came from. "View on Strava" in bold Strava orange, which is one
+   of the treatments its brand guidelines allow for that link. */
+.sum-hero .src{font-size:12px;font-weight:700;margin-top:6px;color:var(--muted);line-height:1.6}
+.sum-hero .src .dev{margin-right:10px;color:#c9d0de}
+.strava-link{color:#FC5200;font-weight:800;text-decoration:none}
+.sum-hero .src .keep{font-size:10.5px;opacity:.8;margin-top:2px}
+.fold-note{font-size:11px;font-weight:700;text-align:center;line-height:1.6;margin:14px 8px 0}
+/* What Runmon reads - the consent list, on onboarding and in sheets. */
+.consent{font-size:12px;font-weight:600;line-height:1.55;color:var(--muted);text-align:left}
+.consent ul{margin:10px 0 0;padding-left:18px}
+.consent li{margin:0 0 7px}
+.consent b{color:var(--text)}
+.consent a{color:inherit}
+.consent .fine{margin:4px 0 0;font-size:11.5px;font-weight:800}
+/* Strava's own Connect button, drawn as it ships: no frame, no restyle. */
+.strava-btn{display:block;margin:0 auto;padding:0;border:0;background:none;cursor:pointer;line-height:0}
+.strava-btn img{height:48px;width:auto}
+.pwrd-strava{height:14px;width:auto;opacity:.85;margin-bottom:4px}
 .route-card{padding:0;overflow:hidden;position:relative}
 .route-card canvas{display:block;width:100%;height:172px}
 .route-card .empty{height:172px;display:grid;place-items:center;color:var(--muted);font-size:12px;font-weight:700}
@@ -914,6 +932,7 @@ body::before{
 .run-item .km small{font-size:11px;color:var(--muted);font-weight:800;font-family:"Nunito"}
 .run-item .dt{font-size:11px;color:var(--muted);font-weight:800}
 .run-item .d2{font-size:11.5px;color:#8f98ad;font-weight:700;margin-top:4px;display:flex;gap:11px;flex-wrap:wrap}
+.run-item .d3{font-size:10.5px;color:#8f98ad;font-weight:700;margin-top:3px}
 .run-item .xp{
   flex:0 0 auto;text-align:right;font-family:"Fredoka One","Fredoka",sans-serif;
   font-size:15px;color:var(--accent);
@@ -1383,7 +1402,7 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
       <div class="stat-grid" style="margin-top:11px">
         <div class="stat"><div class="v" id="home-streak">0</div><div class="k">Day streak</div></div>
         <div class="stat"><div class="v" id="home-weekdist">0<small>km</small></div><div class="k">This week</div></div>
-        <div class="stat"><div class="v" id="home-total">0<small>km</small></div><div class="k">Lifetime</div></div>
+        <div class="stat"><div class="v" id="home-total">0</div><div class="k">Total XP</div></div>
       </div>
 
       <div class="section-title">Recent runs</div>
@@ -1460,6 +1479,7 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
         <div class="kicker" id="sum-kicker">Run complete</div>
         <div class="dist"><span id="sum-dist">0.00</span><small id="sum-dist-u">km</small></div>
         <div class="when" id="sum-when"></div>
+        <div class="src" id="sum-src"></div>
       </div>
 
       <div class="card route-card" style="margin-top:16px">
@@ -1499,9 +1519,9 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
       </div>
 
       <div class="stat-grid">
-        <div class="stat"><div class="v" id="ev-total">0<small>km</small></div><div class="k">Lifetime</div></div>
+        <div class="stat"><div class="v" id="ev-total">0<small>km</small></div><div class="k">Last 7 days</div></div>
         <div class="stat"><div class="v" id="ev-runs">0</div><div class="k">Runs</div></div>
-        <div class="stat"><div class="v" id="ev-time">0<small>h</small></div><div class="k">Moving</div></div>
+        <div class="stat"><div class="v" id="ev-time">0<small>h</small></div><div class="k">Moving, 7 days</div></div>
       </div>
       <div class="stat-grid" style="margin-top:9px">
         <div class="stat"><div class="v" id="ev-streak">0</div><div class="k">Streak</div></div>
@@ -1653,13 +1673,24 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
       </div>
 
 
-      <div class="section-title">Data</div>
+      <div class="section-title">Data &amp; privacy</div>
+      <a class="row tap" id="row-privacy" href="privacy.html" target="_blank" rel="noopener" style="text-decoration:none;color:inherit">
+        <div class="t"><div class="n">Privacy policy &amp; terms</div><div class="h">What Runmon keeps, for how long, and who sees it</div></div>
+      </a>
+      <div class="row">
+        <div class="t"><div class="n">Download my data</div><div class="h">Everything this phone holds about your pet and your runs, as a file</div></div>
+        <button class="btn ghost" style="width:auto;padding:9px 15px;font-size:13px" id="set-export">Download</button>
+      </div>
+      <a class="row tap" href="mailto:ryancgq@gmail.com?subject=Runmon" style="text-decoration:none;color:inherit">
+        <div class="t"><div class="n">Help &amp; contact</div><div class="h">ryancgq@gmail.com &mdash; questions, problems, or to have everything about you erased</div></div>
+      </a>
       <button class="btn danger" id="btn-reset" style="margin-top:6px">
         <svg viewBox="0 0 24 24"><path d="M3 2v6h6"/><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1L3 8"/></svg>
         New game — reset everything
       </button>
 
       <p class="muted center" style="font-size:11px;font-weight:700;line-height:1.7;margin-top:22px">
+        <img class="pwrd-strava" id="pwrd-strava" src="art/strava/api_logo_pwrdBy_strava_horiz_white.svg" alt="Powered by Strava" hidden><br>
         <span id="storage-where"></span><br>
         <span id="storage-note" class="mono"></span><br>
         <span id="build-stamp" class="mono"></span>
@@ -1707,7 +1738,7 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
       <div class="ob-foot">
         <button class="btn primary" id="ob-go">Choose an egg</button>
         <p class="muted center" id="ob-privacy" style="font-size:11px;font-weight:700;margin-top:14px;line-height:1.6">
-          Needs location permission while a run is in progress.<br>Nothing ever leaves your device.
+          Needs location permission while a run is in progress.<br>Your pet is saved on this device.
         </p>
       </div>
     </div>
@@ -1726,12 +1757,10 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
         <div class="pet-halo"></div>
         <div class="pet-holder egg-crack" id="ob-strava-art"></div>
       </div>
-      <p class="muted" style="font-size:12px;font-weight:700;line-height:1.6;margin:0">
-        Runmon only ever reads your activities, never posts. Runs from before you
-        connect do not count — your pet starts from the next one.
-      </p>
+      <div class="consent" id="ob-consent"></div>
       <div class="ob-foot">
-        <button class="btn primary" id="ob-strava-go">Connect Strava</button>
+        <button class="strava-btn" id="ob-strava-go"><img src="art/strava/btn_strava_connect_with_orange.svg"
+          alt="Connect with Strava" width="237" height="48"></button>
         <button class="btn ghost" id="ob-strava-skip" style="margin-top:9px">Not now</button>
       </div>
     </div>
@@ -2951,16 +2980,21 @@ const STREAK_MULT = 1.2;
 const STREAK_GAP  = 2;    // days you may leave between qualifying runs
 
 const BADGES = [
-  { id:"first",     ico:"👟", name:"First Steps",  test:s=>s.runs.length>=1 },
-  { id:"run10",     ico:"🔟", name:"Ten Runs",     test:s=>s.runs.length>=10 },
-  { id:"run50",     ico:"🏅", name:"Fifty Runs",   test:s=>s.runs.length>=50 },
+  { id:"first",     ico:"👟", name:"First Steps",  test:s=>s.runCount>=1 },
+  { id:"run10",     ico:"🔟", name:"Ten Runs",     test:s=>s.runCount>=10 },
+  { id:"run50",     ico:"🏅", name:"Fifty Runs",   test:s=>s.runCount>=50 },
   { id:"d5k",       ico:"🥉", name:"5K Club",      test:s=>s.runs.some(r=>r.km>=5) },
   { id:"d10k",      ico:"🥈", name:"10K Club",     test:s=>s.runs.some(r=>r.km>=10) },
   { id:"half",      ico:"🥇", name:"Half Mara",    test:s=>s.runs.some(r=>r.km>=21.0975) },
   { id:"full",      ico:"👑", name:"Marathon",     test:s=>s.runs.some(r=>r.km>=42.195) },
-  { id:"km100",     ico:"💯", name:"100 km",       test:s=>s.totalKm>=100 },
-  { id:"km500",     ico:"🌍", name:"500 km",       test:s=>s.totalKm>=500 },
-  { id:"km1000",    ico:"🚀", name:"1000 km",      test:s=>s.totalKm>=1000 },
+  /* These three were lifetime distance - 100, 500 and 1,000 km. Nothing keeps
+     a lifetime distance any more (Strava's data may be kept a week, API
+     Policy 6.2), so they are XP at the flat 100 a kilometre, which is the
+     same distance for anybody running without bonuses, and the ids stay so
+     a badge already won stays won. */
+  { id:"km100",     ico:"💯", name:"10,000 XP",    test:s=>s.totalXp>=10000 },
+  { id:"km500",     ico:"🌍", name:"50,000 XP",    test:s=>s.totalXp>=50000 },
+  { id:"km1000",    ico:"🚀", name:"100,000 XP",   test:s=>s.totalXp>=100000 },
   { id:"streak3",   ico:"🔥", name:"3 Day Streak", test:s=>s.bestStreak>=3 },
   { id:"streak7",   ico:"⚡", name:"7 Day Streak", test:s=>s.bestStreak>=7 },
   { id:"streak30",  ico:"🏆", name:"30 Day Run",   test:s=>s.bestStreak>=30 },
@@ -3636,7 +3670,9 @@ function nf(n, dp=0){ return n.toLocaleString(undefined,{minimumFractionDigits:d
 "use strict";
 /* ---------------------------------------------------------------------------
    3. STATE  —  everything derives from `save.runs`, so deleting a run rolls
-   XP, level, streaks and badges back correctly.
+   XP, level, streaks and badges back correctly - everything, that is, from
+   the last week. Older runs are folded into `save.past` (see foldOldRuns()),
+   which carries on what they added up to without keeping them.
    ------------------------------------------------------------------------- */
 const DEFAULT_SAVE = {
   v: 1,
@@ -3647,6 +3683,14 @@ const DEFAULT_SAVE = {
   // XP and distance set by the admin dashboard, on top of what the runs come
   // to, and the last queued change already applied - see applyAdmin().
   adminXp: 0, adminKm: 0, adminRev: 0,
+  /* What the runs folded away added up to, and what the mood and streak had
+     reached on the day they stopped: { v, through, xp, runs, mood:{rank,
+     idle}, streak:{best, count, first, last} }. null until a run is a week
+     old. `folds` is the same worked out ahead for each day a run could be
+     folded from, which the broker uses to fold its own copy when this phone
+     has not been back - see computeFolds(). */
+  past: null,
+  folds: [],
   badges: {},           // id -> timestamp first earned
   seenStage: 0,         // highest evolution stage already celebrated
   settings: { units:"km", weightKg:70, simulate:DEMO, simSpeed:DEMO ? 10 : 1, wakeLock:true,
@@ -3721,6 +3765,7 @@ function loadSave(){
     delete save.settings.stravaVirtual;
     save.runs = Array.isArray(parsed.runs) ? parsed.runs : [];
     save.badges = parsed.badges || {};
+    save.past = validPast(parsed.past);
     return !!save.species;
   } catch(e){
     console.warn("Save file was corrupt, starting fresh.", e);
@@ -3755,14 +3800,18 @@ function persist(){
 let heldRuns = null;
 
 function recompute(){
-  const all = save.runs.slice().sort((a,b)=>a.t-b.t);
+  const all = activeRuns().sort((a,b)=>a.t-b.t);
   const runs = heldRuns ? all.filter(r => !heldRuns.has(r.id)) : all;
   let totalKm = 0, totalXp = 0, totalSec = 0;
   for (const r of runs){ totalKm += r.km; totalXp += r.xp; totalSec += r.sec; }
+  const past = save.past;
   // an admin adjustment sits on top of the runs rather than in them, so the
-  // run log still says what each run earned
-  totalXp = Math.max(0, totalXp + (Number(save.adminXp) || 0));
-  totalKm = Math.max(0, totalKm + (Number(save.adminKm) || 0));
+  // run log still says what each run earned - and so does what the folded
+  // runs came to
+  totalXp = Math.max(0, totalXp + (Number(save.adminXp) || 0) + (past ? past.xp : 0));
+  // The last week's distance only: nothing older is kept to add up. An old
+  // restore's adminKm is left out - it was a lifetime figure, and would read
+  // as a week's running.
 
   const days = [...new Set(runs.map(r=>dayKey(r.t)))].sort();
   const sk = streakAt(runs, Date.now());
@@ -3771,9 +3820,10 @@ function recompute(){
   const stage = stageForLevel(lv.level);
   const lastRunTs = runs.length ? runs[runs.length-1].t : null;
   const gapDays = lastRunTs == null ? Infinity : daysBetweenKeys(dayKey(lastRunTs), dayKey(Date.now()));
+  const runCount = runs.length + (past ? past.runs : 0);
 
   derived = {
-    runs, totalKm, totalXp, totalSec,
+    runs, totalKm, totalXp, totalSec, runCount, pastRuns: past ? past.runs : 0,
     streak: sk.days, bestStreak: sk.best, streakLive: sk.live,
     streakLeft: sk.left, streakLast: sk.last, streakCount: sk.count,
     level: lv.level, into: lv.into, need: lv.need, pct: lv.pct,
@@ -3800,7 +3850,7 @@ function recompute(){
   };
 
   // badges — sticky once earned
-  const ctx = { runs, totalKm, bestStreak: sk.best, stage, raidSlain: raidSlain() };
+  const ctx = { runs, runCount, totalXp, bestStreak: sk.best, stage, raidSlain: raidSlain() };
   for (const b of BADGES){
     if (!save.badges[b.id] && b.test(ctx)) save.badges[b.id] = Date.now();
   }
@@ -3821,17 +3871,21 @@ function nextDayKey(k){
   d.setDate(d.getDate() + 1);
   return dayKey(d.getTime());
 }
-function moodRankAt(runs, nowTs){
-  if (!runs.length) return MOOD_START;
+function moodStateAt(runs, nowTs, past){
+  const seeded = !!(past && past.through);
+  if (!runs.length && !seeded) return { rank: MOOD_START, idle: 0 };
   const best = new Map();
   for (const r of runs){
     const k = dayKey(r.t);
     best.set(k, Math.max(best.get(k) || 0, r.km));
   }
-  let cursor = dayKey(runs[0].t);
+  // From where the folded runs left the pet, if any have been; otherwise
+  // from the first run. Every run still held is on or after `through`.
+  let cursor = seeded ? past.through : dayKey(Math.min(...runs.map(r => r.t)));
+  let rank = seeded ? past.mood.rank : MOOD_START, idle = seeded ? past.mood.idle : 0;
   const end = dayKey(nowTs);
-  if (daysBetweenKeys(cursor, end) < 0) return MOOD_START;   // clock went backwards
-  let rank = MOOD_START, idle = 0;
+  if (daysBetweenKeys(cursor, end) < 0)       // clock went backwards
+    return seeded ? { rank, idle } : { rank: MOOD_START, idle: 0 };
   for (;;){
     const km = best.get(cursor);
     if (km != null){
@@ -3844,8 +3898,9 @@ function moodRankAt(runs, nowTs){
     if (cursor === end) break;
     cursor = nextDayKey(cursor);
   }
-  return rank;
+  return { rank, idle };
 }
+function moodRankAt(runs, nowTs){ return moodStateAt(runs, nowTs, save.past).rank; }
 /* The rung as of `ts`, counting the day `ts` falls in only once there is a
    qualifying run in it. A day in progress cannot be held against the pet: it
    has not finished, and the run that would save it may be an hour away.
@@ -3868,7 +3923,7 @@ function moodAt(runs, ts){
 }
 /** The mood a run recorded at `atTs` is paid at: the rung before it climbs. */
 function moodIfRunNow(atTs){
-  return moodAt(save.runs.filter(r => r.t < atTs), atTs);
+  return moodAt(activeRuns().filter(r => r.t < atTs), atTs);
 }
 
 /** Days on which a run cleared the bar, ascending. Short runs are not in here -
@@ -3883,13 +3938,25 @@ function qualifyingDays(runs){
 /* The chain of qualifying days ending at or before `key`, walking back while
    every link is no wider than STREAK_GAP. `count` is how many days are in it,
    and that is what decides whether there is a streak at all: one run is a run,
-   and it takes a second one on a different day to make it a habit. */
-function chainEndingAt(days, key){
+   and it takes a second one on a different day to make it a habit.
+
+   `seed` is the chain the folded runs left open, as { count, first, last }:
+   a chain that walks back to the first day still held carries on into it if
+   that day is close enough to `last`, and with nothing held yet the seed is
+   the chain, while it is still in reach. */
+function chainEndingAt(days, key, seed){
   let i = days.length - 1;
   while (i >= 0 && days[i] > key) i--;
-  if (i < 0 || daysBetweenKeys(days[i], key) > STREAK_GAP) return { count:0, span:0, last:null };
+  if (i < 0){
+    if (seed && seed.last && seed.last <= key && daysBetweenKeys(seed.last, key) <= STREAK_GAP)
+      return { count: seed.count, span: daysBetweenKeys(seed.first, seed.last) + 1, last: seed.last };
+    return { count:0, span:0, last:null };
+  }
+  if (daysBetweenKeys(days[i], key) > STREAK_GAP) return { count:0, span:0, last:null };
   let j = i;
   while (j > 0 && daysBetweenKeys(days[j-1], days[j]) <= STREAK_GAP) j--;
+  if (j === 0 && seed && seed.last && daysBetweenKeys(seed.last, days[0]) <= STREAK_GAP)
+    return { count: i + 1 + seed.count, span: daysBetweenKeys(seed.first, days[i]) + 1, last: days[i] };
   return { count: i - j + 1, span: daysBetweenKeys(days[j], days[i]) + 1, last: days[i] };
 }
 /* The streak as of `nowTs`. `days` is its length measured across the calendar -
@@ -3899,21 +3966,112 @@ function chainEndingAt(days, key){
    a streak. `left` is the slack remaining, 0 meaning it shuts tonight, and
    `count` lets the home strip tell "nothing yet" from "one in, one to go".
    `best` is the longest chain ever held, for the badges - also two days or it
-   did not happen. */
-function streakAt(runs, nowTs){
+   did not happen - and it starts from the best the folded runs reached.
+   `past` defaults to the save's own; foldPast() passes the one it is
+   folding from. */
+function streakAt(runs, nowTs, past){
+  if (past === undefined) past = save.past;
+  const seed = past && past.streak && past.streak.last ? past.streak : null;
   const days = qualifyingDays(runs);
-  let best = 0;
+  let best = (past && past.streak && past.streak.best) || 0;
   for (let i = 0; i < days.length; ){
     let j = i;
     while (j + 1 < days.length && daysBetweenKeys(days[j], days[j+1]) <= STREAK_GAP) j++;
-    if (j > i) best = Math.max(best, daysBetweenKeys(days[i], days[j]) + 1);
+    if (i === 0 && seed && daysBetweenKeys(seed.last, days[0]) <= STREAK_GAP)
+      best = Math.max(best, daysBetweenKeys(seed.first, days[j]) + 1);
+    else if (j > i) best = Math.max(best, daysBetweenKeys(days[i], days[j]) + 1);
     i = j + 1;
   }
   const key = dayKey(nowTs);
-  const c = chainEndingAt(days, key);
+  const c = chainEndingAt(days, key, seed);
   const live = c.count >= 2;
-  return { days: live ? c.span : 0, live, best, count: c.count, last: c.last,
+  return { days: live ? c.span : 0, live, best, count: c.count, last: c.last, span: c.span,
            left: c.last ? STREAK_GAP - daysBetweenKeys(c.last, key) : 0 };
+}
+
+/* --- the seven-day rule ---------------------------------------------------
+   Strava's API Policy lets what it hands us be kept for seven days (6.2), and
+   a run is Strava's: its time, distance, pace. So a run is kept, and can be
+   opened, for six full days after the one it was run on, and then folded -
+   deleted, with what it came to carried forward in `save.past`: its XP and
+   one to the run count, and where the mood ladder and the streak stood at the
+   end of the last day folded. The replays above start from there instead of
+   from the first run, so a pet's level, mood and streak read exactly as they
+   would have with every run still in the log. Badges were always sticky.
+
+   A run this phone recorded itself, in the sandbox, is not Strava's and is
+   not deleted - it is marked `folded` so it is not counted twice, and it can
+   still be opened.
+
+   Run on every load and every sync, so the copy on a phone lasts no longer
+   than its next opening. The broker's copy is folded by the broker, from the
+   folds this phone works out ahead (computeFolds) - its own nightly pass. */
+const RETAIN_DAYS = 6;
+const activeRuns = () => save.runs.filter(r => !r.folded);
+function dayStart(k){ return new Date(k + "T00:00:00").getTime(); }
+function daysBeforeKey(k, n){
+  const d = new Date(k + "T00:00:00");
+  d.setDate(d.getDate() - n);
+  return dayKey(d.getTime());
+}
+/** A `past` read from storage or the broker, or null if it is not one. */
+function validPast(p){
+  if (!p || typeof p !== "object" || !/^\d{4}-\d{2}-\d{2}$/.test(String(p.through))) return null;
+  const n = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.round(Number(v) || 0)));
+  const m = p.mood || {}, k = p.streak || {};
+  const key = v => /^\d{4}-\d{2}-\d{2}$/.test(String(v)) ? String(v) : null;
+  return { v: 1, through: String(p.through), xp: n(p.xp, 0, 1e9), runs: n(p.runs, 0, 1e7),
+    mood: { rank: n(m.rank, 0, MOOD_BY_RANK.length - 1), idle: n(m.idle, 0, 1e4) },
+    streak: { best: n(k.best, 0, 1e5), count: key(k.last) ? n(k.count, 1, 1e5) : 0,
+              first: key(k.last) ? key(k.first) || key(k.last) : null, last: key(k.last) } };
+}
+/* What `past` becomes once `runs` - every run held from before `cut` - are
+   folded into it: the mood and streak as they stood at the end of the day
+   before `cut`. The open chain is kept only while a run on `cut` or later
+   could still join it; after that its dates go too. */
+function foldPast(past, runs, cut){
+  const end = dayStart(cut) - 1;
+  const m = moodStateAt(runs, end, past);
+  const sk = streakAt(runs, end, past);
+  let chain = { count: 0, first: null, last: null };
+  if (sk.count > 0 && sk.last && daysBetweenKeys(sk.last, cut) <= STREAK_GAP)
+    chain = { count: sk.count, first: daysBeforeKey(sk.last, sk.span - 1), last: sk.last };
+  return {
+    v: 1, through: cut,
+    xp: Math.round((past ? past.xp : 0) + runs.reduce((t, r) => t + (Number(r.xp) || 0), 0)),
+    runs: (past ? past.runs : 0) + runs.length,
+    mood: { rank: m.rank, idle: m.idle },
+    streak: { best: sk.best, ...chain }
+  };
+}
+/** Fold everything run before six days ago. True when anything changed. */
+function foldOldRuns(now){
+  if (heldRuns) return false;          // not in the middle of a catch-up walk
+  const cut = daysBeforeKey(dayKey(now || Date.now()), RETAIN_DAYS);
+  if (save.past && save.past.through >= cut) return false;
+  const old = activeRuns().filter(r => dayKey(r.t) < cut);
+  if (!old.length && !save.past) return false;
+  save.past = foldPast(save.past, old, cut);
+  save.runs = save.runs
+    .filter(r => r.folded || !(r.strava && dayKey(r.t) < cut))
+    .map(r => !r.folded && dayKey(r.t) < cut ? { ...r, folded: true } : r);
+  save.folds = computeFolds();
+  return true;
+}
+/* The folds the broker may need before this phone is back: one for each day
+   there are runs on, folding that day and everything before it, due the
+   moment this phone would have folded it itself. `from` and `at` are real
+   times, so the broker needs no idea of the time zone. */
+function computeFolds(){
+  const runs = activeRuns().sort((a, b) => a.t - b.t);
+  const days = [...new Set(runs.filter(r => r.strava).map(r => dayKey(r.t)))];
+  return days.map(d => {
+    const cut = nextDayKey(d);
+    const past = foldPast(save.past, runs.filter(r => dayKey(r.t) < cut), cut);
+    const at = new Date(cut + "T00:00:00");
+    at.setDate(at.getDate() + RETAIN_DAYS);
+    return { from: dayStart(cut), at: at.getTime(), past };
+  });
 }
 
 /* unit helpers ------------------------------------------------------------ */
@@ -4482,7 +4640,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-30 6fc564c";
+const BUILD_ID = "2026-09-30 f77366e";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -5166,7 +5324,7 @@ function renderHome(){
     : "Connect Strava in Settings to feed your pet";
   $("#greeting-sub").textContent = d.runs.length
     ? (d.gapDays === 0 ? "You already ran today — nice." : d.gapDays === 1 ? "You ran yesterday. Keep it rolling." : `${d.gapDays} days since your last run`)
-    : noRunsYet;
+    : d.pastRuns ? "A week or more since your last run" : noRunsYet;
 
   // through paintXp rather than beside it: this used to paint the row itself,
   // which meant the no-going-backwards rule lived in only one of the two
@@ -5191,7 +5349,8 @@ function renderHome(){
   const weekStart = startOfWeek();
   const weekKm = d.runs.filter(r => r.t >= weekStart).reduce((a, r) => a + r.km, 0);
   $("#home-weekdist").innerHTML = `${U.distStr(weekKm, 1)}<small>${U.label}</small>`;
-  $("#home-total").innerHTML = `${U.distStr(d.totalKm, d.totalKm >= 100 ? 0 : 1)}<small>${U.label}</small>`;
+  // XP rather than a lifetime distance, which nothing keeps any more
+  $("#home-total").textContent = d.totalXp >= 10000 ? nf(d.totalXp/1000, 1) + "k" : nf(d.totalXp);
 
   renderAttrs(shown.id,
     (previewPet && previewPet.level != null) ? previewPet.level : d.level);
@@ -5235,6 +5394,19 @@ function renderWeek(){
   }).join("");
   $("#home-week").innerHTML = html;
 }
+/* Where a run came from, under its date. What recorded it is named, and a
+   Garmin is named as Garmin asks - "Garmin" and the model, beside the data
+   it recorded - because Strava's API Policy passes Garmin's attribution rule
+   on to us (4.4). A run from Strava links back to it in the words Strava's
+   brand guidelines ask for, and says how long it is kept here. */
+function runSourceHTML(r){
+  if (!r || !r.strava) return "";
+  const dev = r.device ? `<span class="dev">${esc(r.device)}</span>` : "";
+  const left = Math.max(0, RETAIN_DAYS + 1 - daysBetweenKeys(dayKey(r.t), dayKey(Date.now())));
+  return `${dev}<a class="strava-link" href="https://www.strava.com/activities/${encodeURIComponent(r.strava)}"
+      target="_blank" rel="noopener">View on Strava</a>
+    <div class="keep">Kept here for ${left <= 1 ? "one more day" : left + " more days"}, then folded into your pet &mdash; its XP stays.</div>`;
+}
 function runItemHTML(r){
   const paceSec = U.paceSec(r.km, r.sec);
   return `<button class="run-item" data-run="${r.id}">
@@ -5243,6 +5415,7 @@ function runItemHTML(r){
       <div class="d1"><span class="km">${U.distStr(r.km, 2)}<small>${U.label}</small></span>
         <span class="dt">${relDate(r.t)}${r.sim ? " · sim" : ""}</span></div>
       <div class="d2"><span>⏱ ${fmtDur(r.sec)}</span><span>⚡ ${fmtPace(paceSec)} /${U.label}</span><span>🔥 ${r.kcal}</span></div>
+      ${r.device ? `<div class="d3">${esc(r.device)}</div>` : ""}
     </div>
     <div class="xp">+${nf(r.xp)}<small>XP</small></div>
   </button>`;
@@ -5265,7 +5438,9 @@ function renderRecent(){
   renderSeeAll();
   if (!list.length){
     el.innerHTML = `<div class="card center" style="color:var(--muted);font-size:13px;font-weight:700;line-height:1.6">
-      No runs logged yet.<br>Tap the runner button to start one.</div>`;
+      ${derived.pastRuns ? "No runs in the last week.<br>Older runs are folded into your pet after seven days."
+        : NATIVE_RUN ? "No runs logged yet.<br>Tap the runner button to start one."
+        : "No runs yet.<br>Record one on Strava and it lands here."}</div>`;
     return;
   }
   el.innerHTML = list.map(runItemHTML).join("");
@@ -5283,12 +5458,18 @@ function renderSeeAll(){
 
 /* --- history ------------------------------------------------------------- */
 function renderHistory(){
-  const runs = derived.runs.slice().reverse();
+  // a run this phone recorded itself is kept, folded, and still listed
+  const runs = derived.runs.concat(save.runs.filter(r => r.folded)).sort((a, b) => b.t - a.t);
   $("#hist-sub").textContent = runs.length
     ? `${runs.length} run${runs.length === 1 ? "" : "s"} · ${fmtDur(derived.totalSec)} moving`
     : "No runs yet";
   $("#hist-total").textContent = `${U.distStr(derived.totalKm, 1)} ${U.label}`;
   const el = $("#hist-list");
+  // Strava's runs are kept a week (its API Policy 6.2); said here, where the
+  // list would otherwise look as if it had lost them
+  const foldNote = STRAVA_ON ? `<p class="muted fold-note">Runs from Strava are kept here for seven days, then folded
+    into your pet: their XP, streak and badges stay, the details go.${derived.pastRuns
+    ? ` ${nf(derived.pastRuns)} earlier run${derived.pastRuns === 1 ? " is" : "s are"} part of ${esc(save.petName || "your pet")} now.` : ""}</p>` : "";
   if (!runs.length){
     el.innerHTML = NATIVE_RUN
       ? `<div class="empty-state"><div class="ico">🏃</div>
@@ -5298,6 +5479,7 @@ function renderHistory(){
       <h3>No runs yet</h3><p>Runs come from Strava — record one there and it lands
          here, and feeds your pet, the next time you open Runmon.</p>
       ${stravaLinked() ? "" : `<button class="btn primary" data-nav="settings" style="max-width:240px;margin:0 auto">Connect Strava</button>`}</div>`;
+    el.innerHTML += foldNote;
     return;
   }
   let html = "", lastMonth = "";
@@ -5311,7 +5493,7 @@ function renderHistory(){
     }
     html += runItemHTML(r);
   }
-  el.innerHTML = html;
+  el.innerHTML = html + foldNote;
   paintThumbs(el);
 }
 
@@ -5320,8 +5502,10 @@ let evoTab = null;
 function renderEvolve(){
   const d = derived;
   $("#evo-sub").textContent = `${save.petName || d.species.name} · ${d.species.stages[d.stage].name}`;
+  // the last week's distance and time - see foldOldRuns() - and every run
+  // ever counted, which the folded ones still add to
   $("#ev-total").innerHTML = `${U.distStr(d.totalKm, d.totalKm >= 100 ? 0 : 1)}<small>${U.label}</small>`;
-  $("#ev-runs").textContent = d.runs.length;
+  $("#ev-runs").textContent = d.runCount;
   $("#ev-time").innerHTML = d.totalSec >= 3600
     ? `${nf(d.totalSec/3600, 1)}<small>h</small>` : `${Math.round(d.totalSec/60)}<small>m</small>`;
   $("#ev-streak").innerHTML = d.streak + (d.streak >= 2 ? ' <small>🔥</small>' : "");
@@ -6138,7 +6322,7 @@ function makeRun(at, km, sec, extra){
   // The run is folded in before asking, because a qualifying run can be the
   // second day that starts the streak it then collects on. It cannot be the
   // first: one run is a run, and a streak wants two days.
-  const withThis = save.runs.concat([{ t: at, km }]);
+  const withThis = activeRuns().concat([{ t: at, km }]);
   const streakOn = streakAt(withThis, at).live;
   const mood = moodIfRunNow(at);
   // What other players have taken off this run. It is read once, here, and
@@ -6215,10 +6399,11 @@ function finishRun(){
 
 /** XP/level context around one run, computed from the chronological log. */
 function levelContextForRun(run){
-  const ordered = save.runs.slice().sort((a,b) => a.t - b.t);
+  const ordered = activeRuns().sort((a,b) => a.t - b.t);
   // an admin adjustment counts as though it came before every run: it is
-  // the base the latest run's bar walks up from, which is the one that shows
-  let before = Number(save.adminXp) || 0;
+  // the base the latest run's bar walks up from, which is the one that shows.
+  // So do the runs already folded away, which all came before.
+  let before = (Number(save.adminXp) || 0) + (save.past ? save.past.xp : 0);
   for (const r of ordered){ if (r.id === run.id) break; before += r.xp; }
   before = Math.max(0, before);
   const after = before + run.xp;
@@ -6249,6 +6434,7 @@ function showSummary(run, opts){
   $("#sum-pace-k").textContent = `Avg /${U.label}`;
   $("#sum-kcal").textContent = run.kcal;
   $("#sum-delete").classList.toggle("hide", !review);
+  $("#sum-src").innerHTML = runSourceHTML(run);
 
   const cv = $("#sum-canvas");
   const card = cv.parentElement;
@@ -6646,12 +6832,10 @@ function safeCard(c){
     stage: n(c.stage, 0, 4),
     form: String(c.form || SPECIES[species].stages[n(c.stage, 0, 4)].name).slice(0, 24),
     level: n(c.level, 1, 999),
-    km: n(c.km, 0, 1e7),
-    weekKm: n(c.weekKm, 0, 1e7),
-    runs: n(c.runs, 0, 1e6),
+    xp: n(c.xp, 0, 1e9),
     streak: n(c.streak, 0, 1e5),
     best: n(c.best, 0, 1e5),
-    lastRun: c.lastRun && Number(c.lastRun) > 0 ? Number(c.lastRun) : null
+    badges: n(c.badges, 0, 1e3)
   };
 }
 
@@ -6674,7 +6858,7 @@ function rankingRows(){
     rows.push({ id: null, me: true, card: safeCard(publicCard()),
                 pen: markPenalty(save.marks, Date.now()),
                 hits: markCount(save.marks, Date.now()) });
-  rows.sort((a, b) => (b.card.level - a.card.level) || (b.card.km - a.card.km));
+  rows.sort((a, b) => (b.card.level - a.card.level) || (b.card.xp - a.card.xp));
   return rows;
 }
 
@@ -6699,7 +6883,6 @@ function rankBadge(rank){
 function friendRowHTML(r, rank){
   const c = r.card;
   if (!c) return "";                     // the broker only sends hatched pets
-  const ago  = c.lastRun ? relDay(c.lastRun) : "no runs yet";
   // Half a percent rounds to nothing, and "-0% XP" reads as a bug rather than
   // as a mark too small to matter. A broker that predates the count sends a
   // penalty and no number, so the attacks go unnumbered rather than as zero.
@@ -6722,7 +6905,7 @@ function friendRowHTML(r, rank){
       <div class="who">
         <div class="n">${esc(c.pet)} <span class="chip">LV ${c.level}</span>${tag}</div>
         <div class="h">${esc(c.form)} \u00b7 Stage ${c.stage + 1} of 5</div>
-        <div class="s">${U.distStr(c.km, c.km >= 100 ? 0 : 1)} ${U.label} \u00b7 ${c.runs} run${c.runs === 1 ? "" : "s"} \u00b7 ${ago}</div>
+        <div class="s">${nf(c.xp)} XP \u00b7 ${c.streak >= 2 ? c.streak + "-day streak" : "no streak"} \u00b7 ${c.badges} badge${c.badges === 1 ? "" : "s"}</div>
         ${pen}${hit}
       </div>
       ${r.me ? "" : `<span class="go"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>`}
@@ -6928,13 +7111,13 @@ function openFriend(id){
       </div>
       <div class="stat-grid">
         <div class="stat"><div class="v">${c.streak}</div><div class="k">Day streak</div></div>
-        <div class="stat"><div class="v">${U.distStr(c.weekKm != null ? c.weekKm : 0, 1)}<small>${U.label}</small></div><div class="k">This week</div></div>
-        <div class="stat"><div class="v">${U.distStr(c.km, c.km >= 100 ? 0 : 1)}<small>${U.label}</small></div><div class="k">Lifetime</div></div>
+        <div class="stat"><div class="v">${c.best}</div><div class="k">Best streak</div></div>
+        <div class="stat"><div class="v">${c.xp >= 10000 ? nf(c.xp / 1000, 1) + "k" : nf(c.xp)}</div><div class="k">Total XP</div></div>
       </div>
       <div class="stat-grid" style="margin-top:9px">
-        <div class="stat"><div class="v">${c.runs}</div><div class="k">Runs</div></div>
-        <div class="stat"><div class="v">${c.best}</div><div class="k">Best streak</div></div>
-        <div class="stat"><div class="v">${c.lastRun ? shortAgo(c.lastRun) : "\u2014"}</div><div class="k">Last run</div></div>
+        <div class="stat"><div class="v">${c.level}</div><div class="k">Level</div></div>
+        <div class="stat"><div class="v">${c.badges}</div><div class="k">Badges</div></div>
+        <div class="stat"><div class="v" style="font-size:15px">${esc(c.form)}</div><div class="k">Form</div></div>
       </div>
       ${lock.locked ? lockNote(c, lock) : attackNote(c)}`
       : `<p class="desc">No pet on this code yet.</p>`,
@@ -7017,9 +7200,17 @@ function renderStravaPanel(){
            <div class="h">Your runs come from Strava. Last checked: ${when}. Only runs recorded after you connected count.</div></div>
          <button class="btn ghost" style="width:auto;padding:9px 15px;font-size:13px" id="strava-sync"${stravaBusy ? " disabled" : ""}>${stravaBusy ? "Checking…" : "Check now"}</button>
        </div>${err}${why}
+       <div class="row tap" id="strava-what">
+         <div class="t"><div class="n">What Runmon reads</div>
+           <div class="h">What it takes from Strava, how long it keeps it, and who sees what</div></div>
+       </div>
+       <a class="row tap" href="https://www.strava.com/settings/apps" target="_blank" rel="noopener" style="text-decoration:none;color:inherit">
+         <div class="t"><div class="n">Your Strava account</div>
+           <div class="h">See or remove Runmon's access on Strava itself</div></div>
+       </a>
        <div class="row">
          <div class="t"><div class="n">Disconnect</div>
-           <div class="h">Stops Runmon reading your Strava. Your pet is kept, at its level, and carries on when you connect again.</div></div>
+           <div class="h">Stops Runmon reading your Strava. Your pet is kept for four weeks in case you come back, then erased.</div></div>
          <button class="btn danger" style="width:auto;padding:9px 15px;font-size:13px" id="strava-off">Disconnect</button>
        </div>${save.species ? `
        <div class="row">
@@ -7029,7 +7220,8 @@ function renderStravaPanel(){
        </div>` : ""}`
     : `<div class="row">
          <div class="t"><div class="n">Connect Strava</div>
-           <div class="h">Run with Strava as normal and your pet grows on its own. Runs from before you connect do not count — the pet starts from your next one.</div></div>
+           <div class="h">Run with Strava as normal and your pet grows on its own. Runs from before you connect do not count — the pet starts from your next one.${
+             save.parkedAt ? ` <b>Connect before ${fmtDay(save.parkedAt + GRACE_DAYS * 86400e3)} to keep ${esc(save.petName || "your pet")}.</b>` : ""}</div></div>
          <button class="btn primary" style="width:auto;padding:9px 15px;font-size:13px" id="strava-on">Connect</button>
        </div>${err}`;
 }
@@ -7054,8 +7246,11 @@ function renderSettings(){
   // This promised "no account, no server, no tracking" unconditionally, which
   // stopped being true the moment a pet could live on the broker.
   $("#storage-where").innerHTML = stravaLinked()
-    ? "Your pet lives on the server, keyed to your Strava athlete id, with a copy kept on this device. Disconnecting deletes the server copy."
-    : 'Runmon stores everything on this device in <span class="mono">localStorage</span>.<br>No account, no server, no tracking.';
+    ? "Your pet lives on Runmon's server, filed under your Strava athlete id, with a copy on this device. Runs are kept for seven days. Disconnect and it is all erased after four weeks."
+    : save.parkedAt
+      ? `Disconnected from Strava. Your pet is erased from Runmon's server and this device on ${fmtDay(save.parkedAt + GRACE_DAYS * 86400e3)} unless you connect again.`
+      : 'Runmon stores everything on this device in <span class="mono">localStorage</span>.';
+  $("#pwrd-strava").hidden = !STRAVA_ON;
   // Which build this device actually has. Without it, "the new thing is missing"
   // and "the page is cached" look identical, which has cost real debugging time.
   $("#build-stamp").textContent = "build " + BUILD_ID;
@@ -7080,8 +7275,12 @@ function showOnboarding(){
   // simply untrue, and a permission warning nobody will meet is the kind of
   // thing that stops somebody at the first screen.
   const priv = $("#ob-privacy");
+  // It used to end "Nothing ever leaves your device", which stopped being
+  // true when a pet could live on the broker and friends could see it.
   if (priv && !NATIVE_RUN)
-    priv.innerHTML = "Runs come from Strava.<br>Nothing ever leaves your device.";
+    priv.innerHTML = 'Runs come from Strava. <a href="privacy.html" target="_blank" rel="noopener">Privacy policy</a>';
+  const oc = $("#ob-consent");
+  if (oc) oc.innerHTML = stravaDisclosureHTML();
   paintPet($("#ob-hero"), hero, 0, "okay");
   renderSpeciesPicks();
   paintPet($("#ob-strava-art"), hero, 0, "okay");
@@ -7115,6 +7314,8 @@ function hatch(){
   save.species = obSpecies;
   save.petName = name;
   save.createdAt = Date.now();
+  // linked by now only through the onboarding step, which said what it reads
+  if (stravaLinked()) save.stravaConsentAt = Date.now();
   // A new pet meets him too. boot() only announces to a device that already
   // had a save, so without this a player who hatched would not hear about him
   // until their next launch.
@@ -8003,6 +8204,7 @@ function stravaLoadSession(){
       stravaLastError = v === "denied" ? "Strava sign-in was cancelled." : "Strava would not complete the sign-in.";
     } else {
       try { localStorage.setItem(SESSION_KEY, v); } catch(e){}
+      stravaJustLinked = true;           // through a screen that said what it reads
     }
   }
   try { stravaSession = localStorage.getItem(SESSION_KEY); } catch(e){ stravaSession = null; }
@@ -8020,7 +8222,7 @@ async function stravaCall(path, init){
     let why = "";
     try { why = ((await r.json()) || {}).error || ""; } catch (e){}
     // disconnected elsewhere - from another phone, or by the admin
-    if (r.status === 409 && why === "disconnected"){ stravaForget(); throw new Error("This phone is no longer connected to Strava."); }
+    if (r.status === 409 && why === "disconnected"){ markParked(); stravaForget(); throw new Error("This phone is no longer connected to Strava."); }
     throw new Error(why || "The Strava link is not answering (" + r.status + ").");
   }
   return r.json();
@@ -8028,6 +8230,96 @@ async function stravaCall(path, init){
 function stravaForget(){
   stravaSession = null;
   try { localStorage.removeItem(SESSION_KEY); } catch(e){}
+}
+
+/* --- consent, and the four weeks after a disconnect -----------------------
+   Strava's API Policy wants a player told, before anything is read, what is
+   collected and how, how to stop it, how to have it deleted, and that the
+   deletion happened (2.1). This is that, said once and shown in three places:
+   the onboarding step, the sheet Settings opens before connecting, and once
+   to every player who connected before it existed. */
+const GRACE_DAYS = 28;
+const fmtDay = ts => new Date(ts).toLocaleDateString([], { day:"numeric", month:"long", year:"numeric" });
+function stravaDisclosureHTML(){
+  return `<ul>
+    <li><b>What it reads.</b> Your runs and trail runs recorded after you connect: when each
+      started, how far, moving time, elevation gain, the type, whether it was typed in by hand,
+      and the device that recorded it. Your pet is filed under your Strava athlete id.</li>
+    <li><b>How.</b> Through Strava's API, with the read-only permission you grant on Strava's
+      own page, each time you open Runmon. It never posts or changes anything on Strava, and
+      it cannot see activities you keep to "Only You".</li>
+    <li><b>How long, and who sees it.</b> Each run's details for seven days, then only the XP
+      it earned. Other players see your pet's name, form, level, XP, streak and badges &mdash;
+      never your runs, distances or times. Nothing goes to advertisers or to any AI.</li>
+    <li><b>Stopping.</b> Disconnect in Settings, or remove Runmon on Strava. Your runs are
+      deleted at once; your pet is kept four weeks in case you come back, then erased.</li>
+    <li><b>Deleting.</b> Delete your pet in Settings, or email
+      <a href="mailto:ryancgq@gmail.com">ryancgq@gmail.com</a> to have everything about you
+      erased &mdash; you will be told when it is done.</li>
+  </ul>
+  <p class="fine"><a href="privacy.html" target="_blank" rel="noopener">Privacy policy &amp; terms</a></p>`;
+}
+/** Settings' Connect: the same disclosure, then Strava's own button. */
+function openConnectSheet(){
+  openSheet({
+    title: "Connect Strava",
+    body: `<div class="consent">${stravaDisclosureHTML()}</div>
+      <button class="strava-btn" id="strava-go" style="margin-top:12px"><img src="art/strava/btn_strava_connect_with_orange.svg"
+        alt="Connect with Strava" width="237" height="48"></button>`,
+    actions: [{ label: "Not now", cls: "ghost", fn: closeSheet }]
+  });
+}
+/* A player linked before any of this was said is told now, once, and can
+   walk away from it on the spot. Anyone who connected through a screen that
+   said it is marked as told without being asked again. */
+let stravaJustLinked = false;
+function askConsentOnce(){
+  if (!stravaLinked() || !save.species || save.stravaConsentAt) return;
+  // never over another question - the which-pet one above all; next launch will do
+  if (stravaConflict || document.querySelector("#sheet-wrap.show")) return;
+  if (stravaJustLinked){ save.stravaConsentAt = Date.now(); persist(); return; }
+  openSheet({
+    title: "What Runmon does with your Strava",
+    desc: "Runmon now says this before anyone connects. You connected before it did, so here it is.",
+    body: `<div class="consent">${stravaDisclosureHTML()}</div>`,
+    actions: [
+      { label: "Disconnect", cls: "ghost", fn: () => { closeSheet(); $("#strava-off") ? $("#strava-off").click() : go("settings"); } },
+      { label: "OK, keep playing", cls: "primary", fn: () => { save.stravaConsentAt = Date.now(); persist(); closeSheet(); } }
+    ]
+  });
+}
+/** When this phone found out it is no longer connected. */
+function markParked(at){
+  if (!save.species || save.parkedAt) return;
+  save.parkedAt = at || Date.now();
+  persist();
+}
+/* Four weeks after a disconnect the broker erases the pet; this phone's copy
+   goes the same day, the first time the app is opened after it. The one
+   place a save is thrown away without being asked, and so it says so. */
+function expireParked(){
+  if (!save.parkedAt || stravaLinked()) return false;
+  if (Date.now() - save.parkedAt < GRACE_DAYS * 86400e3) return false;
+  const name = save.petName || "Your pet";
+  try { localStorage.removeItem(SAVE_KEY); } catch (e){}
+  save = structuredCloneSafe(DEFAULT_SAVE);
+  obSpecies = null;
+  recompute();
+  showOnboarding();
+  $("#screen-home").classList.add("active");
+  toast(`${name} was erased: four weeks have passed since you disconnected Strava.`, "", "\u{1F95A}");
+  return true;
+}
+/* Everything this phone holds, as a file - Strava's API Policy has a player
+   able to get at what was collected about them (2.2). The broker's copy is
+   the same save. */
+function downloadMyData(){
+  const out = { runmon: "my-data", at: new Date().toISOString(), save };
+  const url = URL.createObjectURL(new Blob([JSON.stringify(out, null, 1)], { type: "application/json" }));
+  const a = document.createElement("a");
+  a.href = url; a.download = `runmon-my-data-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
 /** Pull anything new, turn it into runs, push the save back. */
@@ -8039,19 +8331,29 @@ function stravaForget(){
 
    A level sets the pet to the start of that level, whatever its runs had
    earned; an XP change adds to or takes from it. A restore puts back what a
-   backup kept - species, name, level, XP and lifetime distance - made up on
-   top of whatever this phone's runs now come to. Backups keep no runs (they
-   are Strava's data, and a backup outlives the seven days Strava allows), so
-   the difference is carried in adminXp and adminKm rather than as runs.
-   Nothing here touches a run. */
+   backup kept - species, name, level and XP - made up on top of whatever
+   this phone's runs now come to. Backups keep no runs (they are Strava's
+   data, and a backup outlives the seven days Strava allows), so the
+   difference is carried in adminXp rather than as runs.
+
+   The one kind that does touch a run is "unrun": a run deleted on Strava, or
+   made private, which the broker heard about from Strava's webhook. Strava
+   wants that gone from here within 48 hours (API Policy 6.3), so it is
+   removed exactly as deleting it in the app would, XP and all. */
 function applyAdmin(res){
   if (!res || !save.species) return;
   let note = null;
-  const runXp = () => save.runs.reduce((t, r) => t + (Number(r.xp) || 0), 0);
-  const runKm = () => save.runs.reduce((t, r) => t + (Number(r.km) || 0), 0);
+  // what the runs are worth, folded ones included - an admin level is a total
+  const runXp = () => activeRuns().reduce((t, r) => t + (Number(r.xp) || 0), 0)
+                    + (save.past ? save.past.xp : 0);
+  const runKm = () => activeRuns().reduce((t, r) => t + (Number(r.km) || 0), 0);
   for (const a of (res.adjust || []).slice().sort((x, y) => x.rev - y.rev)){
     if (!(a.rev > (save.adminRev || 0))) continue;
-    if (a.kind === "level"){
+    if (a.kind === "unrun" && a.id){
+      const n = save.runs.length;
+      save.runs = save.runs.filter(r => String(r.strava) !== String(a.id));
+      if (save.runs.length !== n) note = "A run you deleted or hid on Strava has been taken out of Runmon";
+    } else if (a.kind === "level"){
       const to = Math.max(1, Math.min(MAX_LEVEL, Math.round(a.value)));
       save.adminXp = xpAtLevel(to) - runXp();
       note = `${save.petName || "Your pet"} is now level ${to}`;
@@ -8140,15 +8442,18 @@ function askWhichPet(theirs){
    3. a ten-second countdown before the button wakes, which the broker
       enforces from the moment the intent was opened.
    It needs the connection: nothing is removed from this phone until the
-   broker has archived the pet. Archived, not destroyed - the admin can put
-   it back. */
+   broker has archived the pet. Archived for GRACE_DAYS, in case it was a
+   mistake - the admin can put it back - and then erased: Strava's API Policy
+   has what a player asked to be deleted gone within 30 days (2.5, 7.4). */
 function openDeletePet(){
   if (!save.species) return;
   const me = petLine(save);
   openSheet({
     title: `Delete ${esc(me.name)}?`,
     desc: `This removes <b>${esc(me.name)}</b>, your level ${me.lv} ${esc(me.form)}, from your Strava account and from this phone,
-      and you start again with a new egg. You cannot undo this yourself. Your runs stay on Strava.`,
+      and you start again with a new egg. You cannot undo this yourself. Your runs stay on Strava.
+      <br><br>In case it was a mistake, Runmon keeps a copy for four weeks &mdash; email
+      <b>ryancgq@gmail.com</b> to have it put back. Then it is erased for good.`,
     actions: [
       { label: `Keep ${esc(me.name)}`, cls: "primary", fn: closeSheet },
       { label: "Continue", cls: "danger", fn: async () => {
@@ -8182,7 +8487,8 @@ function confirmDeletePet(intent, me){
           try { localStorage.removeItem(SAVE_KEY); } catch (e){}
           save = structuredCloneSafe(DEFAULT_SAVE);
           obSpecies = null; recompute(); showOnboarding();
-          toast(`${esc(me.name)} was deleted`, "", "\u{1F95A}");
+          // the confirmation Strava's API Policy asks for (2.1, 2.5): done, and when for good
+          toast(`${esc(me.name)} was deleted. The last copy is erased on ${fmtDay(r && r.eraseAt || Date.now() + GRACE_DAYS * 86400e3)}.`, "", "\u{1F95A}");
         } }
     ],
     onOpen: root => {
@@ -8219,6 +8525,7 @@ async function stravaSync(opts){
     if (res.save && !save.species && res.save.species){
       save = Object.assign(structuredCloneSafe(DEFAULT_SAVE), res.save);
       save.settings = Object.assign({}, DEFAULT_SAVE.settings, res.save.settings || {});
+      save.past = validPast(res.save.past);
       // The other doorway a stored save comes in by, and it can carry the old
       // treadmill flag just as loadSave() can. Cleared here too, or a save
       // that followed somebody from another device would switch it back on.
@@ -8261,12 +8568,15 @@ async function stravaSync(opts){
     const imported = [], newIds = [];
     for (const a of (res.activities || [])){
       if (!a.km || a.km <= 0 || !a.sec) continue;
-      const run = makeRun(a.t, a.km, a.sec, { strava: a.id, manual: !!a.manual });
+      const run = makeRun(a.t, a.km, a.sec, { strava: a.id, manual: !!a.manual, device: a.device || null });
       save.runs.push(run);
       imported.push(a.id);      // for the broker, so it is not fetched again
       newIds.push(run.id);      // for the replay, which walks our own runs
     }
     if (res.error === "reauth"){
+      // no token left for this athlete: disconnected from Strava's side, or
+      // erased - the phone's copy starts its four weeks too
+      markParked();
       stravaForget(); stravaLastError = "Strava needs you to connect again.";
     } else if (res.error){
       // anything else the broker got from Strava - a rate limit, a refused
@@ -8283,9 +8593,18 @@ async function stravaSync(opts){
     // a walk is coming. The gap this closes is real and easy to hit: pushing to
     // the broker is a network call, and coming back to the tab - which repaints
     // the pet screen - is exactly when a sync runs.
+    // Anything a week old goes before the walk is set up: a run that arrives
+    // already that old - a player back after a long gap - is folded straight
+    // in, its XP counted and nothing of it kept.
+    if (foldOldRuns()){
+      const keep = new Set(activeRuns().map(r => r.id));
+      for (let i = newIds.length - 1; i >= 0; i--) if (!keep.has(newIds[i])) newIds.splice(i, 1);
+      recompute();
+    }
     if (newIds.length && currentScreen === "home") heldRuns = heldSetFor(newIds);
     if (imported.length) recompute();
     save.stravaSyncedAt = Date.now();
+    if (!res.error) delete save.parkedAt;   // connected again inside the four weeks
     persist();
     await stravaPush(imported);          // stored and uploaded before anything plays
     // Walk the pet through them one at a time. Collapsing a week of running into
@@ -8367,7 +8686,7 @@ async function stravaSync(opts){
 /* The save and the ids go up together, so an activity cannot be marked
    imported by a save that never arrived. */
 /* What a friend is allowed to see: the pet and the totals behind it, and
-   nothing else. No runs, no routes, no dates beyond the last one, nothing from
+   nothing else. No runs, no routes, no dates, no distance - nothing from
    Strava. The app builds it rather than the broker because the XP curve and the
    form names live here, and working them out twice is how they drift apart. */
 function publicCard(){
@@ -8377,20 +8696,22 @@ function publicCard(){
   const held = heldRuns;
   if (held){ heldRuns = null; recompute(); }
   const d = derived, sp = d.species;
-  const weekStart = startOfWeek();
+  /* Version 2 carries nothing Strava measured. Strava's API Policy lets a
+     player's data be shown to that player only (2.3), and every other player
+     reads this card - so the distance, the week's distance, the run count
+     and the time of the last run are gone, and the table is ordered by XP
+     where distance used to break a tie. */
   const card = {
-    v: 1,
+    v: 2,
     pet: save.petName || sp.name,
     species: sp.id,
     stage: d.stage,
     form: sp.stages[d.stage].name,
     level: d.level,
-    km: Math.round(d.totalKm * 10) / 10,
-    weekKm: Math.round(d.runs.filter(r => r.t >= weekStart).reduce((a, r) => a + r.km, 0) * 10) / 10,
-    runs: d.runs.length,
+    xp: Math.round(d.totalXp),
     streak: d.streak,
     best: d.bestStreak,
-    lastRun: d.lastRunTs || null,
+    badges: Object.keys(save.badges || {}).length,
     at: Date.now()
   };
   if (held){ heldRuns = held; recompute(); }
@@ -8400,6 +8721,7 @@ function publicCard(){
 async function stravaPush(imported){
   // nothing goes up while a saved pet is waiting on the player's choice
   if (!stravaLinked() || stravaConflict) return;
+  save.folds = computeFolds();          // for the broker's own nightly fold
   await stravaCall("/save", { method:"PUT",
     body: JSON.stringify({ save, imported: imported || [], card: publicCard() }) });
 }
@@ -8618,29 +8940,39 @@ function wire(){
   });
   document.addEventListener("click", e => {
     if (!STRAVA_ON) return;
-    if (e.target.closest("#strava-on")){
+    if (e.target.closest("#strava-on")){ openConnectSheet(); return; }
+    if (e.target.closest("#strava-go")){
       // the broker starts the OAuth dance; the secret never comes near here
       location.href = RUNMON_API + "/connect";
       return;
     }
+    if (e.target.closest("#strava-what")){
+      openSheet({ title: "What Runmon reads from Strava", body: `<div class="consent">${stravaDisclosureHTML()}</div>`,
+        actions: [{ label: "Done", cls: "ghost", fn: closeSheet }] });
+      return;
+    }
     if (e.target.closest("#strava-sync")){ stravaSync({ loud:true }); return; }
     if (e.target.closest("#strava-off")){
-      /* A disconnect no longer costs the pet. The broker revokes its access
-         and deletes what it read from Strava - Strava's terms - but keeps the
-         pet at its level, and this phone keeps its copy too, so connecting
-         again carries straight on. Deleting the pet is its own, guarded
-         thing: see openDeletePet(). */
+      /* A disconnect costs the pet only if it lasts. The broker revokes its
+         access and deletes what it read from Strava at once, and keeps the
+         pet at its level for GRACE_DAYS - Strava's API Policy has everything
+         about a player erased within 30 days of a disconnect (2.5, 7.4) - so
+         connecting again inside that carries straight on. This phone keeps
+         its copy for the same four weeks; see expireParked(). */
+      const until = fmtDay(Date.now() + GRACE_DAYS * 86400e3);
       openSheet({
         title:"Disconnect Strava?",
-        desc:"Runmon will stop reading your activities and removes your runs from its server. Your pet is kept at its level &mdash; connect again any time and it carries on. Runs you record while disconnected will not count.",
+        desc:`Runmon stops reading your activities and deletes your runs now. ${esc(save.petName || "Your pet")} is kept until <b>${until}</b> &mdash; connect again before then and it carries on. After that it is erased from Runmon's server and this phone.`,
         actions:[
           { label:"Stay connected", cls:"ghost", fn: closeSheet },
           { label:"Disconnect", cls:"danger", fn: async () => {
               closeSheet();
-              try { await stravaCall("/disconnect", { method:"POST" }); }
+              let r;
+              try { r = await stravaCall("/disconnect", { method:"POST" }); }
               catch (err){ toast("Could not disconnect: " + (err.message || err), "bad", "\u26A0\uFE0F"); return; }
+              markParked(r && r.eraseAt ? r.eraseAt - GRACE_DAYS * 86400e3 : Date.now());
               stravaForget(); renderAll();
-              toast("Disconnected. Your pet is kept.", "", "\u{1F43E}");
+              toast(`Disconnected. Your runs are deleted; your pet is kept until ${until}.`, "", "\u{1F43E}");
             } }
         ]
       });
@@ -8649,6 +8981,7 @@ function wire(){
     if (e.target.closest("#pet-delete")){ openDeletePet(); return; }
   });
 
+  $("#set-export").addEventListener("click", downloadMyData);
   $("#row-keepawake").addEventListener("click", () => {
     save.settings.wakeLock = !save.settings.wakeLock; persist(); renderSettings();
   });
@@ -8754,6 +9087,9 @@ function boot(){
      until RAID_LIVE, and nothing at all on a device with no pet yet - the
      home screen it would sit on is not the screen they are looking at. */
   if (has) raidAnnounce();
+  if (has && expireParked()) return;
+  // anything a week old is folded before it is drawn - see foldOldRuns()
+  if (has && foldOldRuns()) persist();
   if (has){
     recompute();
     applyTheme(save.species);
@@ -8774,8 +9110,12 @@ function boot(){
     showOnboarding();
     $("#screen-home").classList.add("active");
   }
-  // catch up on anything run while the app was closed
-  if (has && stravaLinked()) stravaSync();
+  // catch up on anything run while the app was closed - and then, for a player
+  // who connected before Runmon said what it reads, ask once. After the sync,
+  // because the sync can ask which pet to keep, and that question matters more.
+  if (has && stravaLinked()) stravaSync().then(askConsentOnce, askConsentOnce);
+  // and a run that turns a week old while the app is open is folded then
+  setInterval(() => { if (save.species && foldOldRuns()){ recompute(); persist(); renderAll(); } }, 3600e3);
   // and again when you come back to the tab, since that is when you check
   if (STRAVA_ON) document.addEventListener("visibilitychange", () => {
     if (!document.hidden && stravaLinked() && Date.now() - (save.stravaSyncedAt || 0) > 60000) stravaSync();

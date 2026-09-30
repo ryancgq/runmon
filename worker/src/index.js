@@ -12,7 +12,9 @@
      GET  /callback     trade the code, mint a session, bounce back to the app
      POST /sync         new activities since last time, plus the stored save
      PUT  /save         store the save and the ids the client actually imported
-     POST /disconnect   tell Strava to forget us, then forget the athlete
+     POST /disconnect   tell Strava to forget us; the pet is erased after GRACE_DAYS
+     POST /pet/delete-intent, /pet/delete   a player deleting their own pet
+     GET|POST /strava/webhook   Strava's events: revokes, runs deleted
      POST /battle/start  claim an attack on somebody, and spend it
      POST /battle/report how the fight went; the mark is priced here
      GET  /battle/marks  what is standing on your own pet, and its fight log
@@ -143,32 +145,169 @@ async function lookupHandle(env, handle){
   const { athleteId } = await r.json();
   return athleteId || null;
 }
-/* What of a pet the broker may keep once Strava has no part in it. Strava's
-   API Policy has its data deleted within 48 hours of a disconnect (6.3), so a
-   parked or archived pet keeps only what the game made: its name, species,
-   hatch time, XP, badges and what it has celebrated. The runs go - their
-   XP is carried over as adminXp, so the level stands - and so does the
-   lifetime distance, and every other player's card the save had cached. */
+/* What of a pet the broker may keep once Strava has no part in it, and only
+   for GRACE_DAYS - see purgeAthlete(). A parked or archived pet keeps what
+   the game made: its name, species, hatch time, XP, badges and what it has
+   celebrated. The runs go - their XP is carried over as adminXp, so the
+   level stands - and so does every other player's card the save had cached,
+   and the dates the streak was counted from. */
 function gameOnly(save){
   const xp = (save.runs || []).reduce((t, r) => t + (Number(r.xp) || 0), 0) + (Number(save.adminXp) || 0);
-  return { ...save, runs: [], adminXp: Math.max(0, Math.round(xp)), adminKm: 0,
+  const past = save.past ? { ...save.past,
+    streak: { best: Number(save.past.streak && save.past.streak.best) || 0, count: 0, first: null, last: null } } : null;
+  return { ...save, runs: [], adminXp: Math.max(0, Math.round(xp)), adminKm: 0, past, folds: [],
     friends: (save.friends || []).map(f => ({ code: f.code, addedAt: f.addedAt })),
     roster: [], notices: [], noticesGone: [], stravaSyncedAt: null };
 }
-/** A card with nothing from Strava on it: the pet and its level. */
-const gameCard = c => c ? { v: c.v || 1, pet: c.pet, species: c.species, stage: c.stage,
-  form: c.form, level: c.level, at: c.at } : null;
 
-/* A disconnect, from Settings or from the dashboard. It used to delete the
-   athlete outright; now the pet is parked. Strava's grant is revoked, its
-   tokens and everything read from it are deleted, and the save becomes
-   gameOnly(). The pet stays where it is, under the Strava id it belongs to,
-   so connecting again finds it at the same level - on the same phone, or on
-   a new one that has no pet of its own. The Rankings row stays for the admin
-   list, stripped and marked disconnected, and is hidden from players; the
-   friend code's directory entry goes so nobody finds a pet that is not
-   playing, and comes back the first time they ask for their code again. The
-   nightly backups lose this player's distance for the same 48-hour reason. */
+/* How long a disconnected player's pet, or a deleted one, is kept before it
+   is erased for good. Strava's API Policy has everything about a player -
+   the app's own data included, since its "Data" means both - deleted within
+   30 days of a disconnect or a request (2.5, 7.4). The erase runs nightly,
+   so 28 days leaves the last night's slack and a day to spare. Inside it a
+   player who reconnects finds their pet, and the admin can put a deleted
+   one back. */
+const GRACE_DAYS = 28, GRACE_MS = GRACE_DAYS * 86400e3;
+/* How long anything read from Strava is kept: its API Policy caps a cache at
+   seven days (6.2). The app folds a run into its pet at six; this is the
+   broker's own backstop for a copy the app has not been back to fold. */
+const RETAIN_MS = 7 * 86400e3;
+
+/* Everything about one player, gone: their Strava grant revoked if it still
+   stands, their object emptied - save, card, tokens, archived pets, friend
+   code - their roster row and handle entry, their rows in the deleted-pets
+   index, and their entries in every nightly backup. The end of the grace
+   period, or the admin acting on a request to be forgotten. `athleteId` may
+   be null for a row whose directory entry never existed; the rest still
+   goes. */
+async function purgeAthlete(env, athleteId, handle){
+  handle = handle || (await hmac(env.SESSION_SECRET, "roster:" + athleteId)).slice(0, 12);
+  let code = null;
+  if (athleteId)
+    ({ code } = await (await (await athleteStub(env, athleteId)).fetch("https://do/purge", { method:"POST" })).json());
+  await rosterStub(env).fetch("https://do/roster-drop", { method:"POST", body: JSON.stringify({ handle }) });
+  await handleStub(env, handle).fetch("https://do/dir-clear", { method:"POST" });
+  if (code) await codeStub(env, code).fetch("https://do/dir-clear", { method:"POST" });
+  await deletedStub(env).fetch("https://do/del-drop", { method:"POST", body: JSON.stringify({ handle }) });
+  await backupStub(env).fetch("https://do/bk-scrub", { method:"POST", body: JSON.stringify({ handle, drop: true }) });
+  return { ok:true, handle, erased: true };
+}
+/** One archived pet erased: from its owner's object, the index and the backups. */
+async function eraseDeleted(env, row){
+  if (row.athleteId) await (await athleteStub(env, row.athleteId)).fetch("https://do/pet-drop",
+    { method:"POST", body: JSON.stringify({ id: row.id }) });
+  await deletedStub(env).fetch("https://do/del-drop", { method:"POST", body: JSON.stringify({ id: row.id }) });
+  await backupStub(env).fetch("https://do/bk-scrub", { method:"POST", body: JSON.stringify({ deletedId: row.id }) });
+}
+
+/* The nightly pass that keeps the rules, before the night's backup is taken:
+   players disconnected longer than the grace period and pets deleted longer
+   ago than it are erased; every connected pet's copy here has its old runs
+   folded and its week-old Strava ids let go (see Athlete.retention()); roster
+   rows are rewritten to the cut-down card; and the backups lose any distance
+   an older version wrote into them. */
+async function retention(env){
+  const now = Date.now();
+  const out = { erased: 0, deletedErased: 0, folded: 0 };
+  const { rows } = await (await rosterStub(env).fetch("https://do/roster-list")).json();
+  for (const r of rows){
+    const id = await lookupHandle(env, r.handle);
+    if (r.disconnected){
+      if (r.disconnectedAt && now - r.disconnectedAt >= GRACE_MS){ await purgeAthlete(env, id, r.handle); out.erased++; }
+      continue;
+    }
+    if (!id) continue;
+    const f = await (await (await athleteStub(env, id)).fetch("https://do/retention", { method:"POST" })).json();
+    if (f.folded) out.folded++;
+  }
+  await rosterStub(env).fetch("https://do/roster-scrub", { method:"POST" });
+  const { rows: dels } = await (await deletedStub(env).fetch("https://do/del-list")).json();
+  for (const d of dels) if (now - (d.at || now) >= GRACE_MS){ await eraseDeleted(env, d); out.deletedErased++; }
+  await backupStub(env).fetch("https://do/bk-scrub", { method:"POST", body: "{}" });
+  return out;
+}
+
+/* The server's copy of a save, folded the way the app folds its own. The app
+   works out, for every day its runs could be folded from, what the pet
+   carries forward - XP, run count, mood and streak - and sends those with the
+   save as `folds`, because replaying the mood and streak rules here would be
+   the game written twice, and in the wrong time zone. Each fold says from when
+   (`from`, a local midnight) and from when it is due (`at`). A run the app
+   never priced a fold for - a save an older app pushed - is folded the blunt
+   way once it passes RETAIN_MS: its XP kept, its details gone. */
+function foldServer(save, now){
+  const runs0 = Array.isArray(save.runs) ? save.runs : [];
+  const due = (Array.isArray(save.folds) ? save.folds : [])
+    .filter(f => f && f.past && Number(f.at) <= now).sort((a, b) => a.from - b.from);
+  const f = due[due.length - 1] || null;
+  let runs = runs0, past = save.past || null, adminXp = Number(save.adminXp) || 0;
+  if (f){
+    runs = runs.filter(r => !(r.strava && r.t < f.from))
+      .map(r => !r.strava && !r.folded && r.t < f.from ? { ...r, folded: true } : r);
+    past = f.past;
+  }
+  const left = runs.filter(r => r.strava && !r.folded && r.t < now - RETAIN_MS);
+  if (left.length){
+    adminXp += left.reduce((t, r) => t + (Number(r.xp) || 0), 0);
+    runs = runs.filter(r => !left.includes(r));
+  }
+  if (!f && !left.length) return null;
+  return { ...save, runs, past, adminXp: Math.round(adminXp),
+    folds: (save.folds || []).filter(g => g && (!f || g.from > f.from)) };
+}
+
+/* The webhook's own object: the subscription id Strava gave us, and the
+   events already handled, so a retried or doubled event is acted on once. */
+const webhookStub = env => env.ATHLETE.get(env.ATHLETE.idFromName("webhook:strava"));
+const webhookToken = async env => (await hmac(env.SESSION_SECRET, "strava-webhook")).slice(0, 24);
+/* One event from Strava. None of it is signed, and the callback is a public
+   URL, so nothing is taken on the event's word: a revoke is acted on only
+   once Strava refuses the athlete's own token, and a run is removed only
+   once Strava says it is not there - and only if it is one we hold. */
+async function handleWebhook(env, ev){
+  if (!ev || typeof ev !== "object") return { ignored: "body" };
+  const conf = await (await webhookStub(env).fetch("https://do/wh-get")).json();
+  if (conf.id && Number(ev.subscription_id) !== Number(conf.id)) return { ignored: "subscription" };
+  const key = [ev.object_type, ev.aspect_type, ev.object_id, ev.owner_id, ev.event_time,
+               JSON.stringify(ev.updates || {})].join("|");
+  const { dup } = await (await webhookStub(env).fetch("https://do/wh-seen",
+    { method:"POST", body: JSON.stringify({ key }) })).json();
+  if (dup) return { ignored: "duplicate" };
+  const owner = String(ev.owner_id || "");
+  if (!/^\d+$/.test(owner)) return { ignored: "owner" };
+  const stub = await athleteStub(env, owner);
+  const upd = ev.updates || {};
+  if (ev.object_type === "athlete" && String(upd.authorized) === "false"){
+    const v = await (await stub.fetch("https://do/verify-revoked", { method:"POST" })).json();
+    if (!v.known || !v.revoked) return { ignored: "not revoked" };
+    await parkAthlete(env, owner);
+    return { parked: true };
+  }
+  /* With the activity:read scope a run made "Only You" arrives as a delete,
+     so the one case covers both; `private` is checked as well in case the
+     scope is ever widened. */
+  if (ev.object_type === "activity" &&
+      (ev.aspect_type === "delete" || (ev.aspect_type === "update" && String(upd.private) === "true")))
+    return await (await stub.fetch("https://do/activity-gone", { method:"POST",
+      body: JSON.stringify({ id: String(ev.object_id) }) })).json();
+  return { ignored: "kind" };
+}
+/** A card as it may be stored or shown to anybody else - see rosterCard().
+    Also what an older app's card is cut down to on the way in, and what one
+    already stored is cut down to on the way out, so no player sees another's
+    distance whatever version either of them is running. */
+const gameCard = c => c ? { v: 2, ...rosterCard(c), at: Number(c.at) || null } : null;
+
+/* A disconnect - from Settings, from the dashboard, or from Strava's side,
+   which arrives as a webhook. The pet is parked for GRACE_DAYS and then
+   erased. Strava's grant is revoked, its tokens and everything read from it
+   are deleted, and the save becomes gameOnly(). The pet stays where it is,
+   under the Strava id it belongs to, so connecting again inside the grace
+   period finds it at the same level - on the same phone, or on a new one that
+   has no pet of its own. The Rankings row stays for the admin list, stripped
+   and marked disconnected with the time the clock started, and is hidden
+   from players; the friend code's directory entry goes so nobody finds a pet
+   that is not playing. */
 async function parkAthlete(env, athleteId){
   const stub = await athleteStub(env, athleteId);
   const { code } = await (await stub.fetch("https://do/park", { method:"POST" })).json();
@@ -185,7 +324,7 @@ async function parkAthlete(env, athleteId){
 const deletedStub = env => env.ATHLETE.get(env.ATHLETE.idFromName("deleted:all"));
 
 /* Every pet's backup entry, or one: what adminSnapshot() keeps - name,
-   species, level, XP and lifetime distance - and no runs. Shared by the
+   species, level and XP - and nothing from Strava. Shared by the
    dashboard's download and the nightly copy, so the two can never disagree
    about what a backup is. */
 async function snapshotUsers(env, handle){
@@ -196,7 +335,8 @@ async function snapshotUsers(env, handle){
     const id = await lookupHandle(env, r.handle);
     const snap = id ? (await (await (await athleteStub(env, id)).fetch("https://do/admin-snapshot")).json()).snap : null;
     const entry = { handle: r.handle, ...(snap || { pet: r.pet || "", species: r.species || null,
-      level: r.level || null, xp: null, km: null }), reachable: !!id };
+      level: r.level || null, xp: null }), reachable: !!id,
+      ...(r.disconnected && r.disconnectedAt ? { eraseAt: r.disconnectedAt + GRACE_MS } : {}) };
     (r.disconnected ? disconnected : connected).push(entry);
   }
   return { connected, disconnected };
@@ -212,9 +352,9 @@ async function backupOf(env, handle){
 }
 /* The nightly copy, kept on the broker so there is always a recent one
    without anybody remembering to press a button. Fourteen days of them: long
-   enough to notice a lost pet and put it back, and no longer, since the one
-   Strava figure in a backup - lifetime distance - is still Strava's. One
-   object holds them all, a key a day. */
+   enough to notice a lost pet and put it back. A player erased is taken out
+   of all of them at once (purgeAthlete), so fourteen days of copies cannot
+   stretch anybody's grace period. One object holds them all, a key a day. */
 const AUTO_KEEP_DAYS = 14;
 const backupStub = env => env.ATHLETE.get(env.ATHLETE.idFromName("backups:auto"));
 async function autoBackup(env){
@@ -383,17 +523,38 @@ async function withAthlete(request, env, fn){
 }
 
 export default {
-  /* Cloudflare's cron (wrangler.toml [triggers]) - once a night. */
+  /* Cloudflare's cron (wrangler.toml [triggers]) - once a night: the rules
+     first, so the backup it then takes holds nothing they have let go. */
   async scheduled(event, env, ctx){
-    ctx.waitUntil(autoBackup(env));
+    ctx.waitUntil((async () => { await retention(env); await autoBackup(env); })());
   },
 
-  async fetch(request, env){
+  async fetch(request, env, ctx){
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/+$/, "") || "/";
     if (request.method === "OPTIONS") return new Response(null, { headers: cors(env) });
 
     try {
+      /* Strava's webhook. The GET is Strava checking the address when the
+         subscription is made (see /admin/webhook); the POSTs are events,
+         answered at once - Strava wants a 200 inside two seconds - and
+         handled after. */
+      if (path === "/strava/webhook"){
+        if (request.method === "GET"){
+          if (url.searchParams.get("hub.mode") === "subscribe" &&
+              url.searchParams.get("hub.verify_token") === await webhookToken(env))
+            return new Response(JSON.stringify({ "hub.challenge": url.searchParams.get("hub.challenge") || "" }),
+              { headers:{ "Content-Type":"application/json" } });
+          return json(env, { error:"no such endpoint" }, 404);
+        }
+        if (request.method === "POST"){
+          const ev = await request.json().catch(() => null);
+          const job = handleWebhook(env, ev).catch(() => null);
+          if (ctx && ctx.waitUntil) ctx.waitUntil(job); else await job;
+          return new Response("ok");
+        }
+      }
+
       if (path === "/connect"){
         // `state` is signed so a stranger cannot walk an athlete through a
         // callback we did not start
@@ -432,8 +593,8 @@ export default {
         const stub = await athleteStub(env, athleteId);
         await stub.fetch("https://do/open", { method:"POST", body: JSON.stringify({
           athleteId, refresh: tok.refresh_token, access: tok.access_token,
-          expires: tok.expires_at * 1000,
-          firstName: (tok.athlete && tok.athlete.firstname) || "" }) });
+          // nothing else from the athlete's profile: Runmon has no use for it
+          expires: tok.expires_at * 1000 }) });
 
         // On the roster the moment they link, so somebody who connects and never
         // runs still shows up as a connection rather than as nothing at all.
@@ -477,7 +638,7 @@ export default {
 
       if (path === "/disconnect" && request.method === "POST")
         return await withAthlete(request, env, async (stub, id) =>
-          json(env, { disconnected: true, ...(await parkAthlete(env, id)) }));
+          json(env, { disconnected: true, ...(await parkAthlete(env, id)), eraseAt: Date.now() + GRACE_MS }));
 
       /* A player deleting their own pet. Two calls, on purpose, and both
          checked here rather than trusted to the app: the first opens an
@@ -497,7 +658,7 @@ export default {
           await deletedStub(env).fetch("https://do/del-add", { method:"POST",
             body: JSON.stringify({ ...r.entry, handle, athleteId: String(id) }) });
           await rosterStub(env).fetch("https://do/roster-reset", { method:"POST", body: JSON.stringify({ handle }) });
-          return json(env, { ok:true, deleted: r.entry.pet });
+          return json(env, { ok:true, deleted: r.entry.pet, eraseAt: r.entry.at + GRACE_MS });
         });
 
       /* --- friends ---------------------------------------------------------
@@ -536,7 +697,7 @@ export default {
             .filter(x => x.handle !== mine && x.pet && !x.disconnected)
             .map(x => ({ id: x.handle, card: rosterCard(x), lastSeen: x.lastSeen || 0,
                          pen: markPenalty(x.marks), hits: markCount(x.marks) }))
-            .sort((a, b) => (b.card.level - a.card.level) || (b.card.km - a.card.km))
+            .sort((a, b) => byStanding(a.card, b.card))
             .slice(0, 200);
           return json(env, { players });
         });
@@ -843,7 +1004,7 @@ export default {
         const { rows } = await r.json();
         rows.sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0));
         if (url.searchParams.get("format") === "json")
-          return new Response(JSON.stringify({ count: rows.length, rows }, null, 2),
+          return new Response(JSON.stringify({ count: rows.length, rows: rows.map(rowOut) }, null, 2),
             { headers:{ "Content-Type":"application/json", "Cache-Control":"no-store" } });
         return new Response(summaryTable(rows),
           { headers:{ "Content-Type":"text/plain; charset=utf-8", "Cache-Control":"no-store" } });
@@ -868,7 +1029,8 @@ export default {
         if (path === "/admin/users"){
           const { rows } = await (await rosterStub(env).fetch("https://do/roster-list")).json();
           const reach = await Promise.all(rows.map(r => lookupHandle(env, r.handle).then(Boolean)));
-          const out = rows.map((r, i) => ({ ...r, reachable: reach[i],
+          const out = rows.map((r, i) => ({ ...rowOut(r), reachable: reach[i],
+            eraseAt: r.disconnected && r.disconnectedAt ? r.disconnectedAt + GRACE_MS : null,
             pen: markPenalty(r.marks || []), hits: markCount(r.marks || []), marks: undefined }));
           const { raid } = await (await raidStub(env).fetch("https://do/raid-state", { method:"POST", body:"{}" })).json();
           return json(env, { at: Date.now(), rows: out, raid });
@@ -877,7 +1039,9 @@ export default {
         if (path === "/admin/user"){
           const id = await who();
           const { rows } = await (await rosterStub(env).fetch("https://do/roster-list")).json();
-          const row = rows.find(r => r.handle === handle) || null;
+          const found = rows.find(r => r.handle === handle);
+          const row = found ? { ...rowOut(found), marks: undefined,
+            eraseAt: found.disconnected && found.disconnectedAt ? found.disconnectedAt + GRACE_MS : null } : null;
           const peek = await (await (await athleteStub(env, id)).fetch("https://do/admin-peek")).json();
           return json(env, { handle, row, ...peek });
         }
@@ -894,7 +1058,45 @@ export default {
         }
 
         if (path === "/admin/disconnect" && request.method === "POST")
-          return json(env, await parkAthlete(env, await who()));
+          return json(env, { ...(await parkAthlete(env, await who())), eraseAt: Date.now() + GRACE_MS });
+
+        /* Erase a player now rather than at the end of the grace period - a
+           player who asked to be forgotten, by email. Works on a row whose
+           directory entry never existed, since the row and backups still go. */
+        if (path === "/admin/erase" && request.method === "POST"){
+          if (!handle) return json(env, { error:"Which player?" }, 400);
+          return json(env, await purgeAthlete(env, await lookupHandle(env, handle), handle));
+        }
+
+        /* The webhook subscription: what Strava has, and making one. Strava
+           checks the callback while the POST is in flight, which is why the
+           callback is this same worker. If one already exists for this
+           callback it is adopted rather than failed on. */
+        if (path === "/admin/webhook"){
+          const callback = url.origin + "/strava/webhook";
+          const list = async () => {
+            const q = new URL(API(env) + "/push_subscriptions");
+            q.searchParams.set("client_id", env.STRAVA_CLIENT_ID);
+            q.searchParams.set("client_secret", env.STRAVA_CLIENT_SECRET);
+            const r = await fetch(q);
+            const subs = r.ok ? await r.json().catch(() => null) : null;
+            return Array.isArray(subs) ? subs.map(x => ({ id: x.id, callback_url: x.callback_url })) : null;
+          };
+          const remember = id => webhookStub(env).fetch("https://do/wh-set", { method:"POST",
+            body: JSON.stringify({ id, callback, at: Date.now() }) });
+          if (request.method === "POST"){
+            const r = await fetch(API(env) + "/push_subscriptions", { method:"POST",
+              body: new URLSearchParams({ client_id: env.STRAVA_CLIENT_ID, client_secret: env.STRAVA_CLIENT_SECRET,
+                                          callback_url: callback, verify_token: await webhookToken(env) }) });
+            const out = await r.json().catch(() => ({}));
+            if (r.ok && out.id){ await remember(out.id); return json(env, { ok:true, id: out.id, callback }); }
+            const have = (await list() || []).find(x => x.callback_url === callback);
+            if (have){ await remember(have.id); return json(env, { ok:true, id: have.id, callback, adopted: true }); }
+            return json(env, { error: "Strava refused the subscription: " + JSON.stringify(out).slice(0, 300) }, 502);
+          }
+          const stored = await (await webhookStub(env).fetch("https://do/wh-get")).json();
+          return json(env, { stored, strava: await list(), callback });
+        }
 
         /* Pets players deleted: the list, and putting one back on the Strava
            account it came from, as a restore queued like any other. The
@@ -902,7 +1104,14 @@ export default {
            deleted theirs is asked to hatch an egg first. */
         if (path === "/admin/deleted"){
           const { rows } = await (await deletedStub(env).fetch("https://do/del-list")).json();
-          return json(env, { rows: rows.map(({ athleteId, ...rest }) => rest) });
+          return json(env, { rows: rows.map(({ athleteId, ...rest }) => ({ ...rest, eraseAt: rest.at + GRACE_MS })) });
+        }
+        if (path === "/admin/deleted/erase" && request.method === "POST"){
+          const { row } = await (await deletedStub(env).fetch("https://do/del-get", { method:"POST",
+            body: JSON.stringify({ id: body.id }) })).json();
+          if (!row) return json(env, { error:"No deleted pet with that id." }, 404);
+          await eraseDeleted(env, row);
+          return json(env, { ok:true });
         }
         if (path === "/admin/deleted/restore" && request.method === "POST"){
           const { row } = await (await deletedStub(env).fetch("https://do/del-get", { method:"POST",
@@ -920,8 +1129,8 @@ export default {
           return json(env, { ok:true, rev: out.rev });
         }
 
-        /* A backup of every pet, or one: name, species, level, XP and
-           lifetime distance, and nothing run by run - see adminSnapshot(). */
+        /* A backup of every pet, or one: name, species, level and XP, and
+           nothing Strava measured - see adminSnapshot(). */
         const fileOf = (backup, name) => new Response(JSON.stringify(backup, null, 1), {
           headers: { "Content-Type":"application/json", "Cache-Control":"no-store", ...cors(env),
             "Content-Disposition": `attachment; filename="${name}.json"` } });
@@ -952,8 +1161,10 @@ export default {
           const level = Math.round(Number(b.level));
           if (!species || !(level >= 1 && level <= 99)) return json(env, { error:"That is not a Runmon backup of this player." }, 400);
           const num = (v, max) => v == null || !Number.isFinite(Number(v)) ? null : Math.max(0, Math.min(max, Number(v)));
+          // a backup from before distance was dropped still carries it; it is
+          // not put back
           const snap = { species, pet: String(b.pet || "").slice(0, 24), level,
-                         xp: num(b.xp, 1e9), km: num(b.km, 1e7) };
+                         xp: num(b.xp, 1e9), km: null };
           const r = await (await athleteStub(env, await who())).fetch("https://do/admin-adjust",
             { method:"POST", body: JSON.stringify({ kind:"restore", value: level, snap, note: body.note || "restored from backup" }) });
           return json(env, await r.json());
@@ -973,9 +1184,16 @@ export default {
   }
 };
 
-/* What a roster row keeps of a card. Named rather than spread wholesale so
-   that a field added to the card for the game does not silently land in the
-   private table as well. */
+/* What a roster row keeps of a card, which is also everything any other
+   player is ever shown. Named rather than spread wholesale so that a field
+   added to the card for the game does not silently land in the private table
+   as well.
+
+   The game's own numbers and nothing Strava measured. Strava's API Policy
+   lets an athlete's data be shown to that athlete and nobody else (2.3), so
+   the distance, the week's distance, the run count and the time of the last
+   run that cards used to carry are gone - older apps still send them and
+   they are dropped here. Level, XP, streak and badges are the game's. */
 function rosterCard(c){
   return {
     pet: String(c.pet || "").slice(0, 24),
@@ -983,41 +1201,48 @@ function rosterCard(c){
     form: String(c.form || "").slice(0, 24),
     stage: Number(c.stage) || 0,
     level: Number(c.level) || 0,
-    km: Number(c.km) || 0,
-    weekKm: Number(c.weekKm) || 0,
-    runs: Number(c.runs) || 0,
+    xp: Math.max(0, Math.round(Number(c.xp) || 0)),
     streak: Number(c.streak) || 0,
     best: Number(c.best) || 0,
-    lastRun: Number(c.lastRun) || null
+    badges: Math.max(0, Math.round(Number(c.badges) || 0))
   };
 }
+/** A roster row as it leaves the object: the card cut down as above, and
+    the bookkeeping around it. Rows written before the cut still hold the old
+    fields until the pet next saves or the nightly pass rewrites them. */
+const rowOut = r => ({ handle: r.handle, ...(r.pet ? rosterCard(r) : {}),
+  marks: r.marks || [], firstSeen: r.firstSeen || null, lastSeen: r.lastSeen || null,
+  disconnected: !!r.disconnected, disconnectedAt: r.disconnectedAt || null });
+/* Levels first, then XP inside a level - distance used to break the tie. */
+const byStanding = (a, b) => (b.level - a.level) || ((b.xp || 0) - (a.xp || 0));
 /* A plain-text table, because this is read over curl in a terminal. Columns are
    padded to their widest value rather than to a guess, so a long pet name does
-   not push everything out of line. */
+   not push everything out of line.
+
+   The game's numbers only. It used to total everybody's kilometres and runs,
+   which is exactly the aggregate Strava's API Policy (5.4) rules out, and
+   the per-row distances went with it. */
 function summaryTable(rows){
   const DAY = 86400000, now = Date.now();
   const ago = t => !t ? "\u2014" : (d => d === 0 ? "today" : d === 1 ? "1 day" : d + " days")
     (Math.round((now - t) / DAY));
-  const head = ["HANDLE","PET","SPECIES","FORM","LV","KM","WEEK","RUNS","STREAK","LAST RUN","LINKED"];
+  const head = ["HANDLE","PET","SPECIES","FORM","LV","XP","STREAK","SEEN","LINKED",""];
   const body = rows.map(r => [
     r.handle || "", r.pet || "\u2014", r.species || "\u2014", r.form || "not hatched",
-    String(r.level || "\u2014"), (r.km || 0).toFixed(1), (r.weekKm || 0).toFixed(1),
-    String(r.runs || 0), String(r.streak || 0), ago(r.lastRun), ago(r.firstSeen)
+    String(r.level || "\u2014"), String(Math.round(r.xp || 0)), String(r.streak || 0),
+    ago(r.lastSeen), ago(r.firstSeen), r.disconnected ? "disconnected" : ""
   ]);
   const w = head.map((h, i) => Math.max(h.length, ...body.map(b => b[i].length)));
   const line = cells => cells.map((c, i) => c.padEnd(w[i])).join("  ").trimEnd();
 
   const hatched = rows.filter(r => (r.stage || 0) > 0).length;
-  const active7 = rows.filter(r => r.lastRun && now - r.lastRun < 7 * DAY).length;
-  const km = rows.reduce((a, r) => a + (r.km || 0), 0);
-  const runs = rows.reduce((a, r) => a + (r.runs || 0), 0);
+  const linked = rows.filter(r => !r.disconnected).length;
   const out = [
     `Runmon \u00b7 ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC`,
     "",
-    `Connected to Strava   ${rows.length}`,
+    `Connected to Strava   ${linked}`,
+    `Disconnected          ${rows.length - linked}`,
     `Hatched               ${hatched}`,
-    `Ran in the last week  ${active7}`,
-    `Lifetime              ${km.toFixed(1)} km over ${runs} runs`,
     "",
     line(head),
     w.map(n => "-".repeat(n)).join("  "),
@@ -1040,8 +1265,33 @@ export class Athlete {
     if (path === "/park")  return this.park();
     if (path === "/pet-intent") return this.petIntent();
     if (path === "/pet-delete") return this.petDelete(await request.json());
+    if (path === "/purge")      return this.purge();
+    if (path === "/retention")  return this.retention();
+    if (path === "/verify-revoked") return this.verifyRevoked();
+    if (path === "/activity-gone")  return this.activityGone(await request.json());
+    /* One archived pet let go, at the end of its grace period. */
+    if (path === "/pet-drop"){
+      const { id } = await request.json();
+      const list = (await this.state.storage.get("deletedPets") || []).filter(e => e.id !== id);
+      await this.state.storage.put("deletedPets", list);
+      return this.ok({ ok:true });
+    }
+    /* The webhook's object - see handleWebhook(). Events are remembered for
+       three days, which is far longer than Strava retries for. */
+    if (path === "/wh-get") return this.ok(await this.state.storage.get("conf") || {});
+    if (path === "/wh-set"){ await this.state.storage.put("conf", await request.json()); return this.ok({ ok:true }); }
+    if (path === "/wh-seen"){
+      const { key } = await request.json();
+      const now = Date.now();
+      const seen = await this.state.storage.get("seen") || {};
+      for (const k of Object.keys(seen)) if (now - seen[k] > 3 * 86400e3) delete seen[k];
+      const dup = !!seen[key];
+      seen[key] = now;
+      await this.state.storage.put("seen", seen);
+      return this.ok({ dup });
+    }
     if (path === "/code")  return this.code(await request.json());
-    if (path === "/card")  return this.ok({ card: await this.state.storage.get("card") || null });
+    if (path === "/card")  return this.ok({ card: gameCard(await this.state.storage.get("card")) });
     // the friend code without minting one, which /code would do
     if (path === "/code-peek") return this.ok({ code: await this.state.storage.get("friendCode") || null });
     if (path === "/admin-peek")    return this.adminPeek();
@@ -1091,22 +1341,40 @@ export class Athlete {
       const { id } = await request.json();
       return this.ok({ row: await this.state.storage.get("del:" + id) || null });
     }
+    /* An archived pet erased, by its id - or all of one player's, by handle. */
+    if (path === "/del-drop"){
+      const { id, handle } = await request.json();
+      if (id) await this.state.storage.delete("del:" + id);
+      if (handle){
+        const map = await this.state.storage.list({ prefix:"del:" });
+        const keys = [...map].filter(([, v]) => v.handle === handle).map(([k]) => k);
+        if (keys.length) await this.state.storage.delete(keys);
+      }
+      return this.ok({ ok:true });
+    }
     if (path === "/del-mark"){
       const { id, restoredAt } = await request.json();
       const row = await this.state.storage.get("del:" + id);
       if (row) await this.state.storage.put("del:" + id, { ...row, restoredAt });
       return this.ok({ ok:true });
     }
-    /* A disconnect takes the player's distance out of every nightly backup
-       already taken - Strava's 48 hours apply to those copies too. */
+    /* The nightly backups, cleaned. A player erased leaves every one of
+       them (`drop` with their handle), an archived pet erased leaves by its
+       id, and any distance a backup from before it was dropped still holds
+       goes on every call - which the nightly pass makes with nothing else. */
     if (path === "/bk-scrub"){
-      const { handle } = await request.json();
+      const { handle, drop, deletedId } = await request.json().catch(() => ({}));
       const map = await this.state.storage.list({ prefix:"day:" });
       for (const [k, b] of map){
-        let hit = false;
-        for (const key of ["users", "connected", "disconnected"])
-          for (const u of b[key] || []) if (u.handle === handle && u.km != null){ u.km = null; hit = true; }
-        if (hit) await this.state.storage.put(k, b);
+        const before = JSON.stringify(b);
+        for (const key of ["users", "connected", "disconnected"]){
+          if (!Array.isArray(b[key])) continue;
+          if (drop && handle) b[key] = b[key].filter(u => u.handle !== handle);
+          for (const u of b[key]) delete u.km;
+        }
+        if (Array.isArray(b.deleted))
+          b.deleted = b.deleted.filter(d => !(drop && handle && d.handle === handle) && !(deletedId && d.id === deletedId));
+        if (JSON.stringify(b) !== before) await this.state.storage.put(k, b);
       }
       return this.ok({ ok:true });
     }
@@ -1216,12 +1484,12 @@ export class Athlete {
        its best case. */
     if (path === "/raid-claim"){
       const { epoch, seed, at } = await request.json();
-      const km     = await this.state.storage.get("kmSeen") || 0;
-      const earned = Math.floor(km / RAID_KM_PER_SWING);
+      const bank   = await this.raidBank();
+      const earned = bank.earned;
       const spent  = await this.state.storage.get("raidSpent") || 0;
       if (spent >= earned)
         return this.ok({ ok:false, why:"no swings left", earned, spent,
-                         km, toNext: RAID_KM_PER_SWING - (km % RAID_KM_PER_SWING) });
+                         toNext: RAID_KM_PER_SWING - bank.part });
       await this.state.storage.put({ raidSpent: spent + 1,
                                      raidPending: { epoch, seed, at } });
       return this.ok({ ok:true, left: earned - spent - 1, earned, spent: spent + 1 });
@@ -1237,11 +1505,10 @@ export class Athlete {
     }
     /* What this pet has banked, for the screen rather than for a decision. */
     if (path === "/raid-swings"){
-      const km     = await this.state.storage.get("kmSeen") || 0;
-      const earned = Math.floor(km / RAID_KM_PER_SWING);
+      const bank   = await this.raidBank();
       const spent  = await this.state.storage.get("raidSpent") || 0;
-      return this.ok({ km, earned, spent, left: Math.max(0, earned - spent),
-                       toNext: RAID_KM_PER_SWING - (km % RAID_KM_PER_SWING) });
+      return this.ok({ earned: bank.earned, spent, left: Math.max(0, bank.earned - spent),
+                       toNext: RAID_KM_PER_SWING - bank.part });
     }
 
     /* Close it against the claim. An hour is long enough for the longest fight
@@ -1400,9 +1667,9 @@ export class Athlete {
       const { handle } = await request.json();
       const prev = await this.state.storage.get("row:" + handle);
       if (prev) await this.state.storage.put("row:" + handle, {
-        handle, pet: prev.pet, species: prev.species, form: prev.form, stage: prev.stage, level: prev.level,
+        handle, ...(prev.pet ? rosterCard(prev) : {}),
         marks: [], firstSeen: prev.firstSeen, lastSeen: prev.lastSeen,
-        disconnected: true, disconnectedAt: Date.now() });
+        disconnected: true, disconnectedAt: prev.disconnected && prev.disconnectedAt ? prev.disconnectedAt : Date.now() });
       return this.ok({ ok:true });
     }
     /* A pet deleted: the player is still here, with no pet until they hatch one. */
@@ -1411,6 +1678,25 @@ export class Athlete {
       const prev = await this.state.storage.get("row:" + handle) || {};
       await this.state.storage.put("row:" + handle, { handle, marks: [],
         firstSeen: prev.firstSeen || Date.now(), lastSeen: Date.now() });
+      return this.ok({ ok:true });
+    }
+    if (path === "/roster-drop"){
+      const { handle } = await request.json();
+      await this.state.storage.delete("row:" + handle);
+      return this.ok({ ok:true });
+    }
+    /* Every row rewritten to what a row now keeps - the fields Strava
+       measured, from before the card was cut down, go - and a disconnected
+       row with no time on it gets one, so its grace period can run. */
+    if (path === "/roster-scrub"){
+      const map = await this.state.storage.list({ prefix: "row:", limit: 1000 });
+      for (const [k, r] of map){
+        const clean = { handle: r.handle, ...(r.pet ? rosterCard(r) : {}), marks: r.marks || [],
+          firstSeen: r.firstSeen || null, lastSeen: r.lastSeen || null,
+          ...(r.disconnected ? { disconnected: true, disconnectedAt: r.disconnectedAt || Date.now() }
+                             : { disconnected: false }) };
+        if (JSON.stringify(clean) !== JSON.stringify(r)) await this.state.storage.put(k, clean);
+      }
       return this.ok({ ok:true });
     }
     if (path === "/roster-list"){
@@ -1505,12 +1791,15 @@ export class Athlete {
     if (!token) return this.ok({ save, activities: [], error:"reauth" });
 
     const connectedAt = await s.get("connectedAt") || Date.now();
-    const imported = new Set(await s.get("imported") || []);
+    const { map: imported, floor } = await this.pruneImported(Date.now());
     const virtual = !!(save && save.settings && save.settings.stravaVirtual);
     const want = new Set([...ALWAYS, ...(virtual ? OPT_IN : [])]);
 
     const url = new URL(API(this.env) + "/athlete/activities");
-    url.searchParams.set("after", Math.floor(connectedAt / 1000));
+    // From the later of connecting and the floor: anything that started
+    // before the floor was imported more than a week ago and its id let go -
+    // see pruneImported().
+    url.searchParams.set("after", Math.floor(Math.max(connectedAt, floor) / 1000));
     // Strava returns newest first, so a new run is always inside this window;
     // the cap only bites if someone logs more than this between two app opens.
     // 200 is the endpoint's maximum, and costs the same one request as 100.
@@ -1522,7 +1811,7 @@ export class Athlete {
     // empty - nothing recorded since connecting, nothing of a type that counts,
     // or everything already taken - without anyone having to read a log.
     const raw = await r.json();
-    const fresh = raw.filter(a => !imported.has(String(a.id)));
+    const fresh = raw.filter(a => !imported[String(a.id)] && !(Date.parse(a.start_date) <= floor));
     const kinds = {};
     for (const a of fresh) kinds[a.type] = (kinds[a.type] || 0) + 1;
 
@@ -1535,9 +1824,22 @@ export class Athlete {
         sec: a.moving_time,
         elev: a.total_elevation_gain || 0,
         type: a.type,
-        manual: !!a.manual                 // typed in by hand on Strava, not recorded
+        manual: !!a.manual,                // typed in by hand on Strava, not recorded
+        // what recorded it - shown on the run so a Garmin-recorded one carries
+        // Garmin's attribution (Strava's API Policy 4.4)
+        device: a.device_name ? String(a.device_name).slice(0, 60) : null
       }))
       .sort((x, y) => x.t - y.t);
+    /* When each one we hand over started, so that once the app says it
+       imported it the id can be let go on time - see pruneImported(). Kept
+       only until then; a week-old offer the app never took is dropped. */
+    if (activities.length){
+      const offered = await s.get("offered") || {};
+      const cut = Date.now() - RETAIN_MS;
+      for (const k of Object.keys(offered)) if (offered[k].at < cut) delete offered[k];
+      for (const a of activities) offered[a.id] = { t: a.t, at: Date.now() };
+      await s.put("offered", offered);
+    }
 
     await s.put("lastSync", Date.now());
     // connectedAt matters more than it looks: the window is on an activity's
@@ -1561,7 +1863,7 @@ export class Athlete {
       }
     }
     /* Kilometres this broker has seen for itself, which is what a swing at the
-       raid is bought with. The card carries a `km` and it is written by the
+       raid is bought with - banked as swings, see raidBank(). The card carries a `km` and it is written by the
        device, so pricing the raid off it would make the swing budget a number
        the player types. This counter only ever grows by distances read out of
        Strava's own answer.
@@ -1587,8 +1889,12 @@ export class Athlete {
     const counting = activities.filter(a => a.t > kmAfter);
     if (counting.length){
       const km = counting.reduce((t, a) => t + (Number(a.km) || 0), 0);
-      await s.put({ kmSeen: (await s.get("kmSeen") || 0) + km,
-                    kmAfter: Math.max(kmAfter, ...counting.map(a => a.t)) });
+      const bank = await this.raidBank();
+      bank.part += km;
+      const whole = Math.floor(bank.part / RAID_KM_PER_SWING);
+      bank.earned += whole;
+      bank.part = Math.round((bank.part - whole * RAID_KM_PER_SWING) * 1000) / 1000;
+      await s.put({ raidBank: bank, kmAfter: Math.max(kmAfter, ...counting.map(a => a.t)) });
     }
     /* What the admin has queued for this pet. The phone's save is the one
        that counts - the copy here is only adopted by a device that has none -
@@ -1608,59 +1914,57 @@ export class Athlete {
     const s = this.state.storage;
     const [save, card, connectedAt, lastSync, refresh, friendCode, adjust, imported, battles, parkedAt, deletedPets] =
       await Promise.all(["save","card","connectedAt","lastSync","refresh","friendCode",
-                         "adjust","imported","battles","parkedAt","deletedPets"].map(k => s.get(k)));
+                         "adjust","importedAt","battles","parkedAt","deletedPets"].map(k => s.get(k)));
     const runs = (save && save.runs) || [];
     return this.ok({
       linked: !!refresh, connectedAt: connectedAt || null, lastSync: lastSync || null,
-      friendCode: friendCode || null, card: card || null,
+      friendCode: friendCode || null, card: gameCard(card),
+      // XP, never distance: the dashboard is somebody other than the player
       save: save ? {
         petName: save.petName || "", species: save.species || null,
-        runs: runs.length,
-        runXp: runs.reduce((t, r) => t + (Number(r.xp) || 0), 0),
-        runKm: runs.reduce((t, r) => t + (Number(r.km) || 0), 0),
-        adminXp: Number(save.adminXp) || 0, adminKm: Number(save.adminKm) || 0,
+        runs: runs.filter(r => !r.folded).length,
+        runXp: runs.filter(r => !r.folded).reduce((t, r) => t + (Number(r.xp) || 0), 0),
+        pastXp: Number(save.past && save.past.xp) || 0,
+        adminXp: Number(save.adminXp) || 0,
         adminRev: Number(save.adminRev) || 0,
         badges: Object.keys(save.badges || {}).length,
         createdAt: save.createdAt || null, syncedAt: save.stravaSyncedAt || null
       } : null,
       adjust: adjust || [], parkedAt: parkedAt || null, deletedPets: (deletedPets || []).length,
-      imported: (imported || []).length, battles: (battles || []).length
+      eraseAt: parkedAt ? parkedAt + GRACE_MS : null,
+      imported: Object.keys(imported || {}).length, battles: (battles || []).length
     });
   }
 
   /** Queue a change to this pet's level or XP. Kept to the last fifty: the app
       applies every one it has not seen, in order, so the queue is history as
       much as instructions, and fifty is more than a pet will ever need. */
-  async adminAdjust({ kind, value, note, snap }){
+  async adminAdjust({ kind, value, note, snap, id }){
     const s = this.state.storage;
     if (!(await s.get("save"))) return this.ok({ error:"This player has no pet saved yet - they need to open the app (and hatch an egg, on a new phone) first." });
     const list = await s.get("adjust") || [];
     const rev = (list.length ? list[list.length - 1].rev : 0) + 1;
-    list.push({ rev, kind, value, ...(snap ? { snap } : {}), note: String(note || "").slice(0, 120), at: Date.now() });
+    list.push({ rev, kind, value, ...(snap ? { snap } : {}), ...(id ? { id: String(id) } : {}),
+                note: String(note || "").slice(0, 120), at: Date.now() });
     await s.put("adjust", list.slice(-50));
     return this.ok({ ok:true, rev });
   }
 
-  /** What a backup keeps of this pet: the game's own state and one running
-      total, and none of the runs. Strava's API Policy (6.2) allows its data
-      to be kept for seven days, and a backup is kept for longer than that,
-      so the activities themselves - dates, times, distances run by run - stay
-      out of it. Level and XP are the game's; the lifetime distance is the one
-      figure from Strava in it, as a total, because it is what the distance
-      badges and the Lifetime line are measured against. */
+  /** What a backup keeps of this pet: the game's own state, and nothing
+      Strava measured. It used to keep the lifetime distance as well; a
+      backup is kept for longer than Strava's seven days (API Policy 6.2), so
+      that went, with the runs, which were never in it. */
   async adminSnapshot(){
     const s = this.state.storage;
-    const [save, card, parkedAt] = await Promise.all([s.get("save"), s.get("card"), s.get("parkedAt")]);
+    const [save, card] = await Promise.all([s.get("save"), s.get("card")]);
     if (!save) return this.ok({ snap: null });
-    const runs = save.runs || [];
-    const xp = runs.reduce((t, r) => t + (Number(r.xp) || 0), 0) + (Number(save.adminXp) || 0);
-    const km = runs.reduce((t, r) => t + (Number(r.km) || 0), 0) + (Number(save.adminKm) || 0);
+    const runs = (save.runs || []).filter(r => !r.folded);
+    const xp = runs.reduce((t, r) => t + (Number(r.xp) || 0), 0) + (Number(save.adminXp) || 0)
+             + (Number(save.past && save.past.xp) || 0);
     return this.ok({ snap: {
       pet: String(save.petName || "").slice(0, 24), species: save.species || null,
       level: (card && Number(card.level)) || null,
-      xp: Math.max(0, Math.round(xp)),
-      // nothing from Strava is kept for a parked pet - see gameOnly()
-      km: parkedAt ? null : Math.max(0, Math.round(km * 10) / 10)
+      xp: Math.max(0, Math.round(xp))
     } });
   }
 
@@ -1673,7 +1977,7 @@ export class Athlete {
       code = [...bytes].map(b => CODE_ALPHABET[b % CODE_ALPHABET.length]).join("");
       await s.put("friendCode", code);
     }
-    return this.ok({ code, card: await s.get("card") || null });
+    return this.ok({ code, card: gameCard(await s.get("card")) });
   }
 
   /** The client says what it stored and what it managed to import, together, so
@@ -1683,10 +1987,21 @@ export class Athlete {
   async commit({ save, imported, card }){
     const s = this.state.storage;
     if (await s.get("parkedAt")) return this.ok({ saved: false, error: "disconnected" });
-    const seen = new Set(await s.get("imported") || []);
-    for (const id of imported || []) seen.add(String(id));
-    const write = { save, imported: [...seen] };
-    if (card) write.card = card;
+    const now = Date.now();
+    const { map } = await this.pruneImported(now);
+    const offered = await s.get("offered") || {};
+    for (const id of imported || []){
+      const k = String(id);
+      map[k] = { t: offered[k] ? offered[k].t : now, at: now };
+      delete offered[k];
+    }
+    /* A run Strava has since said is gone (see activityGone()) does not come
+       back in on a push that set off before the app heard. */
+    const gone = await s.get("gone") || {};
+    if (save && Array.isArray(save.runs) && Object.keys(gone).length)
+      save.runs = save.runs.filter(r => !(r && r.strava && gone[String(r.strava)]));
+    const write = { save, importedAt: map, offered };
+    if (card) write.card = gameCard(card);
     await s.put(write);
     return this.ok({ saved: true });
   }
@@ -1694,17 +2009,156 @@ export class Athlete {
   /** A disconnect - see parkAthlete(). */
   async park(){
     const s = this.state.storage;
-    const token = await this.accessToken();
-    if (token) await fetch(STRAVA(this.env) + "/oauth/deauthorize", {
-      method:"POST", headers:{ Authorization:`Bearer ${token}` } }).catch(()=>{});
+    await this.revoke();
     const [save, card] = await Promise.all([s.get("save"), s.get("card")]);
     await s.delete(["refresh", "access", "expires", "connectedAt", "lastSync", "imported",
-                    "kmSeen", "kmAfter", "raidSpent", "raidPending", "deleteIntent"]);
+                    "importedAt", "floor", "offered", "gone",
+                    "kmSeen", "kmAfter", "raidBank", "raidSpent", "raidPending", "deleteIntent"]);
     const put = { parkedAt: Date.now() };
     if (save) put.save = gameOnly(save);
     if (card) put.card = gameCard(card);
     await s.put(put);
     return this.ok({ parked: true, code: await s.get("friendCode") || null });
+  }
+
+  /* Tell Strava to forget us. oauth/revoke is the endpoint Strava now asks
+     for - oauth/deauthorize is retired on 1 June 2027 - and takes the
+     refresh token with the app's own credentials, so it works even when the
+     access token has lapsed. The old endpoint stays as a fallback until then,
+     for a Strava that answers the new one badly. */
+  async revoke(){
+    const s = this.state.storage;
+    const refresh = await s.get("refresh");
+    if (!refresh) return false;
+    const basic = btoa(`${this.env.STRAVA_CLIENT_ID}:${this.env.STRAVA_CLIENT_SECRET}`);
+    const r = await fetch(STRAVA(this.env) + "/oauth/revoke", { method:"POST",
+      headers:{ Authorization:`Basic ${basic}`, "Content-Type":"application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ token: refresh, token_type_hint: "refresh_token" }) }).catch(() => null);
+    if (r && r.ok) return true;
+    const token = await this.accessToken();
+    if (token) await fetch(STRAVA(this.env) + "/oauth/deauthorize", {
+      method:"POST", headers:{ Authorization:`Bearer ${token}` } }).catch(() => {});
+    return false;
+  }
+
+  /** Everything this object holds, gone - see purgeAthlete(). */
+  async purge(){
+    const s = this.state.storage;
+    await this.revoke();
+    const code = await s.get("friendCode");
+    await s.deleteAll();
+    return this.ok({ ok:true, code: code || null });
+  }
+
+  /* The Strava ids of what the app has imported, each kept a week and then
+     let go, which is Strava's cache limit (API Policy 6.2). Letting one go
+     would let it be fetched and paid for again, so the floor moves up to where
+     it started, and nothing starting at or before the floor is fetched again.
+     A run uploaded to Strava more than a week after it began, and after a
+     later run was already imported, is the one thing that misses out.
+
+     The first touch turns the old id list - which had no dates, and kept
+     every id forever - into a floor above everything it could have held. */
+  async pruneImported(now){
+    const s = this.state.storage;
+    let [map, floor] = await Promise.all([s.get("importedAt"), s.get("floor")]);
+    floor = Number(floor) || 0;
+    let dirty = false;
+    if (!map){
+      map = {};
+      if (await s.get("imported")){
+        const save = await s.get("save");
+        const starts = ((save && save.runs) || []).filter(r => r && r.strava).map(r => Number(r.t) || 0);
+        floor = Math.max(floor, Number(await s.get("kmAfter")) || 0, ...starts);
+        await s.delete("imported");
+      }
+      dirty = true;
+    }
+    for (const k of Object.keys(map)){
+      if (now - map[k].at >= RETAIN_MS){ floor = Math.max(floor, Number(map[k].t) || 0); delete map[k]; dirty = true; }
+    }
+    if (dirty) await s.put({ importedAt: map, floor });
+    return { map, floor };
+  }
+
+  /* Swings at the raid, banked. The broker used to keep the lifetime
+     kilometres it had seen and work swings out from them; a lifetime
+     distance is Strava's, and kept past a week it is exactly what the API
+     Policy rules out, so what is kept now is the swings it bought and the
+     part of one still being run for - under five kilometres. */
+  async raidBank(){
+    const s = this.state.storage;
+    let bank = await s.get("raidBank");
+    if (!bank){
+      const km = Number(await s.get("kmSeen")) || 0;
+      const earned = Math.floor(km / RAID_KM_PER_SWING);
+      bank = { earned, part: Math.round((km - earned * RAID_KM_PER_SWING) * 1000) / 1000 };
+      await s.put("raidBank", bank);
+      await s.delete("kmSeen");
+    }
+    return bank;
+  }
+
+  /* The nightly pass for one connected pet: its copy of the save folded
+     (foldServer), its imported ids let go, and the removed-run list trimmed. */
+  async retention(){
+    const s = this.state.storage;
+    const now = Date.now();
+    let folded = false;
+    const save = await s.get("save");
+    if (save){
+      const out = foldServer(save, now);
+      if (out){ await s.put("save", out); folded = true; }
+    }
+    await this.pruneImported(now);
+    await this.raidBank();
+    const gone = await s.get("gone");
+    if (gone){
+      for (const k of Object.keys(gone)) if (now - gone[k] >= RETAIN_MS) delete gone[k];
+      await s.put("gone", gone);
+    }
+    return this.ok({ folded });
+  }
+
+  /* Has this athlete really revoked us? The webhook says so without proof,
+     so Strava is asked: a refresh it refuses, or a 401 on the athlete's own
+     profile, is a yes. An object with no token at all is nobody we know. */
+  async verifyRevoked(){
+    const s = this.state.storage;
+    if (!(await s.get("refresh"))) return this.ok({ known: false });
+    const token = await this.accessToken();
+    if (!token) return this.ok({ known: true, revoked: true });
+    const r = await fetch(API(this.env) + "/athlete", { headers:{ Authorization:`Bearer ${token}` } });
+    return this.ok({ known: true, revoked: r.status === 401 });
+  }
+
+  /* A run deleted on Strava, or made "Only You". Strava wants that reflected
+     within 48 hours (API Policy 6.3). Only a run this object holds is looked
+     at, so a stranger's event costs nothing; Strava is asked whether it is
+     really gone; and then it leaves this copy of the save and is queued for
+     the app, which takes it out of the phone's copy and the pet's XP on its
+     next sync - the same as deleting it in the app. A run already folded into
+     the pet has nothing left to remove. */
+  async activityGone({ id }){
+    const s = this.state.storage;
+    id = String(id || "");
+    const [save, map] = await Promise.all([s.get("save"), s.get("importedAt")]);
+    const inSave = !!(save && Array.isArray(save.runs) && save.runs.some(r => r && String(r.strava) === id));
+    if (!inSave && !(map && map[id])) return this.ok({ ok:false, why:"not ours" });
+    const token = await this.accessToken();
+    if (!token) return this.ok({ ok:false, why:"no token" });
+    const r = await fetch(API(this.env) + "/activities/" + encodeURIComponent(id),
+      { headers:{ Authorization:`Bearer ${token}` } });
+    if (r.ok) return this.ok({ ok:false, why:"still there" });
+    if (r.status !== 404 && r.status !== 403) return this.ok({ ok:false, why:"strava " + r.status });
+    const gone = await s.get("gone") || {};
+    gone[id] = Date.now();
+    const put = { gone };
+    if (map){ delete map[id]; put.importedAt = map; }
+    if (inSave){ save.runs = save.runs.filter(x => !(x && String(x.strava) === id)); put.save = save; }
+    await s.put(put);
+    if (save) await this.adminAdjust({ kind:"unrun", value: 0, id, note:"deleted or made private on Strava" });
+    return this.ok({ ok:true, removed: inSave });
   }
 
   /* Deleting a pet, step one: an intent, which the second step has to wait

@@ -53,6 +53,22 @@ Cloudflare credentials. Generating a secret for them puts it in the transcript,
 which defeats the point. Strava's terms also forbid putting activity data
 through an AI system, so never ask them to paste run data.
 
+## Strava's API rules are load-bearing — don't regress them
+
+The app is being submitted for Strava's athlete-capacity review, and the code
+is built to its API Agreement and API Policy (2026). README → "Strava's rules"
+has the full list; the ones easiest to break by accident:
+
+- Nothing Strava measured (distance, run count, run times, dates) goes on a
+  card, Rankings, the dashboard or a backup. Cards are `rosterCard()` fields only.
+- A run is folded into `save.past` after six full days (`foldOldRuns`); every
+  replay of mood/streak must go through the seeded functions, and
+  `foldeq.mjs`-style equivalence (full log vs folded) must still hold.
+- Disconnected players and deleted pets are erased after `GRACE_DAYS` (28) —
+  never "kept forever". Strava's limit is 30.
+- No lifetime distance anywhere. No Strava data, or anything derived from it,
+  into any AI — including this chat.
+
 ## The app is one file with nine separate `<script>` blocks
 
 `index.html` is ~6,400 lines. The blocks are **not** one scope at parse time: a
