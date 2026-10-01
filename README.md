@@ -1369,9 +1369,12 @@ Runmon follows Strava's [API Agreement](https://www.strava.com/legal/api) and
   broker's copy past the week. Strava activity ids are let go after a week
   too, behind a start-time floor.
 - **Nobody sees another player's Strava data (2.3).** A card — what Rankings,
-  friend codes and the dashboard show — carries the pet, form, level, XP,
-  streak and badge count, and no distance, run count or run time. Rankings
-  break a level tie on XP.
+  friend codes and the dashboard show — carries the pet, form, level, streak
+  and badge count, and no distance, run count or run time. It also carries XP
+  into the roster for the admin table, but the broker strips it
+  (`playerCard`) before any card reaches another player: XP is the run log
+  summed, the closest thing on a card to Strava's own data. Rankings order by
+  level, then badges, then name.
 - **No lifetime distance**, and no badges for distance or pace (see
   [Badges](#badges)). Raid swings are banked as swings, not as kilometres.
 - **Disconnecting (2.5, 7.4).** Runs are deleted at once and Strava's grant is

@@ -734,9 +734,9 @@ export default {
           const { rows } = await r.json();
           const players = (rows || [])
             .filter(x => x.handle !== mine && x.pet && !x.disconnected)
-            .map(x => ({ id: x.handle, card: rosterCard(x), lastSeen: x.lastSeen || 0,
+            .map(x => ({ id: x.handle, card: playerCard(rosterCard(x)), lastSeen: x.lastSeen || 0,
                          pen: markPenalty(x.marks), hits: markCount(x.marks) }))
-            .sort((a, b) => byStanding(a.card, b.card))
+            .sort((a, b) => byRank(a.card, b.card))
             .slice(0, 200);
           return json(env, { players });
         });
@@ -766,7 +766,7 @@ export default {
           const r = await theirs.fetch("https://do/card");
           const { card } = await r.json();
           if (!card) return json(env, { error:"They have not hatched a pet yet." });
-          return json(env, { code, card });
+          return json(env, { code, card: playerCard(card) });
         });
 
       // One round trip for a whole friends list. Codes only - a card carries a
@@ -781,7 +781,7 @@ export default {
             if (!owner) return;
             const r = await (await athleteStub(env, owner)).fetch("https://do/card");
             const { card } = await r.json();
-            if (card) cards[code] = card;
+            if (card) cards[code] = playerCard(card);
           }));
           return json(env, { cards });
         });
@@ -1263,8 +1263,21 @@ function rosterCard(c){
 const rowOut = r => ({ handle: r.handle, ...(r.pet ? rosterCard(r) : {}),
   marks: r.marks || [], firstSeen: r.firstSeen || null, lastSeen: r.lastSeen || null,
   disconnected: !!r.disconnected, disconnectedAt: r.disconnectedAt || null });
-/* Levels first, then XP inside a level - distance used to break the tie. */
+/* Levels first, then XP inside a level - distance used to break the tie.
+   The admin table's order only; players are ranked by byRank. */
 const byStanding = (a, b) => (b.level - a.level) || ((b.xp || 0) - (a.xp || 0));
+/* What one player is shown of another: the card without its XP. XP is the
+   run log summed, so of everything on a card it is the closest to Strava's
+   own data, and putting it side by side down a table of athletes is the
+   comparison Strava's API Policy is most wary of. The card still carries XP
+   into the roster - the admin table and the nightly backfill read it there -
+   it just stops at this door. Level, form, streak and badges are the
+   pet's. */
+const playerCard = c => { const { xp, ...rest } = c; return rest; };
+/* The order players see: level, then badges, then name - XP no longer has a
+   say, for the reason above. */
+const byRank = (a, b) => (b.level - a.level) || ((b.badges || 0) - (a.badges || 0))
+  || String(a.pet).localeCompare(String(b.pet));
 /* A plain-text table, because this is read over curl in a terminal. Columns are
    padded to their widest value rather than to a guess, so a long pet name does
    not push everything out of line.

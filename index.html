@@ -4739,7 +4739,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-10-01 a192e32";
+const BUILD_ID = "2026-10-01 cab2d15";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -6981,7 +6981,6 @@ function safeCard(c){
     stage: n(c.stage, 0, 4),
     form: String(c.form || SPECIES[species].stages[n(c.stage, 0, 4)].name).slice(0, 24),
     level: n(c.level, 1, 999),
-    xp: n(c.xp, 0, 1e9),
     streak: n(c.streak, 0, 1e5),
     best: n(c.best, 0, 1e5),
     badges: n(c.badges, 0, 1e3)
@@ -6998,7 +6997,15 @@ function safeCard(c){
    The penalty rides along on every row. Yours is known locally because runs
    are priced against it; everyone else's arrives with the roster. Seeing it is
    the point - a pet already carrying -20% is a pet the rest of the field has
-   got to first, and that changes who is worth attacking. */
+   got to first, and that changes who is worth attacking.
+
+   Ordered by level, then badges, then name - not XP. XP is the run log added
+   up, which makes it the one number on a card that is Strava's data wearing
+   the game's clothes, and a ranking is exactly the side-by-side comparison of
+   athletes Strava's API Policy is wary of. A level is a band wide enough to
+   be the pet's, not the miles; inside one, the tie goes to whoever has done
+   more with the pet. Your own card drops its XP here too, so the table cannot
+   show a number for you it hides for everybody else. */
 function rankingRows(){
   const rows = playerList()
     .map(f => ({ id: f.id, card: safeCard(f.card), pen: f.pen || 0, hits: f.hits || 0 }))
@@ -7007,7 +7014,8 @@ function rankingRows(){
     rows.push({ id: null, me: true, card: safeCard(publicCard()),
                 pen: markPenalty(save.marks, Date.now()),
                 hits: markCount(save.marks, Date.now()) });
-  rows.sort((a, b) => (b.card.level - a.card.level) || (b.card.xp - a.card.xp));
+  rows.sort((a, b) => (b.card.level - a.card.level) || (b.card.badges - a.card.badges)
+                    || a.card.pet.localeCompare(b.card.pet));
   return rows;
 }
 
@@ -7054,7 +7062,7 @@ function friendRowHTML(r, rank){
       <div class="who">
         <div class="n">${esc(c.pet)} <span class="chip">LV ${c.level}</span>${tag}</div>
         <div class="h">${esc(c.form)} \u00b7 Stage ${c.stage + 1} of 5</div>
-        <div class="s">${nf(c.xp)} XP \u00b7 ${c.streak >= 2 ? c.streak + "-day streak" : "no streak"} \u00b7 ${c.badges} badge${c.badges === 1 ? "" : "s"}</div>
+        <div class="s">${c.streak >= 2 ? c.streak + "-day streak" : "no streak"} \u00b7 ${c.badges} badge${c.badges === 1 ? "" : "s"}</div>
         ${pen}${hit}
       </div>
       ${r.me ? "" : `<span class="go"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span>`}
@@ -7261,7 +7269,7 @@ function openFriend(id){
       <div class="stat-grid">
         <div class="stat"><div class="v">${c.streak}</div><div class="k">Day streak</div></div>
         <div class="stat"><div class="v">${c.best}</div><div class="k">Best streak</div></div>
-        <div class="stat"><div class="v">${c.xp >= 10000 ? nf(c.xp / 1000, 1) + "k" : nf(c.xp)}</div><div class="k">Total XP</div></div>
+        <div class="stat"><div class="v">${c.stage + 1}<span style="font-size:12px;opacity:.6"> of 5</span></div><div class="k">Stage</div></div>
       </div>
       <div class="stat-grid" style="margin-top:9px">
         <div class="stat"><div class="v">${c.level}</div><div class="k">Level</div></div>
@@ -8398,7 +8406,7 @@ function stravaDisclosureHTML(){
       own page, each time you open Runmon. It never posts or changes anything on Strava, and
       it cannot see activities you keep to "Only You".</li>
     <li><b>How long, and who sees it.</b> Each run's details for seven days, then only the XP
-      it earned. Other players see your pet's name, form, level, XP, streak and badges &mdash;
+      it earned. Other players see your pet's name, form, level, streak and badges &mdash;
       never your runs, distances or times. Nothing goes to advertisers or to any AI.</li>
     <li><b>Stopping.</b> Disconnect in Settings, or remove Runmon on Strava. Your runs are
       deleted at once; your pet is kept four weeks in case you come back, then erased.</li>
