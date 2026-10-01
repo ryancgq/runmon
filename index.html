@@ -625,6 +625,7 @@ body::before{
 .strava-link{color:#FC5200;font-weight:800;text-decoration:none}
 .sum-hero .src .keep{font-size:10.5px;opacity:.8;margin-top:2px}
 .fold-note{font-size:11px;font-weight:700;text-align:center;line-height:1.6;margin:14px 8px 0}
+#ob-privacy a{color:inherit;text-decoration:underline}
 /* What Runmon reads - the consent list, on onboarding and in sheets. */
 .consent{font-size:12px;font-weight:600;line-height:1.55;color:var(--muted);text-align:left}
 .consent ul{margin:10px 0 0;padding-left:18px}
@@ -911,6 +912,16 @@ body::before{
 .badge.got .nm{color:#d5dcea}
 @keyframes badgePop{0%{transform:scale(.4)}70%{transform:scale(1.16)}100%{transform:scale(1)}}
 .badge:active{transform:scale(.94)}
+/* The races: one holder each, for the whole game. */
+.firsts{display:grid;gap:8px}
+.first{display:flex;align-items:center;gap:12px;padding:11px 13px;border-radius:14px;background:var(--card);border:1px solid var(--line)}
+.first .ico{font-size:22px;line-height:1;filter:grayscale(1) opacity(.45)}
+.first .nm{font-size:13px;font-weight:800}
+.first .who{font-size:11px;font-weight:700;color:var(--muted);margin-top:2px}
+.first.taken .ico{filter:none;opacity:.8}
+.first.got{background:linear-gradient(160deg, rgba(var(--glow),.18), var(--card));border-color:rgba(var(--glow),.4)}
+.first.got .ico{filter:none}
+.first.got .who{color:#d5dcea}
 
 /* ============================================================
    History
@@ -1538,6 +1549,9 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
 
       <div class="section-title">Badges <span class="chip grey" id="badge-count" style="margin-left:auto">0/0</span></div>
       <div class="badge-grid" id="badge-grid"></div>
+
+      <div class="section-title" id="firsts-title" hidden>Runmon firsts <span class="chip grey" id="firsts-count" style="margin-left:auto">0/0</span></div>
+      <div class="firsts" id="firsts-grid" hidden></div>
 
       <div class="screen-pad"></div>
     </section>
@@ -3036,41 +3050,52 @@ const moodByRank = r => MOOD_BY_RANK[Math.max(0, Math.min(MOOD_BY_RANK.length - 
 const STREAK_MULT = 1.2;
 const STREAK_GAP  = 2;    // days you may leave between qualifying runs
 
+/* Badges are about the pet, not the running. Distance clubs, a marathon, a
+   pace, early and late runs, run counts: Strava already hands out every one
+   of those, and a second copy here was the same achievement twice with a
+   pet drawn next to it. What only Runmon can say is what the pet did -
+   hatched, grew, learnt its moves, won its fights, was as happy as a pet
+   gets - so that is what these are.
+
+   Sticky, as before: earned once, kept. A badge from the old set that a
+   player already won stays in their save but is no longer drawn or counted.
+   Ids that carried over keep their old ones, so nothing anybody has is lost
+   for being renamed ("evolved" was stage 1, and still is - the hatch).
+
+   The races - the first player in the whole game to a level - are not here:
+   only the broker can know who was first, so they arrive from it. See
+   renderFirsts(). */
 const BADGES = [
-  { id:"first",     ico:"👟", name:"First Steps",  test:s=>s.runCount>=1 },
-  { id:"run10",     ico:"🔟", name:"Ten Runs",     test:s=>s.runCount>=10 },
-  { id:"run50",     ico:"🏅", name:"Fifty Runs",   test:s=>s.runCount>=50 },
-  { id:"d5k",       ico:"🥉", name:"5K Club",      test:s=>s.runs.some(r=>r.km>=5) },
-  { id:"d10k",      ico:"🥈", name:"10K Club",     test:s=>s.runs.some(r=>r.km>=10) },
-  { id:"half",      ico:"🥇", name:"Half Mara",    test:s=>s.runs.some(r=>r.km>=21.0975) },
-  { id:"full",      ico:"👑", name:"Marathon",     test:s=>s.runs.some(r=>r.km>=42.195) },
-  /* These three were lifetime distance - 100, 500 and 1,000 km. Nothing keeps
-     a lifetime distance any more (Strava's data may be kept a week, API
-     Policy 6.2), so they are XP at the flat 100 a kilometre, which is the
-     same distance for anybody running without bonuses, and the ids stay so
-     a badge already won stays won. */
-  { id:"km100",     ico:"💯", name:"10,000 XP",    test:s=>s.totalXp>=10000 },
-  { id:"km500",     ico:"🌍", name:"50,000 XP",    test:s=>s.totalXp>=50000 },
-  { id:"km1000",    ico:"🚀", name:"100,000 XP",   test:s=>s.totalXp>=100000 },
-  { id:"streak3",   ico:"🔥", name:"3 Day Streak", test:s=>s.bestStreak>=3 },
-  { id:"streak7",   ico:"⚡", name:"7 Day Streak", test:s=>s.bestStreak>=7 },
-  { id:"streak30",  ico:"🏆", name:"30 Day Run",   test:s=>s.bestStreak>=30 },
-  { id:"early",     ico:"🌅", name:"Early Bird",   test:s=>s.runs.some(r=>new Date(r.t).getHours()<6) },
-  { id:"night",     ico:"🌙", name:"Night Owl",    test:s=>s.runs.some(r=>new Date(r.t).getHours()>=21) },
-  { id:"evolved",   ico:"🧬", name:"Evolved",      test:s=>s.stage>=1 },
-  { id:"teen",      ico:"✨", name:"Teenager",     test:s=>s.stage>=2 },
-  { id:"adult",     ico:"🛡️", name:"Fully Grown", test:s=>s.stage>=3 },
-  { id:"final",     ico:"💎", name:"Final Form",   test:s=>s.stage>=4 },
-  { id:"speedy",    ico:"💨", name:"Sub-5 Pace",   test:s=>s.runs.some(r=>r.km>=1 && (r.sec/60)/r.km < 5) },
-  /* The only badge that is not about your own running, and the only one that
-     can be earned while you are not looking: it lands when he falls, which is
-     usually somebody else's swing. Landing a blow is the whole requirement -
-     a raid is meant to be won by a crowd, so a badge that went to whoever
-     happened to strike last would be a lottery ticket rather than a record of
-     having been there. Sticky like the rest, and once his epoch closes there
-     is no second chance at it. */
-  { id:"orcslayer",  ico:"🪓", name:"Orc Slayer",   test:s=>s.raidSlain }
+  // growing up
+  { id:"first",    ico:"\u{1F356}", name:"First Meal",    desc:"Fed its first run.",                         test:s=>s.runCount>=1 },
+  { id:"evolved",  ico:"\u{1F423}", name:"Hatched",       desc:"Hatched out of its egg, at level 5.",        test:s=>s.stage>=1 },
+  { id:"lv10",     ico:"\u{1F51F}", name:"Double Digits", desc:"Reached level 10.",                          test:s=>s.level>=10 },
+  { id:"teen",     ico:"\u{1F9EC}", name:"Evolved",       desc:"Grew into its third form, at level 15.",     test:s=>s.stage>=2 },
+  { id:"lv20",     ico:"\u2B50",    name:"Level 20",      desc:"Reached level 20.",                          test:s=>s.level>=20 },
+  { id:"lv30",     ico:"\u{1F31F}", name:"Level 30",      desc:"Reached level 30.",                          test:s=>s.level>=30 },
+  // learning moves - "known" counts every move learnt, outgrown ones too
+  { id:"move1",    ico:"\u{1F393}", name:"First Move",    desc:"Learnt its first move.",                     test:s=>s.known>=1 },
+  { id:"move3",    ico:"\u{1F4DA}", name:"Quick Study",   desc:"Has learnt three moves.",                    test:s=>s.known>=3 },
+  { id:"fullkit",  ico:"\u{1F9F0}", name:"Full Kit",      desc:"Learnt every move its current form has.",    test:s=>s.fullKit },
+  // fights - wins counted off the battle log, which keeps the last fifty
+  { id:"win1",     ico:"\u2694\uFE0F", name:"First Win", desc:"Won a fight it started.",                    test:s=>s.wins>=1 },
+  { id:"win10",    ico:"\u{1F94A}", name:"Brawler",       desc:"Won ten fights it started.",                 test:s=>s.wins>=10 },
+  { id:"giant",    ico:"\u{1F5E1}\uFE0F", name:"Giant Slayer", desc:"Beat a pet three or more levels above it.", test:s=>s.giant },
+  /* Lands when the raid boss falls, which is usually somebody else's swing.
+     Landing a blow is the whole requirement - a raid is meant to be won by a
+     crowd, so a badge that went to whoever happened to strike last would be a
+     lottery ticket rather than a record of having been there. Once his epoch
+     closes there is no second chance at it. */
+  { id:"orcslayer",ico:"\u{1FA93}", name:"Orc Slayer",    desc:"Landed a blow on the raid boss the round he fell.", test:s=>s.raidSlain },
+  // looking after it
+  { id:"elated",   ico:"\u{1F604}", name:"Over the Moon", desc:"Was as happy as a pet gets.",                test:s=>s.elated },
+  { id:"streak7",  ico:"\u{1F525}", name:"Never Hungry",  desc:"Kept its streak going for seven days.",      test:s=>s.bestStreak>=7 }
 ];
+/** Badges a pet holds that are drawn and counted: this set, and any race it won. */
+function badgeCount(b){
+  b = b || save.badges || {};
+  return BADGES.filter(x => b[x.id]).length + Object.keys(b).filter(k => k.startsWith("1st-")).length;
+}
 
 /* ---------------------------------------------------------------------------
    2. MATHS
@@ -3855,6 +3880,7 @@ function persist(){
    had already had, and then jumped to 16 with no fill at all. The walk was
    replaying the new run's POSITION rather than its XP. */
 let heldRuns = null;
+let badgeNews = [];
 
 function recompute(){
   const all = activeRuns().sort((a,b)=>a.t-b.t);
@@ -3907,9 +3933,21 @@ function recompute(){
   };
 
   // badges — sticky once earned
-  const ctx = { runs, runCount, totalXp, bestStreak: sk.best, stage, raidSlain: raidSlain() };
+  const sk2 = derived.skills, top = moodByRank(MOOD_BY_RANK.length - 1);
+  const wins = (save.battles || []).filter(r => r && r.dir === "out" && r.win);
+  const ctx = { runs, runCount, totalXp, bestStreak: sk.best, stage, level: lv.level,
+    known: sk2.filter(k => k.known).length,
+    fullKit: sk2.some(k => k.stage === stage) && sk2.filter(k => k.stage === stage).every(k => k.known),
+    wins: wins.length, giant: wins.some(r => (Number(r.gap) || 0) >= 3),
+    elated: derived.mood && derived.mood.key === top.key,
+    raidSlain: raidSlain() };
   for (const b of BADGES){
-    if (!save.badges[b.id] && b.test(ctx)) save.badges[b.id] = Date.now();
+    if (!save.badges[b.id] && b.test(ctx)){
+      save.badges[b.id] = Date.now();
+      // said once it is drawn - see flushBadgeNews(); not mid-catch-up, which
+      // replays the pet up through levels it already had
+      if (!heldRuns) badgeNews.push(b);
+    }
   }
   return derived;
 }
@@ -4701,7 +4739,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-09-30 119bb7d";
+const BUILD_ID = "2026-10-01 a192e32";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -5649,11 +5687,60 @@ function renderEvolve(){
     }).join("");
   }
 
-  const got = Object.keys(save.badges).length;
+  const got = BADGES.filter(b => save.badges[b.id]).length;
   $("#badge-count").textContent = `${got}/${BADGES.length}`;
   $("#badge-grid").innerHTML = BADGES.map(b => `
     <div class="badge ${save.badges[b.id] ? "got" : ""}" data-badge="${b.id}" title="${b.name}">
       <div class="ico">${b.ico}</div><div class="nm">${b.name}</div></div>`).join("");
+  renderFirsts();
+}
+
+/* The races: the first player in the whole game to a level, decided by the
+   broker the moment a save carrying that level lands, and never again - one
+   holder each, for good. Only the broker can know who was first, so the list
+   comes from it (GET /firsts) and is cached in the save like the roster.
+   Each shows who holds it - a pet's name, which every player sees already -
+   or that it is still up for grabs. A race this pet won is also recorded in
+   save.badges, so it counts on its card. */
+function renderFirsts(){
+  const el = $("#firsts-grid"), title = $("#firsts-title");
+  if (!el || !title) return;
+  const list = Array.isArray(save.firsts) ? save.firsts : [];
+  title.hidden = el.hidden = !STRAVA_ON || !list.length;
+  if (!list.length) return;
+  const mine = list.filter(f => f.mine).length;
+  $("#firsts-count").textContent = `${mine}/${list.length}`;
+  el.innerHTML = list.map(f => {
+    const who = f.mine ? "You got there first"
+      : f.holder ? (f.holder.gone ? "Taken by a former player" : `${esc(f.holder.pet || "Somebody")} got there first`)
+      : `Up for grabs \u2014 reach level ${f.level} first`;
+    return `<div class="first ${f.mine ? "got" : f.holder ? "taken" : ""}">
+      <div class="ico">${f.mine ? "\u{1F3C6}" : f.holder ? "\u{1F3C1}" : "\u{1F6A9}"}</div>
+      <div class="t"><div class="nm">${esc(f.name)}</div><div class="who">${who}</div></div></div>`;
+  }).join("");
+}
+/** Fetch the races, record any this pet holds, and say so the first time. */
+async function refreshFirsts(){
+  if (!stravaLinked()) return;
+  let r;
+  try { r = await stravaCall("/firsts"); } catch (e){ return; }
+  if (!r || !Array.isArray(r.firsts)) return;
+  save.firsts = r.firsts;
+  let changed = false;
+  for (const f of r.firsts) if (f.mine && !save.badges[f.id]){
+    save.badges[f.id] = (f.holder && f.holder.at) || Date.now(); changed = true;
+    toast(`${f.name} \u2014 that's you!`, "good", "\u{1F3C6}");
+  }
+  if (changed) persist();
+  if (currentScreen === "evolve") renderFirsts();
+}
+/* New badges, said once they can be seen. Several at once - a save from
+   before this set, earning everything it already deserved - is one line. */
+function flushBadgeNews(){
+  if (!badgeNews.length || heldRuns) return;
+  const n = badgeNews; badgeNews = [];
+  if (n.length === 1) toast(`New badge: ${n[0].name}`, "good", n[0].ico);
+  else toast(`${n.length} new badges`, "good", "\u{1F396}\uFE0F");
 }
 
 /* What the broker has to say about him: his health, your share of it, and the
@@ -5879,6 +5966,7 @@ function renderAll(){
   renderFriends();
   renderSettings();
   persist();
+  flushBadgeNews();
 }
 
 /* --- navigation ---------------------------------------------------------- */
@@ -8668,6 +8756,9 @@ async function stravaSync(opts){
     if (!res.error) delete save.parkedAt;   // connected again inside the four weeks
     persist();
     await stravaPush(imported);          // stored and uploaded before anything plays
+    // the races, after the push: the save that just landed may be the one
+    // that won one. Guarded like the raid - it must not stop a run logging.
+    try { await refreshFirsts(); } catch (e){ /* the badges can wait */ }
     // Walk the pet through them one at a time. Collapsing a week of running into
     // one jump was the whole complaint: the egg would arrive already hatched.
     // This goes BEFORE renderAll for the same reason go("home") does: renderAll
@@ -8775,7 +8866,7 @@ function publicCard(){
     xp: Math.round(d.totalXp),
     streak: d.streak,
     best: d.bestStreak,
-    badges: Object.keys(save.badges || {}).length,
+    badges: badgeCount(),
     at: Date.now()
   };
   if (held){ heldRuns = held; recompute(); }
@@ -8821,7 +8912,7 @@ function wire(){
     if (badge){
       const b = BADGES.find(x => x.id === badge.dataset.badge);
       const when = save.badges[b.id];
-      toast(when ? `${b.name} — earned ${new Date(when).toLocaleDateString()}` : `${b.name} — not earned yet`,
+      toast(when ? `${b.name} — ${b.desc} Earned ${new Date(when).toLocaleDateString()}.` : `${b.name} — ${b.desc} Not earned yet.`,
             when ? "good" : "", b.ico);
       return;
     }

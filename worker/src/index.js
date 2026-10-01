@@ -15,6 +15,7 @@
      POST /disconnect   tell Strava to forget us; the pet is erased after GRACE_DAYS
      POST /pet/delete-intent, /pet/delete   a player deleting their own pet
      GET|POST /strava/webhook   Strava's events: revokes, runs deleted
+     GET  /firsts       the races - first to each level - and who holds them
      POST /battle/start  claim an attack on somebody, and spend it
      POST /battle/report how the fight went; the mark is priced here
      GET  /battle/marks  what is standing on your own pet, and its fight log
@@ -186,6 +187,7 @@ async function purgeAthlete(env, athleteId, handle){
   if (athleteId)
     ({ code } = await (await (await athleteStub(env, athleteId)).fetch("https://do/purge", { method:"POST" })).json());
   await rosterStub(env).fetch("https://do/roster-drop", { method:"POST", body: JSON.stringify({ handle }) });
+  await rosterStub(env).fetch("https://do/firsts-forget", { method:"POST", body: JSON.stringify({ handle }) });
   await handleStub(env, handle).fetch("https://do/dir-clear", { method:"POST" });
   if (code) await codeStub(env, code).fetch("https://do/dir-clear", { method:"POST" });
   await deletedStub(env).fetch("https://do/del-drop", { method:"POST", body: JSON.stringify({ handle }) });
@@ -198,6 +200,8 @@ async function eraseDeleted(env, row){
     { method:"POST", body: JSON.stringify({ id: row.id }) });
   await deletedStub(env).fetch("https://do/del-drop", { method:"POST", body: JSON.stringify({ id: row.id }) });
   await backupStub(env).fetch("https://do/bk-scrub", { method:"POST", body: JSON.stringify({ deletedId: row.id }) });
+  if (row.handle && row.pet && row.pet.pet) await rosterStub(env).fetch("https://do/firsts-forget", { method:"POST",
+    body: JSON.stringify({ handle: row.handle, pet: row.pet.pet }) });
 }
 
 /* The nightly pass that keeps the rules, before the night's backup is taken:
@@ -312,6 +316,21 @@ async function handleWebhook(env, ev){
       body: JSON.stringify({ id: String(ev.object_id) }) })).json();
   return { ignored: "kind" };
 }
+/* The races: the first player in the whole game to each of these levels.
+   Decided here, in the roster object, the moment a save carrying the level
+   lands - one object, one thread, so two players crossing the line together
+   cannot both win - and never again. Level 5 and the first evolution are
+   not among them: every player had passed both before races existed, and
+   nobody kept who did it first. Game data only - a level and a pet's name,
+   which every player sees in Rankings already. */
+const FIRSTS = [
+  { id:"1st-lv12",  level:12, name:"First to Level 12" },
+  { id:"1st-form3", level:15, name:"First to Evolve Twice" },
+  { id:"1st-lv20",  level:20, name:"First to Level 20" },
+  { id:"1st-lv25",  level:25, name:"First to Level 25" },
+  { id:"1st-lv30",  level:30, name:"First to Level 30" }
+];
+
 /** A card as it may be stored or shown to anybody else - see rosterCard().
     Also what an older app's card is cut down to on the way in, and what one
     already stored is cut down to on the way out, so no player sees another's
@@ -720,6 +739,17 @@ export default {
             .sort((a, b) => byStanding(a.card, b.card))
             .slice(0, 200);
           return json(env, { players });
+        });
+
+      /* The races, and who holds each - see FIRSTS. `mine` is worked out here,
+         since the app does not know its own handle. */
+      if (path === "/firsts")
+        return await withAthlete(request, env, async (_stub, me) => {
+          const mine = (await hmac(env.SESSION_SECRET, "roster:" + me)).slice(0, 12);
+          const { firsts } = await (await rosterStub(env).fetch("https://do/firsts-list")).json();
+          return json(env, { firsts: FIRSTS.map(f => { const h = firsts[f.id];
+            return { id: f.id, name: f.name, level: f.level, mine: !!(h && h.handle === mine),
+                     holder: h ? (h.gone ? { gone: true, at: h.at } : { pet: h.pet, species: h.species, at: h.at }) : null }; }) });
         });
 
       if (path === "/friends/lookup")
@@ -1564,6 +1594,13 @@ export class Athlete {
         // only a connected athlete writes a row, so this is always a return
         disconnected: false
       });
+      if (card){
+        const c = rosterCard(card);
+        for (const f of FIRSTS){
+          if (c.level < f.level || await this.state.storage.get("first:" + f.id)) continue;
+          await this.state.storage.put("first:" + f.id, { handle, pet: c.pet, species: c.species, at: Date.now() });
+        }
+      }
       return this.ok({ ok: true });
     }
     /* The pet's own marks, as the roster sees them. Merged rather than
@@ -1706,6 +1743,21 @@ export class Athlete {
       const { handle, card } = await request.json();
       const prev = await this.state.storage.get("row:" + handle);
       if (prev && prev.pet) await this.state.storage.put("row:" + handle, { ...prev, ...rosterCard(card) });
+      return this.ok({ ok:true });
+    }
+    if (path === "/firsts-list"){
+      const map = await this.state.storage.list({ prefix: "first:" });
+      const out = {}; for (const [k, v] of map) out[k.slice(6)] = v;
+      return this.ok({ firsts: out });
+    }
+    /* A race won by somebody being erased stays won - it happened - but by
+       nobody named: "a former player". With `pet`, only the races that pet
+       won, for an archived pet erased while its owner plays on. */
+    if (path === "/firsts-forget"){
+      const { handle, pet } = await request.json();
+      const map = await this.state.storage.list({ prefix: "first:" });
+      for (const [k, v] of map) if (v.handle === handle && (!pet || v.pet === pet))
+        await this.state.storage.put(k, { at: v.at, species: v.species, gone: true });
       return this.ok({ ok:true });
     }
     if (path === "/roster-drop"){

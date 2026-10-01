@@ -225,7 +225,7 @@ import if you want to move a save or keep a backup.
 | **Pet** | The animated pet, its name, level, XP bar, mood, weekly streak strip and recent runs |
 | **Run** | Live map, distance, duration, average pace, calories, pause/resume and hold-to-finish |
 | **Summary** | Route trace, run stats, a full XP breakdown, animated bar fill, and any level up or evolution |
-| **Evolve** | Lifetime stats, the five-stage evolution tree for all three species, and 20 badges. A form you have not been keeps its name back — the silhouette and the description are the tease, and a name beside them answers the question they are asking |
+| **Evolve** | Lifetime stats, the five-stage evolution tree for all three species, 15 badges and the Runmon firsts (see [Badges](#badges)). A form you have not been keeps its name back — the silhouette and the description are the tease, and a name beside them answers the question they are asking |
 | **Friends** | Your friend code, adding someone by theirs, and everyone's pet with their level and totals |
 | **History** | Every run by month, with route thumbnails; reached from **See all runs** under Recent runs |
 | **Settings** | Strava, units, body weight, XP bar animation, new game |
@@ -1279,6 +1279,39 @@ earns 0.70×, so the same forms cost it nearly twice as far.
 file control this, and `Runmon.xpTable()` prints the whole curve in the
 console.
 
+## Badges
+
+Badges are about the pet, not the running. Distance clubs, a marathon, a pace,
+early and late runs and run counts were dropped: Strava already awards all of
+those, and a second copy here was the same achievement with a pet drawn next to
+it. Badges a player already won from the old set stay in their save but are no
+longer shown or counted.
+
+| | Badge | For |
+| --- | --- | --- |
+| 🍖 | First Meal | Its first run |
+| 🐣 | Hatched | Out of the egg, at level 5 |
+| 🔟 | Double Digits | Level 10 |
+| 🧬 | Evolved | Its third form, at level 15 |
+| ⭐ 🌟 | Level 20, Level 30 | Those levels |
+| 🎓 | First Move | Its first move learnt |
+| 📚 | Quick Study | Three moves learnt |
+| 🧰 | Full Kit | Every move its current form has |
+| ⚔️ | First Win | Won a fight it started |
+| 🥊 | Brawler | Ten of them |
+| 🗡️ | Giant Slayer | Beat a pet three or more levels above it |
+| 🪓 | Orc Slayer | Hit the raid boss the round he fell |
+| 😄 | Over the Moon | The happiest mood there is |
+| 🔥 | Never Hungry | A seven-day streak |
+
+**Runmon firsts** are races: the first player in the whole game to level 12,
+to evolve twice (level 15), and to levels 20, 25 and 30. The broker decides
+them as saves land — one roster object, one thread, so a tie cannot have two
+winners — and each has one holder for good. Everybody sees who holds each, by
+pet name. Level 5 and the first evolution are not races: every player was past
+both before races existed, and nobody kept who got there first. A player who
+is erased leaves their races won, by "a former player".
+
 ## How tracking works
 
 The run screen says so under the Start button: phone GPS is the worse of the
@@ -1339,10 +1372,8 @@ Runmon follows Strava's [API Agreement](https://www.strava.com/legal/api) and
   friend codes and the dashboard show — carries the pet, form, level, XP,
   streak and badge count, and no distance, run count or run time. Rankings
   break a level tie on XP.
-- **No lifetime distance.** The three distance badges became 10,000, 50,000
-  and 100,000 XP (the same distance at the flat rate; ids kept, so badges won
-  stay won). The Lifetime tile is Total XP; the profile's distance is the last
-  seven days. Raid swings are banked as swings, not as kilometres.
+- **No lifetime distance**, and no badges for distance or pace (see
+  [Badges](#badges)). Raid swings are banked as swings, not as kilometres.
 - **Disconnecting (2.5, 7.4).** Runs are deleted at once and Strava's grant is
   revoked through `oauth/revoke`. The pet is kept for **28 days** in case the
   player comes back — then the broker erases everything about them, including
