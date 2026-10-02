@@ -1423,6 +1423,14 @@ one address lock that address out for fifteen minutes. From it you can:
   time the player opens it — the page shows each one as waiting or done. The
   adjustment sits on top of what their runs earned (`adminXp` in the save);
   no run is rewritten;
+- **rename their pet** — the only name Runmon has for anybody. Queued for the
+  app like a level change, but since a name shows on everybody else's screen
+  it does not wait for that: the broker puts it on the stored card, the
+  Rankings row and any race the pet holds at once, and a push from the
+  player's app that has not applied it yet is given the new name rather than
+  putting the old one back. The player can still rename the pet themselves
+  afterwards. Up to 16 characters; control and text-direction characters are
+  taken out;
 - **back up** one player or everyone, and **restore** a player from a backup
   file. A backup keeps each pet's name, species, level and XP — no runs and no
   distances. A restore puts those back on the player's next sync;

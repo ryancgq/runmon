@@ -670,7 +670,7 @@ export default {
           // the roster row is a copy of the card, refreshed as the save lands
           try {
             const parsed = JSON.parse(body);
-            if (parsed && parsed.card) await rosterPut(env, id, parsed.card);
+            if (parsed && parsed.card) await rosterPut(env, id, out.pet ? { ...parsed.card, pet: out.pet } : parsed.card);
           } catch (e){ /* a save that will not parse is the DO's problem, not the roster's */ }
           return json(env, out);
         });
@@ -1107,6 +1107,26 @@ export default {
           return json(env, await r.json());
         }
 
+        /* A new name for a player's pet - one somebody should not have to
+           see in Rankings, or a typo they asked to have fixed. The pet's name
+           is the only name Runmon has for anybody: it collects none from
+           Strava. Unlike a level it shows on everybody else's screen, so it
+           cannot wait for the player to open the app: the stored card, the
+           Rankings row and any race the pet holds take it now, and the app
+           picks it up on its next sync like any other adjustment. Until it
+           has, a push from it carrying the old name is given the new one -
+           see commit(). */
+        if (path === "/admin/rename" && request.method === "POST"){
+          const name = petNameOf(body.name);
+          if (!name) return json(env, { error:"A name is 1 to 16 characters." }, 400);
+          const r = await (await (await athleteStub(env, await who())).fetch("https://do/admin-rename",
+            { method:"POST", body: JSON.stringify({ name, note: body.note }) })).json();
+          if (r.error) return json(env, r);
+          if (r.card) await rosterStub(env).fetch("https://do/roster-card", { method:"POST",
+            body: JSON.stringify({ handle, card: r.card }) });
+          return json(env, r);
+        }
+
         if (path === "/admin/disconnect" && request.method === "POST")
           return json(env, { ...(await parkAthlete(env, await who())), eraseAt: Date.now() + GRACE_MS });
 
@@ -1257,6 +1277,19 @@ function rosterCard(c){
     badges: Math.max(0, Math.round(Number(c.badges) || 0))
   };
 }
+/* A pet's name as the dashboard may set it: the app's own limit of 16, with
+   control and direction-override characters taken out - a name is drawn on
+   other people's screens, and an override would let one run backwards over
+   whatever sits next to it. Cut on a whole character, so an emoji is not
+   cut in half, and short enough for rosterCard()'s 24 code units, which would
+   otherwise cut it for us. Empty when nothing is left. */
+function petNameOf(v){
+  const s = String(v || "").replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, "")
+    .replace(/\s+/g, " ").trim();
+  let out = "", n = 0;
+  for (const ch of s){ if (n === 16 || out.length + ch.length > 24) break; out += ch; n++; }
+  return out.trim();
+}
 /** A roster row as it leaves the object: the card cut down as above, and
     the bookkeeping around it. Rows written before the cut still hold the old
     fields until the pet next saves or the nightly pass rewrites them. */
@@ -1360,6 +1393,7 @@ export class Athlete {
     if (path === "/code-peek") return this.ok({ code: await this.state.storage.get("friendCode") || null });
     if (path === "/admin-peek")    return this.adminPeek();
     if (path === "/admin-adjust")  return this.adminAdjust(await request.json());
+    if (path === "/admin-rename")  return this.adminRename(await request.json());
     if (path === "/admin-snapshot") return this.adminSnapshot();
     // a directory entry, or anything else, emptied - for a disconnect
     if (path === "/dir-clear"){ await this.state.storage.deleteAll(); return this.ok({ ok:true }); }
@@ -1607,6 +1641,7 @@ export class Athlete {
         // only a connected athlete writes a row, so this is always a return
         disconnected: false
       });
+      if (card && prev.pet) await this.renameFirsts(handle, prev.pet, rosterCard(card).pet);
       if (card){
         const c = rosterCard(card);
         for (const f of FIRSTS){
@@ -1755,7 +1790,10 @@ export class Athlete {
     if (path === "/roster-card"){
       const { handle, card } = await request.json();
       const prev = await this.state.storage.get("row:" + handle);
-      if (prev && prev.pet) await this.state.storage.put("row:" + handle, { ...prev, ...rosterCard(card) });
+      if (prev && prev.pet){
+        await this.state.storage.put("row:" + handle, { ...prev, ...rosterCard(card) });
+        await this.renameFirsts(handle, prev.pet, rosterCard(card).pet);
+      }
       return this.ok({ ok:true });
     }
     if (path === "/firsts-list"){
@@ -2000,6 +2038,16 @@ export class Athlete {
     return this.ok({ save, activities, seen, adjust });
   }
 
+  /* A race is held by a pet's name, so a renamed pet keeps its races under
+     its new one. Only races that name - the same player's deleted pets keep
+     theirs under the names they had. */
+  async renameFirsts(handle, from, to){
+    if (!from || !to || from === to) return;
+    const map = await this.state.storage.list({ prefix: "first:" });
+    for (const [k, v] of map) if (v.handle === handle && v.pet === from)
+      await this.state.storage.put(k, { ...v, pet: to });
+  }
+
   /** What the admin dashboard shows for one pet. The save is summarised
       rather than handed over whole; the whole thing is what /admin/backup is
       for. */
@@ -2032,15 +2080,32 @@ export class Athlete {
   /** Queue a change to this pet's level or XP. Kept to the last fifty: the app
       applies every one it has not seen, in order, so the queue is history as
       much as instructions, and fifty is more than a pet will ever need. */
-  async adminAdjust({ kind, value, note, snap, id }){
+  async adminAdjust({ kind, value, note, snap, id, name, from }){
     const s = this.state.storage;
     if (!(await s.get("save"))) return this.ok({ error:"This player has no pet saved yet - they need to open the app (and hatch an egg, on a new phone) first." });
     const list = await s.get("adjust") || [];
     const rev = (list.length ? list[list.length - 1].rev : 0) + 1;
     list.push({ rev, kind, value, ...(snap ? { snap } : {}), ...(id ? { id: String(id) } : {}),
+                ...(name ? { name, from: String(from || "") } : {}),
                 note: String(note || "").slice(0, 120), at: Date.now() });
     await s.put("adjust", list.slice(-50));
     return this.ok({ ok:true, rev });
+  }
+
+  /** Rename the pet: queued for the app like any adjustment, and put on the
+      stored save and card at once, since those are what everybody else is
+      shown. The card comes back so the roster row can follow. */
+  async adminRename({ name, note }){
+    const s = this.state.storage;
+    const [save, card] = await Promise.all([s.get("save"), s.get("card")]);
+    if (!save) return this.ok({ error:"This player has no pet saved yet - they need to open the app (and hatch an egg, on a new phone) first." });
+    const from = save.petName || "";
+    const r = await (await this.adminAdjust({ kind:"name", value: 0, name, from, note })).json();
+    if (r.error) return this.ok(r);
+    const put = { save: { ...save, petName: name } };
+    if (card) put.card = { ...card, pet: name };
+    await s.put(put);
+    return this.ok({ ok:true, rev: r.rev, from, card: put.card ? gameCard(put.card) : null });
   }
 
   /** What a backup keeps of this pet: the game's own state, and nothing
@@ -2093,10 +2158,17 @@ export class Athlete {
     const gone = await s.get("gone") || {};
     if (save && Array.isArray(save.runs) && Object.keys(gone).length)
       save.runs = save.runs.filter(r => !(r && r.strava && gone[String(r.strava)]));
+    /* A rename from the dashboard the app has not applied yet. The app takes
+       adjustments before it pushes on a sync, but a push of its own - after a
+       fight, say - can land first, and would put the old name back on the
+       card and the Rankings row until the next sync. */
+    const named = (await s.get("adjust") || [])
+      .filter(a => a.kind === "name" && a.name && a.rev > (Number(save && save.adminRev) || 0)).pop();
+    if (named && save){ save.petName = named.name; if (card) card = { ...card, pet: named.name }; }
     const write = { save, importedAt: map, offered };
     if (card) write.card = gameCard(card);
     await s.put(write);
-    return this.ok({ saved: true });
+    return this.ok({ saved: true, ...(named && save ? { pet: named.name } : {}) });
   }
 
   /** A disconnect - see parkAthlete(). */

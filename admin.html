@@ -274,7 +274,7 @@ async function show(handle, quiet){
   const s = u.save;
   const applied = s ? s.adminRev : 0;
   const hist = (u.adjust || []).slice().reverse().map(a => `<div>
-      <span>${a.kind === "level" ? "Set to level " + a.value : a.kind === "restore" ? "Restored to level " + a.value : a.kind === "unrun" ? "A run removed" : (a.value >= 0 ? "+" : "−") + Math.abs(a.value).toLocaleString() + " XP"}${a.note ? " · " + esc(a.note) : ""}</span>
+      <span>${a.kind === "level" ? "Set to level " + a.value : a.kind === "restore" ? "Restored to level " + a.value : a.kind === "unrun" ? "A run removed" : a.kind === "name" ? `Renamed ${a.from ? esc(a.from) + " " : ""}→ ${esc(a.name || "")}` : (a.value >= 0 ? "+" : "−") + Math.abs(a.value).toLocaleString() + " XP"}${a.note ? " · " + esc(a.note) : ""}</span>
       <span class="muted">${a.rev <= applied ? "done" : "waiting for the app"} · ${ago(a.at)}</span></div>`).join("");
   d.innerHTML = `
     <div class="top" style="margin-bottom:10px">
@@ -301,6 +301,13 @@ async function show(handle, quiet){
         <dt>Fights logged</dt><dd>${u.battles}</dd>
       </dl>
     </div>
+    <hr class="sep">
+    <h3>Name</h3>
+    <p class="small muted" style="margin:4px 0 0">Other players see the new name in Rankings straight away; their own app picks it up the next time they open it.</p>
+    ${s ? `<div class="act">
+      <input type="text" id="rename" maxlength="16" value="${esc((s && s.petName) || r.pet || "")}" autocomplete="off">
+      <button class="btn primary" id="do-rename">Rename</button>
+    </div>` : `<p class="muted">No pet saved yet, so there is nothing to rename.</p>`}
     <hr class="sep">
     <h3>Level</h3>
     <p class="small muted" style="margin:4px 0 0">Takes effect the next time they open the app. Setting a level puts the pet at the start of it; their runs keep counting on top.</p>
@@ -342,6 +349,7 @@ async function show(handle, quiet){
   if (s){
     $("#set-lv").onclick = () => adjust(handle, "level", Number($("#lv").value), note());
     $("#add-xp").onclick = () => adjust(handle, "xp", Number($("#xp").value), note());
+    $("#do-rename").onclick = () => rename(handle, $("#rename").value, note());
   }
   $("#dl").onclick = () => download("/admin/backup?handle=" + encodeURIComponent(handle), `runmon-${handle}.json`);
   $("#up").onchange = e => restore(handle, e.target.files[0]);
@@ -355,6 +363,17 @@ async function adjust(handle, kind, value, note){
   try {
     await call("/admin/adjust", { method:"POST", body: JSON.stringify({ handle, kind, value, note }) });
     say(kind === "level" ? `Queued: level ${value}` : `Queued: ${value > 0 ? "+" : ""}${value} XP`);
+    show(handle, true);
+  } catch (e){ say(e.message, true); }
+}
+
+async function rename(handle, name, note){
+  name = String(name || "").trim();
+  if (!name) return say("Type a name first.", true);
+  try {
+    const r = await call("/admin/rename", { method:"POST", body: JSON.stringify({ handle, name, note }) });
+    say(`Renamed to ${r.card ? r.card.pet : name}`);
+    await load();               // the list shows the row's name
     show(handle, true);
   } catch (e){ say(e.message, true); }
 }

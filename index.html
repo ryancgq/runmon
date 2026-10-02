@@ -4739,7 +4739,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-10-01 cab2d15";
+const BUILD_ID = "2026-10-02 804817d";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -8513,10 +8513,10 @@ function applyAdmin(res){
     } else if (a.kind === "level"){
       const to = Math.max(1, Math.min(MAX_LEVEL, Math.round(a.value)));
       save.adminXp = xpAtLevel(to) - runXp();
-      note = `${save.petName || "Your pet"} is now level ${to}`;
+      note = `${esc(save.petName || "Your pet")} is now level ${to}`;
     } else if (a.kind === "xp"){
       save.adminXp = Math.max(-runXp(), (Number(save.adminXp) || 0) + Math.round(a.value));
-      note = `${a.value >= 0 ? "+" : "\u2212"}${nf(Math.abs(a.value))} XP for ${save.petName || "your pet"}`;
+      note = `${a.value >= 0 ? "+" : "\u2212"}${nf(Math.abs(a.value))} XP for ${esc(save.petName || "your pet")}`;
     } else if (a.kind === "restore" && a.snap){
       const b = a.snap;
       if (SPECIES[b.species]) save.species = b.species;
@@ -8530,7 +8530,11 @@ function applyAdmin(res){
       // what it had already celebrated, so a restored Blazewyrm does not
       // hatch all over again
       save.seenStage = Math.max(save.seenStage || 0, stageForLevel(lv));
-      note = `${save.petName || "Your pet"} was restored from a backup`;
+      note = `${esc(save.petName || "Your pet")} was restored from a backup`;
+    } else if (a.kind === "name" && a.name){
+      // from the dashboard - see /admin/rename; everybody else already sees it
+      save.petName = String(a.name).slice(0, 24);
+      note = `Your pet is now called ${esc(save.petName)}`;
     }
     save.adminRev = a.rev;
   }
