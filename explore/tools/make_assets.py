@@ -3,7 +3,7 @@
 
 Everything the pets themselves wear comes from the main game's sheets in
 ../art/ - this only draws what the world needs that the game has never had:
-ground tiles, props, the raid boss and its minion.
+ground tiles and props. The raid boss is the game's own Sir Uwaaarghhhh.
 
 Drawn at native resolution and upscaled by a whole number with
 nearest-neighbour, the same rule ART-SPEC.md sets for pets, so the output is
@@ -141,8 +141,9 @@ ASH = [hexc("#3a2a2c"), hexc("#4a3434"), hexc("#5a3f3a"), hexc("#6b4a40")]
 LAVA = [hexc("#ff6b35"), hexc("#ffd23f"), hexc("#c23a1c")]
 MOSS = [hexc("#2c4f33"), hexc("#355f37"), hexc("#43723f"), hexc("#6f9a4c")]
 CLOUD = [hexc("#4a5674"), hexc("#5b6888"), hexc("#6f7d9e"), hexc("#93a3c4")]
-STONE = [hexc("#4b4560"), hexc("#5b5472"), hexc("#6c6585"), hexc("#857da0")]
-RUNE = hexc("#c69cff")
+# the hill the orc came down off: packed earth-grey flagstone, torch-lit runes
+STONE = [hexc("#4a4238"), hexc("#5a5144"), hexc("#6b6152"), hexc("#857a66")]
+RUNE = hexc("#ffb347")
 FLOWERS = [hexc("#ffd23f"), hexc("#ff8fb1"), hexc("#ffffff"), hexc("#9fd8ff")]
 
 
@@ -456,241 +457,9 @@ def props():
     return upscale(sheet, 2)
 
 
-# --------------------------------------------------------------------------
-# Lord Lull, the raid boss: 128x96 native, x3 -> 384x288 (ART-SPEC's canvas)
-# --------------------------------------------------------------------------
-# The game's whole villain is the rest day - the pet sulks, then sleeps, if you
-# stop running - so the boss is that, given a body: a vast plush sleep-spirit
-# in a nightcap that wants everyone to lie down. It summons sheep. Of course.
-
-LULL = [hexc("#3d2b63"), hexc("#55408a"), hexc("#6d55a8"), hexc("#8a72c4"), hexc("#a993dc")]
-LULL_RAGE = [hexc("#4a1f4f"), hexc("#6a2a70"), hexc("#8a3a8f"), hexc("#a956a8"), hexc("#c77ac4")]
-BELLY = [hexc("#b9a6e6"), hexc("#cdbdf2"), hexc("#e0d5fa")]
-CAP_A = hexc("#2b3f7a")
-CAP_B = hexc("#e9e2ff")
-POM = [hexc("#d8cfee"), hexc("#f2edff"), hexc("#ffffff")]
-CHEEK = hexc("#e48ab8")
-MOUTH = hexc("#2a1236")
-TONGUE = hexc("#e2668f")
-EYE_W = hexc("#f6f3ff")
-ZED = hexc("#c9b8ff")
-GOLD = hexc("#ffd23f")
-BASE = 88  # native baseline: 88 * 3 = 264, ART-SPEC's ground line
-
-
-def zee(img, x, y, s):
-    for i in range(s):
-        put(img, x + i, y, ZED)
-        put(img, x + i, y + s - 1, ZED)
-        put(img, x + s - 1 - i, y + i, ZED)
-
-
-def lord_lull(sx=1.0, sy=1.0, eyes="drowsy", mouth="small", arms="rest",
-              zs=0, rage=False, dust=False, shift=0):
-    W, H = 128, 96
-    ramp = LULL_RAGE if rage else LULL
-    rx, ry = 46 * sx, 32 * sy
-    cx, cy = 64 + shift, BASE - ry
-    top = cy - ry
-
-    def fy(v):
-        """Map a feature's height on the resting body onto this squash."""
-        return BASE - (BASE - v) * sy
-
-    feet = layer(W, H)
-    for fx in (cx - 22 * sx, cx + 22 * sx):
-        ellipse(feet, fx, BASE - 2, 9 * sx, 4, ramp[0:3])
-
-    ears = layer(W, H)
-    for ex in (cx - 30 * sx, cx + 30 * sx):
-        ellipse(ears, ex, top + 8 * sy, 8, 8, ramp[1:4])
-        ellipse(ears, ex, top + 9 * sy, 4, 4, (CHEEK[0], CHEEK[1], CHEEK[2], 255))
-
-    body = layer(W, H)
-    ellipse(body, cx, cy, rx, ry, ramp)
-    belly = layer(W, H)
-    ellipse(belly, cx, cy + 12 * sy, rx * .55, ry * .5, BELLY)
-    body.alpha_composite(belly)
-
-    arm_l, arm_r = layer(W, H), layer(W, H)
-    if arms == "up":
-        ellipse(arm_l, cx - rx + 4, fy(36), 7, 9, ramp[1:4])
-        ellipse(arm_r, cx + rx - 4, fy(36), 7, 9, ramp[1:4])
-    elif arms == "out":
-        ellipse(arm_l, cx - rx - 2, BASE - 6, 10, 6, ramp[1:4])
-        ellipse(arm_r, cx + rx + 2, BASE - 6, 10, 6, ramp[1:4])
-    else:
-        ellipse(arm_l, cx - rx + 6, fy(70), 7, 8, ramp[1:4])
-        ellipse(arm_r, cx + rx - 6, fy(70), 7, 8, ramp[1:4])
-
-    # the nightcap, slumped off to the right with a pompom on the end
-    cap = layer(W, H)
-    t = top + 4 * sy
-    pts = [(cx - 26, t + 8), (cx - 14, t - 10), (cx + 4, t - 20), (cx + 26, t - 18),
-           (cx + 40, t - 8), (cx + 44, t + 2), (cx + 36, t - 2), (cx + 22, t - 8),
-           (cx + 26, t + 8)]
-    if rage:  # it stands up on end when Lull is properly awake
-        pts = [(cx - 24, t + 8), (cx - 16, t - 12), (cx - 4, t - 28), (cx + 6, t - 34),
-               (cx + 12, t - 26), (cx + 22, t - 10), (cx + 26, t + 8)]
-    polygon(cap, pts, lambda x, y: CAP_A if int((x + y) / 5) % 2 else CAP_B)
-    rect(cap, cx - 28, t + 4, cx + 29, t + 10, CAP_B)
-    pom = layer(W, H)
-    px_, py_ = (cx + 42, t + 4) if not rage else (cx + 6, t - 35)
-    ellipse(pom, px_, py_, 5, 5, POM)
-
-    face = layer(W, H)
-    ey = fy(52)
-    for ex in (cx - 16 * sx, cx + 16 * sx):
-        if eyes == "drowsy":
-            ellipse(face, ex, ey, 6, 4, EYE_W)
-            ellipse(face, ex + 1, ey + 1, 2.5, 2.5, MOUTH)
-            rect(face, ex - 7, ey - 5, ex + 7, ey, ramp[2])
-            line(face, ex - 6, ey, ex + 6, ey, OUTLINE)
-            line(face, ex - 4, ey + 6, ex + 4, ey + 6, ramp[1])
-        elif eyes == "shut":
-            for k in range(-5, 6):
-                put(face, ex + k, ey + 1 + (abs(k) < 4), OUTLINE)
-        elif eyes == "angry":
-            ellipse(face, ex, ey, 6, 5, EYE_W)
-            ellipse(face, ex, ey + 1, 3, 3, hexc("#ff3b5c") if rage else MOUTH)
-            put(face, ex, ey, hexc("#ffffff"))
-            d = 1 if ex < cx else -1
-            line(face, ex - 7, ey - 6 - 2 * d, ex + 7, ey - 6 + 2 * d, OUTLINE)
-            line(face, ex - 7, ey - 7 - 2 * d, ex + 7, ey - 7 + 2 * d, OUTLINE)
-        elif eyes == "hurt":
-            line(face, ex - 4, ey - 3, ex + 4, ey + 3, OUTLINE)
-            line(face, ex - 4, ey + 3, ex + 4, ey - 3, OUTLINE)
-        elif eyes == "out":
-            line(face, ex - 4, ey - 3, ex + 4, ey + 3, OUTLINE)
-            line(face, ex - 4, ey + 3, ex + 4, ey - 3, OUTLINE)
-            line(face, ex - 3, ey - 3, ex + 5, ey + 3, OUTLINE)
-        ellipse(face, ex + (-6 if ex < cx else 6) * sx, ey + 9, 4, 2.5, CHEEK)
-    my = fy(66)
-    if mouth == "small":
-        for k in range(-3, 4):
-            put(face, cx + k, my + (1 if abs(k) == 1 else 0), OUTLINE)
-    elif mouth == "yawn":
-        ellipse(face, cx, my + 2, 8, 9, MOUTH)
-        ellipse(face, cx, my + 7, 5, 3, TONGUE)
-    elif mouth == "gasp":
-        ellipse(face, cx, my + 1, 4, 4, MOUTH)
-    elif mouth == "snarl":
-        rect(face, cx - 6, my - 1, cx + 7, my + 4, MOUTH)
-        for k in range(-5, 7, 3):
-            put(face, cx + k, my - 1, EYE_W)
-            put(face, cx + k, my + 3, EYE_W)
-
-    fx = layer(W, H)
-    for i in range(zs):
-        zee(fx, 100 + i * 7, 30 - i * 10, 4 + i)
-    if dust:
-        rng = random.Random(5)
-        for i in range(26):
-            a = rng.uniform(math.pi, 2 * math.pi)
-            r = rng.uniform(40, 62)
-            put(fx, 64 + r * math.cos(a) * 1.15, BASE - 2 + r * math.sin(a) * .18, POM[1])
-            put(fx, 64 + r * math.cos(a) * 1.15 + 1, BASE - 2 + r * math.sin(a) * .18, POM[0])
-
-    img = stack((W, H), outlined(feet), outlined(ears), outlined(arm_l), outlined(arm_r),
-                outlined(body), face, outlined(cap), outlined(pom), fx)
-    return img
-
-
-BOSS_FRAMES = [
-    # 0-3 idle: a slow breath, the zeds drifting off it
-    dict(sy=1.00, zs=1), dict(sy=1.03, sx=.99, zs=2), dict(sy=1.05, sx=.985, zs=3), dict(sy=1.02, zs=2),
-    # 4-5 wind-up for the Pillow Slam: up on its toes, arms over its head
-    dict(sy=1.12, sx=.93, eyes="angry", mouth="gasp", arms="up"),
-    dict(sy=1.18, sx=.90, eyes="angry", mouth="snarl", arms="up"),
-    # 6-7 the slam: flattened, dust thrown out
-    dict(sy=.80, sx=1.12, eyes="shut", mouth="snarl", arms="out", dust=True),
-    dict(sy=.90, sx=1.06, eyes="angry", mouth="small", arms="out"),
-    # 8-9 the Yawn
-    dict(sy=1.06, eyes="shut", mouth="yawn", arms="up"),
-    dict(sy=1.10, sx=.98, eyes="shut", mouth="yawn", arms="up", zs=1),
-    # 10 hurt, 11 enraged (phase two onward holds this as its idle)
-    dict(sy=.96, sx=1.03, eyes="hurt", mouth="gasp", shift=-2),
-    dict(sy=1.04, eyes="angry", mouth="snarl", rage=True),
-]
-# extra rows for the enraged phase and the defeat, appended after the twelve
-BOSS_EXTRA = [
-    dict(sy=1.02, eyes="angry", mouth="small", rage=True),           # 12 rage idle b
-    dict(sy=.70, sx=1.16, eyes="out", mouth="gasp", arms="out"),       # 13 defeated
-    dict(sy=.68, sx=1.18, eyes="shut", mouth="small", arms="out", zs=3),  # 14 asleep at last
-]
-
-
-def boss():
-    frames = [lord_lull(**f) for f in BOSS_FRAMES + BOSS_EXTRA]
-    sheet = layer(128 * len(frames), 96)
-    for i, f in enumerate(frames):
-        sheet.alpha_composite(f, (i * 128, 0))
-    return upscale(sheet, 3)
-
-
-# --------------------------------------------------------------------------
-# Snoozling: the sheep Lord Lull counts. 32x24 native, x3 -> 96x72
-# --------------------------------------------------------------------------
-
-WOOL = [hexc("#b8b0d6"), hexc("#d6d0ee"), hexc("#efeafc"), hexc("#ffffff")]
-SHEEP_FACE = [hexc("#2d2440"), hexc("#3d3256"), hexc("#524470")]
-
-
-def snoozling(lift=0, squash=1.0, eyes="drowsy", hit=False):
-    W, H = 32, 24
-    b = 21 - lift
-    legs = layer(W, H)
-    if lift == 0:
-        for x in (11, 14, 18, 21):
-            rect(legs, x, b - 3, x + 2, b + 1, SHEEP_FACE[0])
-    else:
-        for x in (10, 14, 18, 22):
-            rect(legs, x, b - 3, x + 2, b, SHEEP_FACE[0])
-    wool = layer(W, H)
-    for cx, cy, r in ((11, 14, 5), (16, 11, 6), (21, 14, 5), (13, 17, 5), (19, 17, 5)):
-        ellipse(wool, cx, b - (21 - cy) * squash, r, r * squash, WOOL)
-    head = layer(W, H)
-    hx, hy = 24, b - 9 * squash
-    ellipse(head, hx, hy, 4.5, 4, SHEEP_FACE)
-    ellipse(head, hx - 4, hy - 3, 2, 1.5, SHEEP_FACE[1:])
-    face = layer(W, H)
-    if eyes == "drowsy":
-        put(face, hx - 2, hy, WOOL[3])
-        put(face, hx - 1, hy, WOOL[3])
-        put(face, hx + 1, hy, WOOL[3])
-        put(face, hx + 2, hy, WOOL[3])
-    elif eyes == "shut":
-        put(face, hx - 2, hy + 1, WOOL[1])
-        put(face, hx + 1, hy + 1, WOOL[1])
-    elif eyes == "x":
-        for d in (-1, 0, 1):
-            put(face, hx - 2 + d, hy + d, WOOL[3])
-            put(face, hx + 2 + d, hy - d, WOOL[3])
-    put(face, hx, hy + 2, CHEEK)
-    img = stack((W, H), outlined(legs), outlined(wool), outlined(head), face)
-    if hit:
-        px = img.load()
-        for y in range(H):
-            for x in range(W):
-                r, g, bb, a = px[x, y]
-                if a:
-                    px[x, y] = (min(255, r + 90), min(255, g + 60), min(255, bb + 60), a)
-    return img
-
-
-def sheep():
-    frames = [snoozling(0, 1.0), snoozling(0, .9), snoozling(3, 1.05),
-              snoozling(0, .95, "x", True), snoozling(0, .8, "shut"), snoozling(0, .78, "shut")]
-    sheet = layer(32 * len(frames), 24)
-    for i, f in enumerate(frames):
-        sheet.alpha_composite(f, (i * 32, 0))
-    return upscale(sheet, 3)
-
-
 def main():
     print("writing", OUT)
-    for name, img in (("tiles.png", tiles()), ("props.png", props()),
-                      ("boss-lord-lull.png", boss()), ("snoozling.png", sheep())):
+    for name, img in (("tiles.png", tiles()), ("props.png", props())):
         img.save(os.path.join(OUT, name), optimize=True)
         quantise_check(img, name)
 
