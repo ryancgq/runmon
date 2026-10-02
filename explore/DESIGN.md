@@ -1,8 +1,8 @@
 # Runmon Explore — design
 
-Pets leave the pet screen and walk around a top-down world. They battle the
-wild pets they meet, and take swings at the raid boss, Sir Uwaaarghhhh, on his
-hill.
+Pets leave the pet screen and walk around a top-down world. They fight the
+wild pets they meet live, dungeon-crawler style, using their own skills on
+cooldowns, and take on the raid boss, Sir Uwaaarghhhh, on his hill.
 
 This is a **standalone prototype** for phones. It lives in `explore/`, shares
 nothing with the game's `index.html`, and never reads or writes a save. Its
@@ -27,8 +27,9 @@ phone-sized frame, and on a phone held sideways it asks you to turn it back.
 - **Running is still the only way to grow.** Explore earns no XP. A pet's
   level, stats and moves come from its running level, the same as the game.
   The select screen lets you choose a level, but only for testing.
-- **Fights are the game's battles.** The same attributes, the same moves, the
-  same damage, the same turns. See §3.
+- **Fights run on the game's numbers.** They are live, but use the same
+  attributes, damage, moves, effects and cooldowns, with one turn equal to
+  1.4 s. See §3.
 - **The raid is the game's raid.** The same boss, art, moves and stats, and the
   same rule that his wounds carry over from one attempt to the next.
 
@@ -51,100 +52,114 @@ level you test.
 
 Each species has a temperament:
 
-- **Ember** pets come at you. When one charges, a "!" appears over it, and you
-  battle when it reaches you.
-- **Nimbus** and **Verdant** pets mind their own business. When you walk up to
-  one, a **⚔ Battle** button appears.
+- **Ember** pets come at you.
+- **Nimbus** and **Verdant** pets mind their own business until you hit them.
 
-**Controls.** Drag anywhere on the lower half of the screen to walk. Everything
-else is a button.
+**Controls.** Drag on the left half of the screen to walk. Your right thumb
+has Attack, with up to four skills in an arc around it.
 
-## 3. Battles: the game's engine, in the world
+## 3. Combat: live, on the game's numbers
 
-When a fight starts, both pets square off where they met, and a sheet slides
-up over the bottom of the screen. It holds the game's battle screen, folded
-down:
+Fights are live, dungeon-crawler style. Move with the left thumb. Tap
+**👊 Attack** or any of your pet's skills whenever they're off cooldown.
+Each button counts its own cooldown down.
 
-- both pets' health
-- status tags straight from the engine (stoked, charged, guard open, burning,
-  wide open)
-- a line saying what just happened
-- your moves, which show "ready in N turns" exactly as the game counts it
+Everything a fight is made of comes from the game's battle engine:
 
-**Auto** lets your pet choose, using the game's own chooser. **Run** leaves a
-wild battle at any time.
+| Game (turn-based) | Here (live) |
+| --- | --- |
+| Attributes `attrsFor`, HP pool ×5 | the same |
+| Damage: `btHit`, divisive Defence, K, ±35% jitter, no crits | the same function |
+| Each move's multiplier, pierce and riders (burn, rattle, stoke, charge, soften, open, Nap's heal and expose) | the same, applied the same way |
+| One move per turn | one turn = **1.4 s** of the pet's own clock |
+| Cooldown `cd` turns, a 2-turn shared cooldown after any skill | `cd × 1.4 s`, and 2.8 s shared |
+| Speed buys extra turns, up to 35%, chaining | the pet's whole clock runs `1/(1−p)` faster against its opponent: Attack, cooldowns, clips, its burn and guard timers |
+| The boss never gets extra turns | the same |
+| Opponent picks any ready move at random (`btChoose`) | the wild pets' AI picks the same way, the moment its turn comes round |
 
-### Why the engine is copied rather than re-imagined
+**Attack** is the plain move (×1). It lunges at whatever is closest. With
+nothing in reach it is a dash, and nothing *he* swings can land on you
+mid-dash.
 
-The first version fought in real time. Every move used the game's damage
-formula and multipliers, with turns converted to seconds. It did not hold the
-balance. Simulated against the game's own engine at levels 12, 26 and 40, the
-species matchups came out like this:
+**Skills** play their real clip from the game, sped up to fit inside one turn
+so a long clip never costs extra time. The hit is drawn on the clip's impact
+frame. Shots and strikes find their target, rushes steer onto it and stop when
+they connect, and novas, swipes and gales take whatever is in their shape.
 
-| Matchup | Game | Real-time version |
-| --- | --- | --- |
-| Verdant v Ember | 44–47% | 3–13% |
-| Verdant v Nimbus | 52–56% | 23–65% |
-| Ember v Nimbus | 47–50% | 20–90% |
+### Keeping it close to the game's balance
 
-Walking into range, closing speed and both sides acting at once all
-favour speed and burst in ways a turn-based battle doesn't. So fights now run on
-`btSide`, `btHit`, `btAct` and `btChoose`, copied line for line.
+Live fights do not reproduce turn-based win rates by themselves. Things a
+battle never charges for showed up as large swings:
 
-Verified:
+- walking back into reach after a shove
+- a rush that carries on past its target
+- a slow clip whose hit was still in the air when its pet died
 
-- **The same seed plays the same fight.** Seed 12345 gives the identical move
-  list and final HP in this page and in the game.
-- **The win rates match.** Over 4,000 fights per pairing at levels 12, 26 and
-  40, every matchup lands at 44–56%, as in the game.
+Each was measured against the game's engine and removed:
 
-What the world adds is staging only. The attacker plays its real skill clip,
-taken from `SKILLS` with its own `order` and `durations` at 0.8× pace. The
-hit lands on the clip's impact frame:
+- **Pets don't shove each other.** Only his blows knock you back.
+- **Rushes stop when they connect.**
+- **Between pets, a move resolves the moment it's taken**, as `btAct` does.
+  The clip shows the number, flash and knockout on its impact frame. His
+  blows still land on impact, so they can be dodged.
+- **No opening coin.** The game weights who moves first by Speed. Adding that
+  live made every matchup worse, so both pets start together.
 
-- a ring for novas
-- a bolt dropping on the target for strikes
-- a fireball, acorn or bamboo flying across for shots
-- an arc for swipes and lashes
-- the gas cloud for Green Gale
-- the body crossing to the target and back for rushes
-- a lunge for a plain Attack, landing 400 ms in, as on the battle screen
+Per move, the live version now matches the game: the same moves per fight and
+the same damage per move. For example, in Panda v Blazewyrm at Lv 26, Attack
+averages 69 and Landslide 99, against 69 and 101 in the game.
 
-The bars only move when the blow lands, which is the same fix the game's
-battle screen needed.
+Simulated AI v AI at levels 12, 26 and 40, the species matchups land **9
+points from the game's on average** (game 46–57%, live 32–70%). Some of that
+is sampling noise at 160 fights a pairing. The worst case is Verdant v Nimbus,
+which runs about 15 points Verdant's way.
 
-**Winning or losing.** Beat a wild pet and it wanders off, then comes back
-later. Lose and you wake at the campfire. Every battle starts at full health,
-as every battle in the game does.
+Some difference is unavoidable. Verdant's matchups are knife-edge races in the
+game too, decided by a fraction of an action, and real time moves those
+fractions about. A player who dodges and spaces well will beat these numbers;
+that is the point of making it live.
 
-## 4. The raid: Sir UwaaarghhhhUWAAGRRHH
+**Out of a fight** you get your breath back slowly, faster at the campfire.
+Berries heal 30%. Lose to a wild pet and you wake at the campfire.
+
+## 4. The raid: Sir UwaaarghhhhUWAAGRRHH, live
 
 Everything about him is the game's:
 
 - his four worn-down sheets, which change at 75%, 50% and 25%
-- his three moves, each with its own sheet: **UWAAAARGH!**, **Splitter** and
-  **Torchswing**
-- his plain swing, a lunge
-- the death clip that plays when he falls
+- his three moves, each with its own sheet and the game's numbers:
+  **UWAAAARGH!**, **Splitter** and **Torchswing**
+- his plain swing (×1)
+- his death clip
 - his stats: Power 90, Defence 25, Speed 60, and no extra turns
 
-As in the game:
+He chooses the way the game's `btChoose` does: any ready move at random, with
+cooldowns counted in his own turns, which come every 2.1 s and quicken as his
+roar charges him. **Every blow is marked on the ground first**, so you can
+walk or dash out of it:
 
-- You always get the first swing at him.
+| Move | What you see | What it does |
+| --- | --- | --- |
+| Plain swing | a red mark under one pet | ×1, a short lunge |
+| **Splitter** | a large red mark under a pet, as he raises the torch | ×2.2, 70% through guard. It deletes a low-level pet, as in the game |
+| **Torchswing** | a ring all round him | ×1.35 to anything within reach |
+| **UWAAAARGH!** | he roars | no damage, but his next two blows hit ×1.6 and he charges, getting faster and stronger, up to twice |
+
+**As in the game:**
+
+- You always get the first swing.
 - An attempt ends when your pet falls.
 - His health carries over to the next attempt.
-- His bar shows a percentage, so the raw pool number never appears.
-- What changes is only where he stands: out on the hill, turned to face you.
+- His bar shows a percentage.
 
-**Swings.** You get three. The game earns one per 5 km run; here they refill
-from the menu.
+You get three swings; the menu gives you more. The game earns one per 5 km
+run.
 
-**Pool size.** The game's pool is 25,000, sized for a whole field of runners
-over weeks. One person testing would never see him fall, so here the pool is
-sized by running the engine itself. Before the first swing, the page simulates
-300 attempts at your pet's level and sets the pool to six average attempts.
-That works out to a handful of swings at any level. The result card after each
-attempt shows what you took off him and his running total.
+**His health pool.** The game's pool is 25,000, sized for a whole field of
+runners over weeks. Here it is 70 of your plain Attacks at your level. In
+simulation, a player who half-dodges fells him in 2–7 swings, with attempts
+lasting 17–45 s. In the menu you can bring two other runners' pets, AI allies
+that step out of his marks, to try the raid as a group.
 
 ## 5. Art
 
