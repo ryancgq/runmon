@@ -1,0 +1,2888 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0a0c13">
+<meta name="robots" content="noindex">
+<title>Runmon Explore</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap">
+<!--
+  Runmon Explore - a standalone prototype, deliberately NOT wired into the
+  main game. Built for phones, portrait, touch only.
+
+  A dungeon crawler: you walk, and you fight live - Attack and your pet's own
+  skills, each on its cooldown. Every number in a fight is the game's battle
+  engine's (attributes, the damage formula, each move's multiplier and its
+  riders), with one battle turn mapped to TURN seconds of real time. Every pet,
+  skill and the raid boss is the game's own art, copied into art/game/ so this
+  folder stands alone. Nothing here touches a real save.
+
+  See DESIGN.md beside this file.
+-->
+<style>
+  /* One dark phone-sized stage. Single dark theme on purpose: it is a game
+     screen and the art is lit for a dark ground. */
+  :root{
+    color-scheme:dark;
+    --bg:#0a0c13; --panel:rgba(14,17,27,.88); --line:rgba(255,255,255,.10);
+    --ink:#eef1f8; --dim:#8b95ad; --ember:#ff6b35; --gold:#ffd23f;
+    --nimbus:#5fe6ff; --verdant:#8ed06a; --torch:#ffb347; --hp:#5fd38a; --bad:#ff4d6a;
+    --font:"Nunito",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *,*::before,*::after{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);overflow:hidden;
+    font-family:var(--font);font-weight:700;-webkit-font-smoothing:antialiased;
+    -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;
+    overscroll-behavior:none;touch-action:none}
+  button{font:inherit;color:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  [hidden]{display:none!important}
+
+  /* The device: the whole screen on a phone, a phone-sized frame on anything
+     bigger, so a desk test sees what a thumb would. */
+  #device{position:fixed;inset:0;overflow:hidden;background:var(--bg)}
+  #desk-note{display:none}
+  @media (min-width:600px) and (min-height:560px){
+    body{background:radial-gradient(90% 70% at 50% 0%, #1d1a2c, var(--bg) 70%)}
+    #device{inset:auto;left:50%;top:50%;transform:translate(-50%,-50%);
+      width:390px;height:min(844px,calc(100vh - 40px));border-radius:38px;
+      box-shadow:0 0 0 10px #05060a,0 0 0 11px #2a2f40,0 30px 80px rgba(0,0,0,.6)}
+    #desk-note{display:block;position:fixed;left:50%;bottom:10px;transform:translateX(-50%);
+      color:var(--dim);font-size:12px;white-space:nowrap}
+  }
+  canvas#game{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+  #turn{position:absolute;inset:0;z-index:50;background:var(--bg);display:none;place-items:center;text-align:center;padding:24px}
+  #turn b{display:block;font-size:20px;margin-bottom:6px}
+  #turn span{color:var(--dim);font-size:14px}
+  @media (orientation:landscape) and (max-height:500px){ #turn{display:grid} }
+
+  /* ---------- HUD ---------- */
+  #hud{position:absolute;inset:0;pointer-events:none}
+  #hud .tap{pointer-events:auto}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+  .top{position:absolute;left:10px;right:10px;top:calc(env(safe-area-inset-top,0px) + 10px);display:grid;gap:6px}
+  .row1{display:flex;gap:6px;align-items:flex-start}
+  #me{display:flex;gap:8px;align-items:center;padding:5px 10px 5px 5px;flex:1;min-width:0}
+  #me-face{width:38px;height:38px;border-radius:9px;background:rgba(255,255,255,.05);flex:0 0 auto}
+  #me .who{flex:1;min-width:0}
+  #me .nm{display:flex;justify-content:space-between;gap:6px;font-size:13px}
+  #me .nm i{font-style:normal;color:var(--gold);font-size:11.5px}
+  .bar{height:7px;border-radius:5px;background:rgba(255,255,255,.1);overflow:hidden;margin-top:4px}
+  .bar i{display:block;height:100%;width:100%;border-radius:inherit;background:var(--hp);transition:width .15s}
+  .bar.low i{background:var(--bad)}
+  #me small{display:block;font-size:10.5px;color:var(--dim);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+  .side{display:grid;gap:6px;justify-items:end}
+  #minimap{width:86px;height:66px;border-radius:10px;border:1px solid var(--line);image-rendering:pixelated;display:block}
+  .chips{display:flex;gap:5px}
+  .chip{padding:4px 9px;font-size:11.5px;border-radius:10px;font-variant-numeric:tabular-nums}
+  #menu-btn{width:32px;height:26px;border-radius:9px;font-size:14px;line-height:1;padding:0}
+  #party{display:flex;gap:6px}
+  #party{flex-wrap:wrap}
+  #party .ally{display:flex;align-items:center;gap:5px;padding:2px 8px 2px 2px;font-size:10px;flex:1 1 30%;min-width:0;max-width:50%;border-radius:10px}
+  #party .ally canvas{width:20px;height:20px;flex:0 0 auto}
+  #party .ally div{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #party .ally .bar{height:4px;margin-top:2px}
+  #party .ally .bar i{background:var(--nimbus)}
+  #party .ally.out{opacity:.45}
+  #online{color:var(--nimbus)}
+  .nick{display:flex;align-items:center;gap:10px;font-size:13px;margin:0 0 10px}
+  .nick input{flex:1;min-width:0;font:inherit;font-size:16px;color:var(--ink);background:rgba(255,255,255,.05);
+    border:1px solid var(--line);border-radius:12px;padding:10px 12px;-webkit-user-select:text;user-select:text}
+  .nick input:focus{outline:2px solid var(--gold);outline-offset:1px}
+  .screen p#lobby{color:var(--nimbus);font-size:12.5px;margin:-2px 0 4px}
+  table.dmg tr.me td:first-child{color:var(--gold)}
+
+  #bossbar{padding:6px 10px 7px}
+  #bossbar .bname{display:flex;justify-content:space-between;font-size:12px;font-weight:900;color:var(--torch);letter-spacing:.3px}
+  #bossbar .bname span{color:var(--dim);font-weight:700;font-size:10.5px}
+  #bossbar .bar{height:10px}
+  #bossbar .bar i{background:linear-gradient(90deg,#b84a1c,#ffb347)}
+  #bossbar .cast{font-size:11px;color:var(--gold);margin-top:3px;text-align:center}
+  #bossbar .cast:empty{display:none}
+  /* In the arena the hill is all there is, so the map steps aside and he
+     gets the screen. */
+  #hud.raiding #minimap{display:none}
+  #hud.raiding .side{align-self:stretch;align-content:center}
+
+  #stick{position:absolute;left:0;bottom:0;width:50%;height:46%;pointer-events:auto;touch-action:none}
+  #stick-base{position:absolute;width:118px;height:118px;margin:-59px 0 0 -59px;border-radius:50%;
+    border:2px solid rgba(255,255,255,.16);background:rgba(255,255,255,.05);
+    left:82px;top:calc(100% - 92px - env(safe-area-inset-bottom,0px))}
+  #stick-base.rest{opacity:.5}
+  #stick-knob{position:absolute;left:50%;top:50%;width:50px;height:50px;margin:-25px 0 0 -25px;border-radius:50%;
+    background:rgba(255,255,255,.24);border:2px solid rgba(255,255,255,.34)}
+
+  /* The right thumb: Attack, and the pet's own skills in an arc round it,
+     each with its cooldown sweeping down. */
+  #actions{position:absolute;right:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 22px);width:84px;height:84px}
+  .act{position:absolute;border-radius:50%;border:2px solid rgba(255,255,255,.18);background:rgba(16,19,30,.86);
+    display:grid;place-items:center;pointer-events:auto;touch-action:none;padding:0}
+  .act .ico{font-size:24px;line-height:1;position:relative;z-index:1}
+  .act .cd{position:absolute;inset:0;border-radius:50%;background:conic-gradient(rgba(0,0,0,.7) var(--p,0%), transparent 0);z-index:2;pointer-events:none}
+  .act .cdn{position:absolute;inset:0;display:grid;place-items:center;z-index:3;font-size:15px;font-weight:900;pointer-events:none;text-shadow:0 1px 3px #000}
+  .act.busy{border-color:var(--gold);box-shadow:0 0 18px rgba(255,210,63,.45)}
+  .act.ready{border-color:rgba(255,210,63,.55)}
+  .act.locked{opacity:.35}
+  .act:active{transform:scale(.93)}
+  #act-attack{width:84px;height:84px;right:0;bottom:0;border-color:rgba(255,210,63,.5)}
+  #act-attack .ico{font-size:32px}
+  .act.s{width:58px;height:58px}
+
+  #fight-btn{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 150px);
+    padding:13px 20px;border-radius:16px;border:0;font-weight:900;font-size:15px;color:#2a1204;white-space:nowrap;text-align:center;
+    background:linear-gradient(135deg,#c2410c,#ffb347);box-shadow:0 12px 30px -8px rgba(255,107,53,.8);pointer-events:auto;
+    animation:pulse 1.6s ease-in-out infinite}
+  #fight-btn small{display:block;font-size:11px;font-weight:800;opacity:.75}
+  @keyframes pulse{50%{transform:translateX(-50%) scale(1.04)}}
+
+  #banner{position:absolute;left:12px;right:12px;top:30%;text-align:center;pointer-events:none;opacity:0;transition:opacity .35s}
+  #banner.on{opacity:1}
+  #banner h2{margin:0;font-size:30px;font-weight:900;letter-spacing:.4px;text-wrap:balance;
+    background:linear-gradient(96deg,#ff6b35,#ffd23f);-webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 3px 12px rgba(0,0,0,.9))}
+  #banner p{margin:6px auto 0;max-width:30ch;color:var(--ink);font-size:13.5px;text-shadow:0 2px 8px #000;text-wrap:balance}
+  #banner h2:empty{display:none}
+  #banner h2.long{font-size:clamp(14px,4.7vw,21px);letter-spacing:-.2px;overflow-wrap:anywhere}
+  /* a line of narration, said before something happens */
+  #banner.narr p{font-size:17px;font-style:italic;font-weight:800;max-width:24ch;color:#ffe0b8;
+    text-shadow:0 2px 10px #000,0 0 18px rgba(0,0,0,.8)}
+  #toast{position:absolute;left:50%;top:24%;transform:translateX(-50%);padding:8px 13px;font-size:12.5px;max-width:86%;text-align:center;
+    pointer-events:none;opacity:0;transition:opacity .3s}
+  #toast.on{opacity:1}
+
+  /* ---------- screens ---------- */
+  .screen{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;touch-action:pan-y;z-index:20;
+    background:radial-gradient(120% 60% at 50% -10%, rgba(255,107,53,.16), transparent 62%), rgba(10,12,19,.96);
+    padding:calc(env(safe-area-inset-top,0px) + 22px) 16px calc(env(safe-area-inset-bottom,0px) + 28px)}
+  .screen h1{font-size:28px;margin:8px 0 2px;letter-spacing:.2px;font-weight:900;text-wrap:balance}
+  .screen h1 b{background:linear-gradient(96deg,#ff6b35 8%,#ffd23f 92%);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .screen p{color:var(--dim);font-size:13.5px;line-height:1.55;margin:8px 0;font-weight:600}
+  .tag{display:inline-block;font-size:10px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--gold);letter-spacing:.8px}
+  .picks{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0 10px}
+  .pick{border:1px solid var(--line);background:rgba(255,255,255,.03);border-radius:14px;padding:8px 9px 9px;text-align:left}
+  .pick.on{border-color:var(--gold);background:rgba(255,210,63,.08)}
+  .pick canvas{width:100%;height:74px;display:block}
+  .pick b{display:block;font-size:13.5px;margin-top:3px}
+  .pick small{display:block;font-size:11px;margin-top:1px}
+  .detail{border:1px solid var(--line);border-radius:14px;padding:12px;background:rgba(255,255,255,.03)}
+  .lvrow{display:flex;align-items:center;gap:10px;font-size:13px}
+  .lvrow input{flex:1;accent-color:var(--gold);height:28px}
+  .lvrow b{min-width:52px;text-align:right;font-variant-numeric:tabular-nums}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:10px 0 8px}
+  .stats div{background:rgba(255,255,255,.04);border-radius:10px;padding:6px 4px;text-align:center}
+  .stats span{display:block;font-size:9.5px;color:var(--dim);letter-spacing:.6px;text-transform:uppercase}
+  .stats b{font-size:15px;font-variant-numeric:tabular-nums}
+  .kit{display:grid;gap:4px;font-size:12px}
+  .kit div{display:flex;justify-content:space-between;gap:8px;padding:5px 2px;border-top:1px solid #1e2434}
+  .kit div.no{color:#5b6378}
+  .kit em{font-style:normal;color:var(--dim);font-size:11px;white-space:nowrap}
+  .go{display:block;width:100%;margin:10px 0 0;padding:15px 18px;border-radius:16px;border:0;
+    background:linear-gradient(135deg,#ff6b35,#ffd23f);color:#220d02;font-weight:900;font-size:16px;box-shadow:0 12px 30px -8px rgba(255,107,53,.75)}
+  .go small{display:block;font-size:11.5px;font-weight:800;opacity:.7}
+  .ghost{display:block;width:100%;margin:8px 0 0;padding:13px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.05);font-weight:800}
+  ul.how{list-style:none;padding:0;margin:16px 0 0}
+  ul.how li{color:#98a1b6;font-size:12.5px;line-height:1.5;padding:7px 0 7px 18px;position:relative;border-top:1px solid #1e2434;font-weight:600}
+  ul.how li::before{content:"›";position:absolute;left:4px;color:var(--ember);font-weight:900}
+  ul.how b{color:var(--ink)}
+  .row{display:flex;gap:8px}
+  .row > *{flex:1;min-width:0}
+  table.dmg{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px}
+  table.dmg td{padding:8px 4px;border-top:1px solid #1e2434}
+  table.dmg td:last-child{text-align:right;color:var(--gold);font-variant-numeric:tabular-nums}
+  label.chk{display:flex;gap:10px;align-items:center;font-size:13.5px;color:var(--ink);margin:12px 0;font-weight:700}
+  label.chk input{width:20px;height:20px;accent-color:var(--gold)}
+  .boss-card{display:grid;place-items:center;margin:8px 0 2px}
+  .boss-card canvas{width:200px;height:180px}
+  @media (prefers-reduced-motion:reduce){ #fight-btn{animation:none} }
+</style>
+</head>
+<body>
+<div id="device">
+<canvas id="game"></canvas>
+
+<div id="hud" hidden>
+  <div class="top">
+    <div id="bossbar" class="panel" hidden>
+      <div class="bname">SIR UWAAARGHHHH <span id="bnote">barely marked</span></div>
+      <div class="bar"><i id="bhp"></i></div>
+      <div class="cast" id="bcast"></div>
+    </div>
+    <div class="row1">
+      <div id="me" class="panel">
+        <canvas id="me-face" width="76" height="76"></canvas>
+        <div class="who"><div class="nm"><span id="me-name">-</span><i id="me-lv"></i></div>
+          <div class="bar" id="me-hpbar"><i id="me-hp"></i></div><small id="me-hptext"></small></div>
+      </div>
+      <div class="side">
+        <canvas id="minimap" width="168" height="128"></canvas>
+        <div class="chips"><div class="chip panel" id="online" hidden></div><div class="chip panel" id="swings"></div><button id="menu-btn" class="panel tap" aria-label="Menu">☰</button></div>
+      </div>
+    </div>
+    <div id="party"></div>
+  </div>
+  <div id="stick"><div id="stick-base" class="rest"><div id="stick-knob"></div></div></div>
+  <div id="actions">
+    <button class="act" id="act-attack" aria-label="Attack"><span class="ico">👊</span><span class="cd"></span><span class="cdn"></span></button>
+  </div>
+  <button id="fight-btn" hidden></button>
+  <div id="banner"><h2 id="banner-h"></h2><p id="banner-p"></p></div>
+  <div id="toast" class="panel"></div>
+</div>
+
+<div id="select" class="screen">
+  <span class="tag">PROTOTYPE · NOT IN THE GAME YET</span>
+  <h1>Runmon <b>Explore</b></h1>
+  <p>Take your pet off the pet screen and out into the world. Fight the wild pets you meet, and take on Sir Uwaaarghhhh on his hill.</p>
+  <label class="nick"><span>Your name</span><input id="nick" maxlength="14" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="Runner"></label>
+  <p id="lobby"></p>
+  <div class="picks" id="picks"></div>
+  <div class="detail">
+    <div class="lvrow"><span>Level</span><input type="range" id="lv" min="5" max="14" step="1"><b id="lv-n"></b></div>
+    <div class="stats" id="stats"></div>
+    <div class="kit" id="kit"></div>
+  </div>
+  <button class="go" id="start">Explore</button>
+  <button class="ghost" id="start-raid">Straight to the raid</button>
+  <ul class="how">
+    <li><b>Move</b> with your left thumb, anywhere on the left half of the screen.</li>
+    <li><b>Skills</b> are the fight: your pet's own moves at its level, live, each on its cooldown. Damage and effects are the game's battle numbers; one battle turn is 1.4 seconds.</li>
+    <li><b>👊 Attack</b> is mostly a dash: its swipe barely scratches. Nothing he swings can land on you mid-dash, and it cuts a skill short once the skill has landed.</li>
+    <li><b>Together:</b> everyone with this link open is in the same world. Take him on at the same time and his health is shared.</li>
+    <li><b>Open PvP:</b> out in the world, other players' pets can fight yours, and yours theirs. While anyone is fighting him, nobody can touch them.</li>
+    <li>Sit by the campfire to heal. Berries heal too.</li>
+  </ul>
+  <p style="font-size:12px">Nothing here reads or writes your real pet.</p>
+</div>
+
+<div id="menu" class="screen" hidden>
+  <h1>Paused</h1>
+  <button class="go" id="m-resume">Resume</button>
+  <div class="row"><button class="ghost" id="m-camp">To the campfire</button><button class="ghost" id="m-hill">To the hill</button></div>
+  <div class="row"><button class="ghost" id="m-heal">Full heal</button><button class="ghost" id="m-swings">10 more swings</button></div>
+  <button class="ghost" id="m-pet">Change pet</button>
+  <p id="m-note"></p>
+  <label class="chk"><input type="checkbox" id="m-god"> God mode (take no damage)</label>
+  <p>Prototype tools. None of this touches your real pet.</p>
+</div>
+
+<div id="result" class="screen" hidden>
+  <span class="tag" id="r-tag">ATTEMPT OVER</span>
+  <h1 id="r-title"></h1>
+  <div class="boss-card"><canvas id="r-boss" width="400" height="360"></canvas></div>
+  <p id="r-sub"></p>
+  <table class="dmg" id="r-table"></table>
+  <button class="go" id="r-again"></button>
+  <button class="ghost" id="r-leave">Back to the trail</button>
+</div>
+
+<div id="turn"><div><b>Turn your phone upright</b><span>Runmon Explore is played in portrait.</span></div></div>
+</div>
+<div id="desk-note">Built for phones. Open this link on your phone to play it with your thumbs.</div>
+
+<script>
+"use strict";
+/* =========================================================================
+   DATA - mirrored from the game
+   =========================================================================
+   Attributes, the battle engine's constants, every skill's `battle` block, the
+   raid boss and all sprite geometry are copied from index.html on the game's
+   current branch. On integration they become shared code, not copies. */
+
+const GAME_ART = "art/game/";
+const art = s => GAME_ART + s;
+
+const EVO_LEVELS = [1, 5, 15, 30, 50];
+const STAGE_CAP  = 2;
+function stageForLevel(level){
+  let s = 0;
+  for (let i = 0; i < EVO_LEVELS.length; i++) if (level >= EVO_LEVELS[i]) s = i;
+  return Math.min(s, STAGE_CAP);
+}
+const ATTR_BASE = 100, ATTR_GROWTH = 6, ATTR_EVO = [0, 0, 18, 42, 72];
+const ATTR_SPLIT = {
+  verdant: { hp:0.37, def:0.26, pow:0.27, spd:0.10 },
+  ember:   { hp:0.19, def:0.19, pow:0.37, spd:0.25 },
+  nimbus:  { hp:0.21, def:0.19, pow:0.30, spd:0.29 }
+};
+const ATTR_BONUS = { verdant: { from:18, mult:1.03 } };
+function attrBonus(sp, lv){ const b = ATTR_BONUS[sp]; return b && lv >= b.from ? b.mult : 1; }
+function attrTotal(lv){ return ATTR_BASE + ATTR_GROWTH * (lv - 1) + ATTR_EVO[stageForLevel(lv)]; }
+function attrsFor(sp, lv){
+  const split = ATTR_SPLIT[sp] || ATTR_SPLIT.ember, total = attrTotal(lv) * attrBonus(sp, lv), out = {};
+  for (const k of ["hp","def","pow","spd"]) out[k] = Math.round(total * split[k]);
+  return out;
+}
+// the battle engine's constants: HP pool x5, mitigation, +/-35% jitter, crits
+// off, the 35% extra-turn cap and the two-turn shared cooldown
+const BT = { POOL:5, MIT:0.6, JIT:0.35, EXTRA:0.35, GCD:2 };
+
+/* Turns become time. A battle is one move a turn; here a turn is TURN seconds
+   of a pet's own clock, so cooldowns, the shared cooldown, a burn's ticks and
+   a rattled guard keep the same ratios they have in the game. Speed buys extra
+   turns there; here it runs that pet's clock faster (see tempoOf). */
+const TURN = 1.4;
+const WALK = 165;   // px/s, the same for every pet at every level
+const BOSS_TURN = 1.3;   // his own turns come quicker than the game's ratio: live, a slow boss is a boss nobody gets hit by
+
+const SPECIES = {
+  ember:   { name:"Ember",   colour:"#ff6b35" },
+  verdant: { name:"Verdant", colour:"#8ed06a" },
+  nimbus:  { name:"Nimbus",  colour:"#5fe6ff" }
+};
+
+/* box: on-screen size in world px. foot: where the feet sit down the idle
+   frame, measured off each sheet. walk/doze: idle frames used for walking and
+   for fainting - the sheets have no walk cycle of their own yet. */
+const FORMS = {
+  cinderling:{ species:"ember", stage:1, name:"Cinderling", min:5, max:14, def:14, box:66, foot:.922, walk:[1,8], doze:10,
+    idle:{ src:"ember-cinderling.png", frames:12, fps:2, aspect:1.3125, scale:1.18, dx:-3, dy:-5 } },
+  sparky:{ species:"nimbus", stage:1, name:"Sparky", min:5, max:14, def:14, box:66, foot:.936, walk:[0,1], doze:3,
+    idle:{ src:"nimbus-sparky.png", frames:12, fps:2, aspect:1.031, scale:1.068, dx:3, dy:-9.7 } },
+  cub:{ species:"verdant", stage:1, name:"Bamboo Cub", min:5, max:14, def:14, box:66, foot:.961, walk:[0,2], doze:1,
+    idle:{ src:"verdant-bamboo-cub-v2.png", frames:12, fps:2, aspect:0.9542, scale:1.068, dx:4.86, dy:-14.33 } },
+  blazewyrm:{ species:"ember", stage:2, name:"Blazewyrm", min:15, max:40, def:26, box:80, foot:.971, walk:[0,1], doze:2,
+    idle:{ src:"ember-blazewyrm.png", frames:12, fps:2, aspect:1.268, scale:1.2 } },
+  zephyrite:{ species:"nimbus", stage:2, name:"Zephyrite", min:15, max:40, def:22, box:80, foot:.968, walk:[0,5], doze:10,
+    idle:{ src:"nimbus-zephyrite.png", frames:12, fps:2, aspect:1.199, scale:1.2, dx:0.9, dy:-11.3 } },
+  panda:{ species:"verdant", stage:2, name:"Panda", min:15, max:40, def:22, box:80, foot:.977, walk:[0,2], doze:10,
+    idle:{ src:"verdant-panda.png", frames:12, fps:1.25, aspect:1.168, scale:1.2, dx:3.75, dy:-14.7 } }
+};
+const FORM_FOR = { 1:{ ember:"cinderling", nimbus:"sparky", verdant:"cub" }, 2:{ ember:"blazewyrm", nimbus:"zephyrite", verdant:"panda" } };
+const formFor = (sp, lv) => FORM_FOR[Math.max(1, stageForLevel(lv))][sp];
+
+/* `battle` is the game's, untouched. `fx` is how the move plays out in space:
+   its shape and reach, and the beat of the clip the hit lands on - read off
+   the sheet, so the hitbox goes off on the frame the art does. */
+const SKILLS = {
+  ember: [
+    { id:"fizzle", name:"fireball", ico:"🔥", stage:1, level:8,
+      battle:{ dmg:0.40, self:0.02, cd:4, stoke:{ mult:1.5, hits:2 } },
+      fx:{ kind:"puff", impact:14, reach:120 },
+      sprite:{ src:"skill-fizzle.png", frames:16,
+        order:    [0, 1,2,4,  1,2,4,  1,2,4,  3,5,3,5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15],
+        durations:[380, 300,270,245, 225,205,185, 160,145,130, 185,150,150,270,
+                   150,230,260,180,190,260,170,170,190,280],
+        aspect:1.3125, scale:1.23, dx:-5, dy:-4.2 } },
+    { id:"horn-rush", name:"Horn Rush", ico:"💢", stage:1, level:10,
+      battle:{ dmg:1.25, cd:3, open:{ pct:0.15, turns:2 } },
+      fx:{ kind:"rush", from:5, to:10, dist:190 },
+      sprite:{ src:"skill-horn-rush.png", frames:16,
+        durations:[300, 260, 240, 200, 180, 140, 120, 100, 90, 90, 240, 260, 220, 240, 280, 340],
+        aspect:1.2074, scale:1.009, dx:-17.75, dy:2.63 } },
+    { id:"tail-swipe", name:"Tail Swipe", ico:"💨", stage:1, level:12,
+      battle:{ dmg:1.25, cd:3, rattle:{ pct:0.20, turns:2 } },
+      fx:{ kind:"cone", impact:7, reach:125, arc:1.1, tint:"#9fd8ff" },
+      sprite:{ src:"skill-tail-swipe.png", frames:16,
+        durations:[280, 240, 180, 150, 130, 110, 100, 240, 120, 150, 170, 180, 160, 200, 280, 340],
+        aspect:1.6071, scale:1.454, dx:-11.03, dy:14.14 } },
+    { id:"cinder-sweep", name:"Cinder Sweep", ico:"⭕", stage:1, level:14,
+      battle:{ dmg:1.30, self:0.05, cd:3, burn:{ pct:0.20, turns:2 } },
+      fx:{ kind:"nova", impact:7, reach:150, tint:"fire" },
+      sprite:{ src:"skill-cinder-sweep.png", frames:16,
+        durations:[260, 230, 200, 180, 140, 120, 110, 240, 120, 140, 180, 220, 240, 260, 280, 340],
+        aspect:1.6452, scale:1.50, dx:-26.38, dy:-7.99 } },
+    { id:"fireball", name:"Fireball", ico:"🔥", stage:2, level:18,
+      battle:{ dmg:1.20, cd:3, burn:{ pct:0.20, turns:2 } },
+      fx:{ kind:"shot", impact:8, reach:320, tint:"fire" },
+      sprite:{ src:"skill-fireball.png", frames:16,
+        durations:[150,150,140,130, 120,110,100, 90,90,90, 110,110,120,130,140,200],
+        aspect:1.270, scale:1.85, dx:12, dy:-31 } },
+    { id:"flame-stomp", name:"Flame Stomp", ico:"💥", stage:2, level:22,
+      battle:{ dmg:1.40, pierce:0.50, cd:3, open:{ pct:0.15, turns:2 } },
+      fx:{ kind:"nova", impact:8, reach:160, tint:"fire" },
+      sprite:{ src:"skill-flame-stomp.png", frames:16,
+        durations:[160,150,140,130, 120,100,90,80, 100,120,130,140, 150,160,170,220],
+        aspect:1.270, scale:1.98, dx:13, dy:-25 } },
+    { id:"flying-swoop", name:"Flying Swoop", ico:"☄️", stage:2, level:26,
+      battle:{ dmg:1.50, cd:3, charge:{ spd:0.10, pow:0.06, max:3 } },
+      fx:{ kind:"rush", from:3, to:11, dist:240, tint:"fire" },
+      sprite:{ src:"skill-flying-swoop.png", frames:16,
+        durations:[170,160,150, 130,110,90, 80,80,80,90,100, 120,140,160,180,220],
+        aspect:1.270, scale:1.98, dx:1, dy:-36 } }
+  ],
+  nimbus: [
+    { id:"spark", name:"Spark", ico:"⚡", stage:1, level:8,
+      battle:{ dmg:1.05, self:0.01, cd:3, charge:{ spd:0.08, pow:0.12, max:3 } },
+      fx:{ kind:"nova", impact:8, reach:135, tint:"spark" },
+      sprite:{ src:"skill-spark.png", frames:12,
+        order:    [0, 1, 2, 3, 4, 5, 6, 7,  8, 9, 8, 9,  10, 11, 10, 11],
+        durations:[400, 380, 350, 320, 290, 250, 210, 170, 100, 100, 90, 90,  300, 300, 340, 420],
+        aspect:1.079, scale:1.139, dx:3.2, dy:-13.6 } },
+    { id:"static-shock", name:"Static Shock", ico:"💫", stage:1, level:11,
+      battle:{ dmg:1.00, cd:3, rattle:{ pct:0.30, turns:2 } },
+      fx:{ kind:"nova", impact:8, reach:150, tint:"spark" },
+      sprite:{ src:"skill-static-shock.png", frames:16,
+        durations:[300, 260, 230, 210, 190, 170, 150, 130, 120, 120, 170, 250, 200, 200, 230, 320],
+        aspect:1.1699, scale:1.562, dx:5.9, dy:-1.0 } },
+    { id:"acorn-flick", name:"Acorn Flick", ico:"🌰", stage:1, level:12,
+      battle:{ dmg:1.50, cd:5 },
+      fx:{ kind:"shot", impact:7, reach:300, tint:"acorn" },
+      sprite:{ src:"skill-acorn-flick.png", frames:16,
+        durations:[300, 260, 240, 260, 180, 150, 90, 110, 150, 170, 190, 240, 200, 220, 300, 340],
+        aspect:1.4822, scale:1.439, dx:13.05, dy:-12.87 } },
+    { id:"pocket-storm", name:"Pocket Storm", ico:"⛈️", stage:1, level:14,
+      battle:{ dmg:1.40, pierce:0.30, cd:6 },
+      fx:{ kind:"strike", impact:8, reach:280, radius:52, tint:"small" },
+      sprite:{ src:"skill-pocket-storm.png", frames:16,
+        durations:[300, 260, 240, 220, 200, 190, 180, 320, 110, 100, 110, 100, 180, 260, 300, 360],
+        aspect:1.3464, scale:1.388, dx:19.43, dy:-1.93 } },
+    { id:"lightning-bolt", name:"Lightning Bolt", ico:"🌩️", stage:2, level:18,
+      battle:{ dmg:1.58, pierce:0.35, cd:3 },
+      fx:{ kind:"strike", impact:9, reach:330, radius:58 },
+      sprite:{ src:"skill-lightning-bolt.png", frames:12,
+        durations:[380, 340, 300, 260, 230, 200, 180, 160, 150, 170, 260, 460],
+        aspect:1.061, scale:1.376, dx:5.6, dy:-25.2 } },
+    { id:"arc-lash", name:"Arc Lash", ico:"🌀", stage:2, level:22,
+      battle:{ dmg:1.50, cd:3, rattle:{ pct:0.25, turns:3 } },
+      fx:{ kind:"cone", impact:7, reach:175, arc:.75, tint:"#ffd23f" },
+      sprite:{ src:"skill-arc-lash.png", frames:12,
+        durations:[230, 210, 195, 180, 150, 130, 95, 95, 175, 210, 250, 330],
+        aspect:1.4239, scale:1.435, dx:10.19, dy:-4.24 } }
+  ],
+  verdant: [
+    { id:"green-gale", name:"Green Gale", ico:"🍃", stage:1, level:8,
+      battle:{ dmg:1.25, cd:3, soften:{ pct:0.06, max:3 } },
+      fx:{ kind:"gale", impact:8, reach:150, arc:.8 },
+      sprite:{ src:"skill-fart.png", frames:12,
+        order:    [0, 1, 2, 3, 4, 5,  6,   7,   8,   9,  10, 11, 10, 11],
+        durations:[340, 310, 280, 250, 220, 190,  600,  560, 480, 620, 240, 240, 300, 360],
+        aspect:1.348, scale:0.986, dx:1.9, dy:-0.5 } },
+    { id:"bamboo-toss", name:"Bamboo Toss", ico:"🎋", stage:1, level:12,
+      battle:{ dmg:1.40, cd:3 },
+      fx:{ kind:"shot", impact:5, reach:300, tint:"bamboo" },
+      sprite:{ src:"skill-bamboo-toss.png", frames:16,
+        durations:[320, 280, 240, 200, 120, 100, 110, 130, 220, 260, 240, 300, 220, 220, 260, 340],
+        aspect:2.8724, scale:2.381, dx:16.15, dy:-2.96 } },
+    { id:"nap", name:"Nap", ico:"😴", stage:2, level:18,
+      battle:{ dmg:0, cd:4, heal:0.26, expose:1.6, at:0.50, once:true },
+      fx:{ kind:"self", impact:12 },
+      sprite:{ src:"skill-nap.png", frames:16,
+        durations:[220, 240, 260, 360, 360, 220, 190, 220, 340, 400, 400, 400, 280, 220, 200, 340],
+        aspect:1.0790, scale:1.2, dx:4.05, dy:-22.01 } },
+    { id:"landslide", name:"Landslide", ico:"🪨", stage:2, level:22,
+      battle:{ dmg:1.61, pierce:0.35, cd:5, open:{ pct:0.50, turns:3 } },
+      fx:{ kind:"rush", from:8, to:14, dist:250, tint:"dust" },
+      sprite:{ src:"skill-landslide.png", frames:16,
+        durations:[360, 275, 230, 190, 160, 138, 120, 110, 98, 98, 98, 98, 110, 160, 250, 480],
+        aspect:1.1890, scale:1.184, dx:4.9, dy:-13.04 } }
+  ]
+};
+const MOVE = {};
+/* Each clip is played back to fit inside one turn - the time the move costs
+   in a battle. A clip that ran longer would cost its pet part of its next turn,
+   and the long ones (the fizzle at 4.9s, Nap at 4.65s) cost enough to swing a
+   fight; they play quick rather than unfairly. */
+for (const sp in SKILLS) for (const s of SKILLS[sp]){ s.species = sp; s.clip = makeClip(s.sprite, TURN); MOVE[s.id] = s; }
+/* Skills are the fight. Live, a plain Attack is instant and dashes you onto
+   the target, while a skill plays its clip first - so at anything near the
+   game's ×1, spamming Attack was the better button. So:
+   - Attack hits at ×0.1 (ATTACK_MULT), 90% under the game's plain attack.
+     It is for its dash: getting out from under him, or cutting a landed
+     skill's clip short. The damage is the skills'.
+   - No shared cooldown (LIVE_GCD 0). With Attack worth nothing, the game's
+     skill-then-Attack rhythm would be a dead turn after every skill; here a
+     pet chains its skills.
+   - Cooldowns are shorter, so the moves a pet learns first come round more:
+     the first damaging move of each form every 2 turns, the rest one turn
+     sooner than in the game, never under 2. A Nap is still once a fight. */
+let ATTACK_MULT = 0.1, LIVE_GCD = 0, ATTACK_CD = 1;
+function liveCds(short){
+  for (const sp in SKILLS) for (const st of [1, 2]){
+    const kit = SKILLS[sp].filter(k => k.stage === st), first = kit.find(k => k.battle.dmg > 0);
+    for (const k of kit) k.cd = !short || k.battle.once ? k.battle.cd : k === first ? 2 : Math.max(2, k.battle.cd - 1);
+  }
+}
+liveCds(true);
+function makeClip(c, fit){
+  const order = c.order || [...Array(c.frames).keys()];
+  const raw = c.durations || order.map(() => 1000 / (c.fps || 8));
+  const natural = raw.reduce((a, b) => a + b, 0) / 1000;
+  const k = fit ? Math.min(1, fit / natural) : 1;
+  const durs = raw.map(d => d * k), starts = []; let t = 0;
+  for (const d of durs){ starts.push(t); t += d; }
+  return { order, durs, starts, total:t };
+}
+function clipFrame(clip, ms){
+  for (let i = clip.order.length - 1; i >= 0; i--) if (ms >= clip.starts[i]) return clip.order[i];
+  return clip.order[0];
+}
+function kitFor(formId, level){
+  const f = FORMS[formId];
+  return SKILLS[f.species].filter(k => level >= k.level && k.stage === f.stage && stageForLevel(level) === k.stage);
+}
+
+/* Sir UwaaarghhhhUWAAGRRHH - the game's raid boss, as he is in the game: his
+   four worn-down sheets, his three moves, his stats and his death. */
+const RAID_BOSS = {
+  name:"Sir UwaaarghhhhUWAAGRRHH", short:"Sir Uwaaarghhhh",
+  blurb:"Something enormous has come down off the hill, and it is holding a torch.",
+  phases:[
+    { from:0.75, src:"boss-uwaaargh-0.png", note:"barely marked" },
+    { from:0.50, src:"boss-uwaaargh-1.png", note:"bruised" },
+    { from:0.25, src:"boss-uwaaargh-2.png", note:"battered" },
+    { from:0.00, src:"boss-uwaaargh-3.png", note:"on his last legs" }
+  ],
+  sprite:{ frames:12, fps:1.6, aspect:1.0492, scale:1.278, dx:-7.5, dy:1.9 },
+  foot:.885,
+  death:{ src:"boss-death.png", frames:16, aspect:1.2281, scale:1.237, dx:6.8, dy:6.8,
+    durations:[320,200,200,360, 140,140,220,260, 200,180,300,340, 380,400,420,460] },
+  kit:[
+    { id:"uwaaargh", name:"UWAAAARGH!", battle:{ dmg:0, cd:6, stoke:{ mult:1.6, hits:2 }, charge:{ spd:0.08, pow:0.20, max:2 } },
+      fx:{ kind:"roar", impact:9 },
+      sprite:{ src:"boss-skill-warcry.png", frames:16, fps:7, aspect:1.6386, scale:1.646, dx:8.7, dy:19.6 } },
+    { id:"splitter", name:"Splitter", battle:{ dmg:2.2, pierce:0.7, cd:4 },
+      fx:{ kind:"slam", impact:10, radius:105 },
+      sprite:{ src:"boss-skill-smash.png", frames:16, fps:9, aspect:1.1881, scale:1.31, dx:10.7, dy:4.8 } },
+    { id:"torchswing", name:"Torchswing", battle:{ dmg:1.35, cd:2 },
+      fx:{ kind:"sweep", impact:8, radius:185 },
+      sprite:{ src:"boss-skill-swing.png", frames:16, fps:9, aspect:1.4433, scale:1.192, dx:1.1, dy:15.6 } }
+  ],
+  battle:{ pow:90, def:25, spd:60 }
+};
+for (const k of RAID_BOSS.kit){ k.clip = makeClip(k.sprite); MOVE[k.id] = k; }
+RAID_BOSS.deathClip = makeClip(RAID_BOSS.death);
+
+/* =========================================================================
+   ASSETS
+   ========================================================================= */
+const IMG = {};
+function loadImg(key, src){
+  return new Promise(res => {
+    const im = new Image();
+    im.onload = () => { IMG[key] = im; res(im); };
+    im.onerror = () => { console.warn("missing art", src); res(null); };
+    im.src = src;
+  });
+}
+function loadAll(){
+  const jobs = [loadImg("tiles", "art/tiles.png"), loadImg("props", "art/props.png")];
+  for (const f of Object.values(FORMS)) jobs.push(loadImg(f.idle.src, art(f.idle.src)));
+  for (const s of Object.values(MOVE)) jobs.push(loadImg(s.sprite.src, art(s.sprite.src)));
+  for (const p of RAID_BOSS.phases) jobs.push(loadImg(p.src, art(p.src)));
+  jobs.push(loadImg(RAID_BOSS.death.src, art(RAID_BOSS.death.src)));
+  return Promise.all(jobs);
+}
+/* The sheets are painted at ~400px a frame and drawn at ~100, so each frame
+   is resampled once, at the exact device size, and cached. */
+const frameCache = new Map();
+function sheetFrame(src, frames, i, w, h, white){
+  w = Math.max(1, Math.round(w)); h = Math.max(1, Math.round(h));
+  const key = src + "|" + i + "|" + w + "x" + h + (white ? "|w" : "");
+  let c = frameCache.get(key);
+  if (c) return c;
+  const im = IMG[src];
+  if (!im) return null;
+  const fw = im.width / frames;
+  c = document.createElement("canvas"); c.width = w; c.height = h;
+  const g = c.getContext("2d");
+  g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
+  let srcC = im, sx = i * fw, sw = fw, sh = im.height;
+  if (fw > w * 2.2){
+    const mid = document.createElement("canvas");
+    mid.width = Math.round(w * 2); mid.height = Math.round(h * 2);
+    const mg = mid.getContext("2d"); mg.imageSmoothingQuality = "high";
+    mg.drawImage(im, sx, 0, sw, sh, 0, 0, mid.width, mid.height);
+    srcC = mid; sx = 0; sw = mid.width; sh = mid.height;
+  }
+  g.drawImage(srcC, sx, 0, sw, sh, 0, 0, w, h);
+  if (white){ g.globalCompositeOperation = "source-atop"; g.fillStyle = "rgba(255,255,255,.7)"; g.fillRect(0, 0, w, h); }
+  if (frameCache.size > 1600) frameCache.clear();
+  frameCache.set(key, c);
+  return c;
+}
+
+/* =========================================================================
+   WORLD
+   ========================================================================= */
+const TILE = 32, MW = 84, MH = 64;
+const T = { GRASS:0, GRASS2:1, FLOWER:2, TALL:3, PATH:4, WATER:5, WATER2:6, SAND:7, ASH:8, LAVA:9,
+            MOSS:10, MOSS2:11, CLOUD:12, CLOUD2:13, FLOOR:14, RUNE:15 };
+const PROP = { tree:0, bamboo:1, spire:2, crystal:3, boulder:4, bush:5, stone:6, fire0:7, fire1:8,
+               sign:9, acorn:10, berry:11, mushroom:12 };
+const SOLID_PROPS = new Set(["tree","bamboo","spire","crystal","boulder","bush","stone","sign"]);
+const ARENA = { tx:42, ty:12, r:8.2 };
+const CAMP  = { tx:42, ty:47 };
+const ARENA_PX = { x:(ARENA.tx + .5) * TILE, y:(ARENA.ty + .5) * TILE, r:ARENA.r * TILE };
+const CAMP_PX  = { x:(CAMP.tx + .5) * TILE, y:(CAMP.ty + 1) * TILE - 4 };
+
+function rng32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+function hash2(x, y){ let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263); h = Math.imul(h ^ h >>> 13, 1274126177); return ((h ^ h >>> 16) >>> 0) / 4294967296; }
+function vnoise(x, y, s){
+  const gx = Math.floor(x / s), gy = Math.floor(y / s), fx = x / s - gx, fy = y / s - gy;
+  const a = hash2(gx, gy), b = hash2(gx + 1, gy), c = hash2(gx, gy + 1), d = hash2(gx + 1, gy + 1);
+  const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+  return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
+}
+const world = { tiles:new Uint8Array(MW * MH), solid:new Uint8Array(MW * MH), biome:[], props:[], canvas:null, mini:null };
+function biomeAt(tx, ty){
+  if (Math.hypot(tx - ARENA.tx, ty - ARENA.ty) <= ARENA.r) return "arena";
+  const wob = (vnoise(tx, ty, 7) - .5) * 9;
+  if (tx + wob < 29 && ty + wob < 29) return "nimbus";
+  if (tx + wob < 29) return "verdant";
+  if (tx + wob > 56) return "ember";
+  return "meadow";
+}
+function genWorld(){
+  const R = rng32(20261002);
+  const tiles = world.tiles, solid = world.solid;
+  const at = (x, y) => y * MW + x;
+  const inMap = (x, y) => x >= 0 && y >= 0 && x < MW && y < MH;
+  for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++){
+    const b = biomeAt(x, y); world.biome[at(x, y)] = b;
+    const r = R(); let t;
+    if (b === "meadow")  t = r < .05 ? T.FLOWER : r < .12 ? T.TALL : r < .55 ? T.GRASS2 : T.GRASS;
+    if (b === "verdant") t = r < .18 ? T.MOSS2 : T.MOSS;
+    if (b === "ember")   t = r < .1 ? T.LAVA : T.ASH;
+    if (b === "nimbus")  t = r < .1 ? T.CLOUD2 : T.CLOUD;
+    if (b === "arena"){ const d = Math.hypot(x - ARENA.tx, y - ARENA.ty); t = (d > 5.3 && d < 6.3 && (x + y) % 3 === 0) || d < 1 ? T.RUNE : T.FLOOR; }
+    tiles[at(x, y)] = t;
+  }
+  const ponds = [[56, 54, 5.5, 3.6], [11, 50, 4.2, 3], [66, 33, 3, 2.2], [20, 9, 3.4, 2.4]];
+  for (const [cx, cy, rx, ry] of ponds){
+    for (let y = Math.floor(cy - ry - 2); y <= cy + ry + 2; y++) for (let x = Math.floor(cx - rx - 2); x <= cx + rx + 2; x++){
+      if (!inMap(x, y)) continue;
+      const d = Math.hypot((x - cx) / rx, (y - cy) / ry) + (vnoise(x, y, 3) - .5) * .35;
+      if (d < 1){ tiles[at(x, y)] = T.WATER; solid[at(x, y)] = 1; }
+      else if (d < 1.38 && world.biome[at(x, y)] !== "ember") tiles[at(x, y)] = T.SAND;
+    }
+  }
+  const pathPts = [
+    [[CAMP.tx, CAMP.ty], [CAMP.tx, ARENA.ty + 8]],
+    [[CAMP.tx, CAMP.ty], [30, 46], [18, 44], [7, 40]],
+    [[CAMP.tx, CAMP.ty], [55, 48], [66, 42], [78, 40]],
+    [[30, 46], [26, 34], [18, 24], [12, 14]],
+    [[CAMP.tx, CAMP.ty], [CAMP.tx + 3, 58], [CAMP.tx + 8, 62]]
+  ];
+  const onPath = new Uint8Array(MW * MH);
+  for (const pts of pathPts){
+    for (let i = 0; i < pts.length - 1; i++){
+      const [x0, y0] = pts[i], [x1, y1] = pts[i + 1];
+      const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) * 3);
+      for (let k = 0; k <= n; k++){
+        const t = k / n, wob = Math.sin(t * 9 + i) * .8;
+        const px = x0 + (x1 - x0) * t + wob * (y1 !== y0 ? 1 : 0);
+        const py = y0 + (y1 - y0) * t + wob * (x1 !== x0 ? .5 : 0);
+        for (let oy = -1; oy <= 0; oy++) for (let ox = -1; ox <= 0; ox++){
+          const tx = Math.round(px + ox), ty = Math.round(py + oy);
+          if (!inMap(tx, ty) || world.biome[at(tx, ty)] === "arena" || tiles[at(tx, ty)] === T.WATER) continue;
+          tiles[at(tx, ty)] = T.PATH; onPath[at(tx, ty)] = 1;
+        }
+      }
+    }
+  }
+  for (let y = CAMP.ty - 2; y <= CAMP.ty + 2; y++) for (let x = CAMP.tx - 3; x <= CAMP.tx + 3; x++){
+    if (Math.hypot(x - CAMP.tx, (y - CAMP.ty) * 1.3) < 3.2){ tiles[at(x, y)] = T.PATH; onPath[at(x, y)] = 1; }
+  }
+  const props = world.props;
+  const addProp = (kind, tx, ty, ox = 0) => {
+    props.push({ kind, x:(tx + .5) * TILE + ox, y:(ty + 1) * TILE - 2 });
+    if (SOLID_PROPS.has(kind)) solid[at(tx, ty)] = 1;
+  };
+  for (let a = 0; a < 360; a += 20){
+    if (a > 60 && a < 120) continue;
+    const r = ARENA.r + .6, rad = a * Math.PI / 180;
+    addProp("stone", Math.round(ARENA.tx + Math.cos(rad) * r), Math.round(ARENA.ty + Math.sin(rad) * r));
+  }
+  addProp("fire0", CAMP.tx, CAMP.ty);
+  addProp("sign", CAMP.tx + 2, CAMP.ty - 3);
+  addProp("sign", ARENA.tx + 2, ARENA.ty + 10);
+  world.signs = [
+    { x:(CAMP.tx + 2.5) * TILE, y:(CAMP.ty - 2) * TILE, text:"↑ The hill   ← Verdant Grove   → Ember Crags   ↖ Nimbus Heights" },
+    { x:(ARENA.tx + 2.5) * TILE, y:(ARENA.ty + 11) * TILE, text:RAID_BOSS.blurb }
+  ];
+  const scatter = {
+    meadow:  [["tree", .03], ["bush", .016], ["boulder", .006]],
+    verdant: [["bamboo", .07], ["tree", .025], ["bush", .01], ["mushroom", .02]],
+    ember:   [["spire", .04], ["boulder", .028]],
+    nimbus:  [["crystal", .045], ["boulder", .02]]
+  };
+  for (let y = 1; y < MH - 1; y++) for (let x = 1; x < MW - 1; x++){
+    const i = at(x, y), b = world.biome[i];
+    if (b === "arena" || onPath[i] || solid[i] || tiles[i] === T.SAND) continue;
+    if (Math.hypot(x - CAMP.tx, y - CAMP.ty) < 6 || Math.hypot(x - ARENA.tx, y - ARENA.ty) < ARENA.r + 2.2) continue;
+    let near = false;
+    for (let oy = -1; oy <= 1 && !near; oy++) for (let ox = -1; ox <= 1; ox++) if (onPath[at(x + ox, y + oy)]){ near = true; break; }
+    if (near) continue;
+    const r = R(); let acc = 0;
+    for (const [kind, p] of scatter[b]){ acc += p; if (r < acc){ addProp(kind, x, y, (R() - .5) * 8); break; } }
+  }
+  const edge = { meadow:"tree", verdant:"bamboo", ember:"spire", nimbus:"crystal", arena:"stone" };
+  for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++){
+    if (x > 0 && y > 0 && x < MW - 1 && y < MH - 1) continue;
+    if (!solid[at(x, y)]) addProp(edge[world.biome[at(x, y)]], x, y);
+    solid[at(x, y)] = 1;
+  }
+  props.sort((a, b) => a.y - b.y);
+  renderWorldCanvas();
+}
+function renderWorldCanvas(){
+  const c = document.createElement("canvas");
+  c.width = MW * TILE; c.height = MH * TILE;
+  const g = c.getContext("2d"); g.imageSmoothingEnabled = false;
+  for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++){
+    const t = world.tiles[y * MW + x];
+    g.drawImage(IMG.tiles, t * 32, 0, 32, 32, x * TILE, y * TILE, TILE, TILE);
+    if (t === T.WATER && y > 0 && world.tiles[(y - 1) * MW + x] !== T.WATER) waterLip(g, x, y);
+  }
+  const grd = g.createRadialGradient(ARENA_PX.x, ARENA_PX.y, 10, ARENA_PX.x, ARENA_PX.y, ARENA_PX.r);
+  grd.addColorStop(0, "rgba(255,179,71,.14)"); grd.addColorStop(1, "rgba(255,179,71,0)");
+  g.fillStyle = grd; g.beginPath(); g.arc(ARENA_PX.x, ARENA_PX.y, ARENA_PX.r, 0, 7); g.fill();
+  world.canvas = c;
+  const m = document.createElement("canvas"); m.width = MW; m.height = MH;
+  const mg = m.getContext("2d");
+  const col = { meadow:"#3f7445", verdant:"#2f5a35", ember:"#4a3434", nimbus:"#5b6888", arena:"#6b6152" };
+  for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++){
+    const i = y * MW + x, t = world.tiles[i];
+    mg.fillStyle = t === T.WATER ? "#2b5c99" : t === T.PATH ? "#8d6f50" : world.solid[i] ? "#1d2a22" : col[world.biome[i]];
+    mg.fillRect(x, y, 1, 1);
+  }
+  world.mini = m;
+}
+function waterLip(g, x, y){
+  g.fillStyle = "rgba(10,20,40,.55)"; g.fillRect(x * TILE, y * TILE, TILE, 6);
+  g.fillStyle = "rgba(200,230,255,.35)"; g.fillRect(x * TILE, y * TILE + 6, TILE, 2);
+}
+const solidAt = (tx, ty) => tx < 0 || ty < 0 || tx >= MW || ty >= MH || world.solid[ty * MW + tx] === 1;
+function blocked(x, y, r){
+  const x0 = Math.floor((x - r) / TILE), x1 = Math.floor((x + r) / TILE);
+  const y0 = Math.floor((y - r) / TILE), y1 = Math.floor((y + r) / TILE);
+  for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++){
+    if (!solidAt(tx, ty)) continue;
+    const nx = Math.max(tx * TILE, Math.min(x, tx * TILE + TILE));
+    const ny = Math.max(ty * TILE + 10, Math.min(y, ty * TILE + TILE));
+    if ((nx - x) ** 2 + (ny - y) ** 2 < r * r) return true;
+  }
+  return false;
+}
+
+/* =========================================================================
+   STATE
+   ========================================================================= */
+const G = {
+  running:false, paused:false, time:0, ents:[], projs:[], fx:[], parts:[], texts:[], pickups:[],
+  player:null, boss:null, raid:null, pool:null, swings:3, cam:{ x:0, y:0, shake:0 },
+  god:false, formId:"cinderling", level:14, nick:""
+};
+const rnd = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const $ = id => document.getElementById(id);
+
+/* ---------- entities ---------- */
+class Pet {
+  constructor(formId, level, side, o = {}){
+    const f = FORMS[formId], a = attrsFor(f.species, level);
+    Object.assign(this, {
+      type:"pet", formId, form:f, sp:f.species, level, side,
+      pow:a.pow, def:a.def, spd:a.spd, max:a.hp * BT.POOL, cur:a.hp * BT.POOL,
+      kit:kitFor(formId, level), x:o.x || 0, y:o.y || 0, r:f.box * .27, box:f.box, face:1, aim:{ x:1, y:0 },
+      kx:0, ky:0, cds:{}, gcd:0, atkCd:0, dashT:0, clip:null, flash:0, inv:0,
+      alive:true, faintT:0, moving:0, walkT:Math.random() * 10, idleT:Math.random() * 6,
+      name:o.name || f.name, isPlayer:!!o.player, wild:!!o.wild,
+      home:{ x:o.x || 0, y:o.y || 0 }, aggro:null, wanderT:0, wanderTo:null, dealt:0, respawnT:0, lastFight:-99, calm:0
+    });
+    const c = f.idle, vh = this.box / c.aspect;
+    this.footOff = ((c.dy || 0) / 100) * vh + (f.foot - .5) * vh * (c.scale || 1);
+    resetFight(this);
+  }
+  get busy(){ return !!this.clip || this.dashT > 0; }
+  get canAct(){ return this.alive && !this.doomed; }
+  hitCircle(){ return { x:this.x, y:this.y, r:this.r }; }
+}
+/* Everything a battle builds up and throws away: buffs, a guard left open,
+   the once-a-fight Nap. A pet out of a fight for a few seconds starts the
+   next one clean, the way every battle in the game starts clean. */
+function resetFight(e){
+  Object.assign(e, { powMul:1, spdMul:1, defMul:1, charges:0, softens:0, stoke:null,
+    openT:0, openPct:0, exposed:0, burn:null, used:{}, stokeHits:0, roars:0 });
+}
+class Boss {
+  constructor(){
+    const b = RAID_BOSS.battle;
+    Object.assign(this, {
+      type:"boss", side:"foe", name:RAID_BOSS.short, boss:true,
+      x:ARENA_PX.x, y:ARENA_PX.y - 10, r:60, box:185, face:-1, level:1,
+      pow:Math.round(b.pow * BOSS_POW), def:b.def, spd:b.spd, max:1, cur:1,
+      alive:true, awake:false, flash:0, inv:0, kx:0, ky:0,
+      act:null, next:0, cds:{}, gcd:0, deadT:0, dealt:0, hop:0, moving:0, quarry:null
+    });
+    const c = RAID_BOSS.sprite, vh = this.box / c.aspect;
+    this.footOff = ((c.dy || 0) / 100) * vh + (RAID_BOSS.foot - .5) * vh * c.scale;
+    resetFight(this);
+  }
+  hitCircle(){ return { x:this.x, y:this.y - 30, r:this.r }; }
+}
+const hostile = (a, b) => a.side !== b.side;
+// he is only fair game for a page that has taken a swing at him
+function foesOf(e){
+  const out = G.ents.filter(o => o.alive && !o.doomed && hostile(e, o) && !(o.boss && (!o.awake || !G.raid || G.raid.over)));
+  if (e === G.player) for (const n of NET.pets.values()) if (pvpOk(n)) out.push(n);
+  return out;
+}
+/* Open PvP: out in the world, other people's pets are fair game, and yours
+   is theirs - except on the raid. Anyone fighting him can neither hit nor be
+   hit by another player. */
+const inRaid = () => !!(G.raid && !G.raid.over);
+function pvpOk(n){ return n.alive && !n.rd && !inRaid() && G.player && G.player.alive; }
+function nearestFoe(e, range){
+  let best = null, bd = range;
+  for (const o of foesOf(e)){
+    const h = o.hitCircle(), d = Math.hypot(h.x - e.x, h.y - e.y) - h.r;
+    if (d < bd){ bd = d; best = o; }
+  }
+  return best;
+}
+
+/* =========================================================================
+   THE BATTLE ENGINE, LIVE
+   =========================================================================
+   btHit() is the game's, line for line: Power against a divisive Defence,
+   K scaled to the level of the fight, +/-35% jitter, crits off. The boss has
+   no level, so his fights take the pet's. */
+function fightK(x, y){
+  const lx = x.boss ? y.level : x.level, ly = y.boss ? x.level : y.level;
+  return (attrTotal(lx) + attrTotal(ly)) / 2 * BT.MIT;
+}
+function btHit(x, y, mult, pierce){
+  const K = fightK(x, y);
+  const def = y.def * y.defMul * (y.openT > 0 ? 1 - y.openPct : 1) * (1 - (pierce || 0));
+  let d = x.pow * x.powMul * mult * (K / (K + def));
+  d *= 1 - BT.JIT + Math.random() * 2 * BT.JIT;
+  if (x.stoke){ d *= x.stoke.mult; if (--x.stoke.hits <= 0) x.stoke = null; }
+  if (y.exposed){ d *= y.exposed; y.exposed = 0; }
+  return Math.max(1, Math.round(d));
+}
+/* Speed, out here, is how fast a pet's own clock runs - its Attack, its
+   skills' cooldowns and their clips - by a fixed amount for its own Speed,
+   whoever it is fighting. (The ranked battles keep the game's rule, where
+   Speed buys extra turns against the opponent's.)
+
+   It is Speed for the pet's level - Speed over its total attributes - so a
+   quick species keeps the same edge at every level instead of a flat bonus
+   that means nothing at level 5 and everything at 40:
+       tempo = (1 + 5 × Speed / total) / 1.5
+   Verdant (a tenth of its stats in Speed) runs at the base pace, Ember about
+   1.5× (cooldowns a third shorter) and Nimbus about 1.6× (two-fifths), and a
+   charge's Speed adds to it. Of the forms tried, this kept the species
+   closest to the game's matchups. Walking is untouched: every pet moves at
+   the same pace. */
+function speedTempo(spd, level){ return (1 + 5 * spd / attrTotal(level)) / 1.5; }
+/* Each form's own pace on top of its Speed, tuned so the forms of a stage
+   meet each other about as the game's battles have them meet (§3 in the
+   design notes). Live, with Attack worth almost nothing, a species' kit
+   decides more than it does in a battle, and these even it out. */
+let FORM_PACE = { cinderling:1.06, sparky:1, cub:.93, blazewyrm:1.06, zephyrite:1, panda:1.05 };
+function tempoOf(e){
+  if (e.boss) return 1;
+  return e.tempo = speedTempo(e.spd * (e.spdMul || 1), e.level) * (FORM_PACE[e.formId] || 1);
+}
+
+function strike(x, y, mult, pierce, o = {}){
+  if (!y.alive) return 0;
+  /* Dodging is for his blows only: a battle has no such thing, and pets that
+     could dash through each other's attacks stop trading blows at all. */
+  if (y.inv > 0 && x.boss && !o.unblockable){ floatText(y.x, y.y - y.box, "dodged", "#ffd23f", 12); return 0; }
+  let dmg = btHit(x, y, mult, pierce);
+  if (G.god && y.side === "hero") dmg = 0;
+  if (y.net) pvpHit(y, { d:dmg });   // their page takes it off their pet
+  y.cur -= dmg;
+  x.dealt = (x.dealt || 0) + dmg;
+  if (y.boss && x === G.player) NET.dm += dmg;   // what this page has taken off his shared pool
+  x.lastFight = y.lastFight = G.time;
+  if (o.defer){ if (y.cur <= 0 && !y.net){ y.cur = 0; y.doomed = true; } return dmg; }
+  y.flash = y.boss ? .06 : .12;
+  // his blows throw you. A pet's don't shove at all: walking back into reach
+  // costs time a battle never charges, and the slowest walker paid the most
+  if (o.knock && x.boss){
+    const k = o.knock;
+    const a = Math.atan2(y.y - (o.fromY ?? x.y), y.x - (o.fromX ?? x.x));
+    y.kx += Math.cos(a) * k; y.ky += Math.sin(a) * k;
+  }
+  const h = y.hitCircle(), big = y.boss;
+  const ty = big ? y.y - rnd(150, 230) : y.y - y.box * .95;
+  if (dmg > 0) floatText(h.x + rnd(-14, 14) * (big ? 5 : 1), ty, String(dmg), y.side === "hero" ? "#ff6b7d" : "#ffffff", big ? 17 : 15);
+  if (y === G.player && dmg > 0){ G.cam.shake = Math.max(G.cam.shake, 5); buzz(25); }
+  if (y.cur <= 0 && !y.net) knockOut(y, x);
+  return dmg;
+}
+/* Show a hit the engine already settled: the number, the flash, and - if it
+   was the last blow - the faint, all on the frame the art lands. */
+function showHit(x, y, dmg){
+  y.flash = y.boss ? .06 : .12;
+  const h = y.hitCircle(), big = y.boss;
+  if (dmg > 0) floatText(h.x + rnd(-14, 14) * (big ? 5 : 1), big ? y.y - rnd(150, 230) : y.y - y.box * .95, String(dmg), y.side === "hero" ? "#ff6b7d" : "#ffffff", big ? 17 : 15);
+  if (y === G.player && dmg > 0){ G.cam.shake = Math.max(G.cam.shake, 5); buzz(25); }
+  if (y.doomed && y.alive){ y.doomed = false; faint(y, x); }
+}
+function showPending(x, c){
+  if (!c || !c.pre || c.shown) return;
+  c.shown = true;
+  for (const [y, d] of c.pre) showHit(x, y, d);
+}
+function selfHurt(x, frac, label){
+  if (G.god && x.side === "hero") return;
+  const n = Math.max(1, Math.round(x.max * frac));
+  x.cur -= n; floatText(x.x, x.y - x.box * 1.2, label + " -" + n, "#9aa3b8", 12);
+  if (x.cur <= 0) faint(x, null);
+}
+/* A move's riders, applied the way btAct() applies them: on the user -
+   self-damage, stoke, charge, soften, a guard left open, the Nap's heal; on
+   whatever it hit - a rattled guard, a burn. A Nap leaves its *target* wide
+   open: the next blow on it lands 60% harder. */
+function riders(x, sk, hits, foe){
+  const b = sk.battle, say = (t, c = "#ffd23f") => floatText(x.x, x.y - x.box * 1.35, t, c, 12);
+  if (b.self) selfHurt(x, b.self, x.sp === "nimbus" ? "singed" : "scorched");
+  if (!x.alive) return;
+  if (b.stoke){ x.stoke = { mult:b.stoke.mult, hits:b.stoke.hits }; say(`next ${b.stoke.hits} hits ×${b.stoke.mult}`); }
+  if (b.charge && x.charges < b.charge.max){ x.charges++; x.spdMul += b.charge.spd; x.powMul += b.charge.pow; say(`charged ×${x.charges}`); }
+  if (b.soften && x.softens < b.soften.max){ x.softens++; x.defMul = Math.max(.1, x.defMul - b.soften.pct); say("guard drops", "#9aa3b8"); }
+  if (b.open){ x.openT = b.open.turns * TURN; x.openPct = b.open.pct; say("flat-footed", "#9aa3b8"); }
+  if (b.heal){
+    const n = Math.min(x.max - x.cur, Math.round(x.max * b.heal));
+    x.cur += n; floatText(x.x, x.y - x.box * 1.1, "+" + n, "#5fd38a", 16);
+    if (foe && foe.alive){ if (foe.net) pvpHit(foe, { ex:b.expose }); else foe.exposed = b.expose; floatText(foe.x, foe.y - (foe.boss ? 240 : foe.box * 1.2), "wide open", "#9fd8ff", 12); }
+  }
+  for (const [y, dmg] of hits){
+    if (!y.alive || !dmg) continue;
+    if (y.net){
+      const r = {};
+      if (b.rattle) r.rt = [b.rattle.pct, b.rattle.turns];
+      if (b.burn) r.bn = [Math.max(1, Math.round(dmg * b.burn.pct)), b.burn.turns];
+      if (r.rt || r.bn) pvpHit(y, r);
+    }
+    if (b.rattle){ y.openT = Math.max(y.openT, b.rattle.turns * TURN); y.openPct = Math.max(y.openPct, b.rattle.pct);
+      floatText(y.x, y.y - (y.boss ? 240 : y.box * 1.2), "guard rattled", "#9fd8ff", 12); }
+    if (b.burn){ y.burn = { dmg:Math.max(1, Math.round(dmg * b.burn.pct)), left:b.burn.turns, t:TURN, src:x };
+      floatText(y.x + 20, y.y - (y.boss ? 220 : y.box * 1.1), "burning", "#ff8a3d", 12); }
+  }
+}
+/* What runs on a pet's own clock: a guard reopening, a burn biting once a turn. */
+function tickRiders(e, dt){
+  if (e.openT > 0) e.openT = Math.max(0, e.openT - dt);
+  if (e.burn && e.alive){
+    e.burn.t -= dt;
+    if (e.burn.t <= 0){
+      e.burn.t += TURN;
+      if (!(G.god && e.side === "hero")){
+        e.cur -= e.burn.dmg; floatText(e.x, e.y - (e.boss ? 200 : e.box), String(e.burn.dmg), "#ff8a3d", 13);
+        if (e.burn.src) e.burn.src.dealt += e.burn.dmg;
+        if (e.boss && e.burn.src === G.player) NET.dm += e.burn.dmg;
+        embers(e.x, e.y - 20, 6, .5);
+        if (e.cur <= 0){ knockOut(e, e.burn.src); return; }
+      }
+      if (--e.burn.left <= 0) e.burn = null;
+    }
+  }
+}
+/* With other people here only the page that runs him fells him; the rest
+   hear it from that page. */
+function knockOut(e, src){
+  if (e.boss && !NET.leads()){ e.cur = Math.max(0, e.cur); return; }
+  faint(e, src);
+}
+function faint(e, src){
+  if (e.clip) showPending(e, e.clip);
+  e.cur = 0; e.alive = false; e.doomed = false; e.clip = null; e.dashT = 0; e.burn = null;
+  if (e.type === "pet"){
+    e.faintT = 0;
+    if (e.wild){ e.respawnT = 25; puff(e.x, e.y - 20, "#ffffff", 14); if (Math.random() < .35) G.pickups.push({ kind:"berry", x:e.x, y:e.y, t:0 }); }
+    if (e === G.player) playerFainted();
+  }
+  if (e.boss) bossFelled(e);
+}
+
+/* ---------- particles, effects, text ---------- */
+function floatText(x, y, text, colour, size = 14){ if (G.texts.length < 90) G.texts.push({ x, y, text, colour, size, t:0, life:1.1 }); }
+function part(p){ if (G.parts.length < 600) G.parts.push(Object.assign({ t:0, life:.8, vx:0, vy:0, vz:0, z:0, g:0, size:3, colour:"#fff", glow:false, shrink:true }, p)); }
+function puff(x, y, colour, n = 10){
+  for (let i = 0; i < n; i++){ const a = Math.random() * 6.28, s = rnd(30, 110);
+    part({ x, y, vx:Math.cos(a) * s, vy:Math.sin(a) * s * .6, size:rnd(4, 9), colour, life:rnd(.4, .8) }); }
+}
+function embers(x, y, n, spread = 1){
+  for (let i = 0; i < n; i++){ const a = Math.random() * 6.28, s = rnd(40, 200) * spread;
+    part({ x, y, vx:Math.cos(a) * s, vy:Math.sin(a) * s * .5, vz:rnd(60, 200), g:420, size:rnd(2, 4.5), colour:Math.random() < .5 ? "#ffd23f" : "#ff6b35", glow:true, life:rnd(.4, .9) }); }
+}
+function sparks(x, y, n, spread = 1){
+  for (let i = 0; i < n; i++){ const a = Math.random() * 6.28, s = rnd(60, 260) * spread;
+    part({ x, y, vx:Math.cos(a) * s, vy:Math.sin(a) * s * .55, vz:rnd(20, 140), g:300, size:rnd(1.5, 3.5), colour:Math.random() < .6 ? "#5fe6ff" : "#fff6a8", glow:true, life:rnd(.25, .6) }); }
+}
+function dust(x, y, n){
+  for (let i = 0; i < n; i++) part({ x:x + rnd(-8, 8), y:y + rnd(-3, 3), vx:rnd(-40, 40), vy:rnd(-12, 6), size:rnd(3, 6), colour:"rgba(220,210,190,.55)", life:rnd(.3, .55) });
+}
+function ring(x, y, r, colour, dur = .45, width = 10){ G.fx.push({ kind:"ring", x, y, r, colour, t:0, dur, width }); }
+
+/* =========================================================================
+   ATTACK AND SKILLS, LIVE
+   ========================================================================= */
+function aimAt(e, range){
+  const t = nearestFoe(e, range);
+  if (t){ const h = t.hitCircle(), a = Math.atan2(h.y - e.y, h.x - e.x); e.aim = { x:Math.cos(a), y:Math.sin(a) }; }
+  if (Math.abs(e.aim.x) > .08) e.face = e.aim.x > 0 ? 1 : -1;
+  return t;
+}
+function skillReady(e, sk){
+  if (!sk || !e.canAct || e.busy || e.turnT > 0 || e.gcd > 0 || (e.cds[sk.id] || 0) > 0) return false;
+  if (sk.battle.once && e.used[sk.id]) return false;
+  if (sk.battle.heal && e.cur > e.max * (sk.battle.at || .55)) return false;
+  return true;
+}
+const reachOf = fx => fx.kind === "nova" ? fx.reach * .85 : fx.kind === "rush" ? fx.dist * .75 : fx.kind === "self" ? 1e9 : fx.reach;
+
+/* Attack: a dash, once a turn, with a token swipe at the end (ATTACK_MULT).
+   A lunge at whatever is closest; with nothing in reach just the dash -
+   which is how you get out from under his blows. */
+function useAttack(e){
+  if (!e.canAct || e.dashT > 0) return false;
+  /* Once a move has landed, Attack's dash cuts the rest of its clip short -
+     the way out from under him mid-move. It buys room, not time: the rest
+     of the move's turn still has to run before anything else (turnT). */
+  if (e.clip){
+    const c = e.clip;
+    if (!c.fired) return false;
+    if (c.resolved && c.sk.fx.kind !== "shot") showPending(e, c);
+    e.clip = null; e.dashT = .2; e.inv = .26; e.hitSet = new Set(); e.lunge = false;
+    if (e === G.player) NET.ds++;
+    dust(e.x, e.y, 5);
+    return true;
+  }
+  if (e.atkCd > 0) return false;
+  const t = aimAt(e, 120);
+  e.atkCd = ATTACK_CD * TURN; e.dashT = .2; e.inv = .26; e.hitSet = new Set(); e.lunge = !!t;
+  if (e === G.player) NET.ds++;
+  dust(e.x, e.y, 5);
+  return true;
+}
+function useSkill(e, id){
+  const sk = MOVE[id];
+  if (!skillReady(e, sk)) return false;
+  const fx = sk.fx;
+  const target = aimAt(e, fx.kind === "self" ? 400 : Math.max(reachOf(fx), 160));
+  if (fx.kind === "gale") e.face = e.aim.x > 0 ? -1 : 1;   // the gale comes out the back
+  e.cds[id] = sk.cd * TURN; e.gcd = LIVE_GCD * TURN; e.used[id] = true;
+  e.atkCd = Math.max(e.atkCd, sk.clip.total / 1000);       // a skill is the turn: no Attack on top of it
+  e.turnT = sk.clip.total / 1000;                          // nor another skill, even if the clip is cut short
+  e.clip = { sk, t:0, fired:false, target, aim:{ ...e.aim }, hit:new Map() };
+  if (e === G.player) NET.ks++;
+  floatText(e.x, e.y - e.box * 1.35, sk.name, "#ffffff", 13);
+  /* Between pets a move resolves the moment it is taken, as btAct() does:
+     the damage and the riders are settled now, and the clip only shows them,
+     landing on its impact frame. Left until the impact frame, a slow clip
+     lost races a battle would have given it - whoever died first took their
+     hit in the air with them. His blows still land on impact: those you can
+     dodge. */
+  if (!G.raid) resolveNow(e, e.clip);
+  return true;
+}
+function resolveNow(e, c){
+  const sk = c.sk, fx = sk.fx, b = sk.battle, tgt = c.target;
+  const hits = [];
+  const hit = o => { if (!o || !o.alive || o.doomed) return; hits.push([o, b.dmg > 0 ? strike(e, o, b.dmg, b.pierce, { defer:true }) : 0]); };
+  if (fx.kind === "self"){ /* nothing to hit */ }
+  else if (fx.kind === "shot" || fx.kind === "strike" || fx.kind === "rush"){ if (tgt) hit(tgt); }
+  else {
+    // novas, swipes and gales take whatever is in their shape right now
+    const ax = c.aim.x, ay = c.aim.y, arc = fx.arc || .9;
+    for (const o of foesOf(e)){
+      const h = o.hitCircle(), dx = h.x - e.x, dy = h.y - e.y, d = Math.hypot(dx, dy);
+      if (fx.kind === "nova" ? d < fx.reach + h.r : d <= fx.reach + h.r && (d < h.r + 20 || (dx * ax + dy * ay) / (d || 1) > Math.cos(arc))) hit(o);
+    }
+  }
+  c.pre = hits; c.resolved = true;
+  riders(e, sk, hits, tgt || nearestFoe(e, 300));
+}
+function skillImpact(e, c){
+  const sk = c.sk, fx = sk.fx, b = sk.battle, hits = [];
+  if (c.resolved) return showImpact(e, c);
+  // a strike and a cone land on what they were aimed at, where it is now -
+  // in the game every move lands
+  const tgt = c.target && c.target.alive ? c.target : null;
+  const tx = tgt ? tgt.hitCircle().x : e.x + c.aim.x * 140, ty = tgt ? (tgt.boss ? tgt.y - 6 : tgt.y) : e.y + c.aim.y * 140;
+  const hitAll = (test, opts = {}) => {
+    for (const o of foesOf(e)){ const h = o.hitCircle(); if (test(o, h)){ const d = b.dmg > 0 ? strike(e, o, b.dmg, b.pierce, opts) : 0; hits.push([o, d]); } }
+  };
+  if (fx.kind === "shot"){
+    const sx = e.x + e.face * e.box * .6, sy = e.y - 6, a = Math.atan2(ty - sy, tx - sx);
+    G.projs.push({ x:sx, y:sy, z:e.box * .32, vx:Math.cos(a) * 460, vy:Math.sin(a) * 460, r:14,
+      life:fx.reach / 460 + .4, owner:e, sk, side:e.side, tint:fx.tint, target:tgt });
+    riders(e, { battle:{ ...b, rattle:null, burn:null } }, [], tgt);   // the hit's own riders go on when it lands
+    return;
+  }
+  if (fx.kind === "nova"){
+    const fire = fx.tint === "fire";
+    ring(e.x, e.y, fx.reach, fire ? "#ff8a3d" : "#7ff0ff", .5, fire ? 14 : 8);
+    if (fire) embers(e.x, e.y, 30, 1.1); else sparks(e.x, e.y - e.box * .4, 34, 1.1);
+    G.cam.shake = Math.max(G.cam.shake, 5);
+    hitAll((o, h) => Math.hypot(h.x - e.x, h.y - e.y) < fx.reach + h.r, { knock:fire ? 120 : 60 });
+  }
+  if (fx.kind === "strike"){
+    G.fx.push({ kind:"bolt", x:tx, y:ty, t:0, dur:.42, seed:Math.random() * 1e4, small:fx.tint === "small" });
+    sparks(tx, ty, 26, 1); ring(tx, ty, fx.radius + 10, "#fff3a8", .3, 6);
+    G.cam.shake = Math.max(G.cam.shake, 5);
+    hitAll((o, h) => Math.hypot(h.x - tx, (h.y - ty) * (o.boss ? .5 : 1)) < fx.radius + h.r, { knock:40, fromX:tx, fromY:ty });
+  }
+  if (fx.kind === "cone" || fx.kind === "gale" || fx.kind === "puff"){
+    if (tgt){ const a = Math.atan2(ty - e.y, tx - e.x); c.aim = { x:Math.cos(a), y:Math.sin(a) }; }
+    const ax = c.aim.x, ay = c.aim.y, arc = fx.arc || .9;
+    if (fx.kind === "gale"){
+      for (let i = 0; i < 24; i++){ const s = rnd(-.45, .45), sp = rnd(90, 250), ca = Math.cos(s), sa = Math.sin(s);
+        part({ x:e.x - e.face * e.box * .3, y:e.y - 14, vx:(ax * ca - ay * sa) * sp, vy:(ax * sa + ay * ca) * sp * .8,
+          size:rnd(7, 14), colour:Math.random() < .5 ? "rgba(150,220,90,.55)" : "rgba(190,240,120,.45)", life:rnd(.6, 1.2), shrink:false, grow:14 }); }
+    } else if (fx.kind === "puff"){
+      const px = e.x + e.face * e.box * .45;
+      for (let i = 0; i < 12; i++) part({ x:px, y:e.y - e.box * .3, vx:rnd(-30, 30) + e.face * 30, vy:rnd(-30, 10), vz:rnd(10, 50),
+        size:rnd(6, 12), colour:"rgba(140,140,150,.55)", life:rnd(.7, 1.3), shrink:false, grow:10 });
+      floatText(e.x, e.y - e.box * 1.15, "*cough*", "#c9c9d6", 13);
+    } else {
+      G.fx.push({ kind:"arc", x:e.x, y:e.y - 10, a:Math.atan2(ay, ax), r:fx.reach, arc, t:0, dur:.32, colour:fx.tint });
+      if (fx.tint === "#ffd23f") sparks(e.x + ax * 80, e.y + ay * 80, 20, .8);
+    }
+    hitAll((o, h) => {
+      const dx = h.x - e.x, dy = h.y - e.y, d = Math.hypot(dx, dy);
+      if (d > fx.reach + h.r) return false;
+      return d < h.r + 20 || (dx * ax + dy * ay) / (d || 1) > Math.cos(arc);
+    }, { knock:fx.kind === "gale" ? 150 : 70 });
+  }
+  if (fx.kind === "self"){
+    for (let i = 0; i < 12; i++) part({ x:e.x + rnd(-20, 20), y:e.y - rnd(0, 40), vy:-30, size:3, colour:"#5fd38a", glow:true, life:.9 });
+  }
+  riders(e, sk, hits, tgt || nearestFoe(e, 300));
+}
+/* The look of a move whose hits were settled when it was taken. */
+function showImpact(e, c){
+  const sk = c.sk, fx = sk.fx, tgt = c.target && c.target.alive ? c.target : null;
+  const tx = tgt ? tgt.hitCircle().x : e.x + c.aim.x * 140, ty = tgt ? tgt.y : e.y + c.aim.y * 140;
+  if (fx.kind === "shot"){
+    const sx = e.x + e.face * e.box * .6, sy = e.y - 6, a = Math.atan2(ty - sy, tx - sx);
+    G.projs.push({ x:sx, y:sy, z:e.box * .32, vx:Math.cos(a) * 460, vy:Math.sin(a) * 460, r:14,
+      life:2, owner:e, sk, side:e.side, tint:fx.tint, target:tgt, clip:c });
+    return;
+  }
+  if (fx.kind === "nova"){
+    const fire = fx.tint === "fire";
+    ring(e.x, e.y, fx.reach, fire ? "#ff8a3d" : "#7ff0ff", .5, fire ? 14 : 8);
+    if (fire) embers(e.x, e.y, 30, 1.1); else sparks(e.x, e.y - e.box * .4, 34, 1.1);
+    G.cam.shake = Math.max(G.cam.shake, 4);
+  }
+  if (fx.kind === "strike"){
+    G.fx.push({ kind:"bolt", x:tx, y:ty, t:0, dur:.42, seed:Math.random() * 1e4, small:fx.tint === "small" });
+    sparks(tx, ty, 26, 1); ring(tx, ty, fx.radius + 10, "#fff3a8", .3, 6);
+  }
+  if (fx.kind === "cone" || fx.kind === "gale" || fx.kind === "puff"){
+    if (tgt){ const a = Math.atan2(ty - e.y, tx - e.x); c.aim = { x:Math.cos(a), y:Math.sin(a) }; }
+    const ax = c.aim.x, ay = c.aim.y;
+    if (fx.kind === "gale"){
+      for (let i = 0; i < 24; i++){ const s = rnd(-.45, .45), sp = rnd(90, 250), ca = Math.cos(s), sa = Math.sin(s);
+        part({ x:e.x - e.face * e.box * .3, y:e.y - 14, vx:(ax * ca - ay * sa) * sp, vy:(ax * sa + ay * ca) * sp * .8,
+          size:rnd(7, 14), colour:Math.random() < .5 ? "rgba(150,220,90,.55)" : "rgba(190,240,120,.45)", life:rnd(.6, 1.2), shrink:false, grow:14 }); }
+    } else if (fx.kind === "puff"){
+      const px = e.x + e.face * e.box * .45;
+      for (let i = 0; i < 12; i++) part({ x:px, y:e.y - e.box * .3, vx:rnd(-30, 30) + e.face * 30, vy:rnd(-30, 10), vz:rnd(10, 50),
+        size:rnd(6, 12), colour:"rgba(140,140,150,.55)", life:rnd(.7, 1.3), shrink:false, grow:10 });
+      floatText(e.x, e.y - e.box * 1.15, "*cough*", "#c9c9d6", 13);
+    } else {
+      G.fx.push({ kind:"arc", x:e.x, y:e.y - 10, a:Math.atan2(ay, ax), r:fx.reach, arc:fx.arc || .9, t:0, dur:.32, colour:fx.tint });
+      if (fx.tint === "#ffd23f") sparks(e.x + ax * 80, e.y + ay * 80, 20, .8);
+    }
+  }
+  if (fx.kind === "self") for (let i = 0; i < 12; i++) part({ x:e.x + rnd(-20, 20), y:e.y - rnd(0, 40), vy:-30, size:3, colour:"#5fd38a", glow:true, life:.9 });
+  showPending(e, c);
+}
+function updateClip(e, dt){
+  const c = e.clip; if (!c) return;
+  const sk = c.sk, fx = sk.fx;
+  c.t += dt * 1000;
+  if (fx.kind === "rush"){
+    const a = sk.clip.starts[fx.from], b = sk.clip.starts[fx.to] ?? sk.clip.total;
+    if (c.t >= a && c.t < b && !c.stopped){
+      e.inv = Math.max(e.inv, .1);
+      // a rush steers onto what it was aimed at
+      if (c.target && c.target.alive && !c.hit.has(c.target)){
+        const h = c.target.hitCircle(), ang = Math.atan2(h.y - e.y, h.x - e.x);
+        c.aim = { x:Math.cos(ang), y:Math.sin(ang) };
+        if (Math.abs(c.aim.x) > .1) e.face = c.aim.x > 0 ? 1 : -1;
+      }
+      const sp = fx.dist / ((b - a) / 1000);
+      moveEnt(e, c.aim.x * sp * dt, c.aim.y * sp * dt);
+      if (fx.tint === "fire" && Math.random() < .8) embers(e.x - e.face * 20, e.y - 10, 2, .3);
+      else if (Math.random() < .6) dust(e.x - e.face * 14, e.y, 1);
+      if (c.resolved){
+        const t = c.target;
+        if (t && !c.shown && Math.hypot(t.hitCircle().x - e.x, t.y - e.y) < t.r + e.r + 16){
+          // it stops where it lands: carried on past, it would spend its next turn walking back
+          showPending(e, c); dust(t.x, t.y, 8); c.stopped = true;
+          if (fx.tint !== "fire") floatText(t.x, t.y - t.box * 1.2, "★", "#ffd23f", 16);
+        }
+      } else for (const o of foesOf(e)){
+        if (c.hit.has(o)) continue;
+        const h = o.hitCircle();
+        if (Math.hypot(h.x - e.x, h.y - (e.y - 10)) < h.r + e.r + 16){
+          const d = strike(e, o, sk.battle.dmg, sk.battle.pierce, { knock:110 }); c.hit.set(o, d);
+          if (o === c.target) c.stopped = true;
+          if (fx.tint !== "fire") floatText(o.x, o.y - (o.boss ? 230 : o.box * 1.2), "★", "#ffd23f", 16);
+        }
+      }
+    }
+    if (!c.fired && c.t >= b){ c.fired = true; if (c.resolved) showPending(e, c); else riders(e, sk, [...c.hit], c.target); }
+  } else if (!c.fired && c.t >= sk.clip.starts[fx.impact]){
+    c.fired = true; skillImpact(e, c);
+  }
+  if (c.t >= sk.clip.total){
+    if (!c.fired){ c.fired = true; if (fx.kind === "rush"){ if (c.resolved) showPending(e, c); else riders(e, sk, [...c.hit], c.target); } else skillImpact(e, c); }
+    if (fx.kind !== "shot") showPending(e, c);
+    e.clip = null;
+  }
+}
+
+/* =========================================================================
+   MOVEMENT & TOUCH
+   ========================================================================= */
+function moveEnt(e, dx, dy){
+  const steps = Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / 8) || 1;
+  for (let i = 0; i < steps; i++){
+    const sx = dx / steps, sy = dy / steps;
+    const stuck = inBoss(e, e.x, e.y);   // he landed on you: walk out of him
+    if (!blocked(e.x + sx, e.y, e.r * .8) && (stuck || !inBoss(e, e.x + sx, e.y))) e.x += sx;
+    if (!blocked(e.x, e.y + sy, e.r * .8) && (stuck || !inBoss(e, e.x, e.y + sy))) e.y += sy;
+  }
+  if (G.raid && e.side === "hero"){
+    const d = Math.hypot(e.x - ARENA_PX.x, e.y - ARENA_PX.y), lim = ARENA_PX.r - 20;
+    if (d > lim){ e.x = ARENA_PX.x + (e.x - ARENA_PX.x) / d * lim; e.y = ARENA_PX.y + (e.y - ARENA_PX.y) / d * lim; }
+  }
+}
+function inBoss(e, x, y){
+  const b = G.boss;
+  if (!b || e === b || !b.alive) return false;
+  return Math.hypot(x - b.x, (y - b.y + 8) * 1.7) < b.r * .9 + e.r;
+}
+const stick = { x:0, y:0, on:false, id:null, ox:0, oy:0 };
+let touched = false;   // a phone only buzzes for a page that has been touched
+addEventListener("pointerdown", () => { touched = true; }, { once:true, capture:true });
+function buzz(ms){ if (touched) try { navigator.vibrate && navigator.vibrate(ms); } catch(e){} }
+function bindTouch(){
+  const zone = $("stick"), base = $("stick-base"), knob = $("stick-knob");
+  zone.addEventListener("pointerdown", ev => {
+    if (stick.on) return;
+    stick.on = true; stick.id = ev.pointerId; stick.ox = ev.clientX; stick.oy = ev.clientY;
+    try { zone.setPointerCapture(ev.pointerId); } catch(e){}
+    const r = zone.getBoundingClientRect();
+    base.classList.remove("rest");
+    base.style.left = (ev.clientX - r.left) + "px"; base.style.top = (ev.clientY - r.top) + "px";
+    knob.style.transform = ""; ev.preventDefault();
+  });
+  zone.addEventListener("pointermove", ev => {
+    if (!stick.on || ev.pointerId !== stick.id) return;
+    let dx = ev.clientX - stick.ox, dy = ev.clientY - stick.oy;
+    const m = Math.hypot(dx, dy), R = 48;
+    if (m > R){ dx = dx / m * R; dy = dy / m * R; }
+    stick.x = dx / R; stick.y = dy / R;
+    if (Math.hypot(stick.x, stick.y) < .15){ stick.x = 0; stick.y = 0; }
+    knob.style.transform = `translate(${dx}px,${dy}px)`;
+  });
+  const end = ev => {
+    if (ev.pointerId !== stick.id) return;
+    stick.on = false; stick.x = stick.y = 0; knob.style.transform = "";
+    base.classList.add("rest"); base.style.left = ""; base.style.top = "";
+  };
+  zone.addEventListener("pointerup", end); zone.addEventListener("pointercancel", end);
+  $("act-attack").addEventListener("pointerdown", ev => { ev.preventDefault(); if (G.running && !G.paused) useAttack(G.player); });
+  document.addEventListener("contextmenu", ev => ev.preventDefault());
+  document.addEventListener("gesturestart", ev => ev.preventDefault());
+  document.addEventListener("dblclick", ev => ev.preventDefault());
+}
+/* The pet's own skills in an arc round Attack - up to four, which is what the
+   Cinderling and the Sparky have by 14. Offsets of each button's centre from
+   Attack's centre. */
+const ARC = [[-104, 0], [-86, -62], [-36, -102], [26, -106]];
+function buildSkillButtons(){
+  const host = $("actions");
+  host.querySelectorAll(".act.s").forEach(b => b.remove());
+  G.player.kit.forEach((sk, i) => {
+    const b = document.createElement("button");
+    b.className = "act s"; b.dataset.id = sk.id; b.setAttribute("aria-label", sk.name);
+    const [dx, dy] = ARC[i];
+    b.style.right = (42 - 29 - dx) + "px"; b.style.bottom = (42 - 29 - dy) + "px";
+    b.innerHTML = `<span class="ico">${sk.ico}</span><span class="cd"></span><span class="cdn"></span>`;
+    b.addEventListener("pointerdown", ev => { ev.preventDefault(); if (G.running && !G.paused) useSkill(G.player, sk.id); });
+    host.appendChild(b);
+  });
+}
+
+/* =========================================================================
+   UPDATE
+   ========================================================================= */
+function updatePet(e, dt){
+  e.flash = Math.max(0, e.flash - dt); e.inv = Math.max(0, e.inv - dt);
+  if (!e.alive){
+    e.faintT += dt;
+    if (e.respawnT > 0){ e.respawnT -= dt; if (e.respawnT <= 0) respawnPet(e); }
+    return;
+  }
+  const tdt = dt * tempoOf(e);   // the pet's own clock, run by its Speed
+  e.atkCd = Math.max(0, e.atkCd - tdt); e.gcd = Math.max(0, e.gcd - tdt);
+  for (const k in e.cds) e.cds[k] = Math.max(0, e.cds[k] - tdt);
+  e.turnT = Math.max(0, (e.turnT || 0) - tdt);
+  tickRiders(e, tdt);
+  if (!e.alive) return;
+  // out of a fight for a while: the next one starts clean, and you get your breath back
+  if (G.time - e.lastFight > 6){
+    if (e.charges || e.softens || e.stoke || e.used.nap || e.exposed) resetFight(e);
+    if (!G.raid && e.cur < e.max) e.cur = Math.min(e.max, e.cur + e.max * .04 * dt);
+  }
+  if (Math.abs(e.kx) + Math.abs(e.ky) > 1){ moveEnt(e, e.kx * dt, e.ky * dt); e.kx *= Math.pow(.004, dt); e.ky *= Math.pow(.004, dt); }
+  else e.kx = e.ky = 0;
+
+  const want = e.isPlayer ? { x:stick.x, y:stick.y } : petAI(e, dt);
+  if (e.dashT > 0){
+    e.dashT -= dt;
+    moveEnt(e, e.aim.x * 560 * dt, e.aim.y * 560 * dt);
+    if (e.lunge) for (const o of foesOf(e)){
+      if (e.hitSet.has(o)) continue;
+      const h = o.hitCircle();
+      if (Math.hypot(h.x - e.x, h.y - (e.y - 8)) < h.r + e.r + 12){
+        e.hitSet.add(o); strike(e, o, ATTACK_MULT, 0, { knock:150 }); e.dashT = Math.min(e.dashT, .04); dust(e.x, e.y, 4);
+        break;   // a plain attack is one blow
+      }
+    }
+    e.moving = 1;
+  } else if (e.clip){ updateClip(e, tdt); e.moving = 0; }
+  else {
+    const m = Math.hypot(want.x, want.y);
+    if (m > .05){
+      // every pet walks at one pace: Speed buys turns (tempoOf), not legs
+      const sp = WALK * (e.wild && !e.aggro ? .45 : 1);
+      moveEnt(e, want.x * sp * dt, want.y * sp * dt);
+      e.aim = { x:want.x / m, y:want.y / m };
+      if (Math.abs(want.x) > .15) e.face = want.x > 0 ? 1 : -1;
+      e.walkT += dt * (sp / 60) * Math.min(1, m); e.moving = Math.min(1, m);
+      if (Math.random() < dt * 5) dust(e.x - e.face * 10, e.y, 1);
+    } else e.moving = 0;
+  }
+  e.idleT += dt;
+}
+
+/* ---------- AI: the game's picker, live ----------
+   btChoose(): any skill it has ready, at random, a Nap only once it is hurt,
+   and a plain Attack when nothing is - taken the moment its turn comes round. */
+const TEMPER = { ember:200, nimbus:0, verdant:0 };   // Ember pets pick fights; the others wait to be hit
+function petAI(e, dt){
+  if (!e.canAct) return { x:0, y:0 };
+  if (e.bot) return raidBot(e, dt);
+  const p = G.player;
+  e.calm = Math.max(0, e.calm - dt);
+  if (e.aggro && (!e.aggro.alive || dist(e, e.home) > 520)){ e.aggro = null; e.calm = 4; }
+  if (!e.aggro && !e.calm && p.alive && !G.raid && (dist(e, p) < TEMPER[e.sp] || (e.cur < e.max && dist(e, p) < 360))) e.aggro = p;
+  if (e.aggro) return fightAI(e, e.aggro, dt);
+  if (e.cur < e.max) e.cur = Math.min(e.max, e.cur + e.max * .08 * dt);
+  e.wanderT -= dt;
+  if (e.wanderT <= 0){ e.wanderT = rnd(2, 5); e.wanderTo = Math.random() < .4 ? null : { x:e.home.x + rnd(-110, 110), y:e.home.y + rnd(-80, 80) }; }
+  if (e.wanderTo){
+    const dx = e.wanderTo.x - e.x, dy = e.wanderTo.y - e.y, d = Math.hypot(dx, dy);
+    if (d < 8){ e.wanderTo = null; return { x:0, y:0 }; }
+    return { x:dx / d, y:dy / d };
+  }
+  return { x:0, y:0 };
+}
+function fightAI(e, t, dt){
+  const h = t.hitCircle(), dx = h.x - e.x, dy = h.y - e.y, d = Math.hypot(dx, dy) - h.r;
+  if (!e.busy){
+    // a skill whenever one is ready - an Attack taken in a gap never holds one back
+    const ready = e.kit.filter(sk => skillReady(e, sk) && d < reachOf(sk.fx));
+    if (ready.length){ useSkill(e, ready[Math.floor(Math.random() * ready.length)].id); return { x:0, y:0 }; }
+    if (d < 80 && e.atkCd <= 0){ useAttack(e); return { x:0, y:0 }; }
+  }
+  const n = d + h.r || 1;
+  if (d > 30) return { x:dx / n, y:dy / n };     // everyone closes in: a plain Attack is a lunge
+  const s = Math.sin(G.time * 1.3 + e.home.x) > 0 ? 1 : -1;
+  return { x:-dy / n * .3 * s, y:dx / n * .3 * s };
+}
+/* A stand-in player, for testing the raid without thumbs: it fights him and
+   steps out of anything about to land - what a player is learning too. */
+function raidBot(e, dt){
+  for (const f of G.fx){
+    if (f.kind !== "tele" || f.full) continue;   // nowhere to run from the roar: keep fighting
+    // marked: no skill now - walk out, and maybe dash the last of it
+    const d = Math.hypot(e.x - f.x, (e.y - f.y) * 1.4);
+    if (d < f.r + 20){
+      const a = Math.atan2(e.y - f.y, e.x - f.x);
+      // a mark still following you can't be outrun: wait for it to lock, then go
+      if (f.lock && f.t < f.lock) return { x:0, y:0 };
+      if ((f.dur - f.t) < .9 && e.dashT <= 0 && (e.clip ? e.clip.fired : e.atkCd <= 0) && Math.random() < .35){
+        useAttack(e); e.aim = { x:Math.cos(a), y:Math.sin(a) }; e.lunge = false;
+        return { x:0, y:0 };
+      }
+      return { x:Math.cos(a), y:Math.sin(a) };
+    }
+  }
+  const b = G.boss;
+  if (G.raid && b.alive && b.awake) return fightAI(e, b, dt);
+  return { x:0, y:0 };
+}
+
+/* ---------- Sir Uwaaarghhhh, live ----------
+   btChoose() for him: any move he has ready, at random, rolled even when only
+   one is ready; nothing ready means a plain swing. He doesn't stand and wait:
+   between blows he walks at whoever he has picked, and every blow carries him
+   - a plain swing lunges, a Splitter leaps, a Torchswing charges in. Where it
+   lands is marked on the ground first, so getting out of the way is still the
+   answer to him.
+
+   With other people here one page runs him (NET.leads) and the others follow
+   its account. Every page settles his blows on its own pet only. */
+const BOSS_WALK = 95;
+const ROAR_HIT = 0.6, ROAR_GROW = 0.25;   // the roar's own hit, and how much more each roar of a fight adds
+// where in its sheet a blow is: the wind-up stretched by `pre`, the rest at `rate`
+function actClipMs(a){
+  const rate = a.rate || 1, pre = a.pre || 1;
+  return a.t < a.impact ? a.t * rate / pre * 1000 : (a.impact * rate / pre + (a.t - a.impact) * rate) * 1000;
+}
+function bossPhase(cur, max){ const f = cur / max; return RAID_BOSS.phases.find(p => f >= p.from) || RAID_BOSS.phases[3]; }
+// everyone who has taken a swing at him and is still standing, this page's pet included
+function bossQuarries(){
+  const out = [], p = G.player;
+  if (G.raid && !G.raid.over && p.alive) out.push({ id:NET.me, x:p.x, y:p.y });
+  for (const [id, n] of NET.pets) if (n.rd && n.alive) out.push({ id, x:n.x, y:n.y });
+  return out;
+}
+function keepInArena(o, margin){
+  const d = Math.hypot(o.x - ARENA_PX.x, o.y - ARENA_PX.y), lim = ARENA_PX.r - margin;
+  if (d > lim){ o.x = ARENA_PX.x + (o.x - ARENA_PX.x) / d * lim; o.y = ARENA_PX.y + (o.y - ARENA_PX.y) / d * lim; }
+}
+function updateBoss(b, dt){
+  b.flash = Math.max(0, b.flash - dt);
+  if (!b.alive){ b.deadT += dt * 1000; return; }
+  tickRiders(b, dt);   // the burns this page's moves left on him
+  if (!b.alive) return;
+  if (!NET.leads()){ followBoss(b, dt); return; }
+  const qs = bossQuarries(), was = b.awake;
+  b.awake = qs.length > 0;
+  // you always get the first swing at him, as in the game
+  if (b.awake && !was){ b.next = BOSS_TURN * 1.2; b.cds = {}; b.gcd = 0; }
+  if (!b.awake && was){ resetFight(b); b.act = null; b.hop = 0; b.quarry = null; castLabel(""); G.fx = G.fx.filter(f => f.kind !== "tele"); }
+  if (b.act){ runBossAct(b, dt); return; }
+  b.moving = 0;
+  if (!b.awake){
+    // nobody on him: back to the middle of his hill
+    const hx = ARENA_PX.x - b.x, hy = ARENA_PX.y - 10 - b.y, hd = Math.hypot(hx, hy);
+    if (hd > 6){ b.x += hx / hd * BOSS_WALK * .5 * dt; b.y += hy / hd * BOSS_WALK * .5 * dt; b.moving = 1; b.face = hx < 0 ? -1 : 1; }
+    return;
+  }
+  let q = qs.find(o => o.id === b.quarry);
+  if (!q || Math.random() < dt * .12){ q = qs[Math.floor(Math.random() * qs.length)]; b.quarry = q.id; }
+  const dx = q.x - b.x, dy = q.y - b.y, d = Math.hypot(dx, dy) || 1, sp = BOSS_WALK * b.spdMul;
+  if (Math.abs(dx) > 8) b.face = dx < 0 ? -1 : 1;
+  // closes in, then circles - never quite where you left him
+  if (d > 150){ b.x += dx / d * sp * dt; b.y += dy / d * sp * dt; }
+  else {
+    if (!b.strafe || Math.random() < dt * .5) b.strafe = Math.random() < .5 ? -1 : 1;
+    b.x += -dy / d * b.strafe * sp * .6 * dt; b.y += dx / d * b.strafe * sp * .6 * dt;
+  }
+  b.moving = 1; keepInArena(b, 80);
+  b.next -= dt;
+  if (b.next > 0) return;
+  // his cooldowns and the shared one count his own turns, as a pet's do
+  for (const k in b.cds) b.cds[k] = Math.max(0, b.cds[k] - 1);
+  b.gcd = Math.max(0, b.gcd - 1);
+  const ready = RAID_BOSS.kit.filter(k => (b.cds[k.id] || 0) <= 0 && b.gcd <= 0);
+  const pick = ready.length ? ready[Math.floor(Math.random() * ready.length)] : null;
+  if (pick){ b.cds[pick.id] = pick.battle.cd; b.gcd = BT.GCD; }
+  startBossAct(b, pick, q);
+}
+/* A blow is one plain record - where he starts and lands, where it is marked,
+   when it lands - so the page that runs him can hand it to the others whole. */
+/* How each blow travels and how hard it is to read:
+   - swing: quick (marked .7 s), and the mark follows you until .42 s before
+     it lands - you can't step out early, you have to react.
+   - sweep (Torchswing): played 35% faster after a wind-up 15% longer than
+     that (`pre`), charges in further and reaches wider.
+   - slam (Splitter): its wind-up 15% longer than the sheet's. The big,
+     readable one you can always get out of.
+   - roar: wound up twice as long, and can't be got out of at all. */
+const BOSS_REACH = {
+  swing:{ r:64, go:260, short:70, from:.5, tele:.7, track:.42 },
+  slam:{ go:420, short:80, from:.3, pre:1.15 },
+  sweep:{ go:220, short:100, from:0, rate:1.35, pre:1.15, r:210 },
+  roar:{ go:0, short:0, from:0, pre:2 }   // his roar winds up twice as long as its sheet
+};
+function startBossAct(b, sk, q){
+  const kind = sk ? sk.fx.kind : "swing", R = BOSS_REACH[kind];
+  const dx = q.x - b.x, dy = q.y - b.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d;
+  const rate = R.rate || 1, pre = R.pre || 1;
+  // `pre` stretches only the wind-up; what follows the blow plays at `rate`
+  const hit = sk ? sk.clip.starts[sk.fx.impact] / 1000 : 0;
+  const impact = sk ? hit * pre / rate : R.tele, end = sk ? impact + (sk.clip.total / 1000 - hit) / rate : impact + .4;
+  const go = clamp(d - R.short, 0, R.go), lx = b.x + ux * go, ly = b.y + uy * go;
+  let mx = lx, my = ly, r = R.r || (sk ? sk.fx.radius || 0 : 0);
+  // a swing and a Splitter come down on you - or as near as he can reach
+  if (kind === "swing" || kind === "slam"){ const reach = Math.min(d, go + R.short); mx = b.x + ux * reach; my = b.y + uy * reach; }
+  // the roar is marked too: the whole hill goes red (beginAct)
+  if (kind === "roar") r = 1;
+  // the roar's own hit grows with every roar in a fight: nobody outlasts him
+  const rm = kind === "roar" ? ROAR_HIT + ROAR_GROW * (b.roars++) : 0;
+  // a roar's stoke rides on the blow, so every page lands it the same
+  let m = 1;
+  if (kind !== "roar" && b.stokeHits > 0){ m = RAID_BOSS.kit[0].battle.stoke.mult; b.stokeHits--; }
+  beginAct(b, { n:(Math.random() * 1e9) | 0, k:sk ? sk.id : "", t:0, impact, end, sx:b.x, sy:b.y, lx, ly, mx, my, r, from:R.from, m, rm, pre,
+    rate, q:q.id, lock:R.track ? impact - R.track : 0 });
+}
+function beginAct(b, a){
+  a.sk = a.k && MOVE[a.k] && RAID_BOSS.kit.includes(MOVE[a.k]) ? MOVE[a.k] : null;
+  a.fired = a.t >= a.impact;
+  b.act = a;
+  if (Math.abs(a.mx - b.x) > 8) b.face = a.mx < b.x ? -1 : 1;
+  if (a.r && !a.fired){
+    a.tf = { kind:"tele", x:a.mx, y:a.my, r:a.r, t:0, dur:a.impact - a.t, lock:Math.max(0, (a.lock || 0) - a.t) };
+    // the roar's mark is the whole hill
+    if (a.k === "uwaaargh") Object.assign(a.tf, { x:ARENA_PX.x, y:ARENA_PX.y, r:ARENA_PX.r - 8, full:true });
+    G.fx.push(a.tf);
+  }
+  castLabel(a.sk ? a.sk.name : "");
+  // the roar is narrated as he winds up to it
+  if (a.k === "uwaaargh" && !a.fired && G.raid && !G.raid.over)
+    banner("", `${RAID_BOSS.short} is getting very upset and starts to…`, Math.max(.4, a.impact - a.t), true);
+}
+// where a pet he has picked is now, on this page: this page's own, or another's as drawn here
+function quarryAt(id){
+  if (id === NET.me) return G.player.alive ? G.player : null;
+  const n = NET.pets.get(id); return n && n.alive ? n : null;
+}
+function runBossAct(b, dt){
+  const a = b.act; a.t += dt;
+  // a swing's mark follows its pet until it locks
+  if (a.lock && a.t < a.lock){
+    const q = quarryAt(a.q);
+    if (q){
+      const R = BOSS_REACH.swing, dx = q.x - a.sx, dy = q.y - a.sy, d = Math.hypot(dx, dy) || 1;
+      const go = clamp(d - R.short, 0, R.go), reach = Math.min(d, go + R.short);
+      a.lx = a.sx + dx / d * go; a.ly = a.sy + dy / d * go; a.mx = a.sx + dx / d * reach; a.my = a.sy + dy / d * reach;
+      if (a.tf){ a.tf.x = a.mx; a.tf.y = a.my; }
+      if (Math.abs(dx) > 8) b.face = dx < 0 ? -1 : 1;
+    }
+  }
+  // he travels with the blow: a swing lunges late, a Splitter leaps, a Torchswing charges in
+  const k0 = a.from * a.impact, k = clamp((a.t - k0) / Math.max(.01, a.impact - k0), 0, 1), ease = k * k * (3 - 2 * k);
+  b.x = a.sx + (a.lx - a.sx) * ease; b.y = a.sy + (a.ly - a.sy) * ease;
+  b.hop = a.k === "splitter" ? Math.sin(k * Math.PI) * 70 : 0;
+  b.moving = 0;
+  if (!a.fired && a.t >= a.impact){ a.fired = true; landBlow(b, a); }
+  if (a.t >= a.end){
+    b.act = null; b.hop = 0; castLabel("");
+    b.next = BOSS_TURN / b.spdMul * rnd(.8, 1.1);   // Speed sets his rhythm; a roar quickens it
+  }
+}
+/* Where a blow lands. Each page settles it on its own pet. */
+function landBlow(b, a){
+  const p = G.player, mine = !!(G.raid && !G.raid.over && p.alive);
+  const inMark = o => Math.hypot(o.x - a.mx, (o.y - a.my) * 1.4) < a.r + o.r * .5;
+  if (!a.sk){
+    if (mine && inMark(p)) strike(b, p, a.m, 0, { knock:200, fromX:a.mx, fromY:a.my });
+    dust(a.mx, a.my, 10); G.cam.shake = Math.max(G.cam.shake, 5);
+    return;
+  }
+  const k = a.sk, fx = k.fx;
+  if (fx.kind === "slam"){
+    G.cam.shake = 14; dust(a.mx, a.my, 24); embers(a.mx, a.my, 18, 1); ring(a.mx, a.my, a.r, "#ffb347", .35, 10);
+    if (mine && inMark(p)) strike(b, p, k.battle.dmg * a.m, k.battle.pierce, { knock:240, fromX:a.mx, fromY:a.my });
+  }
+  if (fx.kind === "sweep"){
+    G.cam.shake = 8; embers(b.x, b.y - 40, 30, 1.6);
+    if (mine && inMark(p)) strike(b, p, k.battle.dmg * a.m, 0, { knock:260, fromX:a.mx, fromY:a.my });
+  }
+  if (fx.kind === "roar"){
+    /* UWAAAARGH: the whole hill is marked red - there is nowhere to stand
+       out of it, and a dash won't carry you through it. It hits everyone on
+       him. Its own hit
+       is the lightest of his (ROAR_HIT) but grows with every roar of the
+       fight, so however well you move, he wears you down. Then, as in the
+       game, his next two blows land 60% harder and he charges, faster and
+       stronger, up to twice. */
+    if (mine) strike(b, p, a.rm || ROAR_HIT, 0, { knock:160, fromX:b.x, fromY:b.y, unblockable:true });
+    if (NET.leads()){
+      b.stokeHits = k.battle.stoke.hits;
+      if (b.charges < k.battle.charge.max){ b.charges++; b.spdMul += k.battle.charge.spd; b.powMul += k.battle.charge.pow; }
+    }
+    ring(b.x, b.y - 120, 260, "#fff3a8", .6, 8); G.cam.shake = 10;
+    if (mine) shout("UUUWWAAAARRGGHHHHHHHHH", "his next two blows land harder");
+    if (mine && p.alive){ const ang = Math.atan2(p.y - b.y, p.x - b.x); p.kx += Math.cos(ang) * 160; p.ky += Math.sin(ang) * 160; }
+  }
+}
+/* A page that doesn't run him draws him from the account of the page that
+   does: where he is, and each blow as it starts. */
+function followBoss(b, dt){
+  const h = NET.hb; if (!h) return;
+  b.awake = !!h.w; b.powMul = +h.pw || 1; b.spdMul = +h.sm || 1;
+  const a = h.a;
+  if (a && typeof a === "object" && a.n !== b.seenAct){
+    b.seenAct = a.n;
+    const num = (v, lo, hi) => clamp(+v || 0, lo, hi);
+    const act = { n:a.n, k:String(a.k || ""), t:num(a.t, 0, 5) + .05, impact:num(a.impact, 0, 5), end:num(a.end, 0, 6),
+      sx:+a.sx || b.x, sy:+a.sy || b.y, lx:+a.lx || b.x, ly:+a.ly || b.y, mx:+a.mx || b.x, my:+a.my || b.y,
+      r:num(a.r, 0, 300), from:num(a.from, 0, 1), m:num(a.m, 1, 2), rm:num(a.rm, 0, 10), rate:num(a.rate, .5, 2) || 1, pre:num(a.pre, 1, 4) || 1,
+      q:String(a.q || ""), lock:num(a.lock, 0, 5) };
+    if (act.t < act.end) beginAct(b, act);
+  }
+  if (b.act){ runBossAct(b, dt); return; }
+  const ox = b.x, oy = b.y, k = Math.min(1, dt * 10);
+  b.x += ((+h.x || b.x) - b.x) * k; b.y += ((+h.y || b.y) - b.y) * k;
+  if (h.f === 1 || h.f === -1) b.face = h.f;
+  b.moving = Math.hypot(b.x - ox, b.y - oy) > dt * 12 ? 1 : 0;
+}
+
+/* ---------- projectiles, fx ---------- */
+function updateProjs(dt){
+  for (const p of G.projs){
+    // it finds what it was thrown at: in the game every move lands
+    if (p.target && p.target.alive){
+      const h = p.target.hitCircle(), a = Math.atan2((p.target.boss ? p.target.y - 6 : h.y) - p.y, h.x - p.x);
+      p.vx = Math.cos(a) * 460; p.vy = Math.sin(a) * 460;
+    }
+    p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; p.spin = (p.spin || 0) + dt * 14;
+    if (p.tint === "fire" && Math.random() < .9) part({ x:p.x + rnd(-4, 4), y:p.y, z:p.z, vx:-p.vx * .1 + rnd(-20, 20), vy:-p.vy * .1, size:rnd(3, 6), colour:Math.random() < .5 ? "#ffd23f" : "#ff6b35", glow:true, life:rnd(.2, .4) });
+    if (!p.target && blocked(p.x, p.y, 4)) p.life = 0;
+    if (p.clip){
+      const t = p.target;
+      if ((t && (!t.alive || Math.hypot(t.hitCircle().x - p.x, t.y - p.y) < t.r + p.r + 4)) || p.life < 1.2){ showPending(p.owner, p.clip); p.life = 0; }
+    }
+    else for (const o of G.ents){
+      if (p.life <= 0 || !o.alive || !hostile(p, o) || (o.boss && !o.awake)) continue;
+      const h = o.hitCircle();
+      if (Math.hypot(h.x - p.x, (h.y - p.y) * (o.boss ? .7 : 1)) < h.r + p.r){
+        const d = strike(p.owner, o, p.sk.battle.dmg, p.sk.battle.pierce, { knock:80, fromX:p.x - p.vx, fromY:p.y - p.vy });
+        riders(p.owner, { battle:{ rattle:p.sk.battle.rattle, burn:p.sk.battle.burn } }, [[o, d]]);
+        p.life = 0;
+      }
+    }
+    if (p.life <= 0){
+      if (p.tint === "fire"){ embers(p.x, p.y, 14, .8); ring(p.x, p.y, 34, "#ff8a3d", .3, 6); }
+      else puff(p.x, p.y - 10, p.tint === "bamboo" ? "#94c24a" : "#c23a1c", 6);
+    }
+  }
+  G.projs = G.projs.filter(p => p.life > 0);
+}
+function updatePickups(dt){
+  const p = G.player;
+  for (const k of G.pickups){
+    k.t += dt;
+    if (k.taken){ k.respawn -= dt; if (k.respawn <= 0 && k.home) k.taken = false; continue; }
+    if (p.alive && dist(k, p) < 30 && p.cur < p.max){
+      k.taken = true; k.respawn = 40;
+      const h = Math.round(p.max * .3);
+      p.cur = Math.min(p.max, p.cur + h); floatText(p.x, p.y - p.box, "+" + h, "#5fd38a", 16);
+    }
+  }
+  G.pickups = G.pickups.filter(k => !k.taken || k.home);
+}
+function ambient(dt){
+  const p = G.player; if (!p) return;
+  const b = world.biome[clamp(Math.floor(p.y / TILE), 0, MH - 1) * MW + clamp(Math.floor(p.x / TILE), 0, MW - 1)];
+  if (b === "ember" && Math.random() < dt * 12) part({ x:p.x + rnd(-300, 300), y:p.y + rnd(-400, 300), vy:-rnd(10, 30), size:rnd(1.5, 3), colour:"#ff8a3d", glow:true, life:rnd(1.5, 3) });
+  if (b === "verdant" && Math.random() < dt * 4) part({ x:p.x + rnd(-300, 300), y:p.y + rnd(-400, 300), vx:rnd(15, 40), vy:rnd(8, 25), size:3, colour:"#8ed06a", life:rnd(2, 4), leaf:true, shrink:false });
+  if (b === "nimbus" && Math.random() < dt * 6) part({ x:p.x + rnd(-300, 300), y:p.y + rnd(-400, 300), vy:-8, size:rnd(1, 2.5), colour:"#bff8ff", glow:true, life:rnd(.6, 1.4) });
+  if (p.alive && !G.raid && dist(p, CAMP_PX) < 100 && p.cur < p.max){
+    p.cur = Math.min(p.max, p.cur + p.max * .15 * dt);
+    if (Math.random() < dt * 4) part({ x:p.x + rnd(-14, 14), y:p.y - rnd(0, 30), vy:-30, size:3, colour:"#5fd38a", glow:true, life:.8 });
+  }
+  if (Math.random() < dt * 8) embers(CAMP_PX.x, CAMP_PX.y - 18, 1, .15);
+}
+
+/* =========================================================================
+   FLOW
+   ========================================================================= */
+/* Wild pets are near the player's own level, so a fight is a fight at
+   whatever level is being tested. Their form follows their level. */
+const WILD_SPAWNS = [
+  ["ember", 63, 46, -1], ["ember", 72, 50, 0], ["ember", 74, 36, 2], ["ember", 68, 30, 1], ["ember", 78, 56, 3],
+  ["verdant", 12, 42, -1], ["verdant", 18, 54, 0], ["verdant", 8, 33, 2], ["verdant", 22, 38, 1], ["verdant", 15, 58, 3],
+  ["nimbus", 10, 18, -1], ["nimbus", 20, 22, 0], ["nimbus", 8, 10, 2], ["nimbus", 24, 6, 1], ["nimbus", 16, 4, 3]
+];
+function spawnWild(){
+  for (const [sp, tx, ty, off] of WILD_SPAWNS){
+    const lv = clamp(G.player.level + off, 5, 40), form = formFor(sp, lv);
+    let x = (tx + .5) * TILE, y = (ty + .5) * TILE;
+    for (let k = 0; k < 30 && blocked(x, y, 20); k++){ x += rnd(-40, 40); y += rnd(-40, 40); }
+    G.ents.push(new Pet(form, lv, "foe", { x, y, wild:true, name:"Wild " + FORMS[form].name }));
+  }
+  const R = rng32(99);
+  for (let i = 0; i < 22; i++){
+    const tx = 2 + Math.floor(R() * (MW - 4)), ty = 2 + Math.floor(R() * (MH - 4));
+    if (solidAt(tx, ty) || world.biome[ty * MW + tx] === "arena" || Math.hypot(tx - CAMP.tx, ty - CAMP.ty) < 9) continue;
+    G.pickups.push({ kind:world.biome[ty * MW + tx] === "nimbus" ? "acorn" : "berry", x:(tx + .5) * TILE, y:(ty + .8) * TILE, t:R() * 5, home:true });
+  }
+}
+function respawnPet(e){
+  if (e.wild){
+    if (dist(e.home, G.player) < 420){ e.respawnT = 5; return; }
+    resetFight(e);
+    Object.assign(e, { alive:true, cur:e.max, x:e.home.x, y:e.home.y, aggro:null });
+  }
+}
+function newGame(toRaid){
+  Object.assign(G, { ents:[], projs:[], fx:[], parts:[], texts:[], pickups:[], raid:null, swings:3 });
+  G.player = new Pet(G.formId, G.level, "hero", { x:CAMP_PX.x - 60, y:CAMP_PX.y + 30, player:true });
+  G.ents.push(G.player);
+  G.boss = new Boss(); G.ents.push(G.boss);
+  // he is whatever everyone has left of him - a new pet doesn't heal him
+  NET.since = G.time;
+  if (BS.dead) G.boss.alive = false, G.boss.deadT = 1e6;
+  spawnWild();
+  if (toRaid){ G.player.x = ARENA_PX.x; G.player.y = ARENA_PX.y + ARENA_PX.r - 50; }
+  G.cam.x = G.player.x; G.cam.y = G.player.y;
+  buildSkillButtons(); setupHud();
+  G.running = true; G.paused = false;
+  $("select").hidden = true; $("result").hidden = true; $("hud").hidden = false;
+  resize();
+  if (toRaid) setTimeout(startAttempt, 300);
+  else banner("The Trailhead", "Sir Uwaaarghhhh is up on the hill to the north.", 2.6);
+}
+function playerFainted(){
+  if (G.raid){
+    // falling after he does is still his fall - the felling card comes from bossFelled
+    if (G.boss.alive) setTimeout(() => endAttempt(false), 1100);
+    return;
+  }
+  const by = NET.lastBy && G.time - NET.lastBy.t < 3 ? NET.lastBy.who : null;
+  banner("Your " + G.player.form.name + " needs a rest", by ? `${by} got you - back at the campfire` : "back at the campfire", 1.8);
+  setTimeout(() => {
+    const p = G.player; resetFight(p);
+    Object.assign(p, { alive:true, cur:p.max, x:CAMP_PX.x - 60, y:CAMP_PX.y + 30 });
+    for (const e of G.ents) if (e.aggro === p){ e.aggro = null; e.calm = 6; }
+  }, 2000);
+}
+
+/* ---------- the raid ----------
+   As in the game: his health is a pool that carries over from one attempt to
+   the next, an attempt costs a swing, and it ends when your pet falls. Here it
+   is fought live, every blow of his marked on the ground first, and the pool
+   is shared by everyone in the world (BS, below). */
+/* His health is one fixed pool, the same for everyone, and it never
+   regenerates: every swing anyone takes stays off him until he is felled, as
+   in the game. Who's fighting, and how many, changes nothing about it.
+
+   He is a group's work over weeks. Seven runners at the game's 30 km a
+   week earn about 180 swings a month between them. At level 26 a swing takes
+   about 2,250 off him for a player who dodges but gets caught mid-skill, and
+   about 8,500 for one only his roar ever touches. At 400,000 that is about
+   a month for a field of the first kind, a week for a field of the second,
+   and about two weeks between the two. The bar shows a
+   percentage, as in the game. */
+const RAID_HP = 400000;
+/* He hits a little harder than the game's Power 90 (×1.08), so attempts are
+   a little shorter and the fight is a long one for a whole group (see RAID_HP). */
+const BOSS_POW = 1.08;
+const RESPAWN = 20;   // seconds before he is back on his hill after a felling
+/* BS: his one account. The round (it goes up by one each time he is felled
+   and comes back), whether he's down and since when (by the wall clock, so
+   every device agrees), and what each tab has taken off him this round - tab
+   key: [damage, name, form]. Damage only ever grows, so every copy of the
+   account merges by keeping the larger figure per tab, whichever page or
+   store it came from. It is kept in the page's shared store when there is
+   one (STORE, below), and in this browser when there isn't. */
+let BS = null;
+function freshPool(e){ BS = { e:e | 0, mx:RAID_HP, dd:{}, dead:false, deadAt:0 }; }
+function mergeHit(k, dm, n, f){
+  if (typeof k !== "string" || !/^[a-z0-9]{4,20}$/.test(k)) return;
+  dm = clamp(+dm || 0, 0, RAID_HP);
+  const o = BS.dd[k];
+  if (!dm || (o && o[0] >= dm)) return;
+  BS.dd[k] = [dm, cleanNick(n), FORMS[f] ? f : ""];
+}
+// a later round replaces this one; the same round can only gain a felling
+function adoptRound(e, dead, deadAt){
+  e = e | 0;
+  if (e < BS.e) return;
+  if (e > BS.e){ freshPool(e); if (G.raid && !G.raid.over){ G.raid.e = e; G.raid.startDm = 0; } }
+  if (dead && !BS.dead){ BS.dead = true; BS.deadAt = +deadAt || Date.now(); }
+}
+function startAttempt(){
+  const b = G.boss;
+  if (G.raid || !b.alive || BS.dead) return;
+  if (G.swings <= 0){ toast("No swings left. Get three more from the menu - in the game, you'd go for a run.", 3); return; }
+  G.swings--;
+  G.raid = { t:0, e:BS.e, startDm:NET.dm };
+  const p = G.player;
+  resetFight(p); Object.assign(p, { alive:true, cur:p.max, dealt:0, respawnT:0 });
+  if (dist(p, ARENA_PX) > ARENA_PX.r - 40){ p.x = ARENA_PX.x; p.y = ARENA_PX.y + ARENA_PX.r - 60; }
+  for (const e of G.ents) if (e.wild) e.aggro = null;
+  G.cam.shake = 10;
+  const others = [...NET.pets.values()].filter(n => n.rd && n.alive).length;
+  banner(RAID_BOSS.short, others ? `${others} other${others === 1 ? " is" : "s are"} already on him.` : RAID_BOSS.blurb, 2.6);
+  setupHud();
+}
+function endAttempt(felled){
+  const r = G.raid; if (!r || r.over) return;
+  r.over = true;
+  showResult(felled || !G.boss.alive, r);
+}
+function bossFelled(b){
+  b.deadT = 0; b.act = null; b.hop = 0; castLabel("");
+  G.fx = G.fx.filter(f => f.kind !== "tele");
+  if (NET.leads() && !BS.dead){ BS.dead = true; BS.deadAt = Date.now(); writeState(); }
+  const fighting = G.raid && !G.raid.over;
+  if (fighting || dist(G.player, ARENA_PX) < ARENA_PX.r + 200){
+    G.cam.shake = 16;
+    banner("Felled.", "His grip fails and the torch bursts apart.", 2.6);
+  } else toast("Sir Uwaaarghhhh has been felled on his hill.", 3);
+  if (fighting) setTimeout(() => endAttempt(true), RAID_BOSS.deathClip.total + 300);
+}
+function reviveBoss(b){
+  resetFight(b);
+  Object.assign(b, { alive:true, deadT:0, act:null, awake:false, hop:0, quarry:null, x:ARENA_PX.x, y:ARENA_PX.y - 10 });
+  if (G.running) toast("Sir Uwaaarghhhh is back on his hill.", 2.4);
+}
+function leaveRaid(){
+  G.fx = G.fx.filter(f => f.kind !== "tele");
+  G.raid = null;
+  const p = G.player; resetFight(p);
+  Object.assign(p, { alive:true, cur:p.max, respawnT:0, x:ARENA_PX.x, y:ARENA_PX.y + ARENA_PX.r + 50 });
+  castLabel(""); setupHud();
+}
+function pct(n){ return (Math.round(n * 1000) / 10).toFixed(1) + "%"; }
+/* Who has taken what off him this time round, biggest first. */
+function shares(){
+  return Object.entries(BS.dd).filter(([, v]) => v[0] > 0)
+    .map(([k, v]) => ({ me:k === NET.key, name:k === NET.key ? "You" : v[1] || "Someone", form:FORMS[v[2]] ? FORMS[v[2]].name : "", share:v[0] / BS.mx }))
+    .sort((a, b) => b.share - a.share);
+}
+function showResult(felled, r){
+  if (!NET.on) G.paused = true;   // with other people here the world goes on
+  // what this swing took off the pool - a killing blow's overkill is not health he had
+  const took = r.e === BS.e ? Math.min(NET.dm - r.startDm, BS.mx) / BS.mx : 0;
+  const b = G.boss, left = b.max ? b.cur / b.max : 0;
+  $("r-tag").textContent = felled ? "RAID CLEARED" : "ATTEMPT OVER";
+  $("r-title").textContent = felled ? "Felled." : `You took ${pct(Math.max(0, took))} off him`;
+  const many = shares().length > 1;
+  $("r-sub").textContent = felled
+    ? `The hill comes up to meet him. Every swing ${many ? "anybody" : "you"} took is in that fall. He's back in ${RESPAWN} seconds.`
+    : `He is ${bossPhase(b.cur, b.max).note}, at ${pct(left)}, and he keeps his wounds until the next swing${many ? " - anybody's" : ""}. ${G.swings} swing${G.swings === 1 ? "" : "s"} left. In the game, every 5 km you run earns one.`;
+  const t = $("r-table"); t.textContent = "";
+  for (const s of shares().slice(0, 8)){
+    const tr = document.createElement("tr"), a = document.createElement("td"), c = document.createElement("td");
+    a.textContent = s.name + (s.form ? " · " + s.form : ""); c.textContent = pct(s.share);
+    if (s.me) tr.className = "me";
+    tr.append(a, c); t.appendChild(tr);
+  }
+  const again = $("r-again");
+  $("r-leave").hidden = felled;
+  if (felled){ again.textContent = "Back to the trail"; again.onclick = closeResult; }
+  else if (G.swings > 0){ again.innerHTML = `Swing again <small>${G.swings} left</small>`; again.onclick = () => { closeResult(); startAttempt(); }; }
+  else { again.innerHTML = `Three more swings <small>prototype only - in the game you'd go for a run</small>`; again.onclick = () => { G.swings = 3; closeResult(); startAttempt(); }; }
+  drawBossCard(felled);
+  $("result").hidden = false;
+}
+function closeResult(){ $("result").hidden = true; leaveRaid(); G.paused = false; }
+function drawBossCard(felled){
+  const c = $("r-boss"), g = c.getContext("2d"); g.clearRect(0, 0, c.width, c.height);
+  const b = G.boss, src = felled ? RAID_BOSS.death.src : bossPhase(b.cur, b.max).src, frames = felled ? 16 : 12, i = felled ? 15 : 0;
+  const im = IMG[src]; if (!im) return;
+  const fw = im.width / frames, s = Math.min(c.width / fw, c.height / im.height);
+  g.imageSmoothingQuality = "high";
+  g.drawImage(im, i * fw, 0, fw, im.height, (c.width - fw * s) / 2, c.height - im.height * s, fw * s, im.height * s);
+}
+
+/* =========================================================================
+   TOGETHER
+   =========================================================================
+   Everyone who has this page open is in one world, through the page's room.
+   Each page sets its own presence about ten times a second - its pet, where
+   it is, what it's doing, how much it has taken off him - and draws everyone
+   else from theirs. Nothing persists, and nothing another page says is
+   trusted to hurt this page's pet: each page settles hits on its own.
+
+   He needs one account, so one page runs him. It says so in its presence,
+   with how long it has, and the page that has run him longest keeps him -
+   so someone arriving never takes him over with a fresh pool. When it goes
+   (or its screen goes off), the lowest peer label among the pages still
+   here and on screen picks him up from the last account it saw. His health is
+   the pool less the sum of what every tab says it has taken off him this
+   round (BS).
+
+   With no room - a public link, a page opened outside Claude - it is the
+   same game, alone. */
+const NET = {
+  room:null, on:false, me:"me", pets:new Map(), hb:null, lastHB:null, leader:true,
+  dm:0, dmE:null, sendT:0, ks:0, ds:0, online:0, others:[], since:0,
+  hits:[], hitN:0, seen:{}, lastBy:null,
+  leads(){ return this.leader; }
+};
+/* This tab's key for what it has taken off him: kept through a reload, new
+   in each tab, so two tabs never overwrite each other's damage. */
+function tabKey(){
+  let k = null;
+  try { k = sessionStorage.getItem("rx.tab"); } catch(e){}
+  if (!k || !/^[a-z0-9]{4,20}$/.test(k)){ k = "t" + Math.random().toString(36).slice(2, 12); try { sessionStorage.setItem("rx.tab", k); } catch(e){} }
+  return k;
+}
+NET.key = tabKey();
+
+/* =========================================================================
+   WHERE THE WORLD IS
+   =========================================================================
+   Three ways to be in the world, tried in order:
+   1. Inside Claude, the Artifact page's own `room` and `db`.
+   2. Anywhere else, Runmon Explore's own server (explore-worker/), when the
+      page knows of one: on the game's site, or with ?server= on the link.
+      It speaks the same two shapes (openServer, below), so nothing past
+      this point knows which it got.
+   3. Neither: the same game, alone, his wounds kept in this browser. */
+const EXPLORE_SERVER = "wss://runmon-explore.runmon-gq.workers.dev/world";
+function serverUrl(){
+  let q = null;
+  try { q = new URLSearchParams(location.search).get("server"); } catch(e){}
+  if (q && /^wss?:\/\//.test(q)) return q;
+  return /(^|\.)github\.io$/.test(location.hostname) ? EXPLORE_SERVER : null;
+}
+async function connectNet(){
+  const use = n => {
+    try { return window.claude && typeof window.claude.use === "function" ? Promise.resolve(window.claude.use(n)).catch(() => null) : Promise.resolve(null); }
+    catch(e){ return Promise.resolve(null); }
+  };
+  let [room, db] = await Promise.all([use("room"), use("db")]);
+  const url = !room && !db && serverUrl();
+  if (url){
+    NET.serverTried = true;
+    const s = openServer(url);
+    if (await s.ready){ room = s.room; db = s.db; NET.server = s; }
+  }
+  connectStore(db);
+  connectRoom(room);
+}
+/* The server, wearing the room and db shapes the game already speaks. It
+   reconnects on its own; while it is away the page plays on alone. */
+function openServer(base){
+  let code = null;
+  try { code = new URLSearchParams(location.search).get("code"); } catch(e){}
+  const url = base + (code ? (base.includes("?") ? "&" : "?") + "code=" + encodeURIComponent(code) : "");
+  const S = { ws:null, me:null, up:false, peers:new Map(), mine:{}, snap:Object.freeze([]), onPeers:new Set(), onConn:new Set(),
+              subs:new Map(), pend:new Map(), n:0, retry:600 };
+  const peerRec = (id, p, mine) => Object.freeze({ peer:id, by:null, isMe:!!mine, sameTab:!!mine, kind:"viewer", guest:false,
+                                                   presence:Object.freeze(p || {}), updatedAt:Date.now() });
+  const rebuild = () => {
+    const arr = S.me ? [peerRec(S.me, { ...S.mine }, true)] : [];
+    for (const [id, p] of S.peers) arr.push(peerRec(id, p, false));
+    S.snap = Object.freeze(arr);
+    for (const f of S.onPeers){ try { f({ peers:S.snap, joined:[], left:[], updated:[] }); } catch(e){} }
+  };
+  const send = m => { if (S.ws && S.up){ try { S.ws.send(JSON.stringify(m)); } catch(e){} } };
+  const conn = up => { S.up = up; for (const f of S.onConn){ try { f(up); } catch(e){} } };
+  // a document as the game's store hands it out
+  const docSnap = (path, data) => ({ id:path.split("/").pop(), exists:data != null, data:() => data == null ? undefined : data,
+                                     metadata:{ fromCache:false, hasPendingWrites:false } });
+  const deliver = sub => {
+    if (sub.exact) for (const f of sub.cbs) f(docSnap(sub.prefix, sub.docs.get(sub.prefix)));
+    else {
+      const docs = [...sub.docs].filter(([, d]) => d != null).map(([p, d]) => docSnap(p, d));
+      for (const f of sub.cbs) f({ docs, size:docs.length, empty:!docs.length, docChanges:() => [], metadata:{} });
+    }
+  };
+  const subscribe = (prefix, exact, cb) => {
+    let sub = S.subs.get(prefix);
+    if (!sub){ sub = { prefix, exact, docs:new Map(), cbs:new Set(), got:false }; S.subs.set(prefix, sub); send({ t:"sub", prefix }); }
+    sub.cbs.add(cb);
+    if (sub.got) deliver(sub);
+    return () => { sub.cbs.delete(cb); if (!sub.cbs.size){ S.subs.delete(prefix); send({ t:"unsub", prefix }); } };
+  };
+  const inSub = (sub, path) => sub.exact ? path === sub.prefix : path.startsWith(sub.prefix + "/") && !path.slice(sub.prefix.length + 1).includes("/");
+  let readyDone, firstTry = true;
+  const ready = new Promise(res => { readyDone = res; setTimeout(() => res(false), 6000); });
+  const connect = () => {
+    let ws;
+    try { ws = new WebSocket(url); } catch(e){ readyDone(false); return; }
+    S.ws = ws;
+    ws.onmessage = ev => {
+      let m; try { m = JSON.parse(ev.data); } catch(e){ return; }
+      if (!m || typeof m !== "object") return;
+      if (m.t === "hello"){
+        S.me = String(m.id); S.retry = 600; S.peers.clear();
+        for (const x of Array.isArray(m.peers) ? m.peers : []) if (x && x.id !== S.me) S.peers.set(String(x.id), x.p || {});
+        conn(true); readyDone(true);
+        send({ t:"p", p:S.mine });
+        for (const sub of S.subs.values()) send({ t:"sub", prefix:sub.prefix });
+        rebuild();
+      } else if (m.t === "join"){ if (!S.peers.has(m.id)){ S.peers.set(String(m.id), {}); rebuild(); } }
+      else if (m.t === "p"){ S.peers.set(String(m.id), m.p || {}); rebuild(); }
+      else if (m.t === "left"){ S.peers.delete(String(m.id)); rebuild(); }
+      else if (m.t === "docs" || m.t === "doc"){
+        const list = m.t === "docs" ? (Array.isArray(m.docs) ? m.docs : []) : [{ path:m.path, data:m.data }];
+        for (const sub of S.subs.values()){
+          let hit = false;
+          if (m.t === "docs" && m.prefix === sub.prefix){ sub.got = true; hit = true; }
+          for (const d of list) if (d && typeof d.path === "string" && inSub(sub, d.path)){ sub.docs.set(d.path, d.data); hit = true; }
+          if (hit) deliver(sub);
+        }
+      } else if (m.t === "ack" || m.t === "err"){
+        const p = S.pend.get(m.n); if (!p) return;
+        S.pend.delete(m.n);
+        if (m.t === "ack") p.res(); else p.rej({ code:String(m.code || "unavailable"), message:"refused by the server" });
+      }
+    };
+    ws.onclose = () => {
+      const was = S.up; S.ws = null; S.peers.clear();
+      if (was) conn(false);
+      rebuild();
+      for (const p of S.pend.values()) p.rej({ code:"unavailable", message:"no connection" });
+      S.pend.clear();
+      if (firstTry && !was){ firstTry = false; readyDone(false); }
+      setTimeout(connect, S.retry); S.retry = Math.min(S.retry * 2, 15000);
+    };
+  };
+  connect();
+  const room = {
+    presence(patch){
+      for (const k in patch){ if (patch[k] === null) delete S.mine[k]; else S.mine[k] = patch[k]; }
+      if (JSON.stringify(S.mine).length > 4096) return Promise.reject({ code:"invalid_argument", message:"presence too big" });
+      send({ t:"p", p:S.mine }); rebuild();
+      return Promise.resolve();
+    },
+    peers(){ return S.snap; },
+    onPeers(f){ S.onPeers.add(f); setTimeout(() => f({ peers:S.snap, joined:S.snap, left:[], updated:[] })); return () => S.onPeers.delete(f); },
+    connected(){ return S.up; },
+    onConnection(f){ S.onConn.add(f); return () => S.onConn.delete(f); },
+    emit(){ return Promise.resolve(); }, on(){ return () => {}; }
+  };
+  const docRef = path => ({
+    id:path.split("/").pop(), path,
+    onSnapshot(next){ return subscribe(path, true, next); },
+    set(data){
+      if (!S.up) return Promise.reject({ code:"unavailable", message:"no connection" });
+      const n = ++S.n;
+      return new Promise((res, rej) => { S.pend.set(n, { res, rej }); send({ t:"set", n, path, data }); });
+    }
+  });
+  const db = {
+    doc:docRef,
+    collection(path){
+      const q = { path, limit:() => q, where:() => q, orderBy:() => q, doc:id => docRef(path + "/" + id),
+                  onSnapshot(next){ return subscribe(path, false, next); } };
+      return q;
+    }
+  };
+  return { ready, room, db };
+}
+
+/* =========================================================================
+   KEEPING HIS WOUNDS
+   =========================================================================
+   With the page's shared store (db), every tab's damage this round is a
+   document of its own - raids/e<round>/hits/<tab key> - and raids/state
+   says which round it is and when he fell. So his health survives everyone
+   closing the page, and it's the same number on every device. A tab writes
+   its own document; the page running him also writes everyone else's
+   figures it knows of, so a tester who can only view still leaves a mark
+   while someone who can write is about. Without the store (signed out, a
+   public link, the repo copy) the account lives in this browser. */
+const STORE = { db:null, ok:true, seen:{}, hitsE:null, unHits:null, writing:false, lastT:0, stateBusy:false, statePending:false, localJson:"" };
+function connectStore(db){
+  if (!db) return;
+  STORE.db = db;
+  // the shared account replaces this browser's own - solo damage never leaks into it
+  freshPool(1); NET.dm = 0; NET.dmE = 1;
+  db.doc("raids/state").onSnapshot(snap => {
+    const d = snap.exists ? snap.data() : null;
+    if (d) adoptRound(d.e, +d.felledAt > 0, +d.felledAt);
+    watchHits();
+  }, () => {});
+  watchHits();
+}
+function watchHits(){
+  if (!STORE.db || STORE.hitsE === BS.e) return;
+  if (STORE.unHits) STORE.unHits();
+  const e = STORE.hitsE = BS.e; STORE.seen = {};
+  STORE.unHits = STORE.db.collection("raids/e" + e + "/hits").limit(1000).onSnapshot(qs => {
+    if (BS.e !== e) return;
+    for (const d of qs.docs){
+      const v = d.data() || {};
+      STORE.seen[d.id] = Math.max(STORE.seen[d.id] || 0, +v.dm || 0);
+      mergeHit(d.id, v.dm, v.n, v.f);
+      // this tab, reloaded: carry on from what it had already taken off him
+      if (d.id === NET.key && NET.dmE === e && +v.dm > NET.dm) NET.dm = +v.dm;
+    }
+  }, () => { STORE.hitsE = null; });
+}
+function writeState(){
+  if (!STORE.db || !STORE.ok) return;
+  if (STORE.stateBusy){ STORE.statePending = true; return; }
+  STORE.stateBusy = true;
+  STORE.db.doc("raids/state").set({ e:BS.e, felledAt:BS.dead ? BS.deadAt : 0 })
+    .catch(err => { if (err && err.code === "invalid_argument") STORE.ok = false; })
+    .finally(() => { STORE.stateBusy = false; if (STORE.statePending){ STORE.statePending = false; writeState(); } });
+}
+/* One write in flight at a time, at most every 0.7 s: this tab's own figure
+   first, then (on the page running him) anyone else's the store is behind on. */
+function persist(){
+  const now = Date.now();
+  if (STORE.db && STORE.ok && !STORE.writing && now - STORE.lastT > 700 && STORE.hitsE === BS.e){
+    let k = null;
+    const mine = BS.dd[NET.key];
+    if (mine && mine[0] > (STORE.seen[NET.key] || 0) + .5) k = NET.key;
+    else if (NET.leader) for (const key in BS.dd) if (BS.dd[key][0] > (STORE.seen[key] || 0) + .5){ k = key; break; }
+    if (k){
+      const v = BS.dd[k], e = BS.e, dm = Math.round(v[0]);
+      STORE.writing = true; STORE.lastT = now;
+      STORE.db.doc("raids/e" + e + "/hits/" + k).set({ dm, n:v[1], f:v[2], at:now })
+        .then(() => { if (BS.e === e) STORE.seen[k] = Math.max(STORE.seen[k] || 0, dm); },
+              err => { if (err && err.code === "invalid_argument") STORE.ok = false; })
+        .finally(() => { STORE.writing = false; });
+    }
+  }
+  if (!STORE.db && now - STORE.lastT > 2000){
+    STORE.lastT = now;
+    const json = JSON.stringify({ e:BS.e, dead:BS.dead, deadAt:BS.deadAt, dd:BS.dd });
+    if (json !== STORE.localJson){ STORE.localJson = json; store("rx.raid", json); }
+  }
+}
+function loadLocal(){
+  freshPool(1);
+  try {
+    const s = JSON.parse(store("rx.raid") || "null");
+    if (s && (s.e | 0) >= 1){
+      freshPool(s.e); BS.dead = !!s.dead; BS.deadAt = +s.deadAt || 0;
+      for (const k in s.dd || {}){ const v = s.dd[k]; if (Array.isArray(v)) mergeHit(k, v[0], v[1], v[2]); }
+    }
+  } catch(e){}
+  const mine = BS.dd[NET.key];
+  NET.dmE = BS.e; NET.dm = mine ? mine[0] : 0;
+}
+function cleanNick(s){ return String(s || "").replace(/[\u0000-\u001f\u007f-\u009f<>&"'`\\]/g, "").trim().slice(0, 14); }
+function nick(){ return cleanNick(G.nick) || "Runner"; }
+function connectRoom(room){
+  if (!room) return showLobby();
+  NET.room = room; NET.on = true;
+  room.onPeers(() => { NET.dirty = true; if (!G.running) showLobby(); });
+  room.onConnection(() => showLobby());
+  publish(1);
+  showLobby();
+}
+function viewers(){ return NET.room ? NET.room.peers().filter(p => p.kind === "viewer") : []; }
+/* One beat of the shared world, before the local one moves. */
+function netTick(dt){
+  const room = NET.room, b = G.boss;
+  if (room){
+    const all = room.peers(), mine = all.find(p => p.sameTab);
+    if (mine) NET.me = mine.peer;
+    NET.others = all.filter(p => !p.sameTab && p.kind === "viewer" && p.presence && p.presence.g === 1);
+    NET.online = all.filter(p => p.kind === "viewer").length;
+  }
+  const others = NET.others;
+  // who runs him: whoever has longest, else the lowest label on screen
+  const here = document.hidden ? [] : [{ id:NET.me, lt:NET.leader ? G.time - NET.since : -1 }];
+  for (const p of others) if (!p.presence.hd) here.push({ id:p.peer, lt:p.presence.b && typeof p.presence.b === "object" ? +p.presence.lt || 0 : -1 });
+  let lead = null;
+  const runs = here.filter(c => c.lt >= 0);
+  if (runs.length){
+    const top = Math.max(...runs.map(c => c.lt));
+    lead = runs.filter(c => c.lt >= top - 2).map(c => c.id).sort()[0];   // near-ties go by label
+  } else if (here.length) lead = here.map(c => c.id).sort()[0];
+  const was = NET.leader;
+  NET.leader = lead === null || lead === NET.me;
+  if (NET.leader && !was) NET.since = G.time;
+  const lp = NET.leader ? null : others.find(p => p.peer === lead);
+  const hb = lp && lp.presence.b && typeof lp.presence.b === "object" ? lp.presence.b : null;
+  NET.hb = hb; if (hb) NET.lastHB = hb;
+  if (NET.leader && !was) takeOver(b);
+  // everyone else's pet
+  const seen = new Set();
+  for (const p of others){ seen.add(p.peer); syncNetPet(p.peer, p.presence); takeHits(p); }
+  NET.hits = NET.hits.filter(h => G.time - h.t < 3);   // a hit stays in presence long enough to be read
+  for (const id of [...NET.pets.keys()]) if (!seen.has(id)) NET.pets.delete(id);
+  for (const n of NET.pets.values()) animNetPet(n, dt);
+  // his pool: one account, merged from every copy of it here
+  if (hb) followPool(hb);
+  if (NET.dmE !== BS.e){ NET.dmE = BS.e; NET.dm = 0; }
+  if (NET.dm > 0) mergeHit(NET.key, NET.dm, nick(), G.formId);
+  for (const p of others){ const pr = p.presence; if ((pr.ep | 0) === BS.e) mergeHit(String(pr.k || ""), pr.dm, pr.n, pr.f); }
+  let total = 0; for (const k in BS.dd) total += BS.dd[k][0];
+  b.max = BS.mx; b.cur = Math.max(0, BS.mx - total);
+  if (NET.leader){
+    if (b.alive && b.cur <= 0 && !BS.dead) faint(b, null);   // bossFelled marks the round down
+    if (BS.dead && Date.now() - BS.deadAt > RESPAWN * 1000){ freshPool(BS.e + 1); writeState(); }
+  }
+  // every page draws him as the account has him
+  if (BS.dead && b.alive){ b.cur = 0; faint(b, null); }
+  if (!BS.dead && !b.alive){ reviveBoss(b); b.cur = b.max = BS.mx; }
+  watchHits(); persist();
+  publish(dt);
+}
+function followPool(h){
+  adoptRound(h.e, !!h.dead, h.da);
+  if ((h.e | 0) !== BS.e || !h.dd || typeof h.dd !== "object") return;
+  for (const k in h.dd){ const v = h.dd[k]; if (k !== NET.key && Array.isArray(v)) mergeHit(k, v[0], v[1], v[2]); }
+}
+/* This page runs him now: pick him up where the last page left him. */
+function takeOver(b){
+  const h = NET.lastHB;
+  if (!h) return;   // nobody ran him before: he is this page's, as he stands
+  followPool(h);
+  Object.assign(b, { x:+h.x || b.x, y:+h.y || b.y, act:null, hop:0, next:1, awake:false,
+    powMul:+h.pw || 1, spdMul:+h.sm || 1, charges:h.ch | 0, stokeHits:h.st | 0, roars:h.ro | 0 });
+  castLabel("");
+  NET.lastHB = null;   // used once: an older account must never come back later
+}
+function bossState(b){
+  const a = b.act, dd = {};
+  // the biggest 40 - a page coming in without the store gets the rest from their own pages
+  Object.entries(BS.dd).sort((x, y) => y[1][0] - x[1][0]).slice(0, 40).forEach(([k, v]) => { dd[k] = [Math.round(v[0]), v[1].slice(0, 10), v[2]]; });
+  const r2 = v => Math.round(v * 100) / 100;
+  return { e:BS.e, dead:BS.dead ? 1 : 0, da:BS.deadAt, dd, x:Math.round(b.x), y:Math.round(b.y), f:b.face, w:b.awake ? 1 : 0,
+    pw:r2(b.powMul), sm:r2(b.spdMul), ch:b.charges, st:b.stokeHits || 0, ro:b.roars || 0,
+    a:a && a.t < a.end ? { n:a.n, k:a.k, t:r2(a.t), impact:r2(a.impact), end:r2(a.end), sx:Math.round(a.sx), sy:Math.round(a.sy),
+      lx:Math.round(a.lx), ly:Math.round(a.ly), mx:Math.round(a.mx), my:Math.round(a.my), r:a.r, from:a.from, m:a.m,
+      rate:a.rate, pre:a.pre || 1, q:a.q, lock:r2(a.lock || 0), rm:r2(a.rm || 0) } : null };
+}
+function publish(dt){
+  if (!NET.room) return;
+  NET.sendT -= dt; if (NET.sendT > 0) return; NET.sendT = .1;
+  // presence merges, so a page out of the world clears what it said while in it
+  const p = G.player, pr = { g:G.running ? 1 : 0, hd:document.hidden ? 1 : 0, n:nick(), rd:0, b:null, lt:null };
+  if (G.running && p){
+    Object.assign(pr, { f:p.formId, l:p.level, x:Math.round(p.x), y:Math.round(p.y), fc:p.face, mv:p.moving > .1 ? 1 : 0,
+      k:p.clip ? p.clip.sk.id : "", ks:NET.ks, ds:NET.ds, am:Math.round(Math.atan2(p.aim.y, p.aim.x) * 100),
+      hp:Math.round(p.cur), al:p.alive ? 1 : 0, rd:G.raid && !G.raid.over ? 1 : 0,
+      ep:BS.e, dm:Math.round(NET.dm), k:NET.key, b:NET.leader ? bossState(G.boss) : null,
+      pv:NET.hits.length ? NET.hits.map(h => h.o) : null,
+      lt:NET.leader ? Math.round(G.time - NET.since) : null });
+  }
+  NET.room.presence(pr).catch(() => {});
+}
+// a page whose screen goes off stops running him at once, and won't take him back when it returns
+document.addEventListener("visibilitychange", () => { if (document.hidden && NET.on) NET.leader = false; NET.sendT = 0; publish(1); });
+/* PvP, sent: a hit on another player's pet goes into this page's presence,
+   addressed to that pet's page, which takes it off its own pet. Each hit has
+   a number so it is taken once. */
+function pvpHit(n, fields){
+  if (!n.peer) return;
+  NET.hits.push({ t:G.time, o:{ i:++NET.hitN, to:n.peer, ...fields } });
+  if (NET.hits.length > 12) NET.hits.shift();
+}
+/* PvP, received: hits another page says it landed on this page's pet. Not
+   while fighting him, and never from someone who is. */
+function takeHits(p){
+  const pv = p.presence.pv;
+  if (!Array.isArray(pv)) return;
+  const me = G.player, last = NET.seen[p.peer] || 0;
+  for (const h of pv){
+    if (!h || typeof h !== "object" || h.to !== NET.me || (h.i | 0) <= last) continue;
+    NET.seen[p.peer] = Math.max(NET.seen[p.peer] || 0, h.i | 0);
+    if (!me || !me.alive || inRaid() || p.presence.rd) continue;
+    const who = cleanNick(p.presence.n) || "Someone";
+    me.lastFight = G.time; NET.lastBy = { who, t:G.time };
+    if (h.d > 0){
+      let d = clamp(Math.round(+h.d), 0, me.max);
+      if (me.exposed){ d = Math.round(d * me.exposed); me.exposed = 0; }
+      if (G.god) d = 0;
+      me.cur -= d; me.flash = .12;
+      if (d > 0){ floatText(me.x + rnd(-14, 14), me.y - me.box * .95, String(d), "#ff6b7d", 15); G.cam.shake = Math.max(G.cam.shake, 5); buzz(25); }
+    }
+    if (Array.isArray(h.rt)){ me.openT = Math.max(me.openT, clamp(+h.rt[1] || 0, 0, 4) * TURN); me.openPct = Math.max(me.openPct, clamp(+h.rt[0] || 0, 0, .5));
+      floatText(me.x, me.y - me.box * 1.2, "guard rattled", "#9fd8ff", 12); }
+    if (Array.isArray(h.bn)){ me.burn = { dmg:clamp(Math.round(+h.bn[0]) || 1, 1, me.max), left:clamp(h.bn[1] | 0, 1, 4), t:TURN, src:null };
+      floatText(me.x + 20, me.y - me.box * 1.1, "burning", "#ff8a3d", 12); }
+    if (+h.ex > 1){ me.exposed = clamp(+h.ex, 1, 2); floatText(me.x, me.y - me.box * 1.2, "wide open", "#9fd8ff", 12); }
+    if (me.cur <= 0){ me.cur = 0; faint(me, null); break; }
+  }
+}
+
+/* Another page's pet: drawn from its presence, never simulated here. */
+function syncNetPet(id, pr){
+  const form = FORMS[pr.f] ? pr.f : null;
+  if (!form){ NET.pets.delete(id); return; }
+  const lv = clamp(Math.round(+pr.l || FORMS[form].min), 1, 60);
+  let n = NET.pets.get(id);
+  if (!n || n.formId !== form || n.level !== lv){
+    n = new Pet(form, lv, "net", { x:+pr.x || 0, y:+pr.y || 0 }); n.net = true; n.peer = id; n.tx = n.x; n.ty = n.y;
+    NET.pets.set(id, n);
+  }
+  n.nick = cleanNick(pr.n) || "Runner";
+  n.tx = Number.isFinite(+pr.x) ? +pr.x : n.tx; n.ty = Number.isFinite(+pr.y) ? +pr.y : n.ty;
+  if (pr.fc === 1 || pr.fc === -1) n.face = pr.fc;
+  n.mv = pr.mv ? 1 : 0; n.rd = !!pr.rd;
+  const hp = clamp(+pr.hp || 0, 0, n.max);
+  if (hp < n.cur - .5) n.flash = .12;
+  n.cur = hp;
+  const alive = pr.al !== 0;
+  if (n.alive && !alive) n.faintT = 0;
+  n.alive = alive;
+  const ang = (+pr.am || 0) / 100; n.aim = { x:Math.cos(ang), y:Math.sin(ang) };
+  if (pr.ks !== n.ks){ if (n.ks !== undefined && MOVE[pr.k] && !RAID_BOSS.kit.includes(MOVE[pr.k])) n.clip = { sk:MOVE[pr.k], t:0, fired:false, aim:{ ...n.aim }, net:true }; n.ks = pr.ks; }
+  if (pr.ds !== n.ds){ if (n.ds !== undefined) n.dashT = .2; n.ds = pr.ds; }
+}
+function animNetPet(n, dt){
+  const ox = n.x, oy = n.y, k = Math.min(1, dt * 12);
+  if (Math.hypot(n.tx - n.x, n.ty - n.y) > 400){ n.x = n.tx; n.y = n.ty; }
+  else { n.x += (n.tx - n.x) * k; n.y += (n.ty - n.y) * k; }
+  const sp = Math.hypot(n.x - ox, n.y - oy) / Math.max(dt, 1e-3);
+  n.moving = n.alive && (n.mv || sp > 30) ? 1 : 0;
+  n.walkT += dt * 2.2 * n.moving; n.idleT += dt;
+  n.dashT = Math.max(0, n.dashT - dt); n.flash = Math.max(0, n.flash - dt);
+  if (!n.alive) n.faintT += dt;
+  const c = n.clip;
+  if (c){
+    c.t += dt * 1000;
+    const fx = c.sk.fx, at = fx.kind === "rush" ? fx.to : fx.impact;
+    if (!c.fired && c.t >= (c.sk.clip.starts[at] ?? 0)){ c.fired = true; netFx(n, c); }
+    if (c.t >= c.sk.clip.total) n.clip = null;
+  }
+}
+/* The look of another pet's move - no hits, those are its own page's. */
+function netFx(e, c){
+  const fx = c.sk.fx, b = G.boss;
+  const onHim = e.rd && b.alive && dist(e, b) < 420;
+  const tx = onHim ? b.x : e.x + c.aim.x * 140, ty = onHim ? b.y - 6 : e.y + c.aim.y * 140;
+  const ax = Math.cos(Math.atan2(ty - e.y, tx - e.x)), ay = Math.sin(Math.atan2(ty - e.y, tx - e.x));
+  if (fx.kind === "nova"){
+    const fire = fx.tint === "fire";
+    ring(e.x, e.y, fx.reach, fire ? "#ff8a3d" : "#7ff0ff", .5, fire ? 14 : 8);
+    if (fire) embers(e.x, e.y, 20, 1.1); else sparks(e.x, e.y - e.box * .4, 22, 1.1);
+  }
+  if (fx.kind === "strike"){ G.fx.push({ kind:"bolt", x:tx, y:ty, t:0, dur:.42, seed:Math.random() * 1e4, small:fx.tint === "small" }); sparks(tx, ty, 18, 1); }
+  if (fx.kind === "shot"){
+    const sx = e.x + e.face * e.box * .6, sy = e.y - 6, a = Math.atan2(ty - sy, tx - sx);
+    G.projs.push({ x:sx, y:sy, z:e.box * .32, vx:Math.cos(a) * 460, vy:Math.sin(a) * 460, r:14, life:2, owner:e, sk:c.sk, side:"net",
+      tint:fx.tint, target:onHim ? b : null, clip:{ shown:true } });
+  }
+  if (fx.kind === "cone") G.fx.push({ kind:"arc", x:e.x, y:e.y - 10, a:Math.atan2(ay, ax), r:fx.reach, arc:fx.arc || .9, t:0, dur:.32, colour:fx.tint });
+  if (fx.kind === "gale") for (let i = 0; i < 16; i++){ const s = rnd(-.45, .45), sp = rnd(90, 250), ca = Math.cos(s), sa = Math.sin(s);
+    part({ x:e.x - e.face * e.box * .3, y:e.y - 14, vx:(ax * ca - ay * sa) * sp, vy:(ax * sa + ay * ca) * sp * .8,
+      size:rnd(7, 14), colour:"rgba(150,220,90,.5)", life:rnd(.6, 1.2), shrink:false, grow:14 }); }
+  if (fx.kind === "puff") for (let i = 0; i < 10; i++) part({ x:e.x + e.face * e.box * .45, y:e.y - e.box * .3, vx:rnd(-30, 30) + e.face * 30, vy:rnd(-30, 10), vz:rnd(10, 50),
+    size:rnd(6, 12), colour:"rgba(140,140,150,.55)", life:rnd(.7, 1.3), shrink:false, grow:10 });
+  if (fx.kind === "self") for (let i = 0; i < 12; i++) part({ x:e.x + rnd(-20, 20), y:e.y - rnd(0, 40), vy:-30, size:3, colour:"#5fd38a", glow:true, life:.9 });
+}
+/* The select screen says who's here before you go in. */
+function showLobby(){
+  const el = $("lobby"); if (!el) return;
+  if (!NET.room){
+    el.textContent = NET.serverTried ? "Couldn't reach the world just now, so you're playing solo. Reload to try again."
+                                     : "Solo. To play together, open the shared link while signed in to Claude.";
+    return;
+  }
+  const peers = viewers(), inWorld = peers.filter(p => !p.sameTab && p.presence && p.presence.g === 1);
+  const names = inWorld.map(p => cleanNick(p.presence.n) || "Runner").slice(0, 4);
+  el.textContent = inWorld.length
+    ? `${inWorld.length} in the world now: ${names.join(", ")}${inWorld.length > names.length ? "…" : ""}`
+    : peers.length > 1 ? `${peers.length - 1} other${peers.length > 2 ? "s" : ""} here, not out yet.` : "Nobody else here yet. Send someone the link.";
+}
+
+/* =========================================================================
+   HUD
+   ========================================================================= */
+let bannerTimer = 0, toastTimer = 0;
+/* A shout comes out a letter at a time, faster as it goes, the banner
+   shaking with it; what it means follows once it's out. */
+let shouting = null;
+function shout(text, after){
+  banner("", "", 99);
+  $("banner-h").classList.toggle("long", text.length > 18);
+  shouting = { text, after, t:0, dur:1.1 };
+}
+function updateShout(dt){
+  const s = shouting; if (!s) return;
+  s.t += dt;
+  const k = Math.min(1, s.t / s.dur), n = Math.max(1, Math.ceil(s.text.length * Math.pow(k, .8)));
+  const h = $("banner-h"), shown = s.text.slice(0, n);
+  if (h.textContent !== shown){ h.textContent = shown; buzz(8); }
+  const amp = k < 1 ? 5 : Math.max(0, 5 * (1 - (s.t - s.dur) / .4));
+  h.style.transform = amp > 0 ? `translate(${rnd(-amp, amp)}px,${rnd(-amp, amp)}px) scale(${1 + .06 * (1 - k)})` : "";
+  if (k >= 1 && !s.done){ s.done = true; $("banner-p").textContent = s.after; bannerTimer = 1.6; }
+  if (s.done && s.t > s.dur + .45){ h.style.transform = ""; shouting = null; }
+}
+function banner(h, p, secs, narr){
+  shouting = null; $("banner-h").style.transform = "";
+  $("banner-h").textContent = h; $("banner-h").classList.toggle("long", h.length > 18);
+  $("banner-p").textContent = p || "";
+  $("banner").classList.toggle("narr", !!narr); $("banner").classList.add("on"); bannerTimer = secs;
+}
+function toast(msg, secs = 2.2){ $("toast").textContent = msg; $("toast").classList.add("on"); toastTimer = secs; }
+function castLabel(s){ $("bcast").textContent = s; }
+function drawPortrait(canvas, formId, frame = 0){
+  const f = FORMS[formId], c = f.idle, g = canvas.getContext("2d");
+  g.clearRect(0, 0, canvas.width, canvas.height);
+  const im = IMG[c.src]; if (!im) return;
+  const fw = im.width / c.frames, ar = fw / im.height;
+  let h = canvas.height * 1.02, w = h * ar;
+  if (w > canvas.width * 1.1){ w = canvas.width * 1.1; h = w / ar; }
+  g.imageSmoothingQuality = "high";
+  g.drawImage(im, frame * fw, 0, fw, im.height, (canvas.width - w) / 2, canvas.height - h, w, h);
+}
+/* The others on him with you: a portrait, a name and a health bar each,
+   rebuilt only when who's there changes. Names go in as text. */
+let partyKey = null;
+function updateParty(){
+  const on = G.raid ? [...NET.pets.entries()].filter(([, n]) => n.rd).slice(0, 6) : [];
+  const key = on.map(([id, n]) => id + n.formId + n.nick).join("|");
+  const party = $("party");
+  if (key !== partyKey){
+    partyKey = key; party.textContent = "";
+    for (const [, n] of on){
+      const d = document.createElement("div"); d.className = "ally panel";
+      const c = document.createElement("canvas"); c.width = c.height = 48;
+      const w = document.createElement("div"); w.textContent = n.nick;
+      const bar = document.createElement("div"); bar.className = "bar"; bar.appendChild(document.createElement("i"));
+      w.appendChild(bar); d.append(c, w); party.appendChild(d);
+      drawPortrait(c, n.formId); n.hudEl = d;
+    }
+  }
+  for (const [, n] of on) if (n.hudEl){ n.hudEl.querySelector("i").style.width = Math.max(0, n.cur / n.max * 100) + "%"; n.hudEl.classList.toggle("out", !n.alive); }
+}
+function setupHud(){
+  const p = G.player;
+  $("me-name").textContent = p.form.name; $("me-lv").textContent = "Lv " + p.level;
+  drawPortrait($("me-face"), p.formId);
+  partyKey = null;
+  $("bossbar").hidden = !G.raid;
+  $("hud").classList.toggle("raiding", !!G.raid);
+}
+function updateHud(dt){
+  const p = G.player;
+  const hp = Math.max(0, p.cur / p.max * 100);
+  $("me-hp").style.width = hp + "%"; $("me-hpbar").classList.toggle("low", hp < 30);
+  const fx = [];
+  if (p.stoke) fx.push("stoked"); if (p.charges) fx.push("charged ×" + p.charges); if (p.openT > 0) fx.push("guard open");
+  if (p.burn) fx.push("burning"); if (p.softens) fx.push("guard down");
+  if ((p.tempo || 1) > 1.005) fx.push(`cooldowns −${Math.round((1 - 1 / p.tempo) * 100)}%`);   // what its Speed buys
+  $("me-hptext").textContent = p.alive ? `${Math.ceil(p.cur)} / ${p.max} HP${fx.length ? " · " + fx.join(" · ") : ""}` : "fainted";
+  $("swings").textContent = "⚔ " + G.swings;
+  const ol = $("online"); ol.hidden = !NET.room;
+  if (NET.room){ const t = "👥 " + Math.max(1, NET.online); if (ol.textContent !== t) ol.textContent = t; }
+  updateParty();
+  const tempo = p.tempo || 1;
+  $("act-attack").querySelector(".cd").style.setProperty("--p", Math.min(100, p.atkCd / (ATTACK_CD * TURN) * 100) + "%");
+  for (const btn of $("actions").querySelectorAll(".act.s")){
+    const sk = MOVE[btn.dataset.id], own = p.cds[sk.id] || 0, wait = Math.max(own, p.gcd);
+    const spent = sk.battle.once && p.used[sk.id];
+    const full = own >= p.gcd ? sk.cd * TURN : LIVE_GCD * TURN;
+    btn.querySelector(".cd").style.setProperty("--p", spent ? "100%" : (wait / full * 100) + "%");
+    // seconds left on the clock, at this pet's tempo
+    btn.querySelector(".cdn").textContent = spent ? "✓" : wait > 0 ? Math.ceil(wait / tempo) : "";
+    btn.classList.toggle("busy", !!(p.clip && p.clip.sk === sk));
+    btn.classList.toggle("ready", !p.busy && skillReady(p, sk));
+    btn.classList.toggle("locked", !!(sk.battle.heal && p.cur > p.max * sk.battle.at));
+  }
+  if (G.raid){
+    const b = G.boss, ph = bossPhase(b.cur, b.max).note;
+    $("bhp").style.width = Math.max(0, b.cur / b.max * 100) + "%";
+    $("bnote").textContent = b.alive ? `${pct(b.cur / b.max)} · ${ph}` : "felled";
+    // his art changes at 75/50/25, and so does what the raid says
+    if (G.raid.lastNote && G.raid.lastNote !== ph && b.alive) toast(`He is ${ph}.`, 1.8);
+    G.raid.lastNote = ph;
+  }
+  const near = !G.raid && G.boss.alive && !BS.dead && p.alive && dist(p, ARENA_PX) < ARENA_PX.r - 10;
+  const fb = $("fight-btn");
+  fb.hidden = !near;
+  if (near){
+    const b = G.boss, on = [...NET.pets.values()].filter(n => n.rd && n.alive).length;
+    const html = `⚔ Take him on<small>${G.swings} swing${G.swings === 1 ? "" : "s"} left${b.cur < b.max ? " · he's at " + pct(b.cur / b.max) : ""}${on ? ` · ${on} on him now` : ""}</small>`;
+    if (fb.innerHTML !== html) fb.innerHTML = html;
+  }
+  for (const s of world.signs) if (dist(p, s) < 60 && !s.shown){ s.shown = true; toast(s.text, 3.2); setTimeout(() => s.shown = false, 6000); }
+  updateShout(dt);
+  if (bannerTimer > 0){ bannerTimer -= dt; if (bannerTimer <= 0) $("banner").classList.remove("on"); }
+  if (toastTimer > 0){ toastTimer -= dt; if (toastTimer <= 0) $("toast").classList.remove("on"); }
+}
+let miniT = 0;
+function drawMinimap(dt){
+  miniT -= dt; if (miniT > 0) return; miniT = .25;
+  const c = $("minimap"), g = c.getContext("2d");
+  g.imageSmoothingEnabled = false; g.fillStyle = "#0a0c13"; g.fillRect(0, 0, c.width, c.height);
+  const s = c.width / MW;
+  g.drawImage(world.mini, 0, 0, MW * s, MH * s);
+  g.fillStyle = G.boss.alive ? "#ffb347" : "#6b6152"; g.beginPath(); g.arc(G.boss.x / TILE * s, G.boss.y / TILE * s, 5, 0, 7); g.fill();
+  g.fillStyle = "#ffd23f"; g.fillRect(CAMP.tx * s - 2, CAMP.ty * s - 2, 4, 4);
+  for (const e of G.ents){ if (!e.alive || e.type !== "pet" || e === G.player) continue;
+    g.fillStyle = SPECIES[e.sp].colour; g.fillRect(e.x / TILE * s - 1.5, e.y / TILE * s - 1.5, 3, 3); }
+  // other people: bigger, and in the colour their labels are
+  g.fillStyle = "#5fe6ff"; g.strokeStyle = "#000"; g.lineWidth = 1;
+  for (const n of NET.pets.values()){ g.beginPath(); g.arc(n.x / TILE * s, n.y / TILE * s, 3, 0, 7); g.fill(); g.stroke(); }
+  const p = G.player;
+  g.fillStyle = "#fff"; g.strokeStyle = "#000"; g.lineWidth = 1.5;
+  g.beginPath(); g.arc(p.x / TILE * s, p.y / TILE * s, 4, 0, 7); g.fill(); g.stroke();
+}
+
+/* =========================================================================
+   RENDER
+   ========================================================================= */
+const cv = $("game"), ctx = cv.getContext("2d");
+let VW = 390, VH = 844, DPR = 1, ZOOM = 1, S = 1;
+function resize(){
+  const r = $("device").getBoundingClientRect();
+  DPR = Math.min(2.5, window.devicePixelRatio || 1);
+  VW = r.width || 390; VH = r.height || 844;
+  cv.width = Math.round(VW * DPR); cv.height = Math.round(VH * DPR);
+  ZOOM = clamp(VW / (12 * TILE), .9, 1.6);   // about twelve tiles across a phone held upright
+  S = DPR * ZOOM;
+  frameCache.clear();
+}
+addEventListener("resize", resize);
+
+/* One routine draws any sheet the way the pet screen does: a box, the sheet's
+   aspect, scale and dx/dy, its ground line on the entity's feet. */
+function drawSheet(cfg, frames, frame, e, box, opts = {}){
+  const vh = box / cfg.aspect, sc = cfg.scale || 1, w = box * sc, h = vh * sc;
+  const ox = ((cfg.dx || 0) / 100) * box * e.face, oy = ((cfg.dy || 0) / 100) * vh;
+  const img = sheetFrame(cfg.src || opts.src, frames, frame, w * S, h * S, opts.white);
+  if (!img) return;
+  ctx.save();
+  ctx.globalAlpha = opts.alpha ?? 1;
+  if (opts.filter) ctx.filter = opts.filter;
+  ctx.translate(e.x + ox, e.y - (opts.hop || 0));
+  ctx.rotate(opts.tilt || 0); ctx.scale(e.face * (opts.sx || 1), opts.sy || 1);
+  ctx.drawImage(img, -w / 2, (-e.footOff + oy) - h / 2, w, h);
+  ctx.restore();
+}
+function drawPet(e){
+  const f = e.form;
+  let cfg = f.idle, frames = cfg.frames, frame;
+  if (e.clip){ cfg = e.clip.sk.sprite; frames = cfg.frames; frame = clipFrame(e.clip.sk.clip, e.clip.t); }
+  else if (!e.alive) frame = f.doze;
+  else if (e.moving > .1) frame = f.walk[Math.floor(e.walkT * 2.2) % 2];
+  else frame = Math.floor(e.idleT * cfg.fps) % frames;
+  let hop = 0, sx = 1, sy = 1, tilt = 0, alpha = 1;
+  if (!e.clip && e.alive && e.moving > .1 && e.dashT <= 0){
+    const ph = e.walkT * 2.2 % 1;
+    hop = Math.abs(Math.sin(ph * Math.PI)) * 7 * e.moving;
+    const land = ph < .12 || ph > .88;
+    sx = land ? 1.06 : .97; sy = land ? .93 : 1.04; tilt = Math.sin(ph * Math.PI * 2) * .05 * e.face;
+  }
+  if (e.dashT > 0){ sx = 1.14; sy = .9; tilt = .12 * e.face; }
+  if (!e.alive){ alpha = e.wild ? Math.max(0, 1 - e.faintT / 1.2) : .55; sy = .85; tilt = .45 * e.face; }
+  if (alpha <= 0) return;
+  ctx.fillStyle = "rgba(0,0,0,.28)";
+  ctx.beginPath(); ctx.ellipse(e.x, e.y + 2, e.box * .34 * (1 - hop / 30), e.box * .1, 0, 0, 7); ctx.fill();
+  if (e.net || e.isPlayer){
+    ctx.strokeStyle = e.isPlayer ? "rgba(255,210,63,.6)" : "rgba(95,230,255,.5)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(e.x, e.y + 2, e.box * .38, e.box * .12, 0, 0, 7); ctx.stroke();
+  }
+  if (e.burn && Math.random() < .3) embers(e.x + rnd(-10, 10), e.y - e.box * .4, 1, .2);
+  drawSheet(cfg, frames, frame, e, e.box, {
+    hop, sx, sy, tilt, white:e.flash > 0,
+    alpha:alpha * (e.inv > 0 && e.isPlayer && !e.dashT && !e.clip && Math.floor(G.time * 20) % 2 ? .55 : 1),
+    filter:!e.alive ? "saturate(.5) brightness(.8)" : null
+  });
+}
+function drawLabel(e){
+  if (e.net){
+    // another person's pet: its name, always, and its health
+    const w = 46, x = e.x - w / 2, y = e.y - e.box * 1.08 - 8;
+    ctx.fillStyle = "rgba(0,0,0,.55)"; ctx.fillRect(x - 1, y - 1, w + 2, 6);
+    ctx.fillStyle = "#5fe6ff"; ctx.fillRect(x, y, w * Math.max(0, e.cur / e.max), 4);
+    ctx.font = "900 11px Nunito, system-ui, sans-serif"; ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(0,0,0,.7)"; ctx.fillText(e.nick, e.x + 1, y - 3);
+    ctx.fillStyle = e.alive ? "#bff4ff" : "#7d8aa3"; ctx.fillText(e.nick, e.x, y - 4);
+    return;
+  }
+  if (!e.alive || e.isPlayer) return;
+  const near = dist(e, G.player) < 170;
+  if (!(e.aggro || e.cur < e.max || near)) return;
+  const w = 46, x = e.x - w / 2, y = e.y - e.box * 1.08 - 8;
+  if (e.aggro || e.cur < e.max){
+    ctx.fillStyle = "rgba(0,0,0,.55)"; ctx.fillRect(x - 1, y - 1, w + 2, 6);
+    ctx.fillStyle = e.cur / e.max < .3 ? "#ff4d6a" : "#ffb04a";
+    ctx.fillRect(x, y, w * Math.max(0, e.cur / e.max), 4);
+  }
+  ctx.font = "800 10px Nunito, system-ui, sans-serif"; ctx.textAlign = "center";
+  ctx.fillStyle = "rgba(0,0,0,.65)"; ctx.fillText(`Lv${e.level} ${e.name}`, e.x + 1, y - 3);
+  ctx.fillStyle = e.aggro ? "#ffb04a" : "#fff"; ctx.fillText(`Lv${e.level} ${e.name}`, e.x, y - 4);
+  if (e.aggro && e.sp === "ember" && e.cur >= e.max){ ctx.font = "900 16px Nunito, system-ui, sans-serif"; ctx.fillStyle = "#ff6b35"; ctx.fillText("!", e.x, y - 18); }
+}
+function drawBoss(b){
+  const box = b.box, base = RAID_BOSS.sprite;
+  const air = b.hop || 0;   // a Splitter's leap: the shadow stays on the ground
+  ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.beginPath(); ctx.ellipse(b.x, b.y + 2, box * .36 * (1 - air / 300), box * .09 * (1 - air / 300), 0, 0, 7); ctx.fill();
+  let cfg, frames, frame, src;
+  if (!b.alive){ cfg = RAID_BOSS.death; frames = 16; frame = clipFrame(RAID_BOSS.deathClip, b.deadT); }
+  else if (b.act && b.act.sk){ cfg = b.act.sk.sprite; frames = 16; frame = clipFrame(b.act.sk.clip, actClipMs(b.act)); }
+  else {
+    cfg = base; frames = 12;
+    src = bossPhase(b.cur, b.max || 1).src; frame = Math.floor(G.time * base.fps) % 12;
+  }
+  // a plain swing has no sheet: he rears back, then the lunge itself carries him
+  let lx = 0, bob = 0;
+  if (b.act && !b.act.sk){ const k = b.act.t / b.act.impact; if (k < .55) lx = -Math.sin(k / .55 * Math.PI) * 14 * b.face; }
+  if (b.moving && b.alive && !b.act) bob = Math.abs(Math.sin(G.time * 7)) * 5;   // his heavy walk
+  const e = { x:b.x + lx, y:b.y - air - bob, face:b.face, footOff:b.footOff };
+  drawSheet(cfg, frames, frame, e, box, { src, white:b.flash > 0 && b.alive, filter:b.awake || !b.alive ? null : "brightness(.8) saturate(.8)" });
+}
+function drawProp(p){
+  let idx = PROP[p.kind];
+  if (p.kind === "fire0") idx = PROP.fire0 + (Math.floor(G.time * 5) % 2);
+  ctx.drawImage(IMG.props, idx * 64, 0, 64, 96, p.x - 32, p.y - 94, 64, 96);
+}
+function drawFxGround(){
+  for (const f of G.fx){
+    const k = f.t / f.dur;
+    if (f.kind === "tele"){
+      // his marks: a red pool that fills in as the blow comes down. One still
+      // following its pet flickers, and goes solid when it locks
+      ctx.save();
+      if (f.lock && f.t < f.lock){ ctx.setLineDash([10, 7]); ctx.globalAlpha = .65 + .35 * Math.sin(G.time * 30); }
+      ctx.fillStyle = `rgba(255,77,106,${.1 + .14 * k})`; ctx.strokeStyle = `rgba(255,120,140,${.55 + .4 * k})`; ctx.lineWidth = 2.5;
+      const ry = f.full ? f.r : f.r / 1.4;   // the whole hill is a circle on the map
+      ctx.beginPath(); ctx.ellipse(f.x, f.y, f.r, ry, 0, 0, 7); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "rgba(255,120,140,.28)";
+      ctx.beginPath(); ctx.ellipse(f.x, f.y, f.r * k, ry * k, 0, 0, 7); ctx.fill();
+      ctx.restore();
+    }
+    if (f.kind === "ring"){
+      ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.strokeStyle = f.colour; ctx.globalAlpha = 1 - k; ctx.lineWidth = f.width * (1 - k * .6);
+      const r = f.r * (.35 + .65 * Math.sqrt(k)); ctx.beginPath(); ctx.ellipse(f.x, f.y, r, r * .55, 0, 0, 7); ctx.stroke(); ctx.restore();
+    }
+  }
+}
+function drawFxAir(){
+  for (const f of G.fx){
+    const k = f.t / f.dur;
+    if (f.kind === "bolt"){
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      const a = 1 - k, R = rng32(f.seed | 0), top = f.small ? 160 : 380;
+      for (let pass = 0; pass < 2; pass++){
+        ctx.strokeStyle = pass ? `rgba(255,255,255,${a})` : (f.small ? `rgba(255,210,63,${a * .8})` : `rgba(95,230,255,${a * .8})`);
+        ctx.lineWidth = pass ? 3 : (f.small ? 7 : 10);
+        ctx.beginPath(); let y = f.y - top; ctx.moveTo(f.x + 20, y);
+        while (y < f.y){ y = Math.min(f.y, y + 26 + R() * 18); ctx.lineTo(f.x + (R() - .5) * 36, y); }
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    if (f.kind === "arc"){
+      ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 1 - k;
+      ctx.strokeStyle = f.colour; ctx.lineWidth = 12 * (1 - k * .5);
+      const r = f.r * (.6 + .4 * k);
+      ctx.beginPath(); ctx.ellipse(f.x, f.y, r, r * .6, 0, f.a - f.arc, f.a + f.arc); ctx.stroke();
+      ctx.restore();
+    }
+  }
+  for (const p of G.projs){
+    const y = p.y - p.z;
+    ctx.fillStyle = "rgba(0,0,0,.2)"; ctx.beginPath(); ctx.ellipse(p.x, p.y, 9, 3, 0, 0, 7); ctx.fill();
+    if (p.tint === "fire"){
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      const g = ctx.createRadialGradient(p.x, y, 1, p.x, y, 24);
+      g.addColorStop(0, "rgba(255,255,220,1)"); g.addColorStop(.35, "rgba(255,210,63,.95)"); g.addColorStop(.7, "rgba(255,107,53,.6)"); g.addColorStop(1, "rgba(255,107,53,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, y, 24, 0, 7); ctx.fill(); ctx.restore();
+    } else if (p.tint === "acorn"){
+      ctx.save(); ctx.translate(p.x, y); ctx.rotate(p.spin); ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(IMG.props, PROP.acorn * 64 + 16, 52, 32, 40, -11, -14, 22, 28); ctx.restore();
+    } else {
+      ctx.save(); ctx.translate(p.x, y); ctx.rotate(p.spin);
+      ctx.fillStyle = "#6c9c35"; ctx.strokeStyle = "#1a1028"; ctx.lineWidth = 2;
+      ctx.fillRect(-16, -3, 32, 6); ctx.strokeRect(-16, -3, 32, 6); ctx.restore();
+    }
+  }
+}
+function drawParts(){
+  for (const p of G.parts){
+    const k = p.t / p.life, s = p.shrink ? p.size * (1 - k) : p.size;
+    if (s <= .2) continue;
+    if (p.glow) ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = p.shrink ? 1 : 1 - k; ctx.fillStyle = p.colour;
+    if (p.leaf){ ctx.save(); ctx.translate(p.x + Math.sin(p.t * 3) * 10, p.y); ctx.rotate(p.t * 2); ctx.fillRect(-3, -1.5, 6, 3); ctx.restore(); }
+    else { ctx.beginPath(); ctx.arc(p.x, p.y - p.z, s, 0, 7); ctx.fill(); }
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+  }
+}
+function drawTexts(){
+  ctx.textAlign = "center";
+  for (const t of G.texts){
+    const k = t.t / t.life;
+    ctx.globalAlpha = k > .7 ? (1 - k) / .3 : 1;
+    const pop = t.t < .12 ? 1 + (1 - t.t / .12) * .5 : 1;
+    ctx.font = `900 ${Math.round(t.size * pop)}px Nunito, system-ui, sans-serif`;
+    ctx.lineWidth = 3.5; ctx.strokeStyle = "rgba(10,12,19,.85)"; ctx.strokeText(t.text, t.x, t.y);
+    ctx.fillStyle = t.colour; ctx.fillText(t.text, t.x, t.y);
+  }
+  ctx.globalAlpha = 1;
+}
+function drawPickup(k){
+  if (k.taken) return;
+  const bob = Math.sin(k.t * 3) * 2.5;
+  ctx.fillStyle = "rgba(0,0,0,.22)"; ctx.beginPath(); ctx.ellipse(k.x, k.y, 9, 3, 0, 0, 7); ctx.fill();
+  ctx.drawImage(IMG.props, PROP[k.kind] * 64 + 12, 46, 40, 48, k.x - 15, k.y - 34 + bob, 30, 36);
+}
+function render(){
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = "#0a0c13"; ctx.fillRect(0, 0, cv.width, cv.height);
+  const halfW = VW / ZOOM / 2, halfH = VH / ZOOM / 2;
+  let camX = clamp(G.cam.x, halfW, MW * TILE - halfW), camY = clamp(G.cam.y, halfH, MH * TILE - halfH);
+  if (G.cam.shake > 0){ camX += rnd(-1, 1) * G.cam.shake; camY += rnd(-1, 1) * G.cam.shake; }
+  ctx.setTransform(S, 0, 0, S, Math.round((halfW - camX) * S), Math.round((halfH - camY) * S));
+  ctx.imageSmoothingEnabled = false;
+  const vx0 = camX - halfW, vy0 = camY - halfH;
+  ctx.drawImage(world.canvas, vx0, vy0, halfW * 2, halfH * 2, vx0, vy0, halfW * 2, halfH * 2);
+  if (Math.floor(G.time * 1.6) % 2){
+    const tx0 = Math.max(0, Math.floor(vx0 / TILE)), tx1 = Math.min(MW - 1, Math.floor((vx0 + halfW * 2) / TILE));
+    const ty0 = Math.max(0, Math.floor(vy0 / TILE)), ty1 = Math.min(MH - 1, Math.floor((vy0 + halfH * 2) / TILE));
+    for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++){
+      if (world.tiles[ty * MW + tx] !== T.WATER) continue;
+      ctx.drawImage(IMG.tiles, T.WATER2 * 32, 0, 32, 32, tx * TILE, ty * TILE, TILE, TILE);
+      if (ty > 0 && world.tiles[(ty - 1) * MW + tx] !== T.WATER) waterLip(ctx, tx, ty);
+    }
+  }
+  if (G.raid){
+    ctx.save(); ctx.strokeStyle = `rgba(255,179,71,${.4 + Math.sin(G.time * 5) * .15})`; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(ARENA_PX.x, ARENA_PX.y, ARENA_PX.r - 8, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+  }
+  drawFxGround();
+  for (const k of G.pickups) drawPickup(k);
+  const list = [];
+  for (const pr of world.props) if (pr.x > vx0 - 60 && pr.x < vx0 + halfW * 2 + 60 && pr.y > vy0 - 10 && pr.y < vy0 + halfH * 2 + 100) list.push(pr);
+  for (const e of G.ents) if (e.x > vx0 - 300 && e.x < vx0 + halfW * 2 + 300 && e.y > vy0 - 60 && e.y < vy0 + halfH * 2 + 300) list.push(e);
+  for (const n of NET.pets.values()) if (n.x > vx0 - 100 && n.x < vx0 + halfW * 2 + 100 && n.y > vy0 - 60 && n.y < vy0 + halfH * 2 + 200) list.push(n);
+  list.sort((a, b) => a.y - b.y);
+  for (const o of list){
+    if (o.kind){ ctx.imageSmoothingEnabled = false; drawProp(o); continue; }
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+    if (o.type === "pet") drawPet(o); else if (o.type === "boss") drawBoss(o);
+  }
+  ctx.imageSmoothingEnabled = true;
+  for (const e of G.ents) if (e.type === "pet") drawLabel(e);
+  for (const n of NET.pets.values()) drawLabel(n);
+  drawFxAir(); drawParts(); drawTexts();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const g = ctx.createRadialGradient(cv.width / 2, cv.height / 2, Math.min(cv.width, cv.height) * .4, cv.width / 2, cv.height / 2, Math.max(cv.width, cv.height) * .72);
+  g.addColorStop(0, "rgba(10,12,19,0)"); g.addColorStop(1, "rgba(10,12,19,.5)");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, cv.width, cv.height);
+}
+
+/* =========================================================================
+   LOOP
+   ========================================================================= */
+let last = 0;
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt = Math.min(.05, (now - last) / 1000 || 0); last = now;
+  if (!G.running){ drawPicks(now); publish(dt); return; }
+  if (!G.paused) step(dt);
+  render(); updateHud(dt); drawMinimap(dt);
+}
+/* One tick of the world, separate from drawing it, so a fight can also be
+   fast-forwarded without a screen - which is how the balance was checked. */
+function step(dt){
+  G.time += dt;
+  if (G.raid) G.raid.t += dt;
+  netTick(dt);
+  for (const e of G.ents){ if (e.type === "pet") updatePet(e, dt); else if (e.type === "boss") updateBoss(e, dt); }
+  const pets = G.ents.filter(e => e.type === "pet" && e.alive);
+  for (let i = 0; i < pets.length; i++) for (let j = i + 1; j < pets.length; j++){
+    const a = pets[i], b = pets[j], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy), m = a.r + b.r;
+    if (d > 0 && d < m){ const push = (m - d) / 2; moveEnt(a, -dx / d * push, -dy / d * push); moveEnt(b, dx / d * push, dy / d * push); }
+  }
+  // he landed on you: you're shoved clear of him
+  const b = G.boss, p = G.player;
+  if (b.alive && p.alive && inBoss(p, p.x, p.y)){
+    const dx = p.x - b.x, dy = (p.y - b.y + 8) * 1.7, d = Math.hypot(dx, dy) || 1, R = b.r * .9 + p.r + 1;
+    p.x = b.x + dx / d * R; p.y = b.y - 8 + dy / d * R / 1.7; moveEnt(p, 0, 0);
+  }
+  updateProjs(dt);
+  for (const f of G.fx) f.t += dt;
+  G.fx = G.fx.filter(f => f.t < f.dur);
+  for (const p of G.parts){
+    p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= Math.pow(.25, dt); p.vy *= Math.pow(.25, dt);
+    p.z += p.vz * dt; p.vz -= p.g * dt; if (p.z < 0){ p.z = 0; p.vz = 0; }
+    if (p.grow) p.size += p.grow * dt;
+  }
+  G.parts = G.parts.filter(p => p.t < p.life);
+  for (const t of G.texts){ t.t += dt; t.y -= 36 * dt; }
+  G.texts = G.texts.filter(t => t.t < t.life);
+  updatePickups(dt); ambient(dt);
+  let tx = p.x + p.aim.x * 8, ty = p.y - 30;
+  // in a raid the camera frames the two of you, pushed down so he stands clear of the bars up top
+  if (G.raid){ tx = tx * .6 + G.boss.x * .4; ty = (p.y + G.boss.y) / 2 - 70; }
+  G.cam.x += (tx - G.cam.x) * Math.min(1, dt * 5); G.cam.y += (ty - G.cam.y) * Math.min(1, dt * 5);
+  G.cam.shake = Math.max(0, G.cam.shake - dt * 30);
+}
+
+/* =========================================================================
+   MENUS
+   ========================================================================= */
+function store(k, v){ try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch(e){ return null; } }
+function moveNote(sk){
+  const b = sk.battle, bits = [];
+  if (b.dmg) bits.push("×" + b.dmg);
+  if (b.pierce) bits.push(`${Math.round(b.pierce * 100)}% through guard`);
+  if (b.burn) bits.push("burns");
+  if (b.rattle) bits.push("rattles guard");
+  if (b.stoke) bits.push(`next ${b.stoke.hits} ×${b.stoke.mult}`);
+  if (b.charge) bits.push("charges");
+  if (b.heal) bits.push(`heals ${Math.round(b.heal * 100)}%`);
+  bits.push(`every ${(sk.cd * TURN).toFixed(1)}s`);
+  return bits.slice(0, 3).join(" · ");
+}
+function buildPicks(){
+  const wrap = $("picks"); wrap.innerHTML = "";
+  for (const [id, f] of Object.entries(FORMS)){
+    const b = document.createElement("button"); b.className = "pick" + (id === G.formId ? " on" : "");
+    b.innerHTML = `<canvas width="240" height="148"></canvas><b>${f.name}</b><small style="color:${SPECIES[f.species].colour}">${SPECIES[f.species].name} · Lv ${f.min}–${f.max}</small>`;
+    b.onclick = () => { G.formId = id; G.level = f.def; store("rx.form", id); store("rx.level", f.def); buildPicks(); };
+    wrap.appendChild(b);
+  }
+  const f = FORMS[G.formId], lv = $("lv");
+  G.level = clamp(G.level || f.def, f.min, f.max);
+  lv.min = f.min; lv.max = f.max; lv.value = G.level;
+  showDetail();
+}
+function showDetail(){
+  const f = FORMS[G.formId], a = attrsFor(f.species, G.level);
+  $("lv-n").textContent = "Lv " + G.level;
+  $("stats").innerHTML = [["HP", a.hp * BT.POOL], ["Defence", a.def], ["Power", a.pow], ["Speed", a.spd]]
+    .map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join("");
+  const kit = SKILLS[f.species].filter(k => k.stage === f.stage);
+  const cut = Math.round((1 - 1 / speedTempo(a.spd, G.level)) * 100);
+  $("kit").innerHTML = `<div><span>⏱ Speed ${a.spd}</span><em>${cut > 0 ? `cooldowns ${cut}% shorter` : "cooldowns at the base pace"}</em></div>` + kit.map(k => {
+    const has = G.level >= k.level;
+    return `<div class="${has ? "" : "no"}"><span>${k.ico} ${k.name}</span><em>${has ? moveNote(k) : "learnt at Lv " + k.level}</em></div>`;
+  }).join("");
+}
+function drawPicks(now){
+  const cards = document.querySelectorAll(".pick canvas"), ids = Object.keys(FORMS);
+  cards.forEach((c, i) => { const f = FORMS[ids[i]]; drawPortrait(c, ids[i], Math.floor(now / 1000 * f.idle.fps) % f.idle.frames); });
+}
+function togglePause(on){
+  if (!G.running || !$("result").hidden) return;
+  // with other people here the world goes on while the menu is up
+  G.paused = on && !NET.on; $("menu").hidden = !on;
+  if (on){
+    $("m-god").checked = G.god;
+    $("m-note").textContent = NET.on ? "Prototype tools. The world keeps going while this is open." : "Prototype tools. None of this touches your real pet.";
+  }
+}
+function bindMenus(){
+  $("lv").oninput = ev => { G.level = +ev.target.value; store("rx.level", G.level); showDetail(); };
+  $("start").onclick = () => newGame(false);
+  $("start-raid").onclick = () => newGame(true);
+  $("menu-btn").onclick = () => togglePause(true);
+  $("m-resume").onclick = () => togglePause(false);
+  $("m-camp").onclick = () => { if (G.raid) leaveRaid(); Object.assign(G.player, { x:CAMP_PX.x - 60, y:CAMP_PX.y + 30 }); togglePause(false); };
+  $("m-hill").onclick = () => { if (G.raid) leaveRaid(); Object.assign(G.player, { x:ARENA_PX.x, y:ARENA_PX.y + ARENA_PX.r - 50 }); togglePause(false); };
+  $("m-heal").onclick = () => { for (const e of G.ents) if (e.side === "hero"){ e.alive = true; e.cur = e.max; } togglePause(false); };
+  $("m-swings").onclick = () => { G.swings += 10; togglePause(false); toast(`${G.swings} swings.`, 1.4); };
+  $("m-pet").onclick = () => { if (G.raid) leaveRaid(); G.running = false; G.paused = false; $("menu").hidden = true; $("hud").hidden = true; $("select").hidden = false; NET.pets.clear(); NET.sendT = 0; buildPicks(); showLobby(); };
+  $("m-god").onchange = ev => G.god = ev.target.checked;
+  $("nick").oninput = ev => { G.nick = cleanNick(ev.target.value); store("rx.nick", G.nick); };
+  $("fight-btn").onclick = startAttempt;
+  $("r-leave").onclick = closeResult;
+}
+
+/* =========================================================================
+   BOOT
+   ========================================================================= */
+(async function boot(){
+  resize();
+  const f0 = store("rx.form"), l0 = +store("rx.level");
+  if (f0 && FORMS[f0]){ G.formId = f0; G.level = l0 || FORMS[f0].def; }
+  G.nick = cleanNick(store("rx.nick")) || "Runner " + (10 + Math.floor(Math.random() * 90));
+  store("rx.nick", G.nick); $("nick").value = G.nick;
+  loadLocal();     // his wounds as this browser last saw them...
+  connectNet();    // ...or as everyone left them, with everyone else in the world
+  await loadAll();
+  genWorld();
+  bindTouch(); bindMenus();
+  // a bare #token deep link for testing: #raid, #explore, #raid.blazewyrm
+  const [go, pet] = (location.hash || "").slice(1).split(".");
+  if (pet && FORMS[pet]){ G.formId = pet; G.level = FORMS[pet].def; }
+  buildPicks();
+  if (go === "raid" || go === "explore") newGame(go === "raid");
+  requestAnimationFrame(frame);
+  window.__G = G; window.__step = step;
+})();
+</script>
+</body>
+</html>
