@@ -85,7 +85,7 @@ Everything a fight is made of comes from the game's battle engine:
 | --- | --- |
 | Attributes `attrsFor`, HP pool ×5 | the same |
 | Damage: `btHit`, divisive Defence, K, ±35% jitter, no crits | the same function |
-| Each move's multiplier, pierce and riders (burn, rattle, stoke, charge, soften, open, Nap's heal and expose) | the same, applied the same way |
+| Each move's multiplier, pierce and riders (burn, rattle, stoke, charge, soften, open, Cuddle's squeeze, Nap's heal and guard) | the same, applied the same way |
 | One move per turn | one turn = **1.4 s** of the pet's own clock |
 | Cooldown `cd` turns, a 2-turn shared cooldown after any skill | shorter cooldowns (below), × 1.4 s, and **no shared cooldown** |
 | Attack ×1, once a turn | **Attack ×0.1**, once a turn (below) |
@@ -128,7 +128,7 @@ fix, Attack at ×0.75, still left it too strong, so:
   | Blazewyrm | Fireball, Flame Stomp, Flying Swoop | 3, 3, 3 | 2, 2, 2 |
   | Sparky | Spark, Static Shock, Acorn Flick, Pocket Storm | 3, 3, 5, 6 | 2, 2, 4, 5 |
   | Zephyrite | Lightning Bolt, Arc Lash | 3, 3 | 2, 2 |
-  | Bamboo Cub | Green Gale, Bamboo Toss | 3, 3 | 2, 2 |
+  | Bamboo Cub | Green Gale, Cuddle, Bamboo Tasting, Forest Slam | 3, 3, 3, 5 | 2, 2, 2, 4 |
   | Panda | Nap, Landslide | 4 (once), 5 | 4 (once), 2 |
 
 - **Bigger areas for the moves that go off around your pet.** They don't seek
@@ -340,8 +340,8 @@ server of our own.
   position and charges came through the hand-off intact.
 - **Open PvP.** Out in the world, other players' pets are fair game, and
   yours is theirs. Your moves aim at, and land on, their pets as they would on
-  a wild pet. The hit (its damage, and any burn, rattled guard or Nap's "wide
-  open") goes into your page's presence addressed to that player's page, and
+  a wild pet. The hit (its damage, and any burn, rattled guard or Cuddle's
+  squeeze) goes into your page's presence addressed to that player's page, and
   their page takes it off their pet, once per hit. When a player is knocked
   out, they wake at the campfire and are told who got them. **Nobody fighting
   the boss can hit or be hit by another player.** Both pages check this. No

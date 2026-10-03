@@ -339,8 +339,8 @@ const FORMS = {
     idle:{ src:"ember-cinderling.png", frames:12, fps:2, aspect:1.3125, scale:1.18, dx:-3, dy:-5 } },
   sparky:{ species:"nimbus", stage:1, name:"Sparky", min:5, max:14, def:14, box:66, foot:.936, walk:[0,1], doze:3,
     idle:{ src:"nimbus-sparky.png", frames:12, fps:2, aspect:1.031, scale:1.068, dx:3, dy:-9.7 } },
-  cub:{ species:"verdant", stage:1, name:"Bamboo Cub", min:5, max:14, def:14, box:66, foot:.961, walk:[0,2], doze:1,
-    idle:{ src:"verdant-bamboo-cub-v2.png", frames:12, fps:2, aspect:0.9542, scale:1.068, dx:4.86, dy:-14.33 } },
+  cub:{ species:"verdant", stage:1, name:"Bamboo Cub", min:5, max:14, def:14, box:66, foot:.971, walk:[0,2], doze:1,
+    idle:{ src:"verdant-bamboo-cub-v3.png", frames:12, fps:2, aspect:0.9412, scale:1.0508, dx:6.87, dy:-14.98 } },
   blazewyrm:{ species:"ember", stage:2, name:"Blazewyrm", min:15, max:40, def:26, box:80, foot:.971, walk:[0,1], doze:2,
     idle:{ src:"ember-blazewyrm.png", frames:12, fps:2, aspect:1.268, scale:1.2 } },
   zephyrite:{ species:"nimbus", stage:2, name:"Zephyrite", min:15, max:40, def:22, box:80, foot:.968, walk:[0,5], doze:10,
@@ -448,14 +448,33 @@ const SKILLS = {
         order:    [0, 1, 2, 3, 4, 5,  6,   7,   8,   9,  10, 11, 10, 11],
         durations:[340, 310, 280, 250, 220, 190,  600,  560, 480, 620, 240, 240, 300, 360],
         aspect:1.348, scale:0.986, dx:1.9, dy:-0.5 } },
-    { id:"bamboo-toss", name:"Bamboo Toss", ico:"🎋", stage:1, level:12,
+    /* Cuddle (the game's, from level 11): a leap and a hug. Whatever it
+       catches is squeezed, and its own hits land softer for a while. Live,
+       the leap is a rush onto its target, landing on frame 11. */
+    { id:"cuddle", name:"Cuddle", ico:"🤗", stage:1, level:11,
+      battle:{ dmg:1.15, cd:3, hug:{ pct:0.15, turns:2 } },
+      fx:{ kind:"rush", from:4, to:12, dist:170, tint:"dust" },
+      sprite:{ src:"skill-cuddle.png", frames:16,
+        durations:[300, 240, 220, 260, 110, 100, 100, 120, 110, 120, 140, 160, 380, 300, 200, 340],
+        aspect:1.4872, scale:1.253, dx:-1.28, dy:4.85 } },
+    /* Bamboo Tasting (was Bamboo Toss; the game kept its id): a bite, a chew,
+       and the chunk spat at them on frame 8. */
+    { id:"bamboo-toss", name:"Bamboo Tasting", ico:"🎋", stage:1, level:12,
       battle:{ dmg:1.40, cd:3 },
-      fx:{ kind:"shot", impact:5, reach:300, tint:"bamboo" },
-      sprite:{ src:"skill-bamboo-toss.png", frames:16,
-        durations:[320, 280, 240, 200, 120, 100, 110, 130, 220, 260, 240, 300, 220, 220, 260, 340],
-        aspect:2.8724, scale:2.381, dx:16.15, dy:-2.96 } },
+      fx:{ kind:"shot", impact:8, reach:300, tint:"bamboo" },
+      sprite:{ src:"skill-bamboo-tasting.png", frames:16,
+        durations:[300, 220, 260, 240, 260, 220, 240, 420, 100, 110, 120, 160, 260, 200, 260, 340],
+        aspect:1.5097, scale:1.219, dx:13.58, dy:-0.84 } },
+    /* Forest Slam (the game's, from level 14): a jump, a ground-pound on frame
+       9, and a wave of leaves rolling out in front - so a wide cone. */
+    { id:"forest-slam", name:"Forest Slam", ico:"🌿", stage:1, level:14,
+      battle:{ dmg:1.70, pierce:0.30, cd:5, self:0.09 },
+      fx:{ kind:"cone", impact:9, reach:175, arc:.85, tint:"#8ed06a" },
+      sprite:{ src:"skill-forest-slam.png", frames:16,
+        durations:[300, 240, 280, 200, 160, 130, 120, 110, 160, 380, 140, 140, 160, 220, 260, 340],
+        aspect:2.0701, scale:2.113, dx:27.08, dy:-11.11 } },
     { id:"nap", name:"Nap", ico:"😴", stage:2, level:18,
-      battle:{ dmg:0, cd:4, heal:0.26, expose:1.6, at:0.50, once:true },
+      battle:{ dmg:0, cd:4, heal:0.33, guard:0.5, at:0.50, once:true },
       fx:{ kind:"self", impact:12 },
       sprite:{ src:"skill-nap.png", frames:16,
         durations:[220, 240, 260, 360, 360, 220, 190, 220, 340, 400, 400, 400, 280, 220, 200, 340],
@@ -795,7 +814,7 @@ class Pet {
    next one clean, the way every battle in the game starts clean. */
 function resetFight(e){
   Object.assign(e, { powMul:1, spdMul:1, defMul:1, charges:0, softens:0, stoke:null,
-    openT:0, openPct:0, exposed:0, burn:null, used:{}, stokeHits:0, roars:0 });
+    openT:0, openPct:0, exposed:0, burn:null, used:{}, stokeHits:0, roars:0, weakT:0, weakPct:0 });
 }
 class Boss {
   constructor(){
@@ -848,6 +867,7 @@ function btHit(x, y, mult, pierce){
   const K = fightK(x, y);
   const def = y.def * y.defMul * (y.openT > 0 ? 1 - y.openPct : 1) * (1 - (pierce || 0));
   let d = x.pow * x.powMul * mult * (K / (K + def));
+  if (x.weakT > 0) d *= 1 - x.weakPct;   // squeezed by a Cuddle: its own hits land softer
   d *= 1 - BT.JIT + Math.random() * 2 * BT.JIT;
   if (x.stoke){ d *= x.stoke.mult; if (--x.stoke.hits <= 0) x.stoke = null; }
   if (y.exposed){ d *= y.exposed; y.exposed = 0; }
@@ -872,7 +892,7 @@ function speedTempo(spd, level){ return (1 + 5 * spd / attrTotal(level)) / 1.5; 
    meet each other about as the game's battles have them meet (§3 in the
    design notes). Live, with Attack worth almost nothing, a species' kit
    decides more than it does in a battle, and these even it out. */
-let FORM_PACE = { cinderling:1.06, sparky:1, cub:.93, blazewyrm:1.06, zephyrite:1, panda:1.05 };
+let FORM_PACE = { cinderling:1.1, sparky:1, cub:.91, blazewyrm:1.06, zephyrite:1, panda:1.4 };
 function tempoOf(e){
   if (e.boss) return 1;
   return e.tempo = speedTempo(e.spd * (e.spdMul || 1), e.level) * (FORM_PACE[e.formId] || 1);
@@ -941,7 +961,8 @@ function riders(x, sk, hits, foe){
   if (b.heal){
     const n = Math.min(x.max - x.cur, Math.round(x.max * b.heal));
     x.cur += n; floatText(x.x, x.y - x.box * 1.1, "+" + n, "#5fd38a", 16);
-    if (foe && foe.alive){ if (foe.net) pvpHit(foe, { ex:b.expose }); else foe.exposed = b.expose; floatText(foe.x, foe.y - (foe.boss ? 240 : foe.box * 1.2), "wide open", "#9fd8ff", 12); }
+    // the game's Nap: it wakes tougher - Defence up by half, for the rest of the fight
+    if (b.guard){ x.defMul += b.guard; say("wakes up tougher", "#5fd38a"); }
   }
   for (const [y, dmg] of hits){
     if (!y.alive || !dmg) continue;
@@ -949,10 +970,13 @@ function riders(x, sk, hits, foe){
       const r = {};
       if (b.rattle) r.rt = [b.rattle.pct, b.rattle.turns];
       if (b.burn) r.bn = [Math.max(1, Math.round(dmg * b.burn.pct)), b.burn.turns];
-      if (r.rt || r.bn) pvpHit(y, r);
+      if (b.hug) r.hg = [b.hug.pct, b.hug.turns];
+      if (r.rt || r.bn || r.hg) pvpHit(y, r);
     }
     if (b.rattle){ y.openT = Math.max(y.openT, b.rattle.turns * TURN); y.openPct = Math.max(y.openPct, b.rattle.pct);
       floatText(y.x, y.y - (y.boss ? 240 : y.box * 1.2), "guard rattled", "#9fd8ff", 12); }
+    if (b.hug){ y.weakT = Math.max(y.weakT || 0, b.hug.turns * TURN); y.weakPct = Math.max(y.weakPct || 0, b.hug.pct);
+      floatText(y.x - 20, y.y - (y.boss ? 230 : y.box * 1.15), "squeezed", "#ffb3c7", 12); }
     if (b.burn){ y.burn = { dmg:Math.max(1, Math.round(dmg * b.burn.pct)), left:b.burn.turns, t:TURN, src:x };
       floatText(y.x + 20, y.y - (y.boss ? 220 : y.box * 1.1), "burning", "#ff8a3d", 12); }
   }
@@ -960,6 +984,7 @@ function riders(x, sk, hits, foe){
 /* What runs on a pet's own clock: a guard reopening, a burn biting once a turn. */
 function tickRiders(e, dt){
   if (e.openT > 0) e.openT = Math.max(0, e.openT - dt);
+  if (e.weakT > 0){ e.weakT = Math.max(0, e.weakT - dt); if (!e.weakT) e.weakPct = 0; }
   if (e.burn && e.alive){
     e.burn.t -= dt;
     if (e.burn.t <= 0){
@@ -2276,6 +2301,8 @@ function takeHits(p){
       floatText(me.x, me.y - me.box * 1.2, "guard rattled", "#9fd8ff", 12); }
     if (Array.isArray(h.bn)){ me.burn = { dmg:clamp(Math.round(+h.bn[0]) || 1, 1, me.max), left:clamp(h.bn[1] | 0, 1, 4), t:TURN, src:null };
       floatText(me.x + 20, me.y - me.box * 1.1, "burning", "#ff8a3d", 12); }
+    if (Array.isArray(h.hg)){ me.weakT = Math.max(me.weakT || 0, clamp(h.hg[1] | 0, 0, 4) * TURN); me.weakPct = Math.max(me.weakPct || 0, clamp(+h.hg[0] || 0, 0, .5));
+      floatText(me.x - 20, me.y - me.box * 1.15, "squeezed", "#ffb3c7", 12); }
     if (+h.ex > 1){ me.exposed = clamp(+h.ex, 1, 2); floatText(me.x, me.y - me.box * 1.2, "wide open", "#9fd8ff", 12); }
     if (me.cur <= 0){ me.cur = 0; faint(me, null); break; }
   }
@@ -2437,7 +2464,7 @@ function updateHud(dt){
   $("me-hp").style.width = hp + "%"; $("me-hpbar").classList.toggle("low", hp < 30);
   const fx = [];
   if (p.stoke) fx.push("stoked"); if (p.charges) fx.push("charged ×" + p.charges); if (p.openT > 0) fx.push("guard open");
-  if (p.burn) fx.push("burning"); if (p.softens) fx.push("guard down");
+  if (p.burn) fx.push("burning"); if (p.softens) fx.push("guard down"); if (p.weakT > 0) fx.push("squeezed");
   if ((p.tempo || 1) > 1.005) fx.push(`cooldowns −${Math.round((1 - 1 / p.tempo) * 100)}%`);   // what its Speed buys
   $("me-hptext").textContent = p.alive ? `${Math.ceil(p.cur)} / ${p.max} HP${fx.length ? " · " + fx.join(" · ") : ""}` : "fainted";
   $("swings").textContent = "⚔ " + G.swings;
@@ -2803,6 +2830,8 @@ function moveNote(sk){
   if (b.stoke) bits.push(`next ${b.stoke.hits} ×${b.stoke.mult}`);
   if (b.charge) bits.push("charges");
   if (b.heal) bits.push(`heals ${Math.round(b.heal * 100)}%`);
+  if (b.guard) bits.push(`Defence +${Math.round(b.guard * 100)}%`);
+  if (b.hug) bits.push("squeezes");
   bits.push(`every ${(sk.cd * TURN).toFixed(1)}s`);
   return bits.slice(0, 3).join(" · ");
 }
