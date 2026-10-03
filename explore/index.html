@@ -1407,6 +1407,11 @@ function raidBot(e, dt){
    its account. Every page settles his blows on its own pet only. */
 const BOSS_WALK = 95;
 const ROAR_HIT = 0.6, ROAR_GROW = 0.25, ROAR_MARK = 200;   // the roar's own hit, and how much more each roar of a fight adds
+// where in its sheet a blow is: the wind-up stretched by `pre`, the rest at `rate`
+function actClipMs(a){
+  const rate = a.rate || 1, pre = a.pre || 1;
+  return a.t < a.impact ? a.t * rate / pre * 1000 : (a.impact * rate / pre + (a.t - a.impact) * rate) * 1000;
+}
 function bossPhase(cur, max){ const f = cur / max; return RAID_BOSS.phases.find(p => f >= p.from) || RAID_BOSS.phases[3]; }
 // everyone who has taken a swing at him and is still standing, this page's pet included
 function bossQuarries(){
@@ -1472,13 +1477,15 @@ const BOSS_REACH = {
   swing:{ r:64, go:260, short:70, from:.5, tele:.6, track:.35 },
   slam:{ go:420, short:80, from:.3 },
   sweep:{ go:220, short:100, from:0, rate:1.35, r:210 },
-  roar:{ go:0, short:0, from:0 }
+  roar:{ go:0, short:0, from:0, pre:2 }   // his roar winds up twice as long as its sheet
 };
 function startBossAct(b, sk, q){
   const kind = sk ? sk.fx.kind : "swing", R = BOSS_REACH[kind];
   const dx = q.x - b.x, dy = q.y - b.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d;
-  const rate = R.rate || 1;
-  const impact = sk ? sk.clip.starts[sk.fx.impact] / 1000 / rate : R.tele, end = sk ? sk.clip.total / 1000 / rate : impact + .4;
+  const rate = R.rate || 1, pre = R.pre || 1;
+  // `pre` stretches only the wind-up; what follows the blow plays at `rate`
+  const hit = sk ? sk.clip.starts[sk.fx.impact] / 1000 : 0;
+  const impact = sk ? hit * pre / rate : R.tele, end = sk ? impact + (sk.clip.total / 1000 - hit) / rate : impact + .4;
   const go = clamp(d - R.short, 0, R.go), lx = b.x + ux * go, ly = b.y + uy * go;
   let mx = lx, my = ly, r = R.r || (sk ? sk.fx.radius || 0 : 0);
   // a swing and a Splitter come down on you - or as near as he can reach
@@ -1490,7 +1497,7 @@ function startBossAct(b, sk, q){
   // a roar's stoke rides on the blow, so every page lands it the same
   let m = 1;
   if (kind !== "roar" && b.stokeHits > 0){ m = RAID_BOSS.kit[0].battle.stoke.mult; b.stokeHits--; }
-  beginAct(b, { n:(Math.random() * 1e9) | 0, k:sk ? sk.id : "", t:0, impact, end, sx:b.x, sy:b.y, lx, ly, mx, my, r, from:R.from, m, rm,
+  beginAct(b, { n:(Math.random() * 1e9) | 0, k:sk ? sk.id : "", t:0, impact, end, sx:b.x, sy:b.y, lx, ly, mx, my, r, from:R.from, m, rm, pre,
     rate, q:q.id, lock:R.track ? impact - R.track : 0 });
 }
 function beginAct(b, a){
@@ -1565,7 +1572,7 @@ function landBlow(b, a){
       if (b.charges < k.battle.charge.max){ b.charges++; b.spdMul += k.battle.charge.spd; b.powMul += k.battle.charge.pow; }
     }
     ring(b.x, b.y - 120, 260, "#fff3a8", .6, 8); G.cam.shake = 10;
-    if (mine) banner("UUUWWAAAARRGGHHHHHHHHH", "his next two blows land harder", 1.8);
+    if (mine) shout("UUUWWAAAARRGGHHHHHHHHH", "his next two blows land harder");
     if (mine && p.alive){ const ang = Math.atan2(p.y - b.y, p.x - b.x); p.kx += Math.cos(ang) * 160; p.ky += Math.sin(ang) * 160; }
   }
 }
@@ -1580,7 +1587,7 @@ function followBoss(b, dt){
     const num = (v, lo, hi) => clamp(+v || 0, lo, hi);
     const act = { n:a.n, k:String(a.k || ""), t:num(a.t, 0, 5) + .05, impact:num(a.impact, 0, 5), end:num(a.end, 0, 6),
       sx:+a.sx || b.x, sy:+a.sy || b.y, lx:+a.lx || b.x, ly:+a.ly || b.y, mx:+a.mx || b.x, my:+a.my || b.y,
-      r:num(a.r, 0, 300), from:num(a.from, 0, 1), m:num(a.m, 1, 2), rm:num(a.rm, 0, 10), rate:num(a.rate, .5, 2) || 1,
+      r:num(a.r, 0, 300), from:num(a.from, 0, 1), m:num(a.m, 1, 2), rm:num(a.rm, 0, 10), rate:num(a.rate, .5, 2) || 1, pre:num(a.pre, 1, 4) || 1,
       q:String(a.q || ""), lock:num(a.lock, 0, 5) };
     if (act.t < act.end) beginAct(b, act);
   }
@@ -2041,7 +2048,7 @@ function bossState(b){
     pw:r2(b.powMul), sm:r2(b.spdMul), ch:b.charges, st:b.stokeHits || 0, ro:b.roars || 0,
     a:a && a.t < a.end ? { n:a.n, k:a.k, t:r2(a.t), impact:r2(a.impact), end:r2(a.end), sx:Math.round(a.sx), sy:Math.round(a.sy),
       lx:Math.round(a.lx), ly:Math.round(a.ly), mx:Math.round(a.mx), my:Math.round(a.my), r:a.r, from:a.from, m:a.m,
-      rate:a.rate, q:a.q, lock:r2(a.lock || 0), rm:r2(a.rm || 0) } : null };
+      rate:a.rate, pre:a.pre || 1, q:a.q, lock:r2(a.lock || 0), rm:r2(a.rm || 0) } : null };
 }
 function publish(dt){
   if (!NET.room) return;
@@ -2140,7 +2147,27 @@ function showLobby(){
    HUD
    ========================================================================= */
 let bannerTimer = 0, toastTimer = 0;
+/* A shout comes out a letter at a time, faster as it goes, the banner
+   shaking with it; what it means follows once it's out. */
+let shouting = null;
+function shout(text, after){
+  banner("", "", 99);
+  $("banner-h").classList.toggle("long", text.length > 18);
+  shouting = { text, after, t:0, dur:1.1 };
+}
+function updateShout(dt){
+  const s = shouting; if (!s) return;
+  s.t += dt;
+  const k = Math.min(1, s.t / s.dur), n = Math.max(1, Math.ceil(s.text.length * Math.pow(k, .8)));
+  const h = $("banner-h"), shown = s.text.slice(0, n);
+  if (h.textContent !== shown){ h.textContent = shown; buzz(8); }
+  const amp = k < 1 ? 5 : Math.max(0, 5 * (1 - (s.t - s.dur) / .4));
+  h.style.transform = amp > 0 ? `translate(${rnd(-amp, amp)}px,${rnd(-amp, amp)}px) scale(${1 + .06 * (1 - k)})` : "";
+  if (k >= 1 && !s.done){ s.done = true; $("banner-p").textContent = s.after; bannerTimer = 1.6; }
+  if (s.done && s.t > s.dur + .45){ h.style.transform = ""; shouting = null; }
+}
 function banner(h, p, secs, narr){
+  shouting = null; $("banner-h").style.transform = "";
   $("banner-h").textContent = h; $("banner-h").classList.toggle("long", h.length > 18);
   $("banner-p").textContent = p || "";
   $("banner").classList.toggle("narr", !!narr); $("banner").classList.add("on"); bannerTimer = secs;
@@ -2227,6 +2254,7 @@ function updateHud(dt){
     if (fb.innerHTML !== html) fb.innerHTML = html;
   }
   for (const s of world.signs) if (dist(p, s) < 60 && !s.shown){ s.shown = true; toast(s.text, 3.2); setTimeout(() => s.shown = false, 6000); }
+  updateShout(dt);
   if (bannerTimer > 0){ bannerTimer -= dt; if (bannerTimer <= 0) $("banner").classList.remove("on"); }
   if (toastTimer > 0){ toastTimer -= dt; if (toastTimer <= 0) $("toast").classList.remove("on"); }
 }
@@ -2341,7 +2369,7 @@ function drawBoss(b){
   ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.beginPath(); ctx.ellipse(b.x, b.y + 2, box * .36 * (1 - air / 300), box * .09 * (1 - air / 300), 0, 0, 7); ctx.fill();
   let cfg, frames, frame, src;
   if (!b.alive){ cfg = RAID_BOSS.death; frames = 16; frame = clipFrame(RAID_BOSS.deathClip, b.deadT); }
-  else if (b.act && b.act.sk){ cfg = b.act.sk.sprite; frames = 16; frame = clipFrame(b.act.sk.clip, b.act.t * 1000 * (b.act.rate || 1)); }
+  else if (b.act && b.act.sk){ cfg = b.act.sk.sprite; frames = 16; frame = clipFrame(b.act.sk.clip, actClipMs(b.act)); }
   else {
     cfg = base; frames = 12;
     src = bossPhase(b.cur, b.max || 1).src; frame = Math.floor(G.time * base.fps) % 12;

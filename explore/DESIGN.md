@@ -211,15 +211,16 @@ marked on the ground first**, so you can walk or dash out of it:
 | Plain swing | rears back, then lunges up to 260 px at you | **harder:** marked only 0.6 s ahead, and the mark **follows you** until 0.35 s before it lands (dashed and flickering while it follows, solid once it locks). Step away early and it comes with you; you have to react. | ×1 |
 | **Torchswing** | charges up to 220 px towards you, then spins | **harder:** played 35% faster (lands about 0.65 s after the mark appears), with a wider ring (210 px) round where he stops | ×1.35 to anything within reach |
 | **Splitter** | leaps up to 420 px, landing beside you | unchanged: a large red mark under you, landing about 1.1 s later. The big, readable one. | ×2.2, 70% through guard. It deletes a low-level pet, as in the game |
-| **UWAAAARGH!** | stands and roars | a red ring round him (200 px), marked like any blow, so it **looks** dodgeable. It isn't: it reaches the whole hill, and a dash doesn't help. The mark is there on purpose, to keep the illusion. As he winds up, a line of narration reads *"Sir Uwaaarghhhh is getting very upset and starts to…"*, and as it lands the screen shouts **UUUWWAAAARRGGHHHHHHHHH**. | hits **everyone** on him, at ×0.6 for the first roar of a fight, plus ×0.25 for each roar after (×0.85, ×1.1, ×1.35 ...). Then, as in the game, his next two blows hit ×1.6 and he charges, getting faster and stronger, up to twice. |
+| **UWAAAARGH!** | stands and roars | a red ring round him (200 px), marked like any blow, so it **looks** dodgeable. It isn't: it reaches the whole hill, and a dash doesn't help. The mark is there on purpose, to keep the illusion. He winds up for **about 2.6 s**, twice his sheet's wind-up, while a line of narration reads *"Sir Uwaaarghhhh is getting very upset and starts to…"*. As it lands, **UUUWWAAAARRGGHHHHHHHHH** comes out a letter at a time over about a second, faster as it goes, with the text shaking (and a phone buzzing) as he shouts it. | hits **everyone** on him, at ×0.6 for the first roar of a fight, plus ×0.25 for each roar after (×0.85, ×1.1, ×1.35 ...). Then, as in the game, his next two blows hit ×1.6 and he charges, getting faster and stronger, up to twice. |
 
 If he lands on you, you're shoved clear of him.
 
 **Nobody outlasts him.** The roar is what makes every attempt end. Its hit is
 the lightest of his, but it can't be avoided and it grows with every roar, and
 there is no healing in a raid beyond Panda's one Nap. In simulation, a perfect
-player (one whom every blow but the roar misses) still falls within 38 to 135
-s, after 2 to 7 roars; the longest of 72 runs was 169 s. Playing well buys
+player (one whom every blow but the roar misses) still falls within 43 to 152
+s on average, after 2 to 7 roars. The longest of 72 runs was 244 s, a Lv 40
+Panda, which can heal once. Playing well buys
 time, and time is damage: a perfect Lv 26 player takes about 5 times as much
 off him per attempt as the test player. Every attempt still ends, and more
 attempts means more running.
