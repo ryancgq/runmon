@@ -249,6 +249,7 @@
     <li><b>Skills</b> are the fight: your pet's own moves at its level, live, each on its cooldown. Damage and effects are the game's battle numbers; one battle turn is 1.4 seconds.</li>
     <li><b>👊 Attack</b> is mostly a dash: its swipe barely scratches. Nothing he swings can land on you mid-dash, and it cuts a skill short once the skill has landed.</li>
     <li><b>Together:</b> everyone with this link open is in the same world. Take him on at the same time and his health is shared.</li>
+    <li><b>Open PvP:</b> out in the world, other players' pets can fight yours, and yours theirs. While anyone is fighting him, nobody can touch them.</li>
     <li>Sit by the campfire to heal. Berries heal too.</li>
   </ul>
   <p style="font-size:12px">Nothing here reads or writes your real pet.</p>
@@ -814,7 +815,16 @@ class Boss {
 }
 const hostile = (a, b) => a.side !== b.side;
 // he is only fair game for a page that has taken a swing at him
-function foesOf(e){ return G.ents.filter(o => o.alive && !o.doomed && hostile(e, o) && !(o.boss && (!o.awake || !G.raid || G.raid.over))); }
+function foesOf(e){
+  const out = G.ents.filter(o => o.alive && !o.doomed && hostile(e, o) && !(o.boss && (!o.awake || !G.raid || G.raid.over)));
+  if (e === G.player) for (const n of NET.pets.values()) if (pvpOk(n)) out.push(n);
+  return out;
+}
+/* Open PvP: out in the world, other people's pets are fair game, and yours
+   is theirs - except on the raid. Anyone fighting him can neither hit nor be
+   hit by another player. */
+const inRaid = () => !!(G.raid && !G.raid.over);
+function pvpOk(n){ return n.alive && !n.rd && !inRaid() && G.player && G.player.alive; }
 function nearestFoe(e, range){
   let best = null, bd = range;
   for (const o of foesOf(e)){
@@ -875,11 +885,12 @@ function strike(x, y, mult, pierce, o = {}){
   if (y.inv > 0 && x.boss && !o.unblockable){ floatText(y.x, y.y - y.box, "dodged", "#ffd23f", 12); return 0; }
   let dmg = btHit(x, y, mult, pierce);
   if (G.god && y.side === "hero") dmg = 0;
+  if (y.net) pvpHit(y, { d:dmg });   // their page takes it off their pet
   y.cur -= dmg;
   x.dealt = (x.dealt || 0) + dmg;
   if (y.boss && x === G.player) NET.dm += dmg;   // what this page has taken off his shared pool
   x.lastFight = y.lastFight = G.time;
-  if (o.defer){ if (y.cur <= 0){ y.cur = 0; y.doomed = true; } return dmg; }
+  if (o.defer){ if (y.cur <= 0 && !y.net){ y.cur = 0; y.doomed = true; } return dmg; }
   y.flash = y.boss ? .06 : .12;
   // his blows throw you. A pet's don't shove at all: walking back into reach
   // costs time a battle never charges, and the slowest walker paid the most
@@ -892,7 +903,7 @@ function strike(x, y, mult, pierce, o = {}){
   const ty = big ? y.y - rnd(150, 230) : y.y - y.box * .95;
   if (dmg > 0) floatText(h.x + rnd(-14, 14) * (big ? 5 : 1), ty, String(dmg), y.side === "hero" ? "#ff6b7d" : "#ffffff", big ? 17 : 15);
   if (y === G.player && dmg > 0){ G.cam.shake = Math.max(G.cam.shake, 5); buzz(25); }
-  if (y.cur <= 0) knockOut(y, x);
+  if (y.cur <= 0 && !y.net) knockOut(y, x);
   return dmg;
 }
 /* Show a hit the engine already settled: the number, the flash, and - if it
@@ -930,10 +941,16 @@ function riders(x, sk, hits, foe){
   if (b.heal){
     const n = Math.min(x.max - x.cur, Math.round(x.max * b.heal));
     x.cur += n; floatText(x.x, x.y - x.box * 1.1, "+" + n, "#5fd38a", 16);
-    if (foe && foe.alive){ foe.exposed = b.expose; floatText(foe.x, foe.y - (foe.boss ? 240 : foe.box * 1.2), "wide open", "#9fd8ff", 12); }
+    if (foe && foe.alive){ if (foe.net) pvpHit(foe, { ex:b.expose }); else foe.exposed = b.expose; floatText(foe.x, foe.y - (foe.boss ? 240 : foe.box * 1.2), "wide open", "#9fd8ff", 12); }
   }
   for (const [y, dmg] of hits){
     if (!y.alive || !dmg) continue;
+    if (y.net){
+      const r = {};
+      if (b.rattle) r.rt = [b.rattle.pct, b.rattle.turns];
+      if (b.burn) r.bn = [Math.max(1, Math.round(dmg * b.burn.pct)), b.burn.turns];
+      if (r.rt || r.bn) pvpHit(y, r);
+    }
     if (b.rattle){ y.openT = Math.max(y.openT, b.rattle.turns * TURN); y.openPct = Math.max(y.openPct, b.rattle.pct);
       floatText(y.x, y.y - (y.boss ? 240 : y.box * 1.2), "guard rattled", "#9fd8ff", 12); }
     if (b.burn){ y.burn = { dmg:Math.max(1, Math.round(dmg * b.burn.pct)), left:b.burn.turns, t:TURN, src:x };
@@ -1723,7 +1740,8 @@ function playerFainted(){
     if (G.boss.alive) setTimeout(() => endAttempt(false), 1100);
     return;
   }
-  banner("Your " + G.player.form.name + " needs a rest", "back at the campfire", 1.8);
+  const by = NET.lastBy && G.time - NET.lastBy.t < 3 ? NET.lastBy.who : null;
+  banner("Your " + G.player.form.name + " needs a rest", by ? `${by} got you - back at the campfire` : "back at the campfire", 1.8);
   setTimeout(() => {
     const p = G.player; resetFight(p);
     Object.assign(p, { alive:true, cur:p.max, x:CAMP_PX.x - 60, y:CAMP_PX.y + 30 });
@@ -1883,6 +1901,7 @@ function drawBossCard(felled){
 const NET = {
   room:null, on:false, me:"me", pets:new Map(), hb:null, lastHB:null, leader:true,
   dm:0, dmE:null, sendT:0, ks:0, ds:0, online:0, others:[], since:0,
+  hits:[], hitN:0, seen:{}, lastBy:null,
   leads(){ return this.leader; }
 };
 /* This tab's key for what it has taken off him: kept through a reload, new
@@ -2021,7 +2040,8 @@ function netTick(dt){
   if (NET.leader && !was) takeOver(b);
   // everyone else's pet
   const seen = new Set();
-  for (const p of others){ seen.add(p.peer); syncNetPet(p.peer, p.presence); }
+  for (const p of others){ seen.add(p.peer); syncNetPet(p.peer, p.presence); takeHits(p); }
+  NET.hits = NET.hits.filter(h => G.time - h.t < 3);   // a hit stays in presence long enough to be read
   for (const id of [...NET.pets.keys()]) if (!seen.has(id)) NET.pets.delete(id);
   for (const n of NET.pets.values()) animNetPet(n, dt);
   // his pool: one account, merged from every copy of it here
@@ -2077,12 +2097,49 @@ function publish(dt){
       k:p.clip ? p.clip.sk.id : "", ks:NET.ks, ds:NET.ds, am:Math.round(Math.atan2(p.aim.y, p.aim.x) * 100),
       hp:Math.round(p.cur), al:p.alive ? 1 : 0, rd:G.raid && !G.raid.over ? 1 : 0,
       ep:BS.e, dm:Math.round(NET.dm), k:NET.key, b:NET.leader ? bossState(G.boss) : null,
+      pv:NET.hits.length ? NET.hits.map(h => h.o) : null,
       lt:NET.leader ? Math.round(G.time - NET.since) : null });
   }
   NET.room.presence(pr).catch(() => {});
 }
 // a page whose screen goes off stops running him at once, and won't take him back when it returns
 document.addEventListener("visibilitychange", () => { if (document.hidden && NET.on) NET.leader = false; NET.sendT = 0; publish(1); });
+/* PvP, sent: a hit on another player's pet goes into this page's presence,
+   addressed to that pet's page, which takes it off its own pet. Each hit has
+   a number so it is taken once. */
+function pvpHit(n, fields){
+  if (!n.peer) return;
+  NET.hits.push({ t:G.time, o:{ i:++NET.hitN, to:n.peer, ...fields } });
+  if (NET.hits.length > 12) NET.hits.shift();
+}
+/* PvP, received: hits another page says it landed on this page's pet. Not
+   while fighting him, and never from someone who is. */
+function takeHits(p){
+  const pv = p.presence.pv;
+  if (!Array.isArray(pv)) return;
+  const me = G.player, last = NET.seen[p.peer] || 0;
+  for (const h of pv){
+    if (!h || typeof h !== "object" || h.to !== NET.me || (h.i | 0) <= last) continue;
+    NET.seen[p.peer] = Math.max(NET.seen[p.peer] || 0, h.i | 0);
+    if (!me || !me.alive || inRaid() || p.presence.rd) continue;
+    const who = cleanNick(p.presence.n) || "Someone";
+    me.lastFight = G.time; NET.lastBy = { who, t:G.time };
+    if (h.d > 0){
+      let d = clamp(Math.round(+h.d), 0, me.max);
+      if (me.exposed){ d = Math.round(d * me.exposed); me.exposed = 0; }
+      if (G.god) d = 0;
+      me.cur -= d; me.flash = .12;
+      if (d > 0){ floatText(me.x + rnd(-14, 14), me.y - me.box * .95, String(d), "#ff6b7d", 15); G.cam.shake = Math.max(G.cam.shake, 5); buzz(25); }
+    }
+    if (Array.isArray(h.rt)){ me.openT = Math.max(me.openT, clamp(+h.rt[1] || 0, 0, 4) * TURN); me.openPct = Math.max(me.openPct, clamp(+h.rt[0] || 0, 0, .5));
+      floatText(me.x, me.y - me.box * 1.2, "guard rattled", "#9fd8ff", 12); }
+    if (Array.isArray(h.bn)){ me.burn = { dmg:clamp(Math.round(+h.bn[0]) || 1, 1, me.max), left:clamp(h.bn[1] | 0, 1, 4), t:TURN, src:null };
+      floatText(me.x + 20, me.y - me.box * 1.1, "burning", "#ff8a3d", 12); }
+    if (+h.ex > 1){ me.exposed = clamp(+h.ex, 1, 2); floatText(me.x, me.y - me.box * 1.2, "wide open", "#9fd8ff", 12); }
+    if (me.cur <= 0){ me.cur = 0; faint(me, null); break; }
+  }
+}
+
 /* Another page's pet: drawn from its presence, never simulated here. */
 function syncNetPet(id, pr){
   const form = FORMS[pr.f] ? pr.f : null;
@@ -2090,7 +2147,7 @@ function syncNetPet(id, pr){
   const lv = clamp(Math.round(+pr.l || FORMS[form].min), 1, 60);
   let n = NET.pets.get(id);
   if (!n || n.formId !== form || n.level !== lv){
-    n = new Pet(form, lv, "net", { x:+pr.x || 0, y:+pr.y || 0 }); n.net = true; n.tx = n.x; n.ty = n.y;
+    n = new Pet(form, lv, "net", { x:+pr.x || 0, y:+pr.y || 0 }); n.net = true; n.peer = id; n.tx = n.x; n.ty = n.y;
     NET.pets.set(id, n);
   }
   n.nick = cleanNick(pr.n) || "Runner";

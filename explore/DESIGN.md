@@ -333,6 +333,14 @@ server of our own.
   closes or goes into the background, the lowest-labelled page still on
   screen picks him up from the last state it saw. In testing, his health,
   position and charges came through the hand-off intact.
+- **Open PvP.** Out in the world, other players' pets are fair game, and
+  yours is theirs. Your moves aim at, and land on, their pets as they would on
+  a wild pet. The hit (its damage, and any burn, rattled guard or Nap's "wide
+  open") goes into your page's presence addressed to that player's page, and
+  their page takes it off their pet, once per hit. When a player is knocked
+  out, they wake at the campfire and are told who got them. **Nobody fighting
+  the boss can hit or be hit by another player.** Both pages check this. No
+  win/loss record for now.
 - **Wild pets stay per player.** Each page has its own, so nobody steals
   anybody's fight.
 - **Alone, it's the same game.** With no room (a public link, or the page
