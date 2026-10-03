@@ -316,7 +316,7 @@ const BT = { POOL:5, MIT:0.6, JIT:0.35, EXTRA:0.35, GCD:2 };
    a rattled guard keep the same ratios they have in the game. Speed buys extra
    turns there; here it runs that pet's clock faster (see tempoOf). */
 const TURN = 1.4;
-const BOSS_TURN = 2.1;
+const BOSS_TURN = 1.3;   // his own turns come quicker than the game's ratio: live, a slow boss is a boss nobody gets hit by
 
 const SPECIES = {
   ember:   { name:"Ember",   colour:"#ff6b35" },
@@ -1376,6 +1376,8 @@ function raidBot(e, dt){
     const d = Math.hypot(e.x - f.x, (e.y - f.y) * 1.4);
     if (d < f.r + 20){
       const a = Math.atan2(e.y - f.y, e.x - f.x);
+      // a mark still following you can't be outrun: wait for it to lock, then go
+      if (f.lock && f.t < f.lock) return { x:0, y:0 };
       if ((f.dur - f.t) < .9 && e.dashT <= 0 && (e.clip ? e.clip.fired : e.atkCd <= 0) && Math.random() < .35){
         useAttack(e); e.aim = { x:Math.cos(a), y:Math.sin(a) }; e.lunge = false;
         return { x:0, y:0 };
@@ -1398,7 +1400,7 @@ function raidBot(e, dt){
 
    With other people here one page runs him (NET.leads) and the others follow
    its account. Every page settles his blows on its own pet only. */
-const BOSS_WALK = 78;
+const BOSS_WALK = 95;
 function bossPhase(cur, max){ const f = cur / max; return RAID_BOSS.phases.find(p => f >= p.from) || RAID_BOSS.phases[3]; }
 // everyone who has taken a swing at him and is still standing, this page's pet included
 function bossQuarries(){
@@ -1453,31 +1455,61 @@ function updateBoss(b, dt){
 }
 /* A blow is one plain record - where he starts and lands, where it is marked,
    when it lands - so the page that runs him can hand it to the others whole. */
-const BOSS_REACH = { swing:{ r:72, go:260, short:75, from:.55 }, slam:{ go:420, short:80, from:.3 }, sweep:{ go:150, short:90, from:0 }, roar:{ go:0, short:0, from:0 } };
+/* How each blow travels and how hard it is to read:
+   - swing: quick (marked .6 s), and the mark follows you until .35 s before
+     it lands - you can't step out early, you have to react.
+   - sweep (Torchswing): played 35% faster, charges in further and reaches
+     wider.
+   - slam (Splitter) and roar: as they were. The Splitter is the big, slow,
+     readable one you can always get out of. */
+const BOSS_REACH = {
+  swing:{ r:64, go:260, short:70, from:.5, tele:.6, track:.35 },
+  slam:{ go:420, short:80, from:.3 },
+  sweep:{ go:220, short:100, from:0, rate:1.35, r:210 },
+  roar:{ go:0, short:0, from:0 }
+};
 function startBossAct(b, sk, q){
   const kind = sk ? sk.fx.kind : "swing", R = BOSS_REACH[kind];
   const dx = q.x - b.x, dy = q.y - b.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d;
-  const impact = sk ? sk.clip.starts[sk.fx.impact] / 1000 : .95, end = sk ? sk.clip.total / 1000 : impact + .45;
+  const rate = R.rate || 1;
+  const impact = sk ? sk.clip.starts[sk.fx.impact] / 1000 / rate : R.tele, end = sk ? sk.clip.total / 1000 / rate : impact + .4;
   const go = clamp(d - R.short, 0, R.go), lx = b.x + ux * go, ly = b.y + uy * go;
-  let mx = lx, my = ly, r = sk ? sk.fx.radius || 0 : R.r;
+  let mx = lx, my = ly, r = R.r || (sk ? sk.fx.radius || 0 : 0);
   // a swing and a Splitter come down on you - or as near as he can reach
   if (kind === "swing" || kind === "slam"){ const reach = Math.min(d, go + R.short); mx = b.x + ux * reach; my = b.y + uy * reach; }
   if (kind === "roar") r = 0;
   // a roar's stoke rides on the blow, so every page lands it the same
   let m = 1;
   if (kind !== "roar" && b.stokeHits > 0){ m = RAID_BOSS.kit[0].battle.stoke.mult; b.stokeHits--; }
-  beginAct(b, { n:(Math.random() * 1e9) | 0, k:sk ? sk.id : "", t:0, impact, end, sx:b.x, sy:b.y, lx, ly, mx, my, r, from:R.from, m });
+  beginAct(b, { n:(Math.random() * 1e9) | 0, k:sk ? sk.id : "", t:0, impact, end, sx:b.x, sy:b.y, lx, ly, mx, my, r, from:R.from, m,
+    rate, q:q.id, lock:R.track ? impact - R.track : 0 });
 }
 function beginAct(b, a){
   a.sk = a.k && MOVE[a.k] && RAID_BOSS.kit.includes(MOVE[a.k]) ? MOVE[a.k] : null;
   a.fired = a.t >= a.impact;
   b.act = a;
   if (Math.abs(a.mx - b.x) > 8) b.face = a.mx < b.x ? -1 : 1;
-  if (a.r && !a.fired) G.fx.push({ kind:"tele", x:a.mx, y:a.my, r:a.r, t:0, dur:a.impact - a.t });
+  if (a.r && !a.fired){ a.tf = { kind:"tele", x:a.mx, y:a.my, r:a.r, t:0, dur:a.impact - a.t, lock:Math.max(0, (a.lock || 0) - a.t) }; G.fx.push(a.tf); }
   castLabel(a.sk ? a.sk.name : "");
+}
+// where a pet he has picked is now, on this page: this page's own, or another's as drawn here
+function quarryAt(id){
+  if (id === NET.me) return G.player.alive ? G.player : null;
+  const n = NET.pets.get(id); return n && n.alive ? n : null;
 }
 function runBossAct(b, dt){
   const a = b.act; a.t += dt;
+  // a swing's mark follows its pet until it locks
+  if (a.lock && a.t < a.lock){
+    const q = quarryAt(a.q);
+    if (q){
+      const R = BOSS_REACH.swing, dx = q.x - a.sx, dy = q.y - a.sy, d = Math.hypot(dx, dy) || 1;
+      const go = clamp(d - R.short, 0, R.go), reach = Math.min(d, go + R.short);
+      a.lx = a.sx + dx / d * go; a.ly = a.sy + dy / d * go; a.mx = a.sx + dx / d * reach; a.my = a.sy + dy / d * reach;
+      if (a.tf){ a.tf.x = a.mx; a.tf.y = a.my; }
+      if (Math.abs(dx) > 8) b.face = dx < 0 ? -1 : 1;
+    }
+  }
   // he travels with the blow: a swing lunges late, a Splitter leaps, a Torchswing charges in
   const k0 = a.from * a.impact, k = clamp((a.t - k0) / Math.max(.01, a.impact - k0), 0, 1), ease = k * k * (3 - 2 * k);
   b.x = a.sx + (a.lx - a.sx) * ease; b.y = a.sy + (a.ly - a.sy) * ease;
@@ -1530,7 +1562,8 @@ function followBoss(b, dt){
     const num = (v, lo, hi) => clamp(+v || 0, lo, hi);
     const act = { n:a.n, k:String(a.k || ""), t:num(a.t, 0, 5) + .05, impact:num(a.impact, 0, 5), end:num(a.end, 0, 6),
       sx:+a.sx || b.x, sy:+a.sy || b.y, lx:+a.lx || b.x, ly:+a.ly || b.y, mx:+a.mx || b.x, my:+a.my || b.y,
-      r:num(a.r, 0, 300), from:num(a.from, 0, 1), m:num(a.m, 1, 2) };
+      r:num(a.r, 0, 300), from:num(a.from, 0, 1), m:num(a.m, 1, 2), rate:num(a.rate, .5, 2) || 1,
+      q:String(a.q || ""), lock:num(a.lock, 0, 5) };
     if (act.t < act.end) beginAct(b, act);
   }
   if (b.act){ runBossAct(b, dt); return; }
@@ -1675,7 +1708,7 @@ function raidPool(p){
   const K = attrTotal(p.level) * BT.MIT;
   return Math.round(p.pow * K / (K + RAID_BOSS.battle.def) * RAID_SHARE);
 }
-const RAID_SHARE = 80;
+const RAID_SHARE = 55;
 const RESPAWN = 20;   // seconds before he is back on his hill after a felling
 /* BS: his one shared account. An epoch (a fresh one each time he respawns),
    the pool's size, whether he's down, and what each page has taken off him -
@@ -1897,7 +1930,8 @@ function bossState(b){
   return { e:BS.e, mx:BS.mx, dead:BS.dead ? 1 : 0, dd, x:Math.round(b.x), y:Math.round(b.y), f:b.face, w:b.awake ? 1 : 0,
     pw:r2(b.powMul), sm:r2(b.spdMul), ch:b.charges, st:b.stokeHits || 0,
     a:a && a.t < a.end ? { n:a.n, k:a.k, t:r2(a.t), impact:r2(a.impact), end:r2(a.end), sx:Math.round(a.sx), sy:Math.round(a.sy),
-      lx:Math.round(a.lx), ly:Math.round(a.ly), mx:Math.round(a.mx), my:Math.round(a.my), r:a.r, from:a.from, m:a.m } : null };
+      lx:Math.round(a.lx), ly:Math.round(a.ly), mx:Math.round(a.mx), my:Math.round(a.my), r:a.r, from:a.from, m:a.m,
+      rate:a.rate, q:a.q, lock:r2(a.lock || 0) } : null };
 }
 function publish(dt){
   if (!NET.room) return;
@@ -2193,7 +2227,7 @@ function drawBoss(b){
   ctx.fillStyle = "rgba(0,0,0,.35)"; ctx.beginPath(); ctx.ellipse(b.x, b.y + 2, box * .36 * (1 - air / 300), box * .09 * (1 - air / 300), 0, 0, 7); ctx.fill();
   let cfg, frames, frame, src;
   if (!b.alive){ cfg = RAID_BOSS.death; frames = 16; frame = clipFrame(RAID_BOSS.deathClip, b.deadT); }
-  else if (b.act && b.act.sk){ cfg = b.act.sk.sprite; frames = 16; frame = clipFrame(b.act.sk.clip, b.act.t * 1000); }
+  else if (b.act && b.act.sk){ cfg = b.act.sk.sprite; frames = 16; frame = clipFrame(b.act.sk.clip, b.act.t * 1000 * (b.act.rate || 1)); }
   else {
     cfg = base; frames = 12;
     src = bossPhase(b.cur, b.max || 1).src; frame = Math.floor(G.time * base.fps) % 12;
@@ -2214,8 +2248,10 @@ function drawFxGround(){
   for (const f of G.fx){
     const k = f.t / f.dur;
     if (f.kind === "tele"){
-      // his marks: a red pool that fills in as the blow comes down
+      // his marks: a red pool that fills in as the blow comes down. One still
+      // following its pet flickers, and goes solid when it locks
       ctx.save();
+      if (f.lock && f.t < f.lock){ ctx.setLineDash([10, 7]); ctx.globalAlpha = .65 + .35 * Math.sin(G.time * 30); }
       ctx.fillStyle = `rgba(255,77,106,${.1 + .14 * k})`; ctx.strokeStyle = `rgba(255,120,140,${.55 + .4 * k})`; ctx.lineWidth = 2.5;
       ctx.beginPath(); ctx.ellipse(f.x, f.y, f.r, f.r / 1.4, 0, 0, 7); ctx.fill(); ctx.stroke();
       ctx.fillStyle = "rgba(255,120,140,.28)";

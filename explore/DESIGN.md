@@ -194,8 +194,9 @@ Everything about him is the game's:
 - his stats: Power 90, Defence 25, Speed 60, and no extra turns
 
 He chooses the way the game's `btChoose` does: any ready move at random, with
-cooldowns counted in his own turns, which come every 2.1 s and quicken as his
-roar charges him.
+cooldowns counted in his own turns. His turns come every **1.3 s** (they were
+2.1 s) and quicken as his roar charges him. At the old rhythm he was too easy
+to stay away from.
 
 **He moves.** Standing still, he was easy to read. Now he walks at whoever he
 has picked between blows, and circles once he's close. He switches targets
@@ -204,10 +205,10 @@ marked on the ground first**, so you can walk or dash out of it:
 
 | Move | How he moves | The mark | What it does |
 | --- | --- | --- | --- |
-| Plain swing | rears back, then lunges up to 260 px at you | a red mark under you | ×1 |
-| **Splitter** | leaps up to 420 px, landing beside you | a large red mark under you | ×2.2, 70% through guard. It deletes a low-level pet, as in the game |
-| **Torchswing** | charges up to 150 px towards you, then spins | a ring round where he stops | ×1.35 to anything within reach |
-| **UWAAAARGH!** | stands and roars | none | no damage, but his next two blows hit ×1.6 and he charges, getting faster and stronger, up to twice |
+| Plain swing | rears back, then lunges up to 260 px at you | **harder:** marked only 0.6 s ahead, and the mark **follows you** until 0.35 s before it lands (dashed and flickering while it follows, solid once it locks). Step away early and it comes with you; you have to react. | ×1 |
+| **Torchswing** | charges up to 220 px towards you, then spins | **harder:** played 35% faster (lands about 0.65 s after the mark appears), with a wider ring (210 px) round where he stops | ×1.35 to anything within reach |
+| **Splitter** | leaps up to 420 px, landing beside you | unchanged: a large red mark under you, landing about 1.1 s later. The big, readable one. | ×2.2, 70% through guard. It deletes a low-level pet, as in the game |
+| **UWAAAARGH!** | stands and roars | unchanged: none | no damage, but his next two blows hit ×1.6 and he charges, getting faster and stronger, up to twice |
 
 If he lands on you, you're shoved clear of him.
 
@@ -222,15 +223,19 @@ You get three swings; the menu gives you more. The game earns one per 5 km
 run.
 
 **His health pool.** The game's pool is 25,000, sized for a whole field of
-runners over weeks. Here each pet that takes him on brings a share: 80
-full-strength blows (×1) at its level. With other people on him at the same
+runners over weeks. Here each pet that takes him on brings a share: 55
+full-strength blows (×1) at its level, cut from 80 to 55 when he got
+faster. With other people on him at the same
 time, the pool is the sum of their shares, so a group fells him about as
 fast as one pet would, together.
 
-In simulation, a player who steps out of his marks and doesn't start a skill
-under one fells him alone in 2 to 5 swings at most levels. Pets with a single
-skill take longer: 5 to 9 for a Lv 18 Blazewyrm, 13 to 19 for a Lv 8
-Cinderling. Attempts last 16 to 48 s.
+In simulation, the test player steps out of his marks, waits for a following
+mark to lock before it dashes, and doesn't start a skill under one. His plain
+swing still lands on it 60 to 75% of the time, because a skill's clip often
+holds it in place when the mark locks. It fells him alone in 2 to 6 swings at
+most levels, with attempts of 11 to 24 s. Pets with a single skill struggle:
+7 to 10 swings for a Lv 18 Blazewyrm, and about 27 for a Lv 8 Cinderling,
+which is not a realistic solo kill.
 
 **After he falls**, everyone who was on him sees the death clip and a card of
 who took what off him. He is back on his hill 20 seconds later, unmarked.
