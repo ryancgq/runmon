@@ -2053,7 +2053,8 @@ function levelUpBeats(beats, gather, burst){
    moves below that quote older numbers describe how each was first set.
 
    Since then the Cinderling has gained Horn Rush (10) and Tail Swipe (12),
-   and Cinder Sweep moved to 14 as its last and strongest move - see there. */
+   and Cinder Sweep moved to 14 as its last and strongest move - see there;
+   and the Bamboo Cub has gained Cuddle (11). */
 const SKILLS = {
   ember: [
     // the id stays "fizzle" - the Blazewyrm's real one already owns "fireball",
@@ -2385,6 +2386,49 @@ const SKILLS = {
         durations:[340, 310, 280, 250, 220, 190,  600,  560, 480, 620,
                    240, 240, 300, 360],
         aspect:1.348, scale:0.986, dx:1.9, dy:-0.5 } },
+    /* The Bamboo Cub's second move, at 11: it charges in arms first and holds
+       on. A little over an attack (1.15), and whatever it catches swings 15%
+       softer for its next two turns - the squeeze, the engine's first effect
+       that blunts the other pet's hits rather than opening its guard (see
+       `hug` in btAct). Defensive, which is the cub's nature: the slowest and
+       sturdiest of the three.
+
+       11, not 10, from the simulation: at 10 the cub already beat the Sparky
+       56% of the time, before Static Shock arrives at 11, and anything
+       landing there pushed that further. At 11 it takes the Cinderling
+       pairing from 47.4 to 52.2 and at 12 from 46.1 to 47.7, with the
+       Sparky's at most 54.6. Win rates for the cub, both sides on
+       btChoose(), 6,000 fights each way per level:
+                          11    12    13    14
+         v Cinderling   52.2  47.7  45.4  46.6   (was 47.4 46.1 45.5 45.4)
+         v Sparky       54.6  54.3  53.7  54.0   (was 48.7 52.2 53.4 52.9)
+       At 13 and 14 it is within noise either way: with three moves picked at
+       random it comes round too seldom to move a fight the Cinderling's four
+       are deciding. Every version strong enough to close that gap - 1.20
+       with a 20% squeeze, or 1.00 with 30% for three turns - put the Sparky
+       pairing at 55-61. That is a job for the cub's fourth move, at 14. The
+       Sparky also learns at 8, 11, 12 and 14, so this is its pattern too. */
+    { id:"cuddle", name:"Cuddle", ico:"\u{1F917}", stage:1, level:11,
+      blurb:"Charges in arms first for the biggest hug it can manage. Whatever it catches comes out squished, and swings softer for a while.",
+      battle:{ dmg:1.15, cd:3, hug:{ pct:0.15, turns:2 } },
+      sprite:{ src:"art/skill-cuddle.png", frames:16, fps:5,
+        /* Wriggle, wind up, launch, land, squeeze. Three frames of getting
+           excited and a lean back to brace; then the leap, arms out, red
+           streaks behind, quick - 100 to 140ms over seven frames. It lands in
+           a puff of dust, and frame 12 is the cuddle itself, eyes shut, the
+           squeeze shaking the air round it: the longest hold, because that is
+           the move. A wobble, a slide back, and it ends lying down, the
+           idle's own opening pose.
+
+           Cut like the idle (cub4), but with dark pixels near red left out
+           as well as near green, since the speed lines are dark red; feet on
+           one line in all sixteen, paws within 1.4px. Fitted on screen to
+           the idle's lying frames (0-2) against this clip's 0, 1 and 15:
+           within a third of a device pixel at the feet and paws, and 99-101%
+           of its size. */
+        durations:[300, 240, 220, 260, 110, 100, 100, 120,
+                   110, 120, 140, 160, 380, 300, 200, 340],
+        aspect:1.4872, scale:1.253, dx:-1.28, dy:4.85 } },
     /* The Bamboo Cub's second move, and the first thing it owns that simply
        hits: Green Gale does more damage than an attack but hands the cub's own
        guard over for it. This costs nothing but the snack.
@@ -3336,6 +3380,7 @@ function btSide(speciesId, level, name){
     stoke: null,      // { mult, hits } - the Fizzle's payoff
     burn: null,       // { dmg, left } - ticks at the end of your own turns
     open: 0, openPct: 0,
+    weak: 0, weakPct: 0,  // squeezed - this side's own hits land softer; see Cuddle
     exposed: 0,       // one incoming hit lands this much harder
     charges: 0, softens: 0,
     gcd: 0, cds: {}, used: {},
@@ -3361,7 +3406,7 @@ function btBossSide(hpLeft){
     name: RAID_BOSS.short, speciesId: null, level: 0, stage: 0,
     pow: b.pow, def: b.def, spd: b.spd, max, cur,
     powMul:1, spdMul:1, defMul:1,
-    stoke:null, burn:null, open:0, openPct:0, exposed:0,
+    stoke:null, burn:null, open:0, openPct:0, weak:0, weakPct:0, exposed:0,
     charges:0, softens:0, gcd:0, cds:{}, used:{},
     kit: RAID_BOSS.kit.slice(),
     boss: true
@@ -3486,6 +3531,7 @@ function btMoves(st, key){
 function btHit(st, x, y, mult, pierce){
   const def = y.def * y.defMul * (y.open > 0 ? 1 - y.openPct : 1) * (1 - (pierce || 0));
   let d = x.pow * x.powMul * mult * (st.K / (st.K + def));
+  if (x.weak > 0) d *= 1 - x.weakPct;
   d *= 1 - BT.JIT + st.rng() * 2 * BT.JIT;
   if (st.rng() < BT.CRIT){ d *= BT.CRIT_X; st.crit = true; }
   if (x.stoke){ d *= x.stoke.mult; if (--x.stoke.hits <= 0) x.stoke = null; }
@@ -3539,6 +3585,18 @@ function btAct(st, moveId){
       y.openPct = Math.max(y.openPct, b.rattle.pct);
       ev.notes.push(`${y.name}'s guard is rattled`);
     }
+    /* The other half of reaching across: rattle opens their guard, this
+       blunts their swing. Held in a cuddle, a pet's own hits land softer
+       until it has had `turns` of its own turns to wriggle out - counted down
+       at the end of each, as burn is, so two means two of theirs whatever
+       the turn order does. Like rattle it takes the longer and deeper of
+       what is already there. It draws nothing from the rng, so no seed
+       plays differently for it existing. */
+    if (b.hug){
+      y.weak = Math.max(y.weak, b.hug.turns);
+      y.weakPct = Math.max(y.weakPct, b.hug.pct);
+      ev.notes.push(`${y.name} is squeezed`);
+    }
     if (b.burn){ y.burn = { dmg: Math.max(1, Math.round(ev.dmg * b.burn.pct)),
                             left: b.burn.turns };
                  ev.notes.push(`${y.name} is burning`); }
@@ -3556,6 +3614,7 @@ function btAct(st, moveId){
   for (const id in x.cds) if (x.cds[id] > 0) x.cds[id]--;
   if (x.gcd > 0) x.gcd--;
   if (x.open > 0) x.open--;
+  if (x.weak > 0 && --x.weak === 0) x.weakPct = 0;
   if (x.burn){
     x.cur -= x.burn.dmg;
     ev.burn = x.burn.dmg;
@@ -4753,7 +4812,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-10-03 af46ea2";
+const BUILD_ID = "2026-10-03 e2f4e98";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;

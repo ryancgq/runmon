@@ -677,6 +677,7 @@ first of its own at 18, the same level the Blazewyrm starts.
 | 🌰 Acorn Flick | Sparky | Level 12 | Winds its whole tail round and swats the acorn at them. It will want that acorn back. |
 | ⛈️ Pocket Storm | Sparky | Level 14 | Brews a thundercloud the size of a teacup and points it at them. It is a very angry teacup. |
 | 🍃 Green Gale | Bamboo Cub | Level 8 | The forest's strength, gathered and released. Out of the wrong end. |
+| 🤗 Cuddle | Bamboo Cub | Level 11 | Charges in arms first for the biggest hug it can manage. Whatever it catches comes out squished, and swings softer for a while. |
 | 🎋 Bamboo Tasting | Bamboo Cub | Level 12 | Takes a thoughtful bite, chews it over, and spits out the verdict. At them. Hard. |
 | 🔥 Fireball | Blazewyrm | Level 18 | Draws a breath and spits a packed ball of flame |
 | 💥 Flame Stomp | Blazewyrm | Level 22 | Lands hard enough to throw a ring of fire out around it |
