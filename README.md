@@ -683,7 +683,7 @@ first of its own at 18, the same level the Blazewyrm starts.
 | 💥 Flame Stomp | Blazewyrm | Level 22 | Lands hard enough to throw a ring of fire out around it |
 | ☄️ Flying Swoop | Blazewyrm | Level 26 | A low, fast pass trailing fire |
 | 🌩️ Lightning Bolt | Zephyrite | Level 18 | Asks the sky for help. The sky, this time, obliges. |
-| 😴 Nap | Panda | Level 18 | Sits down mid-fight and sleeps. Wakes up better, if it wakes up. |
+| 😴 Nap | Panda | Level 18 | Sits down mid-fight and sleeps it off. Wakes up rested, and a lot harder to hurt. |
 | 🪨 Landslide | Panda | Level 22 | Curls up, picks a direction and commits. Steering was never part of the plan. |
 | 🌀 Arc Lash | Zephyrite | Level 22 | Cracks its tail like a whip. Whatever is downrange gets the storm. |
 

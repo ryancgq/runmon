@@ -2043,7 +2043,8 @@ function levelUpBeats(beats, gather, burst){
    What moved: Cinder Sweep 1.05 -> 1.20, Bamboo Toss (now Bamboo Tasting) 1.30 -> 1.40, Acorn
    Flick 1.66 -> 1.50 without its singe, Pocket Storm 1.58 -> 1.40, Fireball
    1.10 -> 1.20, Flame Stomp 1.47 -> 1.40 and flat-footed 25% -> 15%, Arc
-   Lash 1.59 -> 1.50 and its rattle 40% -> 25%, Nap's heal 32% -> 26%.
+   Lash 1.59 -> 1.50 and its rattle 40% -> 25%, Nap's heal 32% -> 26%
+   (and since, 33% with +50% Defence in place of its exposure - see Nap).
 
    The ladder - a move learnt later worth more over six turns than the one
    before it - was a rule for the first-ready picker, which always reached for
@@ -2442,10 +2443,11 @@ const SKILLS = {
        fixing the other; at 12 every pairing from 12 to 14 lands within three
        points of even and 11 is left as it was. */
     /* Bamboo Tasting, drawn as Bamboo Toss until the second sheet. The id
-       stays "bamboo-toss": a fight is recorded as its seed and the ids of the
-       moves chosen (st.moves), so a new id would leave every fight that used
-       it naming a move the engine no longer has. The battle numbers are the toss's, as
-       measured above - only the drawing changed. */
+       stays "bamboo-toss" only because nothing gains from changing it:
+       nothing stores move ids (a fight reports its seed, how much it chipped
+       and who won, and st.moves is never read), so it could be renamed
+       safely. The battle numbers are the toss's, as measured above - only
+       the drawing changed. */
     { id:"bamboo-toss", name:"Bamboo Tasting", ico:"\u{1F38B}", stage:1, level:12,
       blurb:"Takes a thoughtful bite, chews it over, and spits out the verdict. At them. Hard.",
       battle:{ dmg:1.40, cd:3 },
@@ -2472,20 +2474,43 @@ const SKILLS = {
         aspect:1.5097, scale:1.219, dx:13.58, dy:-0.84 } },
     /* The Panda had nothing at all, which made it the only third form with an
        empty skill row - something a player reads as a bug rather than as a
-       gap. Nap fills it and suits the creature: it does no damage, it takes a
-       turn, and it leaves you wide open while you are asleep. The nerve of it
-       is the point.
+       gap. Nap fills it and suits the creature: it does no damage and it takes
+       a turn, and the Panda wakes up mended and harder to hurt - a third of
+       its health back and half again on its Defence for the rest of the
+       fight. The nerve of it is the point.
+
+       It was meant to leave the Panda wide open, with a 1.6x `expose` and a
+       26% heal, but the exposure was set on the wrong side: the Panda's own
+       next hit landed 1.6x, and that one hit was worth 15 points of win
+       rate (46-49% against the Blazewyrm became 32% without it). Asked to
+       make it raise the Panda's Defence instead, it was re-measured on the
+       real engine, both sides on btChoose(), 6,000 fights each way per
+       level, the Panda's win rate:
+                           18    20    22    26    30    35    40
+         v Blazewyrm      52.0  51.2  47.3  43.5  43.9  43.4  42.8
+         v Zephyrite      58.2  55.6  54.5  54.5  52.4  52.8  52.9
+         before (the bug) 49.3  49.1  49.6  46.7  46.4  46.4  45.1
+                          57.3  55.1  55.2  55.7  53.0  53.3  53.4
+       Defence alone could not do it. It pays most at 18-20 and fades from
+       22, where the Blazewyrm learns Flame Stomp and its pierce skips half
+       of any guard - +80% Defence on the old heal still left 40% against it
+       at 26-40 - so the heal carries the late levels: 33% and +50%. Heavier
+       heals lift the floor but put the 18 Zephyrite pairing at 59-60. The
+       Panda is ~9 points apart against the two at every level whatever Nap
+       does; that is the species matchup, which Nap can only shift. Fights
+       run about a turn longer and none reaches the turn limit; a Panda's
+       raid damage per attempt is within 2% of before.
 
        No sheet yet, so `sprite` is null. It is learnt, it is listed, and it
        works in a battle; it simply cannot be tapped to watch. Drawing
        art/skill-nap.png and filling this in is the whole of what is left. */
     { id:"nap", name:"Nap", ico:"\u{1F634}", stage:2, level:18,
-      blurb:"Sits down mid-fight and sleeps. Wakes up better, if it wakes up.",
+      blurb:"Sits down mid-fight and sleeps it off. Wakes up rested, and a lot harder to hurt.",
       /* Once a battle, and that is not a balance dial being turned: two
          Pandas with a repeatable 30% heal out-heal each other's damage
          forever, and the fight only ends because the engine gives up at
          eighty turns. You do not lie down twice in the same fight. */
-      battle:{ dmg:0, cd:4, heal:0.26, expose:1.6, at:0.50, once:true },
+      battle:{ dmg:0, cd:4, heal:0.33, guard:0.50, at:0.50, once:true },
       sprite:{ src:"art/skill-nap.png", frames:16, fps:3.4,
         /* The longest clip in the game, at 4.65s, because the joke is that it
            takes its time: three frames of getting drowsy, two of a yawn held
@@ -3381,7 +3406,6 @@ function btSide(speciesId, level, name){
     burn: null,       // { dmg, left } - ticks at the end of your own turns
     open: 0, openPct: 0,
     weak: 0, weakPct: 0,  // squeezed - this side's own hits land softer; see Cuddle
-    exposed: 0,       // one incoming hit lands this much harder
     charges: 0, softens: 0,
     gcd: 0, cds: {}, used: {},
     // This form's own moves, which is what makes the kit change when the pet
@@ -3406,7 +3430,7 @@ function btBossSide(hpLeft){
     name: RAID_BOSS.short, speciesId: null, level: 0, stage: 0,
     pow: b.pow, def: b.def, spd: b.spd, max, cur,
     powMul:1, spdMul:1, defMul:1,
-    stoke:null, burn:null, open:0, openPct:0, weak:0, weakPct:0, exposed:0,
+    stoke:null, burn:null, open:0, openPct:0, weak:0, weakPct:0,
     charges:0, softens:0, gcd:0, cds:{}, used:{},
     kit: RAID_BOSS.kit.slice(),
     boss: true
@@ -3535,7 +3559,6 @@ function btHit(st, x, y, mult, pierce){
   d *= 1 - BT.JIT + st.rng() * 2 * BT.JIT;
   if (st.rng() < BT.CRIT){ d *= BT.CRIT_X; st.crit = true; }
   if (x.stoke){ d *= x.stoke.mult; if (--x.stoke.hits <= 0) x.stoke = null; }
-  if (y.exposed){ d *= y.exposed; y.exposed = 0; }
   return Math.max(1, Math.round(d));
 }
 
@@ -3603,8 +3626,15 @@ function btAct(st, moveId){
     if (b.heal){
       ev.heal = Math.min(x.max - x.cur, Math.round(x.max * b.heal));
       x.cur += ev.heal;
-      y.exposed = b.expose;
-      ev.notes.push(`${x.name} is wide open`);
+    }
+    /* A guard raised for the rest of the fight - Nap's, so far, and only
+       ever once a fight since Nap is. Until October 2026 Nap instead set an
+       `exposed` multiplier meant to leave the sleeper open, but it was set
+       on the other side, and btHit() reads the defender's: the Panda's own
+       next hit landed 1.6x and nobody hit the Panda any harder. */
+    if (b.guard){
+      x.defMul += b.guard;
+      ev.notes.push(`${x.name} wakes up tougher`);
     }
   }
 
@@ -4812,7 +4842,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-10-03 e2f4e98";
+const BUILD_ID = "2026-10-03 611c129";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
