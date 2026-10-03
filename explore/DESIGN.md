@@ -211,7 +211,7 @@ marked on the ground first**, so you can walk or dash out of it:
 | Plain swing | rears back, then lunges up to 260 px at you | **harder:** marked only 0.6 s ahead, and the mark **follows you** until 0.35 s before it lands (dashed and flickering while it follows, solid once it locks). Step away early and it comes with you; you have to react. | ×1 |
 | **Torchswing** | charges up to 220 px towards you, then spins | **harder:** played 35% faster (lands about 0.65 s after the mark appears), with a wider ring (210 px) round where he stops | ×1.35 to anything within reach |
 | **Splitter** | leaps up to 420 px, landing beside you | unchanged: a large red mark under you, landing about 1.1 s later. The big, readable one. | ×2.2, 70% through guard. It deletes a low-level pet, as in the game |
-| **UWAAAARGH!** | stands and roars | **none: it fills the whole hill.** The screen edges pulse red as it builds (about 1.3 s). Can't be dodged; a dash doesn't help. | hits **everyone** on him, at ×0.6 for the first roar of a fight, plus ×0.25 for each roar after (×0.85, ×1.1, ×1.35 ...). Then, as in the game, his next two blows hit ×1.6 and he charges, getting faster and stronger, up to twice. |
+| **UWAAAARGH!** | stands and roars | a red ring round him (200 px), marked like any blow, so it **looks** dodgeable. It isn't: it reaches the whole hill, and a dash doesn't help. The mark is there on purpose, to keep the illusion. | hits **everyone** on him, at ×0.6 for the first roar of a fight, plus ×0.25 for each roar after (×0.85, ×1.1, ×1.35 ...). Then, as in the game, his next two blows hit ×1.6 and he charges, getting faster and stronger, up to twice. |
 
 If he lands on you, you're shoved clear of him.
 

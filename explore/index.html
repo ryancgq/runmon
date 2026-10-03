@@ -1401,7 +1401,7 @@ function raidBot(e, dt){
    With other people here one page runs him (NET.leads) and the others follow
    its account. Every page settles his blows on its own pet only. */
 const BOSS_WALK = 95;
-const ROAR_HIT = 0.6, ROAR_GROW = 0.25;   // the roar's own hit, and how much more each roar of a fight adds
+const ROAR_HIT = 0.6, ROAR_GROW = 0.25, ROAR_MARK = 200;   // the roar's own hit, and how much more each roar of a fight adds
 function bossPhase(cur, max){ const f = cur / max; return RAID_BOSS.phases.find(p => f >= p.from) || RAID_BOSS.phases[3]; }
 // everyone who has taken a swing at him and is still standing, this page's pet included
 function bossQuarries(){
@@ -1478,7 +1478,8 @@ function startBossAct(b, sk, q){
   let mx = lx, my = ly, r = R.r || (sk ? sk.fx.radius || 0 : 0);
   // a swing and a Splitter come down on you - or as near as he can reach
   if (kind === "swing" || kind === "slam"){ const reach = Math.min(d, go + R.short); mx = b.x + ux * reach; my = b.y + uy * reach; }
-  if (kind === "roar") r = 0;
+  // the roar is marked like any blow, round him - though it reaches the whole hill
+  if (kind === "roar") r = ROAR_MARK;
   // the roar's own hit grows with every roar in a fight: nobody outlasts him
   const rm = kind === "roar" ? ROAR_HIT + ROAR_GROW * (b.roars++) : 0;
   // a roar's stoke rides on the blow, so every page lands it the same
@@ -1543,8 +1544,9 @@ function landBlow(b, a){
     if (mine && inMark(p)) strike(b, p, k.battle.dmg * a.m, 0, { knock:260, fromX:a.mx, fromY:a.my });
   }
   if (fx.kind === "roar"){
-    /* UWAAAARGH: it fills the whole hill - no mark, no dodging, a dash
-       won't carry you through it - and it hits everyone on him. Its own hit
+    /* UWAAAARGH: marked round him like any blow, so it looks like it can be
+       outrun - but it fills the whole hill, a dash won't carry you through
+       it, and it hits everyone on him. Its own hit
        is the lightest of his (ROAR_HIT) but grows with every roar of the
        fight, so however well you move, he wears you down. Then, as in the
        game, his next two blows land 60% harder and he charges, faster and
@@ -1555,7 +1557,7 @@ function landBlow(b, a){
       if (b.charges < k.battle.charge.max){ b.charges++; b.spdMul += k.battle.charge.spd; b.powMul += k.battle.charge.pow; }
     }
     ring(b.x, b.y - 120, 260, "#fff3a8", .6, 8); G.cam.shake = 10;
-    if (mine) banner("UWAAAARGH!", "nowhere to hide - and his next two blows land harder", 1.3);
+    if (mine) banner("UWAAAARGH!", "his next two blows land harder", 1.3);
     if (mine && p.alive){ const ang = Math.atan2(p.y - b.y, p.x - b.x); p.kx += Math.cos(ang) * 160; p.ky += Math.sin(ang) * 160; }
   }
 }
@@ -2477,14 +2479,6 @@ function render(){
   const g = ctx.createRadialGradient(cv.width / 2, cv.height / 2, Math.min(cv.width, cv.height) * .4, cv.width / 2, cv.height / 2, Math.max(cv.width, cv.height) * .72);
   g.addColorStop(0, "rgba(10,12,19,0)"); g.addColorStop(1, "rgba(10,12,19,.5)");
   ctx.fillStyle = g; ctx.fillRect(0, 0, cv.width, cv.height);
-  // his roar has no mark - the whole screen is the mark, reddening as it comes
-  const ba = G.boss && G.boss.act;
-  if (G.raid && ba && ba.k === "uwaaargh" && !ba.fired){
-    const k = clamp(ba.t / ba.impact, 0, 1), a = (.25 + .5 * k) * (.75 + .25 * Math.sin(G.time * 20));
-    const r = ctx.createRadialGradient(cv.width / 2, cv.height / 2, Math.min(cv.width, cv.height) * .3, cv.width / 2, cv.height / 2, Math.max(cv.width, cv.height) * .7);
-    r.addColorStop(0, "rgba(255,40,60,0)"); r.addColorStop(1, `rgba(255,40,60,${a})`);
-    ctx.fillStyle = r; ctx.fillRect(0, 0, cv.width, cv.height);
-  }
 }
 
 /* =========================================================================
