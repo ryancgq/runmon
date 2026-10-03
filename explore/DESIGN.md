@@ -58,9 +58,9 @@ time.
 | Nimbus Heights | north-west, cloudstone and crystals | Sparky / Zephyrite |
 | The hill | north, a ring of standing stones | Sir Uwaaarghhhh |
 
-Wild pets are within a few levels of yours, and their form follows their
-level, the same way your pet's does. So there is a fight worth having at any
-level you test.
+Wild pets are the same for everyone in the world. Each spawn has a fixed
+level that rises further from the Trailhead: 8, 12, 14, 24 and 34 in each
+region. Their form follows their level, the same way your pet's does.
 
 Each species has a temperament:
 
@@ -352,8 +352,22 @@ server of our own.
   out, they wake at the campfire and are told who got them. **Nobody fighting
   the boss can hit or be hit by another player.** Both pages check this. No
   win/loss record for now.
-- **Wild pets stay per player.** Each page has its own, so nobody steals
-  anybody's fight.
+- **Wild pets are shared.** The page that runs the boss also runs the wild
+  pets and puts them in its presence: where each is, its health, the move
+  it's playing, and who it's after. Every other page draws its copy from
+  that. A hit on a wild pet from another page goes to the running page,
+  which takes it off and turns the pet on whoever hit it. The wild pets go
+  for any player out in the world, never anyone on the raid. When the page
+  running them changes, the next one carries on from its copy.
+- **Everyone sees everyone's moves.** Each page plays other players' skills
+  from their presence, and the damage another player does to the boss shows
+  over him in blue.
+- **No hiding from him.** A hidden tab still plays. Browsers stop drawing it,
+  so it runs on a timer and catches up, and your idle pet stays where he can
+  hit it. A phone that freezes the page outright (a locked screen) can't be
+  caught up honestly, so coming back from more than a few seconds of that in
+  the middle of a raid counts as falling ("You left mid-fight"). A page that
+  goes quiet for 4 seconds stops being a target until it speaks again.
 - **Alone, it's the same game.** With no room (a public link, or the page
   outside Claude) the page runs him itself and nothing else changes.
 
