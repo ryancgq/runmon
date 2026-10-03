@@ -679,6 +679,7 @@ first of its own at 18, the same level the Blazewyrm starts.
 | 🍃 Green Gale | Bamboo Cub | Level 8 | The forest's strength, gathered and released. Out of the wrong end. |
 | 🤗 Cuddle | Bamboo Cub | Level 11 | Charges in arms first for the biggest hug it can manage. Whatever it catches comes out squished, and swings softer for a while. |
 | 🎋 Bamboo Tasting | Bamboo Cub | Level 12 | Takes a thoughtful bite, chews it over, and spits out the verdict. At them. Hard. |
+| 🌿 Forest Slam | Bamboo Cub | Level 14 | Leaps as high as a cub can and comes down on the forest floor. The ground erupts - and so, a little, does the cub. |
 | 🔥 Fireball | Blazewyrm | Level 18 | Draws a breath and spits a packed ball of flame |
 | 💥 Flame Stomp | Blazewyrm | Level 22 | Lands hard enough to throw a ring of fire out around it |
 | ☄️ Flying Swoop | Blazewyrm | Level 26 | A low, fast pass trailing fire |

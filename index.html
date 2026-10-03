@@ -2055,7 +2055,8 @@ function levelUpBeats(beats, gather, burst){
 
    Since then the Cinderling has gained Horn Rush (10) and Tail Swipe (12),
    and Cinder Sweep moved to 14 as its last and strongest move - see there;
-   and the Bamboo Cub has gained Cuddle (11). */
+   and the Bamboo Cub has gained Cuddle (11) and Forest Slam (14), its last
+   and strongest. */
 const SKILLS = {
   ember: [
     // the id stays "fizzle" - the Blazewyrm's real one already owns "fireball",
@@ -2407,7 +2408,8 @@ const SKILLS = {
        random it comes round too seldom to move a fight the Cinderling's four
        are deciding. Every version strong enough to close that gap - 1.20
        with a 20% squeeze, or 1.00 with 30% for three turns - put the Sparky
-       pairing at 55-61. That is a job for the cub's fourth move, at 14. The
+       pairing at 55-61. That is a job for the cub's fourth move, at 14 -
+       Forest Slam took 14 to 48.8 against the Cinderling. The
        Sparky also learns at 8, 11, 12 and 14, so this is its pattern too. */
     { id:"cuddle", name:"Cuddle", ico:"\u{1F917}", stage:1, level:11,
       blurb:"Charges in arms first for the biggest hug it can manage. Whatever it catches comes out squished, and swings softer for a while.",
@@ -2472,6 +2474,52 @@ const SKILLS = {
         durations:[300, 220, 260, 240, 260, 220, 240, 420,
                    100, 110, 120, 160, 260, 200, 260, 340],
         aspect:1.5097, scale:1.219, dx:13.58, dy:-0.84 } },
+    /* The Bamboo Cub's last move, at 14, the level before it becomes the
+       Panda, and its strongest: it leaps as high as a cub can and comes down
+       on the forest floor, and the ground erupts. 1.70x with 30% pierce, and
+       the landing costs the cub 9% of its own health - the price of its
+       biggest hit, as Cinder Sweep's singe is the Cinderling's. Worth over six
+       turns at 14 (the ladder's measure): Green Gale 1.042, Cuddle 1.025,
+       Bamboo Tasting 1.067, Forest Slam 1.145.
+
+       The cost is what let it be the strongest without tipping the Sparky
+       pairing over. At 14 the cub stood at 46.6% against the Cinderling and
+       54.0% against the Sparky, both foes have the same Defence, so nothing
+       lifts one pairing without the other, and every costless version strong
+       enough to lead the kit put the Sparky's at 56-61. A guard dropped after
+       landing barely cost the cub - it is the sturdiest of the three - where
+       its own health does. With both sides on btChoose(), 6,000 fights each
+       way: 48.8% against the Cinderling and 55.0% against the Sparky. The
+       cooldown, 5, barely changes how often the random picker reaches it;
+       it is there so a player cannot open with it and repeat it straight
+       away. */
+    { id:"forest-slam", name:"Forest Slam", ico:"\u{1F33F}", stage:1, level:14,
+      blurb:"Leaps as high as a cub can and comes down on the forest floor. The ground erupts - and so, a little, does the cub.",
+      battle:{ dmg:1.70, pierce:0.30, cd:5, self:0.09 },
+      sprite:{ src:"art/skill-forest-slam.png", frames:16, fps:5,
+        /* Crouch, leap, slam, and the wave. Four frames of getting ready - a
+           glance, a squash down, a wriggle with leaves stirring - then the
+           jump, quickening through four frames to the top of the arc, which
+           hangs a beat. Frame 9 is the impact, blades of grass and dirt
+           thrown up round it, and the clip's longest hold. The shockwave
+           rolls out to the right over three quick frames, then the dust and
+           the last leaves settle and it ends lying down, the idle's pose.
+
+           Cut like the idle (cub4), keeping only large dark shapes, since the
+           slam throws dark pebbles round the cub's feet. Two corrections,
+           both measured: frames 10-11 were drawn ~11% smaller than frame 12,
+           the same crouched pose (width, height and ear spacing agree), and
+           the first row ~6.5% larger than frame 15, the same resting pose,
+           and both were scaled to match. The leap is the artist's: the
+           airborne frames keep their height above their row's ground - 13,
+           32, 31 and 48px at frames 5-8 - while frame 9, which read 10px up
+           only because dust hides its feet, is put back on the ground.
+           Fitted on screen to the idle's lying frames against this clip's
+           first and last: within 2px at the feet and paws, 99-102% of its
+           size. */
+        durations:[300, 240, 280, 200, 160, 130, 120, 110,
+                   160, 380, 140, 140, 160, 220, 260, 340],
+        aspect:2.0701, scale:2.113, dx:27.08, dy:-11.11 } },
     /* The Panda had nothing at all, which made it the only third form with an
        empty skill row - something a player reads as a bug rather than as a
        gap. Nap fills it and suits the creature: it does no damage and it takes
@@ -4842,7 +4890,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-10-03 611c129";
+const BUILD_ID = "2026-10-03 cdc5be2";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
