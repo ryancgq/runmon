@@ -321,6 +321,7 @@ const BT = { POOL:5, MIT:0.6, JIT:0.35, EXTRA:0.35, GCD:2 };
    a rattled guard keep the same ratios they have in the game. Speed buys extra
    turns there; here it runs that pet's clock faster (see tempoOf). */
 const TURN = 1.4;
+const WALK = 165;   // px/s, the same for every pet at every level
 const BOSS_TURN = 1.3;   // his own turns come quicker than the game's ratio: live, a slow boss is a boss nobody gets hit by
 
 const SPECIES = {
@@ -1326,7 +1327,8 @@ function updatePet(e, dt){
   else {
     const m = Math.hypot(want.x, want.y);
     if (m > .05){
-      const sp = (110 + e.spd * e.spdMul) * (e.wild && !e.aggro ? .45 : 1);
+      // every pet walks at one pace: Speed buys turns (tempoOf), not legs
+      const sp = WALK * (e.wild && !e.aggro ? .45 : 1);
       moveEnt(e, want.x * sp * dt, want.y * sp * dt);
       e.aim = { x:want.x / m, y:want.y / m };
       if (Math.abs(want.x) > .15) e.face = want.x > 0 ? 1 : -1;
@@ -2223,6 +2225,7 @@ function updateHud(dt){
   const fx = [];
   if (p.stoke) fx.push("stoked"); if (p.charges) fx.push("charged ×" + p.charges); if (p.openT > 0) fx.push("guard open");
   if (p.burn) fx.push("burning"); if (p.softens) fx.push("guard down");
+  if ((p.tempo || 1) > 1.01) fx.push("quick ×" + p.tempo.toFixed(2));   // Speed: its clocks run faster than its foe's
   $("me-hptext").textContent = p.alive ? `${Math.ceil(p.cur)} / ${p.max} HP${fx.length ? " · " + fx.join(" · ") : ""}` : "fainted";
   $("swings").textContent = "⚔ " + G.swings;
   const ol = $("online"); ol.hidden = !NET.room;

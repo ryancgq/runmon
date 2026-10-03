@@ -62,7 +62,8 @@ Each species has a temperament:
 - **Ember** pets come at you.
 - **Nimbus** and **Verdant** pets mind their own business until you hit them.
 
-**Controls.** Drag on the left half of the screen to walk. Your right thumb
+**Controls.** Drag on the left half of the screen to walk. Every pet walks at
+the same pace (165 px/s); Speed shows up in fights instead (§3). Your right thumb
 has Attack, with up to four skills in an arc around it. The select screen
 asks for a name; it is what other people see over your pet.
 
@@ -82,7 +83,7 @@ Everything a fight is made of comes from the game's battle engine:
 | One move per turn | one turn = **1.4 s** of the pet's own clock |
 | Cooldown `cd` turns, a 2-turn shared cooldown after any skill | shorter cooldowns (below), × 1.4 s, and **no shared cooldown** |
 | Attack ×1, once a turn | **Attack ×0.1**, once a turn (below) |
-| Speed buys extra turns, up to 35%, chaining | the pet's whole clock runs `1/(1−p)` faster against its opponent: Attack, cooldowns, clips, its burn and guard timers |
+| Speed buys extra turns, up to 35%, chaining | the pet's whole clock runs `1/(1−p)` faster against its opponent: Attack, skill cooldowns, clips, its burn and guard timers. **Speed does not change how fast a pet walks**: every pet walks at 165 px/s, so Speed only ever means a quicker tempo. When it's quicker, the HUD says so ("quick ×1.15"). |
 | The boss never gets extra turns | the same |
 | Opponent picks any ready move at random (`btChoose`) | the wild pets' AI picks the same way, the moment its turn comes round |
 
