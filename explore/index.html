@@ -801,7 +801,7 @@ class Boss {
     Object.assign(this, {
       type:"boss", side:"foe", name:RAID_BOSS.short, boss:true,
       x:ARENA_PX.x, y:ARENA_PX.y - 10, r:60, box:185, face:-1, level:1,
-      pow:b.pow, def:b.def, spd:b.spd, max:1, cur:1,
+      pow:Math.round(b.pow * BOSS_POW), def:b.def, spd:b.spd, max:1, cur:1,
       alive:true, awake:false, flash:0, inv:0, kx:0, ky:0,
       act:null, next:0, cds:{}, gcd:0, deadT:0, dealt:0, hop:0, moving:0, quarry:null
     });
@@ -1727,13 +1727,17 @@ function playerFainted(){
    regenerates: every swing anyone takes stays off him until he is felled, as
    in the game. Who's fighting, and how many, changes nothing about it.
 
-   The game ships 25000, sized so a field of six level-26 runners fells him in
-   about 1.7 weeks - some 60 attempts between them. A live attempt takes far
-   more off him than a battle does (about 1,450 at level 26, against about
-   400), so the pool here is sized by attempts instead: about 70 at level 26,
-   40 at level 40, and 150 to 240 at level 14. The bar shows a percentage, as
-   in the game. */
-const RAID_HP = 100000;
+   He is a month's work for a group. Seven runners at the game's 30 km a week
+   earn about 180 swings a month between them. At level 26 a swing takes
+   about 1,400 off him for a player who dodges but gets caught mid-skill, and
+   about 6,200 for one only his roar ever touches. Sized for players between
+   the two (about 2,800 a swing), 500,000 is about a month: two months for a
+   field of the first kind, two weeks for a field of the second. The bar shows
+   a percentage, as in the game. */
+const RAID_HP = 500000;
+/* He hits a little harder than the game's Power 90, so attempts are shorter
+   and the fight is a long one for a whole group (see RAID_HP). */
+const BOSS_POW = 1.15;
 const RESPAWN = 20;   // seconds before he is back on his hill after a felling
 /* BS: his one account. The round (it goes up by one each time he is felled
    and comes back), whether he's down and since when (by the wall clock, so
