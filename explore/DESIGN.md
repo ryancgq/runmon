@@ -63,7 +63,8 @@ Each species has a temperament:
 - **Nimbus** and **Verdant** pets mind their own business until you hit them.
 
 **Controls.** Drag on the left half of the screen to walk. Every pet walks at
-the same pace (165 px/s); Speed shows up in fights instead (§3). Your right thumb
+the same pace (165 px/s); Speed shortens its cooldowns instead (§3). The
+select screen shows by how much. Your right thumb
 has Attack, with up to four skills in an arc around it. The select screen
 asks for a name; it is what other people see over your pet.
 
@@ -83,7 +84,7 @@ Everything a fight is made of comes from the game's battle engine:
 | One move per turn | one turn = **1.4 s** of the pet's own clock |
 | Cooldown `cd` turns, a 2-turn shared cooldown after any skill | shorter cooldowns (below), × 1.4 s, and **no shared cooldown** |
 | Attack ×1, once a turn | **Attack ×0.1**, once a turn (below) |
-| Speed buys extra turns, up to 35%, chaining | the pet's whole clock runs `1/(1−p)` faster against its opponent: Attack, skill cooldowns, clips, its burn and guard timers. **Speed does not change how fast a pet walks**: every pet walks at 165 px/s, so Speed only ever means a quicker tempo. When it's quicker, the HUD says so ("quick ×1.15"). |
+| Speed buys extra turns against the opponent, up to 35%, chaining | **a fixed tempo for the pet's own Speed, whoever it fights.** Its Attack, skill cooldowns and clips run `(1 + 5 × Speed / total stats) / 1.5` times as fast: Verdant at the base pace, Ember about 1.5× (cooldowns a third shorter), Nimbus about 1.6× (two-fifths shorter), plus whatever a charge adds. Walking is the same for every pet (165 px/s). The comparison with the opponent stays in the ranked battles only. |
 | The boss never gets extra turns | the same |
 | Opponent picks any ready move at random (`btChoose`) | the wild pets' AI picks the same way, the moment its turn comes round |
 
@@ -129,6 +130,14 @@ fix, Attack at ×0.75, still left it too strong, so:
   a target, so they hardly ever caught anything. Novas are about 40% wider:
   Cinder Sweep 105→150, Flame Stomp 115→160, Spark 95→135, Static Shock
   110→150. The fireball's puff goes from 85 to 120.
+**Speed for the pet's level.** A flat cut per point of Speed was tried first.
+It meant almost nothing at Lv 5 and cut a Lv 40 Zephyrite's cooldowns by
+nearly 60%, and with clips still at full length, Verdant won 99% of its
+matchups. Measuring Speed against the pet's total stats keeps a quick
+species' edge the same at every level. With it, the matchups land about 18
+points from the game's, closer than the opponent-comparison rule managed
+(about 22).
+
 **What it costs in balance.** Measured against the game's engine, simulated at
 levels 12, 26 and 40 with 320 fights a pairing, species matchups now land
 **about 22 points from the game on average**. They were 12 with the game's
@@ -251,13 +260,15 @@ simulation:
 
 | Level | Average player | Near-perfect player | Swings for 400,000, average / near-perfect | Time for 7 runners, average / near-perfect |
 | --- | --- | --- | --- | --- |
-| Lv 14 | ~590 | ~2,400 | ~680 / ~165 | ~4 months / ~4 weeks |
-| Lv 26 | ~1,500 | ~6,400 | ~270 / ~63 | ~6 weeks / ~1.5 weeks |
-| Lv 40 | ~2,600 | ~10,600 | ~155 / ~38 | ~3.5 weeks / ~1 week |
+| Lv 14 | ~830 | ~3,400 | ~480 / ~115 | ~2.7 months / ~3 weeks |
+| Lv 26 | ~1,900 | ~8,800 | ~210 / ~46 | ~5 weeks / ~1 week |
+| Lv 40 | ~3,400 | ~13,900 | ~117 / ~29 | ~3 weeks / ~5 days |
 
 The average player steps out of his marks but gets caught mid-skill. The
 near-perfect one is touched only by his roar. A Lv 26 field halfway between
-the two takes about three weeks.
+the two takes about 2.5 weeks. Speed's quicker cooldowns raised damage per
+swing by about a third for Ember and Nimbus. Bringing the timeline back to
+about three weeks would take about 525,000 health.
 
 **After he falls**, everyone who was on him sees the death clip and a card of
 who took what off him this round. He is back on his hill 20 seconds later

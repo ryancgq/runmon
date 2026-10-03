@@ -843,25 +843,24 @@ function btHit(x, y, mult, pierce){
   if (y.exposed){ d *= y.exposed; y.exposed = 0; }
   return Math.max(1, Math.round(d));
 }
-/* Speed buys extra turns in a battle: after a blow, the speed gap is the
-   chance to go again, capped at 35%, and it chains - a pet at the cap averages
-   1.54 actions to the other's one. Here that is its tempo: every clock the
-   game counts in a pet's own turns (Attack, cooldowns, the shared cooldown,
-   its clips, its own burn and guard) runs that much faster. A boss never gets
-   extra turns, as in the game. */
-function extraTurn(x, y){
-  if (x.boss || !y) return 0;
-  const sx = x.spd * x.spdMul, sy = y.spd * (y.spdMul || 1);
-  return Math.max(0, Math.min(BT.EXTRA, (sx - sy) / (sx + sy)));
-}
+/* Speed, out here, is how fast a pet's own clock runs - its Attack, its
+   skills' cooldowns and their clips - by a fixed amount for its own Speed,
+   whoever it is fighting. (The ranked battles keep the game's rule, where
+   Speed buys extra turns against the opponent's.)
+
+   It is Speed for the pet's level - Speed over its total attributes - so a
+   quick species keeps the same edge at every level instead of a flat bonus
+   that means nothing at level 5 and everything at 40:
+       tempo = (1 + 5 × Speed / total) / 1.5
+   Verdant (a tenth of its stats in Speed) runs at the base pace, Ember about
+   1.5× (cooldowns a third shorter) and Nimbus about 1.6× (two-fifths), and a
+   charge's Speed adds to it. Of the forms tried, this kept the species
+   closest to the game's matchups. Walking is untouched: every pet moves at
+   the same pace. */
+function speedTempo(spd, level){ return (1 + 5 * spd / attrTotal(level)) / 1.5; }
 function tempoOf(e){
-  e.tempoT = (e.tempoT || 0) - 1;
-  if (e.tempoT <= 0){
-    e.tempoT = 15;
-    const foe = e.aggro && e.aggro.alive ? e.aggro : nearestFoe(e, 500);
-    e.tempo = 1 / (1 - extraTurn(e, foe));
-  }
-  return e.tempo || 1;
+  if (e.boss) return 1;
+  return e.tempo = speedTempo(e.spd * (e.spdMul || 1), e.level);
 }
 
 function strike(x, y, mult, pierce, o = {}){
@@ -920,7 +919,7 @@ function riders(x, sk, hits, foe){
   if (b.self) selfHurt(x, b.self, x.sp === "nimbus" ? "singed" : "scorched");
   if (!x.alive) return;
   if (b.stoke){ x.stoke = { mult:b.stoke.mult, hits:b.stoke.hits }; say(`next ${b.stoke.hits} hits ×${b.stoke.mult}`); }
-  if (b.charge && x.charges < b.charge.max){ x.charges++; x.spdMul += b.charge.spd; x.powMul += b.charge.pow; x.tempoT = 0; say(`charged ×${x.charges}`); }
+  if (b.charge && x.charges < b.charge.max){ x.charges++; x.spdMul += b.charge.spd; x.powMul += b.charge.pow; say(`charged ×${x.charges}`); }
   if (b.soften && x.softens < b.soften.max){ x.softens++; x.defMul = Math.max(.1, x.defMul - b.soften.pct); say("guard drops", "#9aa3b8"); }
   if (b.open){ x.openT = b.open.turns * TURN; x.openPct = b.open.pct; say("flat-footed", "#9aa3b8"); }
   if (b.heal){
@@ -1297,9 +1296,10 @@ function updatePet(e, dt){
     if (e.respawnT > 0){ e.respawnT -= dt; if (e.respawnT <= 0) respawnPet(e); }
     return;
   }
-  const tdt = dt * tempoOf(e);   // time in this pet's own turns
-  e.atkCd = Math.max(0, e.atkCd - tdt); e.turnT = Math.max(0, (e.turnT || 0) - tdt); e.gcd = Math.max(0, e.gcd - tdt);
+  const tdt = dt * tempoOf(e);   // the pet's own clock, run by its Speed
+  e.atkCd = Math.max(0, e.atkCd - tdt); e.gcd = Math.max(0, e.gcd - tdt);
   for (const k in e.cds) e.cds[k] = Math.max(0, e.cds[k] - tdt);
+  e.turnT = Math.max(0, (e.turnT || 0) - tdt);
   tickRiders(e, tdt);
   if (!e.alive) return;
   // out of a fight for a while: the next one starts clean, and you get your breath back
@@ -1731,10 +1731,10 @@ function playerFainted(){
 
    He is a group's work over weeks. Seven runners at the game's 30 km a
    week earn about 180 swings a month between them. At level 26 a swing takes
-   about 1,500 off him for a player who dodges but gets caught mid-skill, and
-   about 6,400 for one only his roar ever touches. At 400,000 that is about
-   six weeks for a field of the first kind, a week and a half for a field of
-   the second, and about three weeks between the two. The bar shows a
+   about 1,900 off him for a player who dodges but gets caught mid-skill, and
+   about 8,800 for one only his roar ever touches. At 400,000 that is about
+   five weeks for a field of the first kind, a week for a field of the
+   second, and about two and a half weeks between the two. The bar shows a
    percentage, as in the game. */
 const RAID_HP = 400000;
 /* He hits a little harder than the game's Power 90 (×1.08), so attempts are
@@ -2225,7 +2225,7 @@ function updateHud(dt){
   const fx = [];
   if (p.stoke) fx.push("stoked"); if (p.charges) fx.push("charged ×" + p.charges); if (p.openT > 0) fx.push("guard open");
   if (p.burn) fx.push("burning"); if (p.softens) fx.push("guard down");
-  if ((p.tempo || 1) > 1.01) fx.push("quick ×" + p.tempo.toFixed(2));   // Speed: its clocks run faster than its foe's
+  if ((p.tempo || 1) > 1.005) fx.push(`cooldowns −${Math.round((1 - 1 / p.tempo) * 100)}%`);   // what its Speed buys
   $("me-hptext").textContent = p.alive ? `${Math.ceil(p.cur)} / ${p.max} HP${fx.length ? " · " + fx.join(" · ") : ""}` : "fainted";
   $("swings").textContent = "⚔ " + G.swings;
   const ol = $("online"); ol.hidden = !NET.room;
@@ -2611,7 +2611,8 @@ function showDetail(){
   $("stats").innerHTML = [["HP", a.hp * BT.POOL], ["Defence", a.def], ["Power", a.pow], ["Speed", a.spd]]
     .map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join("");
   const kit = SKILLS[f.species].filter(k => k.stage === f.stage);
-  $("kit").innerHTML = kit.map(k => {
+  const cut = Math.round((1 - 1 / speedTempo(a.spd, G.level)) * 100);
+  $("kit").innerHTML = `<div><span>⏱ Speed ${a.spd}</span><em>${cut > 0 ? `cooldowns ${cut}% shorter` : "cooldowns at the base pace"}</em></div>` + kit.map(k => {
     const has = G.level >= k.level;
     return `<div class="${has ? "" : "no"}"><span>${k.ico} ${k.name}</span><em>${has ? moveNote(k) : "learnt at Lv " + k.level}</em></div>`;
   }).join("");
