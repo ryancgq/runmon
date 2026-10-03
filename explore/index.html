@@ -142,6 +142,11 @@
     background:linear-gradient(96deg,#ff6b35,#ffd23f);-webkit-background-clip:text;background-clip:text;color:transparent;
     filter:drop-shadow(0 3px 12px rgba(0,0,0,.9))}
   #banner p{margin:6px auto 0;max-width:30ch;color:var(--ink);font-size:13.5px;text-shadow:0 2px 8px #000;text-wrap:balance}
+  #banner h2:empty{display:none}
+  #banner h2.long{font-size:clamp(14px,4.7vw,21px);letter-spacing:-.2px;overflow-wrap:anywhere}
+  /* a line of narration, said before something happens */
+  #banner.narr p{font-size:17px;font-style:italic;font-weight:800;max-width:24ch;color:#ffe0b8;
+    text-shadow:0 2px 10px #000,0 0 18px rgba(0,0,0,.8)}
   #toast{position:absolute;left:50%;top:24%;transform:translateX(-50%);padding:8px 13px;font-size:12.5px;max-width:86%;text-align:center;
     pointer-events:none;opacity:0;transition:opacity .3s}
   #toast.on{opacity:1}
@@ -1495,6 +1500,9 @@ function beginAct(b, a){
   if (Math.abs(a.mx - b.x) > 8) b.face = a.mx < b.x ? -1 : 1;
   if (a.r && !a.fired){ a.tf = { kind:"tele", x:a.mx, y:a.my, r:a.r, t:0, dur:a.impact - a.t, lock:Math.max(0, (a.lock || 0) - a.t) }; G.fx.push(a.tf); }
   castLabel(a.sk ? a.sk.name : "");
+  // the roar is narrated as he winds up to it
+  if (a.k === "uwaaargh" && !a.fired && G.raid && !G.raid.over)
+    banner("", `${RAID_BOSS.short} is getting very upset and starts to…`, Math.max(.4, a.impact - a.t), true);
 }
 // where a pet he has picked is now, on this page: this page's own, or another's as drawn here
 function quarryAt(id){
@@ -1557,7 +1565,7 @@ function landBlow(b, a){
       if (b.charges < k.battle.charge.max){ b.charges++; b.spdMul += k.battle.charge.spd; b.powMul += k.battle.charge.pow; }
     }
     ring(b.x, b.y - 120, 260, "#fff3a8", .6, 8); G.cam.shake = 10;
-    if (mine) banner("UWAAAARGH!", "his next two blows land harder", 1.3);
+    if (mine) banner("UUUWWAAAARRGGHHHHHHHHH", "his next two blows land harder", 1.8);
     if (mine && p.alive){ const ang = Math.atan2(p.y - b.y, p.x - b.x); p.kx += Math.cos(ang) * 160; p.ky += Math.sin(ang) * 160; }
   }
 }
@@ -2132,7 +2140,11 @@ function showLobby(){
    HUD
    ========================================================================= */
 let bannerTimer = 0, toastTimer = 0;
-function banner(h, p, secs){ $("banner-h").textContent = h; $("banner-p").textContent = p || ""; $("banner").classList.add("on"); bannerTimer = secs; }
+function banner(h, p, secs, narr){
+  $("banner-h").textContent = h; $("banner-h").classList.toggle("long", h.length > 18);
+  $("banner-p").textContent = p || "";
+  $("banner").classList.toggle("narr", !!narr); $("banner").classList.add("on"); bannerTimer = secs;
+}
 function toast(msg, secs = 2.2){ $("toast").textContent = msg; $("toast").classList.add("on"); toastTimer = secs; }
 function castLabel(s){ $("bcast").textContent = s; }
 function drawPortrait(canvas, formId, frame = 0){
