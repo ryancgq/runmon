@@ -1378,7 +1378,7 @@ function fightAI(e, t, dt){
    steps out of anything about to land - what a player is learning too. */
 function raidBot(e, dt){
   for (const f of G.fx){
-    if (f.kind !== "tele") continue;
+    if (f.kind !== "tele" || f.full) continue;   // nowhere to run from the roar: keep fighting
     // marked: no skill now - walk out, and maybe dash the last of it
     const d = Math.hypot(e.x - f.x, (e.y - f.y) * 1.4);
     if (d < f.r + 20){
@@ -1408,7 +1408,7 @@ function raidBot(e, dt){
    With other people here one page runs him (NET.leads) and the others follow
    its account. Every page settles his blows on its own pet only. */
 const BOSS_WALK = 95;
-const ROAR_HIT = 0.6, ROAR_GROW = 0.25, ROAR_MARK = 200;   // the roar's own hit, and how much more each roar of a fight adds
+const ROAR_HIT = 0.6, ROAR_GROW = 0.25;   // the roar's own hit, and how much more each roar of a fight adds
 // where in its sheet a blow is: the wind-up stretched by `pre`, the rest at `rate`
 function actClipMs(a){
   const rate = a.rate || 1, pre = a.pre || 1;
@@ -1492,8 +1492,8 @@ function startBossAct(b, sk, q){
   let mx = lx, my = ly, r = R.r || (sk ? sk.fx.radius || 0 : 0);
   // a swing and a Splitter come down on you - or as near as he can reach
   if (kind === "swing" || kind === "slam"){ const reach = Math.min(d, go + R.short); mx = b.x + ux * reach; my = b.y + uy * reach; }
-  // the roar is marked like any blow, round him - though it reaches the whole hill
-  if (kind === "roar") r = ROAR_MARK;
+  // the roar is marked too: the whole hill goes red (beginAct)
+  if (kind === "roar") r = 1;
   // the roar's own hit grows with every roar in a fight: nobody outlasts him
   const rm = kind === "roar" ? ROAR_HIT + ROAR_GROW * (b.roars++) : 0;
   // a roar's stoke rides on the blow, so every page lands it the same
@@ -1507,7 +1507,12 @@ function beginAct(b, a){
   a.fired = a.t >= a.impact;
   b.act = a;
   if (Math.abs(a.mx - b.x) > 8) b.face = a.mx < b.x ? -1 : 1;
-  if (a.r && !a.fired){ a.tf = { kind:"tele", x:a.mx, y:a.my, r:a.r, t:0, dur:a.impact - a.t, lock:Math.max(0, (a.lock || 0) - a.t) }; G.fx.push(a.tf); }
+  if (a.r && !a.fired){
+    a.tf = { kind:"tele", x:a.mx, y:a.my, r:a.r, t:0, dur:a.impact - a.t, lock:Math.max(0, (a.lock || 0) - a.t) };
+    // the roar's mark is the whole hill
+    if (a.k === "uwaaargh") Object.assign(a.tf, { x:ARENA_PX.x, y:ARENA_PX.y, r:ARENA_PX.r - 8, full:true });
+    G.fx.push(a.tf);
+  }
   castLabel(a.sk ? a.sk.name : "");
   // the roar is narrated as he winds up to it
   if (a.k === "uwaaargh" && !a.fired && G.raid && !G.raid.over)
@@ -1561,9 +1566,9 @@ function landBlow(b, a){
     if (mine && inMark(p)) strike(b, p, k.battle.dmg * a.m, 0, { knock:260, fromX:a.mx, fromY:a.my });
   }
   if (fx.kind === "roar"){
-    /* UWAAAARGH: marked round him like any blow, so it looks like it can be
-       outrun - but it fills the whole hill, a dash won't carry you through
-       it, and it hits everyone on him. Its own hit
+    /* UWAAAARGH: the whole hill is marked red - there is nowhere to stand
+       out of it, and a dash won't carry you through it. It hits everyone on
+       him. Its own hit
        is the lightest of his (ROAR_HIT) but grows with every roar of the
        fight, so however well you move, he wears you down. Then, as in the
        game, his next two blows land 60% harder and he charges, faster and
@@ -2402,9 +2407,10 @@ function drawFxGround(){
       ctx.save();
       if (f.lock && f.t < f.lock){ ctx.setLineDash([10, 7]); ctx.globalAlpha = .65 + .35 * Math.sin(G.time * 30); }
       ctx.fillStyle = `rgba(255,77,106,${.1 + .14 * k})`; ctx.strokeStyle = `rgba(255,120,140,${.55 + .4 * k})`; ctx.lineWidth = 2.5;
-      ctx.beginPath(); ctx.ellipse(f.x, f.y, f.r, f.r / 1.4, 0, 0, 7); ctx.fill(); ctx.stroke();
+      const ry = f.full ? f.r : f.r / 1.4;   // the whole hill is a circle on the map
+      ctx.beginPath(); ctx.ellipse(f.x, f.y, f.r, ry, 0, 0, 7); ctx.fill(); ctx.stroke();
       ctx.fillStyle = "rgba(255,120,140,.28)";
-      ctx.beginPath(); ctx.ellipse(f.x, f.y, f.r * k, f.r / 1.4 * k, 0, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(f.x, f.y, f.r * k, ry * k, 0, 0, 7); ctx.fill();
       ctx.restore();
     }
     if (f.kind === "ring"){
