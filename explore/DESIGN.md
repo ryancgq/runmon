@@ -218,9 +218,9 @@ marked on the ground first**, so you can walk or dash out of it:
 
 | Move | How he moves | The mark | What it does |
 | --- | --- | --- | --- |
-| Plain swing | rears back, then lunges up to 260 px at you | **harder:** marked only 0.6 s ahead, and the mark **follows you** until 0.35 s before it lands (dashed and flickering while it follows, solid once it locks). Step away early and it comes with you; you have to react. | ×1 |
-| **Torchswing** | charges up to 220 px towards you, then spins | **harder:** played 35% faster (lands about 0.65 s after the mark appears), with a wider ring (210 px) round where he stops | ×1.35 to anything within reach |
-| **Splitter** | leaps up to 420 px, landing beside you | unchanged: a large red mark under you, landing about 1.1 s later. The big, readable one. | ×2.2, 70% through guard. It deletes a low-level pet, as in the game |
+| Plain swing | rears back, then lunges up to 260 px at you | **harder:** marked only 0.7 s ahead, and the mark **follows you** until 0.42 s before it lands (dashed and flickering while it follows, solid once it locks). Step away early and it comes with you; you have to react. | ×1 |
+| **Torchswing** | charges up to 220 px towards you, then spins | **harder:** played 35% faster after a wind-up 15% longer (lands about 0.76 s after the mark appears), with a wider ring (210 px) round where he stops | ×1.35 to anything within reach |
+| **Splitter** | leaps up to 420 px, landing beside you | a large red mark under you, landing about 1.28 s later (the sheet's wind-up, 15% longer). The big, readable one. | ×2.2, 70% through guard. It deletes a low-level pet, as in the game |
 | **UWAAAARGH!** | stands and roars | **the whole hill turns red**, filling in as the roar builds. There is nowhere to stand out of it, and a dash doesn't help. He winds up for **about 2.6 s**, twice his sheet's wind-up, while a line of narration reads *"Sir Uwaaarghhhh is getting very upset and starts to…"*. As it lands, **UUUWWAAAARRGGHHHHHHHHH** comes out a letter at a time over about a second, faster as it goes, with the text shaking (and a phone buzzing) as he shouts it. | hits **everyone** on him, at ×0.6 for the first roar of a fight, plus ×0.25 for each roar after (×0.85, ×1.1, ×1.35 ...). Then, as in the game, his next two blows hit ×1.6 and he charges, getting faster and stronger, up to twice. |
 
 If he lands on you, you're shoved clear of him.
@@ -260,15 +260,13 @@ simulation:
 
 | Level | Average player | Near-perfect player | Swings for 400,000, average / near-perfect | Time for 7 runners, average / near-perfect |
 | --- | --- | --- | --- | --- |
-| Lv 14 | ~830 | ~3,400 | ~480 / ~115 | ~2.7 months / ~3 weeks |
-| Lv 26 | ~1,900 | ~8,800 | ~210 / ~46 | ~5 weeks / ~1 week |
-| Lv 40 | ~3,400 | ~13,900 | ~117 / ~29 | ~3 weeks / ~5 days |
+| Lv 14 | ~910 | ~3,400 | ~440 / ~118 | ~2.4 months / ~3 weeks |
+| Lv 26 | ~2,250 | ~8,500 | ~180 / ~47 | ~1 month / ~1 week |
+| Lv 40 | ~3,450 | ~14,800 | ~116 / ~27 | ~3 weeks / ~4.5 days |
 
 The average player steps out of his marks but gets caught mid-skill. The
 near-perfect one is touched only by his roar. A Lv 26 field halfway between
-the two takes about 2.5 weeks. Speed's quicker cooldowns raised damage per
-swing by about a third for Ember and Nimbus. Bringing the timeline back to
-about three weeks would take about 525,000 health.
+the two takes about two weeks.
 
 **After he falls**, everyone who was on him sees the death clip and a card of
 who took what off him this round. He is back on his hill 20 seconds later

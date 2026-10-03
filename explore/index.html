@@ -1469,16 +1469,17 @@ function updateBoss(b, dt){
 /* A blow is one plain record - where he starts and lands, where it is marked,
    when it lands - so the page that runs him can hand it to the others whole. */
 /* How each blow travels and how hard it is to read:
-   - swing: quick (marked .6 s), and the mark follows you until .35 s before
+   - swing: quick (marked .7 s), and the mark follows you until .42 s before
      it lands - you can't step out early, you have to react.
-   - sweep (Torchswing): played 35% faster, charges in further and reaches
-     wider.
-   - slam (Splitter) and roar: as they were. The Splitter is the big, slow,
-     readable one you can always get out of. */
+   - sweep (Torchswing): played 35% faster after a wind-up 15% longer than
+     that (`pre`), charges in further and reaches wider.
+   - slam (Splitter): its wind-up 15% longer than the sheet's. The big,
+     readable one you can always get out of.
+   - roar: wound up twice as long, and can't be got out of at all. */
 const BOSS_REACH = {
-  swing:{ r:64, go:260, short:70, from:.5, tele:.6, track:.35 },
-  slam:{ go:420, short:80, from:.3 },
-  sweep:{ go:220, short:100, from:0, rate:1.35, r:210 },
+  swing:{ r:64, go:260, short:70, from:.5, tele:.7, track:.42 },
+  slam:{ go:420, short:80, from:.3, pre:1.15 },
+  sweep:{ go:220, short:100, from:0, rate:1.35, pre:1.15, r:210 },
   roar:{ go:0, short:0, from:0, pre:2 }   // his roar winds up twice as long as its sheet
 };
 function startBossAct(b, sk, q){
@@ -1736,10 +1737,10 @@ function playerFainted(){
 
    He is a group's work over weeks. Seven runners at the game's 30 km a
    week earn about 180 swings a month between them. At level 26 a swing takes
-   about 1,900 off him for a player who dodges but gets caught mid-skill, and
-   about 8,800 for one only his roar ever touches. At 400,000 that is about
-   five weeks for a field of the first kind, a week for a field of the
-   second, and about two and a half weeks between the two. The bar shows a
+   about 2,250 off him for a player who dodges but gets caught mid-skill, and
+   about 8,500 for one only his roar ever touches. At 400,000 that is about
+   a month for a field of the first kind, a week for a field of the second,
+   and about two weeks between the two. The bar shows a
    percentage, as in the game. */
 const RAID_HP = 400000;
 /* He hits a little harder than the game's Power 90 (×1.08), so attempts are
