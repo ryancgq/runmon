@@ -3,6 +3,8 @@
 Pets leave the pet screen and walk around a top-down world. They fight the
 wild pets they meet live, dungeon-crawler style, using their own skills on
 cooldowns, and take on the raid boss, Sir Uwaaarghhhh, on his hill.
+Everyone who has the link open is in the same world, and can take him on
+together.
 
 This is a **standalone prototype** for phones. It lives in `explore/`, shares
 nothing with the game's `index.html`, and never reads or writes a save. Its
@@ -10,8 +12,10 @@ job is to show whether the idea works before any of it goes into the game.
 
 ## Try it
 
-- **Hosted link:** a private Artifact page built from this folder (see
-  [Publishing](#publishing)). Open it on a phone.
+- **Hosted link:** an Artifact page built from this folder (see
+  [Publishing](#7-publishing)). Open it on a phone. To play together, share it
+  from the page's Share menu; testers must be signed in to Claude to join the
+  shared world. A public link opens the same game, solo.
 - **Locally:** serve the repo root (`python3 -m http.server`) and open
   `/explore/` with a phone-sized window or the device toolbar.
 - **Deep links for testing:** `#explore`, `#raid`, `#raid.blazewyrm`,
@@ -56,13 +60,14 @@ Each species has a temperament:
 - **Nimbus** and **Verdant** pets mind their own business until you hit them.
 
 **Controls.** Drag on the left half of the screen to walk. Your right thumb
-has Attack, with up to four skills in an arc around it.
+has Attack, with up to four skills in an arc around it. The select screen
+asks for a name; it is what other people see over your pet.
 
 ## 3. Combat: live, on the game's numbers
 
-Fights are live, dungeon-crawler style. Move with the left thumb. Tap
-**👊 Attack** or any of your pet's skills whenever they're off cooldown.
-Each button counts its own cooldown down.
+Fights are live, dungeon-crawler style. Move with the left thumb. Tap any of
+your pet's skills whenever they're off cooldown, and **👊 Attack** between
+them. Each button counts its own cooldown down.
 
 Everything a fight is made of comes from the game's battle engine:
 
@@ -72,19 +77,62 @@ Everything a fight is made of comes from the game's battle engine:
 | Damage: `btHit`, divisive Defence, K, ±35% jitter, no crits | the same function |
 | Each move's multiplier, pierce and riders (burn, rattle, stoke, charge, soften, open, Nap's heal and expose) | the same, applied the same way |
 | One move per turn | one turn = **1.4 s** of the pet's own clock |
-| Cooldown `cd` turns, a 2-turn shared cooldown after any skill | `cd × 1.4 s`, and 2.8 s shared |
+| Cooldown `cd` turns, a 2-turn shared cooldown after any skill | shorter cooldowns (below), × 1.4 s, and 2.8 s shared |
+| Attack ×1, once a turn | **Attack ×0.75**, once a turn (below) |
 | Speed buys extra turns, up to 35%, chaining | the pet's whole clock runs `1/(1−p)` faster against its opponent: Attack, cooldowns, clips, its burn and guard timers |
 | The boss never gets extra turns | the same |
 | Opponent picks any ready move at random (`btChoose`) | the wild pets' AI picks the same way, the moment its turn comes round |
 
-**Attack** is the plain move (×1). It lunges at whatever is closest. With
-nothing in reach it is a dash, and nothing *he* swings can land on you
-mid-dash.
+**Attack** lunges at whatever is closest. With nothing in reach it is a dash,
+and nothing *he* swings can land on you mid-dash. Once a skill has landed,
+Attack's dash cuts the rest of its clip short, which is how you get out from
+under him mid-move. It buys room, not time: the rest of that move's turn
+still runs before the next skill.
 
 **Skills** play their real clip from the game, sped up to fit inside one turn
 so a long clip never costs extra time. The hit is drawn on the clip's impact
 frame. Shots and strikes find their target, rushes steer onto it and stop when
 they connect, and novas, swipes and gales take whatever is in their shape.
+
+### Skills over Attack
+
+In playtesting, spamming Attack was the best play. A ×1 Attack once a turn is
+easy to land and lets you move freely between swipes. Using skills as well
+added only about 15%, because the game's shared cooldown leaves every other
+turn to Attack anyway, and the skills that go off round your own pet rarely
+reached anything. So:
+
+- **Attack hits at ×0.75.** Using your skills as they come up now does about
+  a third more damage than spamming Attack.
+- **Shorter cooldowns, so the moves a pet learns first come round more.** The
+  first damaging move of each form comes back every 2 turns. The rest come
+  back one turn sooner than in the game, never under 2. A Nap is still once a
+  fight.
+
+  | Form | Skill | Game | Here |
+  | --- | --- | --- | --- |
+  | Cinderling | fireball, Horn Rush, Tail Swipe, Cinder Sweep | 4, 3, 3, 3 | 2, 2, 2, 2 |
+  | Blazewyrm | Fireball, Flame Stomp, Flying Swoop | 3, 3, 3 | 2, 2, 2 |
+  | Sparky | Spark, Static Shock, Acorn Flick, Pocket Storm | 3, 3, 5, 6 | 2, 2, 4, 5 |
+  | Zephyrite | Lightning Bolt, Arc Lash | 3, 3 | 2, 2 |
+  | Bamboo Cub | Green Gale, Bamboo Toss | 3, 3 | 2, 2 |
+  | Panda | Nap, Landslide | 4 (once), 5 | 4 (once), 2 |
+
+- **Bigger areas for the moves that go off around your pet.** They don't seek
+  a target, so they hardly ever caught anything. Novas are about 40% wider:
+  Cinder Sweep 105→150, Flame Stomp 115→160, Spark 95→135, Static Shock
+  110→150. The fireball's puff goes from 85 to 120.
+- **The shared cooldown stays.** That keeps the game's rhythm of a skill, then
+  an Attack. Without it, every weaker-Attack variant tipped the matchups
+  Verdant's way, by up to 40 points. Nimbus's speed buys it extra turns, and
+  in the game most of those are Attacks, so a weaker Attack costs Nimbus
+  most.
+
+Measured against the game's engine, simulated at levels 12, 26 and 40 with
+320 fights a pairing, species matchups land **about 14 points from the game
+on average**. The old rules (Attack ×1) measured 12 in the same run. Verdant
+v Nimbus is still the outlier, now 20 to 40 points Verdant's way (it was 7 to
+25 before). Every variant with Attack at ×0.5 measured 16 to 17.
 
 ### Keeping it close to the game's balance
 
@@ -109,10 +157,10 @@ Per move, the live version now matches the game: the same moves per fight and
 the same damage per move. For example, in Panda v Blazewyrm at Lv 26, Attack
 averages 69 and Landslide 99, against 69 and 101 in the game.
 
-Simulated AI v AI at levels 12, 26 and 40, the species matchups land **9
-points from the game's on average** (game 46–57%, live 32–70%). Some of that
-is sampling noise at 160 fights a pairing. The worst case is Verdant v Nimbus,
-which runs about 15 points Verdant's way.
+With the old rules, simulated AI v AI at levels 12, 26 and 40, the species
+matchups landed 9 to 12 points from the game's on average. Fights are short,
+about five moves a side, so one extra action swings a result by 20 points,
+and much of that difference is noise.
 
 Some difference is unavoidable. Verdant's matchups are knife-edge races in the
 game too, decided by a fraction of an action, and real time moves those
@@ -135,15 +183,21 @@ Everything about him is the game's:
 
 He chooses the way the game's `btChoose` does: any ready move at random, with
 cooldowns counted in his own turns, which come every 2.1 s and quicken as his
-roar charges him. **Every blow is marked on the ground first**, so you can
-walk or dash out of it:
+roar charges him.
 
-| Move | What you see | What it does |
-| --- | --- | --- |
-| Plain swing | a red mark under one pet | ×1, a short lunge |
-| **Splitter** | a large red mark under a pet, as he raises the torch | ×2.2, 70% through guard. It deletes a low-level pet, as in the game |
-| **Torchswing** | a ring all round him | ×1.35 to anything within reach |
-| **UWAAAARGH!** | he roars | no damage, but his next two blows hit ×1.6 and he charges, getting faster and stronger, up to twice |
+**He moves.** Standing still, he was easy to read. Now he walks at whoever he
+has picked between blows, and circles once he's close. He switches targets
+now and then, and every blow carries him somewhere new. **Every blow is still
+marked on the ground first**, so you can walk or dash out of it:
+
+| Move | How he moves | The mark | What it does |
+| --- | --- | --- | --- |
+| Plain swing | rears back, then lunges up to 260 px at you | a red mark under you | ×1 |
+| **Splitter** | leaps up to 420 px, landing beside you | a large red mark under you | ×2.2, 70% through guard. It deletes a low-level pet, as in the game |
+| **Torchswing** | charges up to 150 px towards you, then spins | a ring round where he stops | ×1.35 to anything within reach |
+| **UWAAAARGH!** | stands and roars | none | no damage, but his next two blows hit ×1.6 and he charges, getting faster and stronger, up to twice |
+
+If he lands on you, you're shoved clear of him.
 
 **As in the game:**
 
@@ -156,10 +210,57 @@ You get three swings; the menu gives you more. The game earns one per 5 km
 run.
 
 **His health pool.** The game's pool is 25,000, sized for a whole field of
-runners over weeks. Here it is 70 of your plain Attacks at your level. In
-simulation, a player who half-dodges fells him in 2–7 swings, with attempts
-lasting 17–45 s. In the menu you can bring two other runners' pets, AI allies
-that step out of his marks, to try the raid as a group.
+runners over weeks. Here each pet that takes him on brings a share: 80
+full-strength blows (×1) at its level. With other people on him at the same
+time, the pool is the sum of their shares, so a group fells him about as
+fast as one pet would, together.
+
+In simulation, a player who steps out of his marks and doesn't start a skill
+under one fells him alone in 2 to 7 swings, mostly 4 or 5. Attempts last 21
+to 45 s.
+
+**After he falls**, everyone who was on him sees the death clip and a card of
+who took what off him. He is back on his hill 20 seconds later, unmarked.
+
+## 4a. Together
+
+Everyone who has the page open is in the same world. You see each other's
+pets walking about, with their names, health and skills. You can take him on
+at the same time, and his health is one pool for everybody.
+
+**How it works.** It uses the Artifact page's `room` capability. Nothing is
+stored and there is no server of our own.
+
+- **Each page sets its own presence** about ten times a second. That is its
+  pet's form, level and position, the move it is playing, its health, whether
+  it's on him, and how much it has taken off him this time round. Other pages
+  draw a pet from that. They never simulate it, and they never take hits on
+  its behalf.
+- **One page runs him.** It walks him, picks his moves and puts all of it in
+  its presence: where he is, the blow in progress (start, landing, mark, and
+  when it lands), the pool, and everyone's damage. The other pages draw him
+  from that and play each blow from the same record.
+- **Each page settles his blows on its own pet only**, at the moment the mark
+  fills. The page running him decides where he goes, and your page decides
+  whether you were standing in it.
+- **His health** is the pool less the sum of what every page says it has
+  taken off him. The page running him keeps the list, including people who
+  have since left.
+- **Handing him over.** The page that has run him longest keeps him, so
+  someone arriving never takes him over with a fresh pool. If that page
+  closes or goes into the background, the lowest-labelled page still on
+  screen picks him up from the last state it saw. In testing, his health,
+  position and charges came through the hand-off intact.
+- **Wild pets stay per player.** Each page has its own, so nobody steals
+  anybody's fight.
+- **Alone, it's the same game.** With no room (a public link, or the page
+  outside Claude) the page runs him itself and nothing else changes.
+
+**Trust.** It's a prototype for friends. Presence is unverified, so a page
+could claim damage it never dealt. Names are shown as text only, and are
+never parsed as markup. If this goes into the game, the raid pool should
+live on the game's own server (the raid Durable Object already exists), with
+the room only for showing who is where.
 
 ## 5. Art
 
@@ -213,11 +314,17 @@ Artifact and lists the files that go with it (`art/*.png` and
 only strips the outer `<html>`, `<head>` and `<body>` tags that the host
 supplies.
 
+The page is published with the `room` capability (`capabilities: {room: {}}`).
+Only people signed in to Claude whom the owner has shared it with join the
+shared world. Opened any other way, `claude.use("room")` resolves `null` and
+the page plays solo. From the repo, served locally, it is always solo.
+
 ## 8. Open questions
 
-1. **Should the raid go social in the world?** In the game, other runners' swings
-   at him are invisible. Out here they could show up as other pets on the hill,
-   or as a running tally on his sign.
+1. **Is the shared raid worth bringing into the game?** In the game, other
+   runners' swings at him are invisible. The prototype shows them as other
+   pets on the hill, on one pool. It would need the game's server to own the
+   pool (see §4a).
 2. **Should exploring be tied to running directly?** For example, energy that
    each kilometre refills. It would make the link explicit. It would also
    gate fun behind exercise, which might be right or might put people off.
