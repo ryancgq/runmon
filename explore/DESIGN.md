@@ -14,8 +14,11 @@ job is to show whether the idea works before any of it goes into the game.
 
 - **Hosted link:** an Artifact page built from this folder (see
   [Publishing](#7-publishing)). Open it on a phone. To play together, share it
-  from the page's Share menu; testers must be signed in to Claude to join the
-  shared world. A public link opens the same game, solo.
+  from the page's Share menu as **Contributor**. Testers must be signed in to
+  Claude to join the shared world, and need Contributor for their damage to
+  be saved. A Viewer still plays with everyone, and their damage is saved
+  while a Contributor is in the world. A public link opens the same game,
+  solo.
 - **Locally:** serve the repo root (`python3 -m http.server`) and open
   `/explore/` with a phone-sized window or the device toolbar.
 - **Deep links for testing:** `#explore`, `#raid`, `#raid.blazewyrm`,
@@ -216,30 +219,40 @@ If he lands on you, you're shoved clear of him.
 
 - You always get the first swing.
 - An attempt ends when your pet falls.
-- His health carries over to the next attempt.
+- His health carries over to the next attempt, and never regenerates.
 - His bar shows a percentage.
 
-You get three swings; the menu gives you more. The game earns one per 5 km
+You get three swings; the menu gives you ten more. The game earns one per 5 km
 run.
 
-**His health pool.** The game's pool is 25,000, sized for a whole field of
-runners over weeks. Here each pet that takes him on brings a share: 80
-full-strength blows (×1) at its level. He is meant to be hard to kill, so
-his health stayed put when he got faster. With other people on him at the same
-time, the pool is the sum of their shares, so a group fells him about as
-fast as one pet would, together.
+**His health is one fixed pool: 100,000.** It is the same for one player or
+twenty, and it never regenerates. Every swing anyone takes stays off him,
+across attempts, sessions and days, until he is felled. He is meant to be
+the very end of the game.
 
-In simulation, the test player steps out of his marks, waits for a following
-mark to lock before it dashes, and doesn't start a skill under one. His plain
-swing still lands on it 60 to 75% of the time, because a skill's clip often
-holds it in place when the mark locks. Alone, it takes 4 to 10 swings at Lv 14,
-3 to 6 at Lv 26 and 2 or 3 at Lv 40, with attempts of 10 to 25 s. Pets with a
-single skill struggle: 9 to 12 swings for a Lv 18 Blazewyrm, and more than 30
-for a Lv 8 Cinderling. A group's pool grows with each pet that joins, so
-friends don't make him easier, just faster to bring down.
+The game ships 25,000, sized so a field of six level-26 runners fells him in
+about 1.7 weeks, some 60 attempts between them. A live attempt takes far more
+off him than a battle does, so the pool here is sized by attempts instead. In
+simulation, a test player steps out of his marks, waits for a following mark
+to lock before it dashes, and doesn't start a skill under one. Its average
+damage per attempt at each level:
+
+| Level | Damage per attempt | Attempts to fell him |
+| --- | --- | --- |
+| Lv 14 | about 550 | about 180 |
+| Lv 18 Blazewyrm (one skill) | about 470 | about 210 |
+| Lv 26 | about 1,450 (1,000 to 1,900 by species) | about 70 |
+| Lv 40 | about 2,600 | about 40 |
+
+Attempts last 10 to 35 s, and his plain swing lands 60 to 75% of the time,
+because a skill's clip often holds the player in place when the mark locks. A
+Lv 8 Cinderling, with only its ×0.4 fireball, is effectively no threat to
+him. Bringing friends doesn't change his health. It only shares the work.
 
 **After he falls**, everyone who was on him sees the death clip and a card of
-who took what off him. He is back on his hill 20 seconds later, unmarked.
+who took what off him this round. He is back on his hill 20 seconds later
+for the next round, at full health. The 20 seconds is for testing; in the game
+he'd stay down until the next raid.
 
 ## 4a. Together
 
@@ -247,8 +260,9 @@ Everyone who has the page open is in the same world. You see each other's
 pets walking about, with their names, health and skills. You can take him on
 at the same time, and his health is one pool for everybody.
 
-**How it works.** It uses the Artifact page's `room` capability. Nothing is
-stored and there is no server of our own.
+**How it works.** It uses two capabilities of the Artifact page: `room` for
+who's here now, and `db`, a small shared store, for his health. There is no
+server of our own.
 
 - **Each page sets its own presence** about ten times a second. That is its
   pet's form, level and position, the move it is playing, its health, whether
@@ -262,9 +276,19 @@ stored and there is no server of our own.
 - **Each page settles his blows on its own pet only**, at the moment the mark
   fills. The page running him decides where he goes, and your page decides
   whether you were standing in it.
-- **His health** is the pool less the sum of what every page says it has
-  taken off him. The page running him keeps the list, including people who
-  have since left.
+- **His health** is 100,000 less the sum of what every tab has taken off him
+  this round. Each tab keeps its own figure, which survives a reload, so two
+  tabs never overwrite each other. Figures only ever grow, so every copy of
+  the account (the store, the presence of the page running him, this
+  browser) merges by keeping the larger number per tab.
+- **Kept in the store.** Each tab's damage this round is its own document,
+  `raids/e<round>/hits/<tab>`. `raids/state` holds the round number and when
+  he fell. A tab writes its own document; the page running him also writes
+  any figure the store is behind on, so a Viewer's damage is saved while a
+  Contributor is around. Everyone closing the page loses nothing.
+- **Without the store** (signed out, a public link, the repo copy) the same
+  account lives in this browser's local storage. A browser's solo progress
+  never leaks into the shared one.
 - **Handing him over.** The page that has run him longest keeps him, so
   someone arriving never takes him over with a fresh pool. If that page
   closes or goes into the background, the lowest-labelled page still on
@@ -275,8 +299,8 @@ stored and there is no server of our own.
 - **Alone, it's the same game.** With no room (a public link, or the page
   outside Claude) the page runs him itself and nothing else changes.
 
-**Trust.** It's a prototype for friends. Presence is unverified, so a page
-could claim damage it never dealt. Names are shown as text only, and are
+**Trust.** It's a prototype for friends. Presence and the store are
+unverified, so a page could claim damage it never dealt. Names are shown as text only, and are
 never parsed as markup. If this goes into the game, the raid pool should
 live on the game's own server (the raid Durable Object already exists), with
 the room only for showing who is where.
@@ -333,10 +357,12 @@ Artifact and lists the files that go with it (`art/*.png` and
 only strips the outer `<html>`, `<head>` and `<body>` tags that the host
 supplies.
 
-The page is published with the `room` capability (`capabilities: {room: {}}`).
-Only people signed in to Claude whom the owner has shared it with join the
-shared world. Opened any other way, `claude.use("room")` resolves `null` and
-the page plays solo. From the repo, served locally, it is always solo.
+The page is published with `capabilities: {room: {}, db: {}}`, using the
+store's default rules: everyone admitted reads, and Contributors and above
+write. Only people signed in to Claude whom the owner has shared it with join
+the shared world. Opened any other way, both resolve `null` and the page
+plays solo, keeping his health in the browser. From the repo, served locally,
+it is always solo.
 
 ## 8. Open questions
 

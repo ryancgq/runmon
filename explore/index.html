@@ -253,8 +253,8 @@
   <h1>Paused</h1>
   <button class="go" id="m-resume">Resume</button>
   <div class="row"><button class="ghost" id="m-camp">To the campfire</button><button class="ghost" id="m-hill">To the hill</button></div>
-  <div class="row"><button class="ghost" id="m-heal">Full heal</button><button class="ghost" id="m-swings">3 more swings</button></div>
-  <div class="row"><button class="ghost" id="m-reset">Respawn him</button><button class="ghost" id="m-pet">Change pet</button></div>
+  <div class="row"><button class="ghost" id="m-heal">Full heal</button><button class="ghost" id="m-swings">10 more swings</button></div>
+  <button class="ghost" id="m-pet">Change pet</button>
   <p id="m-note"></p>
   <label class="chk"><input type="checkbox" id="m-god"> God mode (take no damage)</label>
   <p>Prototype tools. None of this touches your real pet.</p>
@@ -1666,8 +1666,7 @@ function newGame(toRaid){
   G.player = new Pet(G.formId, G.level, "hero", { x:CAMP_PX.x - 60, y:CAMP_PX.y + 30, player:true });
   G.ents.push(G.player);
   G.boss = new Boss(); G.ents.push(G.boss);
-  // alone, he starts fresh with each pet; with others he is whatever they've left of him
-  if (!BS || !NET.on){ freshPool(); }
+  // he is whatever everyone has left of him - a new pet doesn't heal him
   NET.since = G.time;
   if (BS.dead) G.boss.alive = false, G.boss.deadT = 1e6;
   spawnWild();
@@ -1699,23 +1698,41 @@ function playerFainted(){
    the next, an attempt costs a swing, and it ends when your pet falls. Here it
    is fought live, every blow of his marked on the ground first, and the pool
    is shared by everyone in the world (BS, below). */
-function raidPool(p){
-  /* The game's 25000 is one pool for a whole field of runners over weeks.
-     Here each pet that takes him on brings its share: what a full-strength
-     blow (×1) takes off him at its level, times RAID_SHARE - a few attempts'
-     work for a pet that keeps out from under him. The bar shows a
-     percentage, as in the game, so the number itself never shows. */
-  const K = attrTotal(p.level) * BT.MIT;
-  return Math.round(p.pow * K / (K + RAID_BOSS.battle.def) * RAID_SHARE);
-}
-const RAID_SHARE = 80;
+/* His health is one fixed pool, the same for everyone, and it never
+   regenerates: every swing anyone takes stays off him until he is felled, as
+   in the game. Who's fighting, and how many, changes nothing about it.
+
+   The game ships 25000, sized so a field of six level-26 runners fells him in
+   about 1.7 weeks - some 60 attempts between them. A live attempt takes far
+   more off him than a battle does (about 1,450 at level 26, against about
+   400), so the pool here is sized by attempts instead: about 70 at level 26,
+   40 at level 40, and 150 to 240 at level 14. The bar shows a percentage, as
+   in the game. */
+const RAID_HP = 100000;
 const RESPAWN = 20;   // seconds before he is back on his hill after a felling
-/* BS: his one shared account. An epoch (a fresh one each time he respawns),
-   the pool's size, whether he's down, and what each page has taken off him -
-   peer label: [damage, name, form]. The page that runs him holds the
-   original; the others keep a copy from its presence. */
+/* BS: his one account. The round (it goes up by one each time he is felled
+   and comes back), whether he's down and since when (by the wall clock, so
+   every device agrees), and what each tab has taken off him this round - tab
+   key: [damage, name, form]. Damage only ever grows, so every copy of the
+   account merges by keeping the larger figure per tab, whichever page or
+   store it came from. It is kept in the page's shared store when there is
+   one (STORE, below), and in this browser when there isn't. */
 let BS = null;
-function freshPool(){ BS = { e:(Math.random() * 2 ** 31) | 0, mx:raidPool(G.player), dd:{}, dead:false, deadAt:0 }; NET.dm = 0; NET.dmE = BS.e; }
+function freshPool(e){ BS = { e:e | 0, mx:RAID_HP, dd:{}, dead:false, deadAt:0 }; }
+function mergeHit(k, dm, n, f){
+  if (typeof k !== "string" || !/^[a-z0-9]{4,20}$/.test(k)) return;
+  dm = clamp(+dm || 0, 0, RAID_HP);
+  const o = BS.dd[k];
+  if (!dm || (o && o[0] >= dm)) return;
+  BS.dd[k] = [dm, cleanNick(n), FORMS[f] ? f : ""];
+}
+// a later round replaces this one; the same round can only gain a felling
+function adoptRound(e, dead, deadAt){
+  e = e | 0;
+  if (e < BS.e) return;
+  if (e > BS.e){ freshPool(e); if (G.raid && !G.raid.over){ G.raid.e = e; G.raid.startDm = 0; } }
+  if (dead && !BS.dead){ BS.dead = true; BS.deadAt = +deadAt || Date.now(); }
+}
 function startAttempt(){
   const b = G.boss;
   if (G.raid || !b.alive || BS.dead) return;
@@ -1739,7 +1756,7 @@ function endAttempt(felled){
 function bossFelled(b){
   b.deadT = 0; b.act = null; b.hop = 0; castLabel("");
   G.fx = G.fx.filter(f => f.kind !== "tele");
-  if (NET.leads()){ BS.dead = true; BS.deadAt = G.time; }
+  if (NET.leads() && !BS.dead){ BS.dead = true; BS.deadAt = Date.now(); writeState(); }
   const fighting = G.raid && !G.raid.over;
   if (fighting || dist(G.player, ARENA_PX) < ARENA_PX.r + 200){
     G.cam.shake = 16;
@@ -1763,7 +1780,7 @@ function pct(n){ return (Math.round(n * 1000) / 10).toFixed(1) + "%"; }
 /* Who has taken what off him this time round, biggest first. */
 function shares(){
   return Object.entries(BS.dd).filter(([, v]) => v[0] > 0)
-    .map(([k, v]) => ({ me:k === NET.me, name:k === NET.me ? "You" : v[1] || "Someone", form:FORMS[v[2]] ? FORMS[v[2]].name : "", share:v[0] / BS.mx }))
+    .map(([k, v]) => ({ me:k === NET.key, name:k === NET.key ? "You" : v[1] || "Someone", form:FORMS[v[2]] ? FORMS[v[2]].name : "", share:v[0] / BS.mx }))
     .sort((a, b) => b.share - a.share);
 }
 function showResult(felled, r){
@@ -1815,8 +1832,9 @@ function drawBossCard(felled){
    with how long it has, and the page that has run him longest keeps him -
    so someone arriving never takes him over with a fresh pool. When it goes
    (or its screen goes off), the lowest peer label among the pages still
-   here and on screen picks him up from the last account it saw. His health is the pool less the sum of
-   what each page says it has taken off him this time round.
+   here and on screen picks him up from the last account it saw. His health is
+   the pool less the sum of what every tab says it has taken off him this
+   round (BS).
 
    With no room - a public link, a page opened outside Claude - it is the
    same game, alone. */
@@ -1825,7 +1843,101 @@ const NET = {
   dm:0, dmE:null, sendT:0, ks:0, ds:0, online:0, others:[], since:0,
   leads(){ return this.leader; }
 };
-const myPP = () => raidPool(G.player);
+/* This tab's key for what it has taken off him: kept through a reload, new
+   in each tab, so two tabs never overwrite each other's damage. */
+function tabKey(){
+  let k = null;
+  try { k = sessionStorage.getItem("rx.tab"); } catch(e){}
+  if (!k || !/^[a-z0-9]{4,20}$/.test(k)){ k = "t" + Math.random().toString(36).slice(2, 12); try { sessionStorage.setItem("rx.tab", k); } catch(e){} }
+  return k;
+}
+NET.key = tabKey();
+
+/* =========================================================================
+   KEEPING HIS WOUNDS
+   =========================================================================
+   With the page's shared store (db), every tab's damage this round is a
+   document of its own - raids/e<round>/hits/<tab key> - and raids/state
+   says which round it is and when he fell. So his health survives everyone
+   closing the page, and it's the same number on every device. A tab writes
+   its own document; the page running him also writes everyone else's
+   figures it knows of, so a tester who can only view still leaves a mark
+   while someone who can write is about. Without the store (signed out, a
+   public link, the repo copy) the account lives in this browser. */
+const STORE = { db:null, ok:true, seen:{}, hitsE:null, unHits:null, writing:false, lastT:0, stateBusy:false, statePending:false, localJson:"" };
+async function connectStore(){
+  let db = null;
+  try { db = window.claude && typeof window.claude.use === "function" ? await window.claude.use("db") : null; } catch(e){ db = null; }
+  if (!db) return;
+  STORE.db = db;
+  // the shared account replaces this browser's own - solo damage never leaks into it
+  freshPool(1); NET.dm = 0; NET.dmE = 1;
+  db.doc("raids/state").onSnapshot(snap => {
+    const d = snap.exists ? snap.data() : null;
+    if (d) adoptRound(d.e, +d.felledAt > 0, +d.felledAt);
+    watchHits();
+  }, () => {});
+  watchHits();
+}
+function watchHits(){
+  if (!STORE.db || STORE.hitsE === BS.e) return;
+  if (STORE.unHits) STORE.unHits();
+  const e = STORE.hitsE = BS.e; STORE.seen = {};
+  STORE.unHits = STORE.db.collection("raids/e" + e + "/hits").limit(1000).onSnapshot(qs => {
+    if (BS.e !== e) return;
+    for (const d of qs.docs){
+      const v = d.data() || {};
+      STORE.seen[d.id] = Math.max(STORE.seen[d.id] || 0, +v.dm || 0);
+      mergeHit(d.id, v.dm, v.n, v.f);
+      // this tab, reloaded: carry on from what it had already taken off him
+      if (d.id === NET.key && NET.dmE === e && +v.dm > NET.dm) NET.dm = +v.dm;
+    }
+  }, () => { STORE.hitsE = null; });
+}
+function writeState(){
+  if (!STORE.db || !STORE.ok) return;
+  if (STORE.stateBusy){ STORE.statePending = true; return; }
+  STORE.stateBusy = true;
+  STORE.db.doc("raids/state").set({ e:BS.e, felledAt:BS.dead ? BS.deadAt : 0 })
+    .catch(err => { if (err && err.code === "invalid_argument") STORE.ok = false; })
+    .finally(() => { STORE.stateBusy = false; if (STORE.statePending){ STORE.statePending = false; writeState(); } });
+}
+/* One write in flight at a time, at most every 0.7 s: this tab's own figure
+   first, then (on the page running him) anyone else's the store is behind on. */
+function persist(){
+  const now = Date.now();
+  if (STORE.db && STORE.ok && !STORE.writing && now - STORE.lastT > 700 && STORE.hitsE === BS.e){
+    let k = null;
+    const mine = BS.dd[NET.key];
+    if (mine && mine[0] > (STORE.seen[NET.key] || 0) + .5) k = NET.key;
+    else if (NET.leader) for (const key in BS.dd) if (BS.dd[key][0] > (STORE.seen[key] || 0) + .5){ k = key; break; }
+    if (k){
+      const v = BS.dd[k], e = BS.e, dm = Math.round(v[0]);
+      STORE.writing = true; STORE.lastT = now;
+      STORE.db.doc("raids/e" + e + "/hits/" + k).set({ dm, n:v[1], f:v[2], at:now })
+        .then(() => { if (BS.e === e) STORE.seen[k] = Math.max(STORE.seen[k] || 0, dm); },
+              err => { if (err && err.code === "invalid_argument") STORE.ok = false; })
+        .finally(() => { STORE.writing = false; });
+    }
+  }
+  if (!STORE.db && now - STORE.lastT > 2000){
+    STORE.lastT = now;
+    const json = JSON.stringify({ e:BS.e, dead:BS.dead, deadAt:BS.deadAt, dd:BS.dd });
+    if (json !== STORE.localJson){ STORE.localJson = json; store("rx.raid", json); }
+  }
+}
+function loadLocal(){
+  freshPool(1);
+  try {
+    const s = JSON.parse(store("rx.raid") || "null");
+    if (s && (s.e | 0) >= 1){
+      freshPool(s.e); BS.dead = !!s.dead; BS.deadAt = +s.deadAt || 0;
+      for (const k in s.dd || {}){ const v = s.dd[k]; if (Array.isArray(v)) mergeHit(k, v[0], v[1], v[2]); }
+    }
+  } catch(e){}
+  const mine = BS.dd[NET.key];
+  NET.dmE = BS.e; NET.dm = mine ? mine[0] : 0;
+}
 function cleanNick(s){ return String(s || "").replace(/[\u0000-\u001f\u007f-\u009f<>&"'`\\]/g, "").trim().slice(0, 14); }
 function nick(){ return cleanNick(G.nick) || "Runner"; }
 async function connectRoom(){
@@ -1844,11 +1956,7 @@ function netTick(dt){
   const room = NET.room, b = G.boss;
   if (room){
     const all = room.peers(), mine = all.find(p => p.sameTab);
-    if (mine && mine.peer !== NET.me){
-      // the label the room gave this page replaces the stand-in it used alone
-      if (BS.dd[NET.me]){ BS.dd[mine.peer] = BS.dd[NET.me]; delete BS.dd[NET.me]; }
-      NET.me = mine.peer;
-    }
+    if (mine) NET.me = mine.peer;
     NET.others = all.filter(p => !p.sameTab && p.kind === "viewer" && p.presence && p.presence.g === 1);
     NET.online = all.filter(p => p.kind === "viewer").length;
   }
@@ -1874,43 +1982,27 @@ function netTick(dt){
   for (const p of others){ seen.add(p.peer); syncNetPet(p.peer, p.presence); }
   for (const id of [...NET.pets.keys()]) if (!seen.has(id)) NET.pets.delete(id);
   for (const n of NET.pets.values()) animNetPet(n, dt);
-  // his pool: the page that runs him says its size and who has taken what
+  // his pool: one account, merged from every copy of it here
   if (hb) followPool(hb);
   if (NET.dmE !== BS.e){ NET.dmE = BS.e; NET.dm = 0; }
-  if (NET.dm > 0) BS.dd[NET.me] = [NET.dm, nick(), G.formId];
-  for (const p of others){
-    const pr = p.presence, dm = Math.min(+pr.dm || 0, BS.mx);
-    if (pr.ep === BS.e && dm > 0 && !(BS.dd[p.peer] && BS.dd[p.peer][0] >= dm)) BS.dd[p.peer] = [dm, cleanNick(pr.n), String(pr.f || "")];
-  }
-  if (NET.leader){
-    // each pet that takes him on brings its share of his health
-    let want = G.raid && !G.raid.over ? myPP() : 0;
-    for (const p of others) if (p.presence.rd) want += clamp(+p.presence.pp || 0, 0, 1e6);
-    BS.mx = Math.max(BS.mx, want);
-  }
-  let total = 0; for (const k in BS.dd) total += +BS.dd[k][0] || 0;
+  if (NET.dm > 0) mergeHit(NET.key, NET.dm, nick(), G.formId);
+  for (const p of others){ const pr = p.presence; if ((pr.ep | 0) === BS.e) mergeHit(String(pr.k || ""), pr.dm, pr.n, pr.f); }
+  let total = 0; for (const k in BS.dd) total += BS.dd[k][0];
   b.max = BS.mx; b.cur = Math.max(0, BS.mx - total);
   if (NET.leader){
-    if (b.alive && b.cur <= 0 && !BS.dead) faint(b, null);
-    if (BS.dead && G.time - BS.deadAt > RESPAWN){ freshPool(); reviveBoss(b); b.max = BS.mx; b.cur = BS.mx; }
-  } else if (hb){
-    if (hb.dead && b.alive){ b.cur = 0; faint(b, null); }
-    if (!hb.dead && !b.alive) reviveBoss(b);
+    if (b.alive && b.cur <= 0 && !BS.dead) faint(b, null);   // bossFelled marks the round down
+    if (BS.dead && Date.now() - BS.deadAt > RESPAWN * 1000){ freshPool(BS.e + 1); writeState(); }
   }
+  // every page draws him as the account has him
+  if (BS.dead && b.alive){ b.cur = 0; faint(b, null); }
+  if (!BS.dead && !b.alive){ reviveBoss(b); b.cur = b.max = BS.mx; }
+  watchHits(); persist();
   publish(dt);
 }
 function followPool(h){
-  const e = h.e | 0;
-  if (e !== BS.e){
-    BS = { e, mx:1, dd:{}, dead:false, deadAt:G.time };
-    if (G.raid && !G.raid.over){ G.raid.e = e; G.raid.startDm = 0; }
-  }
-  BS.mx = clamp(+h.mx || 1, 1, 1e7); BS.dead = !!h.dead;
-  if (h.dd && typeof h.dd === "object") for (const k in h.dd){
-    const v = h.dd[k]; if (k === NET.me || !Array.isArray(v)) continue;
-    const dm = Math.min(+v[0] || 0, BS.mx);
-    if (!(BS.dd[k] && BS.dd[k][0] >= dm)) BS.dd[k] = [dm, cleanNick(v[1]), String(v[2] || "")];
-  }
+  adoptRound(h.e, !!h.dead, h.da);
+  if ((h.e | 0) !== BS.e || !h.dd || typeof h.dd !== "object") return;
+  for (const k in h.dd){ const v = h.dd[k]; if (k !== NET.key && Array.isArray(v)) mergeHit(k, v[0], v[1], v[2]); }
 }
 /* This page runs him now: pick him up where the last page left him. */
 function takeOver(b){
@@ -1919,15 +2011,15 @@ function takeOver(b){
   followPool(h);
   Object.assign(b, { x:+h.x || b.x, y:+h.y || b.y, act:null, hop:0, next:1, awake:false,
     powMul:+h.pw || 1, spdMul:+h.sm || 1, charges:h.ch | 0, stokeHits:h.st | 0 });
-  if (BS.dead) BS.deadAt = G.time;
   castLabel("");
   NET.lastHB = null;   // used once: an older account must never come back later
 }
 function bossState(b){
   const a = b.act, dd = {};
-  Object.entries(BS.dd).sort((x, y) => y[1][0] - x[1][0]).slice(0, 30).forEach(([k, v]) => { dd[k] = [Math.round(v[0]), v[1], v[2]]; });
+  // the biggest 40 - a page coming in without the store gets the rest from their own pages
+  Object.entries(BS.dd).sort((x, y) => y[1][0] - x[1][0]).slice(0, 40).forEach(([k, v]) => { dd[k] = [Math.round(v[0]), v[1].slice(0, 10), v[2]]; });
   const r2 = v => Math.round(v * 100) / 100;
-  return { e:BS.e, mx:BS.mx, dead:BS.dead ? 1 : 0, dd, x:Math.round(b.x), y:Math.round(b.y), f:b.face, w:b.awake ? 1 : 0,
+  return { e:BS.e, dead:BS.dead ? 1 : 0, da:BS.deadAt, dd, x:Math.round(b.x), y:Math.round(b.y), f:b.face, w:b.awake ? 1 : 0,
     pw:r2(b.powMul), sm:r2(b.spdMul), ch:b.charges, st:b.stokeHits || 0,
     a:a && a.t < a.end ? { n:a.n, k:a.k, t:r2(a.t), impact:r2(a.impact), end:r2(a.end), sx:Math.round(a.sx), sy:Math.round(a.sy),
       lx:Math.round(a.lx), ly:Math.round(a.ly), mx:Math.round(a.mx), my:Math.round(a.my), r:a.r, from:a.from, m:a.m,
@@ -1942,7 +2034,7 @@ function publish(dt){
     Object.assign(pr, { f:p.formId, l:p.level, x:Math.round(p.x), y:Math.round(p.y), fc:p.face, mv:p.moving > .1 ? 1 : 0,
       k:p.clip ? p.clip.sk.id : "", ks:NET.ks, ds:NET.ds, am:Math.round(Math.atan2(p.aim.y, p.aim.x) * 100),
       hp:Math.round(p.cur), al:p.alive ? 1 : 0, rd:G.raid && !G.raid.over ? 1 : 0,
-      ep:BS.e, dm:Math.round(NET.dm), pp:myPP(), b:NET.leader ? bossState(G.boss) : null,
+      ep:BS.e, dm:Math.round(NET.dm), k:NET.key, b:NET.leader ? bossState(G.boss) : null,
       lt:NET.leader ? Math.round(G.time - NET.since) : null });
   }
   NET.room.presence(pr).catch(() => {});
@@ -2477,7 +2569,6 @@ function togglePause(on){
   G.paused = on && !NET.on; $("menu").hidden = !on;
   if (on){
     $("m-god").checked = G.god;
-    const alone = !NET.pets.size; $("m-reset").hidden = !alone;
     $("m-note").textContent = NET.on ? "Prototype tools. The world keeps going while this is open." : "Prototype tools. None of this touches your real pet.";
   }
 }
@@ -2490,8 +2581,7 @@ function bindMenus(){
   $("m-camp").onclick = () => { if (G.raid) leaveRaid(); Object.assign(G.player, { x:CAMP_PX.x - 60, y:CAMP_PX.y + 30 }); togglePause(false); };
   $("m-hill").onclick = () => { if (G.raid) leaveRaid(); Object.assign(G.player, { x:ARENA_PX.x, y:ARENA_PX.y + ARENA_PX.r - 50 }); togglePause(false); };
   $("m-heal").onclick = () => { for (const e of G.ents) if (e.side === "hero"){ e.alive = true; e.cur = e.max; } togglePause(false); };
-  $("m-swings").onclick = () => { G.swings += 3; togglePause(false); toast(`${G.swings} swings.`, 1.4); };
-  $("m-reset").onclick = () => { if (G.raid) leaveRaid(); freshPool(); reviveBoss(G.boss); togglePause(false); };
+  $("m-swings").onclick = () => { G.swings += 10; togglePause(false); toast(`${G.swings} swings.`, 1.4); };
   $("m-pet").onclick = () => { if (G.raid) leaveRaid(); G.running = false; G.paused = false; $("menu").hidden = true; $("hud").hidden = true; $("select").hidden = false; NET.pets.clear(); NET.sendT = 0; buildPicks(); showLobby(); };
   $("m-god").onchange = ev => G.god = ev.target.checked;
   $("nick").oninput = ev => { G.nick = cleanNick(ev.target.value); store("rx.nick", G.nick); };
@@ -2508,6 +2598,8 @@ function bindMenus(){
   if (f0 && FORMS[f0]){ G.formId = f0; G.level = l0 || FORMS[f0].def; }
   G.nick = cleanNick(store("rx.nick")) || "Runner " + (10 + Math.floor(Math.random() * 90));
   store("rx.nick", G.nick); $("nick").value = G.nick;
+  loadLocal();     // his wounds as this browser last saw them...
+  connectStore();  // ...or as everyone left them, when the page has its shared store
   connectRoom();   // with others if the page has a room; alone, the same game, if not
   await loadAll();
   genWorld();
