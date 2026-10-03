@@ -211,9 +211,18 @@ marked on the ground first**, so you can walk or dash out of it:
 | Plain swing | rears back, then lunges up to 260 px at you | **harder:** marked only 0.6 s ahead, and the mark **follows you** until 0.35 s before it lands (dashed and flickering while it follows, solid once it locks). Step away early and it comes with you; you have to react. | ×1 |
 | **Torchswing** | charges up to 220 px towards you, then spins | **harder:** played 35% faster (lands about 0.65 s after the mark appears), with a wider ring (210 px) round where he stops | ×1.35 to anything within reach |
 | **Splitter** | leaps up to 420 px, landing beside you | unchanged: a large red mark under you, landing about 1.1 s later. The big, readable one. | ×2.2, 70% through guard. It deletes a low-level pet, as in the game |
-| **UWAAAARGH!** | stands and roars | unchanged: none | no damage, but his next two blows hit ×1.6 and he charges, getting faster and stronger, up to twice |
+| **UWAAAARGH!** | stands and roars | **none: it fills the whole hill.** The screen edges pulse red as it builds (about 1.3 s). Can't be dodged; a dash doesn't help. | hits **everyone** on him, at ×0.6 for the first roar of a fight, plus ×0.25 for each roar after (×0.85, ×1.1, ×1.35 ...). Then, as in the game, his next two blows hit ×1.6 and he charges, getting faster and stronger, up to twice. |
 
 If he lands on you, you're shoved clear of him.
+
+**Nobody outlasts him.** The roar is what makes every attempt end. Its hit is
+the lightest of his, but it can't be avoided and it grows with every roar, and
+there is no healing in a raid beyond Panda's one Nap. In simulation, a perfect
+player (one whom every blow but the roar misses) still falls within 38 to 135
+s, after 2 to 7 roars; the longest of 72 runs was 169 s. Playing well buys
+time, and time is damage: a perfect Lv 26 player takes about 5 times as much
+off him per attempt as the test player. Every attempt still ends, and more
+attempts means more running.
 
 **As in the game:**
 

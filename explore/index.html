@@ -788,7 +788,7 @@ class Pet {
    next one clean, the way every battle in the game starts clean. */
 function resetFight(e){
   Object.assign(e, { powMul:1, spdMul:1, defMul:1, charges:0, softens:0, stoke:null,
-    openT:0, openPct:0, exposed:0, burn:null, used:{}, stokeHits:0 });
+    openT:0, openPct:0, exposed:0, burn:null, used:{}, stokeHits:0, roars:0 });
 }
 class Boss {
   constructor(){
@@ -862,7 +862,7 @@ function strike(x, y, mult, pierce, o = {}){
   if (!y.alive) return 0;
   /* Dodging is for his blows only: a battle has no such thing, and pets that
      could dash through each other's attacks stop trading blows at all. */
-  if (y.inv > 0 && x.boss){ floatText(y.x, y.y - y.box, "dodged", "#ffd23f", 12); return 0; }
+  if (y.inv > 0 && x.boss && !o.unblockable){ floatText(y.x, y.y - y.box, "dodged", "#ffd23f", 12); return 0; }
   let dmg = btHit(x, y, mult, pierce);
   if (G.god && y.side === "hero") dmg = 0;
   y.cur -= dmg;
@@ -1401,6 +1401,7 @@ function raidBot(e, dt){
    With other people here one page runs him (NET.leads) and the others follow
    its account. Every page settles his blows on its own pet only. */
 const BOSS_WALK = 95;
+const ROAR_HIT = 0.6, ROAR_GROW = 0.25;   // the roar's own hit, and how much more each roar of a fight adds
 function bossPhase(cur, max){ const f = cur / max; return RAID_BOSS.phases.find(p => f >= p.from) || RAID_BOSS.phases[3]; }
 // everyone who has taken a swing at him and is still standing, this page's pet included
 function bossQuarries(){
@@ -1478,10 +1479,12 @@ function startBossAct(b, sk, q){
   // a swing and a Splitter come down on you - or as near as he can reach
   if (kind === "swing" || kind === "slam"){ const reach = Math.min(d, go + R.short); mx = b.x + ux * reach; my = b.y + uy * reach; }
   if (kind === "roar") r = 0;
+  // the roar's own hit grows with every roar in a fight: nobody outlasts him
+  const rm = kind === "roar" ? ROAR_HIT + ROAR_GROW * (b.roars++) : 0;
   // a roar's stoke rides on the blow, so every page lands it the same
   let m = 1;
   if (kind !== "roar" && b.stokeHits > 0){ m = RAID_BOSS.kit[0].battle.stoke.mult; b.stokeHits--; }
-  beginAct(b, { n:(Math.random() * 1e9) | 0, k:sk ? sk.id : "", t:0, impact, end, sx:b.x, sy:b.y, lx, ly, mx, my, r, from:R.from, m,
+  beginAct(b, { n:(Math.random() * 1e9) | 0, k:sk ? sk.id : "", t:0, impact, end, sx:b.x, sy:b.y, lx, ly, mx, my, r, from:R.from, m, rm,
     rate, q:q.id, lock:R.track ? impact - R.track : 0 });
 }
 function beginAct(b, a){
@@ -1540,15 +1543,20 @@ function landBlow(b, a){
     if (mine && inMark(p)) strike(b, p, k.battle.dmg * a.m, 0, { knock:260, fromX:a.mx, fromY:a.my });
   }
   if (fx.kind === "roar"){
-    // UWAAAARGH: no damage, but his next two blows land 60% harder, and he
-    // charges - faster and stronger, up to twice a fight
+    /* UWAAAARGH: it fills the whole hill - no mark, no dodging, a dash
+       won't carry you through it - and it hits everyone on him. Its own hit
+       is the lightest of his (ROAR_HIT) but grows with every roar of the
+       fight, so however well you move, he wears you down. Then, as in the
+       game, his next two blows land 60% harder and he charges, faster and
+       stronger, up to twice. */
+    if (mine) strike(b, p, a.rm || ROAR_HIT, 0, { knock:160, fromX:b.x, fromY:b.y, unblockable:true });
     if (NET.leads()){
       b.stokeHits = k.battle.stoke.hits;
       if (b.charges < k.battle.charge.max){ b.charges++; b.spdMul += k.battle.charge.spd; b.powMul += k.battle.charge.pow; }
     }
     ring(b.x, b.y - 120, 260, "#fff3a8", .6, 8); G.cam.shake = 10;
-    if (mine) banner("UWAAAARGH!", "his next two blows land harder", 1.3);
-    if (mine){ const ang = Math.atan2(p.y - b.y, p.x - b.x); p.kx += Math.cos(ang) * 160; p.ky += Math.sin(ang) * 160; }
+    if (mine) banner("UWAAAARGH!", "nowhere to hide - and his next two blows land harder", 1.3);
+    if (mine && p.alive){ const ang = Math.atan2(p.y - b.y, p.x - b.x); p.kx += Math.cos(ang) * 160; p.ky += Math.sin(ang) * 160; }
   }
 }
 /* A page that doesn't run him draws him from the account of the page that
@@ -1562,7 +1570,7 @@ function followBoss(b, dt){
     const num = (v, lo, hi) => clamp(+v || 0, lo, hi);
     const act = { n:a.n, k:String(a.k || ""), t:num(a.t, 0, 5) + .05, impact:num(a.impact, 0, 5), end:num(a.end, 0, 6),
       sx:+a.sx || b.x, sy:+a.sy || b.y, lx:+a.lx || b.x, ly:+a.ly || b.y, mx:+a.mx || b.x, my:+a.my || b.y,
-      r:num(a.r, 0, 300), from:num(a.from, 0, 1), m:num(a.m, 1, 2), rate:num(a.rate, .5, 2) || 1,
+      r:num(a.r, 0, 300), from:num(a.from, 0, 1), m:num(a.m, 1, 2), rm:num(a.rm, 0, 10), rate:num(a.rate, .5, 2) || 1,
       q:String(a.q || ""), lock:num(a.lock, 0, 5) };
     if (act.t < act.end) beginAct(b, act);
   }
@@ -2010,7 +2018,7 @@ function takeOver(b){
   if (!h) return;   // nobody ran him before: he is this page's, as he stands
   followPool(h);
   Object.assign(b, { x:+h.x || b.x, y:+h.y || b.y, act:null, hop:0, next:1, awake:false,
-    powMul:+h.pw || 1, spdMul:+h.sm || 1, charges:h.ch | 0, stokeHits:h.st | 0 });
+    powMul:+h.pw || 1, spdMul:+h.sm || 1, charges:h.ch | 0, stokeHits:h.st | 0, roars:h.ro | 0 });
   castLabel("");
   NET.lastHB = null;   // used once: an older account must never come back later
 }
@@ -2020,10 +2028,10 @@ function bossState(b){
   Object.entries(BS.dd).sort((x, y) => y[1][0] - x[1][0]).slice(0, 40).forEach(([k, v]) => { dd[k] = [Math.round(v[0]), v[1].slice(0, 10), v[2]]; });
   const r2 = v => Math.round(v * 100) / 100;
   return { e:BS.e, dead:BS.dead ? 1 : 0, da:BS.deadAt, dd, x:Math.round(b.x), y:Math.round(b.y), f:b.face, w:b.awake ? 1 : 0,
-    pw:r2(b.powMul), sm:r2(b.spdMul), ch:b.charges, st:b.stokeHits || 0,
+    pw:r2(b.powMul), sm:r2(b.spdMul), ch:b.charges, st:b.stokeHits || 0, ro:b.roars || 0,
     a:a && a.t < a.end ? { n:a.n, k:a.k, t:r2(a.t), impact:r2(a.impact), end:r2(a.end), sx:Math.round(a.sx), sy:Math.round(a.sy),
       lx:Math.round(a.lx), ly:Math.round(a.ly), mx:Math.round(a.mx), my:Math.round(a.my), r:a.r, from:a.from, m:a.m,
-      rate:a.rate, q:a.q, lock:r2(a.lock || 0) } : null };
+      rate:a.rate, q:a.q, lock:r2(a.lock || 0), rm:r2(a.rm || 0) } : null };
 }
 function publish(dt){
   if (!NET.room) return;
@@ -2469,6 +2477,14 @@ function render(){
   const g = ctx.createRadialGradient(cv.width / 2, cv.height / 2, Math.min(cv.width, cv.height) * .4, cv.width / 2, cv.height / 2, Math.max(cv.width, cv.height) * .72);
   g.addColorStop(0, "rgba(10,12,19,0)"); g.addColorStop(1, "rgba(10,12,19,.5)");
   ctx.fillStyle = g; ctx.fillRect(0, 0, cv.width, cv.height);
+  // his roar has no mark - the whole screen is the mark, reddening as it comes
+  const ba = G.boss && G.boss.act;
+  if (G.raid && ba && ba.k === "uwaaargh" && !ba.fired){
+    const k = clamp(ba.t / ba.impact, 0, 1), a = (.25 + .5 * k) * (.75 + .25 * Math.sin(G.time * 20));
+    const r = ctx.createRadialGradient(cv.width / 2, cv.height / 2, Math.min(cv.width, cv.height) * .3, cv.width / 2, cv.height / 2, Math.max(cv.width, cv.height) * .7);
+    r.addColorStop(0, "rgba(255,40,60,0)"); r.addColorStop(1, `rgba(255,40,60,${a})`);
+    ctx.fillStyle = r; ctx.fillRect(0, 0, cv.width, cv.height);
+  }
 }
 
 /* =========================================================================
