@@ -2040,7 +2040,7 @@ function levelUpBeats(beats, gather, burst){
    After the retune every pairing at every level from 8 to 40 lands between
    42 and 55.
 
-   What moved: Cinder Sweep 1.05 -> 1.20, Bamboo Toss 1.30 -> 1.40, Acorn
+   What moved: Cinder Sweep 1.05 -> 1.20, Bamboo Toss (now Bamboo Tasting) 1.30 -> 1.40, Acorn
    Flick 1.66 -> 1.50 without its singe, Pocket Storm 1.58 -> 1.40, Fireball
    1.10 -> 1.20, Flame Stomp 1.47 -> 1.40 and flat-footed 25% -> 15%, Arc
    Lash 1.59 -> 1.50 and its rattle 40% -> 25%, Nap's heal 32% -> 26%.
@@ -2397,22 +2397,35 @@ const SKILLS = {
        Cinderling at 11, so at 11 it pulled Ember v Verdant to 44 while
        fixing the other; at 12 every pairing from 12 to 14 lands within three
        points of even and 11 is left as it was. */
-    { id:"bamboo-toss", name:"Bamboo Toss", ico:"\u{1F38B}", stage:1, level:12,
-      blurb:"Parts with a perfectly good snack to make a point. The point is sharp.",
+    /* Bamboo Tasting, drawn as Bamboo Toss until the second sheet. The id
+       stays "bamboo-toss": a fight is recorded as its seed and the ids of the
+       moves chosen (st.moves), so a new id would leave every fight that used
+       it naming a move the engine no longer has. The battle numbers are the toss's, as
+       measured above - only the drawing changed. */
+    { id:"bamboo-toss", name:"Bamboo Tasting", ico:"\u{1F38B}", stage:1, level:12,
+      blurb:"Takes a thoughtful bite, chews it over, and spits out the verdict. At them. Hard.",
       battle:{ dmg:1.40, cd:3 },
-      sprite:{ src:"art/skill-bamboo-toss.png", frames:16, fps:4.5,
-        /* Hold, wind up, throw, and the pleased look after. The wind-up
-           quickens, the throw is the fastest beats in the clip - the release
-           at 100ms, because a toss you can follow is a lob - and the bamboo's
-           flight gets two frames before the leaves scatter. Then it watches,
-           grins, blinks and settles back into the idle pose.
+      sprite:{ src:"art/skill-bamboo-tasting.png", frames:16, fps:4.5,
+        /* Bite, chew, consider, spit. It chews through six frames - a bite,
+           eyes shut on the first taste, a wink, a pleased look - then its
+           cheeks fill and frame 7 holds them full, the clip's longest beat,
+           because the wait is the joke. The spit is the quickest run in the
+           clip, 100ms rising to 160 as the chunk and its green streak leave
+           to the right. Then a look, a blink, a grin, and it settles back
+           hugging the bamboo it started with - the idle's own pose, so the
+           hand-back does not jump.
 
-           A wide sheet on purpose: the bamboo leaves the frame to the right,
-           so the cub sits in its left third and the scale is large to bring it
-           to the idle's size. */
-        durations:[320, 280, 240, 200, 120, 100, 110, 130,
-                   220, 260, 240, 300, 220, 220, 260, 340],
-        aspect:2.8724, scale:2.381, dx:16.15, dy:-2.96 } },
+           Cut like the idle (cub4): the cub pinned by its black, with dark
+           pixels near any green left out because the bamboo is outlined in
+           near-black; feet on one line in all sixteen, paws within 1.3px.
+           Fitted on screen to the idle's matching frames - its 8-11, sitting
+           up with the bamboo, against this clip's 12-15 - within a device
+           pixel at the feet and paws and 99-101% of its size. The old toss
+           sheet is kept in art/ (aspect 2.8724, scale 2.381, dx 16.15,
+           dy -2.96). */
+        durations:[300, 220, 260, 240, 260, 220, 240, 420,
+                   100, 110, 120, 160, 260, 200, 260, 340],
+        aspect:1.5097, scale:1.219, dx:13.58, dy:-0.84 } },
     /* The Panda had nothing at all, which made it the only third form with an
        empty skill row - something a player reads as a bug rather than as a
        gap. Nap fills it and suits the creature: it does no damage, it takes a
@@ -4740,7 +4753,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-10-03 81d4c9b";
+const BUILD_ID = "2026-10-03 af46ea2";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
