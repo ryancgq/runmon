@@ -242,7 +242,7 @@
   <ul class="how">
     <li><b>Move</b> with your left thumb, anywhere on the left half of the screen.</li>
     <li><b>Skills</b> are the fight: your pet's own moves at its level, live, each on its cooldown. Damage and effects are the game's battle numbers; one battle turn is 1.4 seconds.</li>
-    <li><b>👊 Attack</b> is a lighter swipe at whatever is closest, for between skills. With nothing close it is a dash, and nothing he swings can land on you mid-dash. It also cuts a skill short once the skill has landed.</li>
+    <li><b>👊 Attack</b> is mostly a dash: its swipe barely scratches. Nothing he swings can land on you mid-dash, and it cuts a skill short once the skill has landed.</li>
     <li><b>Together:</b> everyone with this link open is in the same world. Take him on at the same time and his health is shared.</li>
     <li>Sit by the campfire to heal. Berries heal too.</li>
   </ul>
@@ -467,20 +467,19 @@ const MOVE = {};
    and the long ones (the fizzle at 4.9s, Nap at 4.65s) cost enough to swing a
    fight; they play quick rather than unfairly. */
 for (const sp in SKILLS) for (const s of SKILLS[sp]){ s.species = sp; s.clip = makeClip(s.sprite, TURN); MOVE[s.id] = s; }
-/* Skills are the fight; Attack is what you do between them. In the game a
-   skill is followed by two turns of shared cooldown, so every other turn is a
-   plain attack at ×1. Live, a ×1 Attack once a turn - easy to land, free to
-   move between - was the better button: about as much damage as using your
-   skills, for none of the trouble. So:
-   - Attack hits at ×0.75 (ATTACK_MULT). Using skills as they come up now
-     out-damages spamming Attack by about a third.
+/* Skills are the fight. Live, a plain Attack is instant and dashes you onto
+   the target, while a skill plays its clip first - so at anything near the
+   game's ×1, spamming Attack was the better button. So:
+   - Attack hits at ×0.1 (ATTACK_MULT), 90% under the game's plain attack.
+     It is for its dash: getting out from under him, or cutting a landed
+     skill's clip short. The damage is the skills'.
+   - No shared cooldown (LIVE_GCD 0). With Attack worth nothing, the game's
+     skill-then-Attack rhythm would be a dead turn after every skill; here a
+     pet chains its skills.
    - Cooldowns are shorter, so the moves a pet learns first come round more:
      the first damaging move of each form every 2 turns, the rest one turn
-     sooner than in the game, never under 2. A Nap is still once a fight.
-   - The shared cooldown stays (LIVE_GCD), so a fight keeps the game's rhythm
-     of a skill, then an Attack. That rhythm is what keeps the species even;
-     without it, a weaker Attack tipped every matchup Verdant's way. */
-let ATTACK_MULT = 0.75, LIVE_GCD = BT.GCD, ATTACK_CD = 1;
+     sooner than in the game, never under 2. A Nap is still once a fight. */
+let ATTACK_MULT = 0.1, LIVE_GCD = 0, ATTACK_CD = 1;
 function liveCds(short){
   for (const sp in SKILLS) for (const st of [1, 2]){
     const kit = SKILLS[sp].filter(k => k.stage === st), first = kit.find(k => k.battle.dmg > 0);
@@ -1003,9 +1002,9 @@ function skillReady(e, sk){
 }
 const reachOf = fx => fx.kind === "nova" ? fx.reach * .85 : fx.kind === "rush" ? fx.dist * .75 : fx.kind === "self" ? 1e9 : fx.reach;
 
-/* Attack: a quick swipe at three-quarters of a plain attack (ATTACK_MULT),
-   once a turn. A lunge at whatever is closest; with nothing in reach it is a
-   dash - which is also how you get out from under his blows. */
+/* Attack: a dash, once a turn, with a token swipe at the end (ATTACK_MULT).
+   A lunge at whatever is closest; with nothing in reach just the dash -
+   which is how you get out from under his blows. */
 function useAttack(e){
   if (!e.canAct || e.dashT > 0) return false;
   /* Once a move has landed, Attack's dash cuts the rest of its clip short -
@@ -1357,10 +1356,11 @@ function petAI(e, dt){
 }
 function fightAI(e, t, dt){
   const h = t.hitCircle(), dx = h.x - e.x, dy = h.y - e.y, d = Math.hypot(dx, dy) - h.r;
-  if (!e.busy && e.atkCd <= 0){
+  if (!e.busy){
+    // a skill whenever one is ready - an Attack taken in a gap never holds one back
     const ready = e.kit.filter(sk => skillReady(e, sk) && d < reachOf(sk.fx));
     if (ready.length){ useSkill(e, ready[Math.floor(Math.random() * ready.length)].id); return { x:0, y:0 }; }
-    if (d < 80){ useAttack(e); return { x:0, y:0 }; }
+    if (d < 80 && e.atkCd <= 0){ useAttack(e); return { x:0, y:0 }; }
   }
   const n = d + h.r || 1;
   if (d > 30) return { x:dx / n, y:dy / n };     // everyone closes in: a plain Attack is a lunge

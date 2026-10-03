@@ -77,13 +77,14 @@ Everything a fight is made of comes from the game's battle engine:
 | Damage: `btHit`, divisive Defence, K, ±35% jitter, no crits | the same function |
 | Each move's multiplier, pierce and riders (burn, rattle, stoke, charge, soften, open, Nap's heal and expose) | the same, applied the same way |
 | One move per turn | one turn = **1.4 s** of the pet's own clock |
-| Cooldown `cd` turns, a 2-turn shared cooldown after any skill | shorter cooldowns (below), × 1.4 s, and 2.8 s shared |
-| Attack ×1, once a turn | **Attack ×0.75**, once a turn (below) |
+| Cooldown `cd` turns, a 2-turn shared cooldown after any skill | shorter cooldowns (below), × 1.4 s, and **no shared cooldown** |
+| Attack ×1, once a turn | **Attack ×0.1**, once a turn (below) |
 | Speed buys extra turns, up to 35%, chaining | the pet's whole clock runs `1/(1−p)` faster against its opponent: Attack, cooldowns, clips, its burn and guard timers |
 | The boss never gets extra turns | the same |
 | Opponent picks any ready move at random (`btChoose`) | the wild pets' AI picks the same way, the moment its turn comes round |
 
-**Attack** lunges at whatever is closest. With nothing in reach it is a dash,
+**Attack** is mostly a dash: it lunges at whatever is closest, but its swipe
+barely scratches (×0.1). With nothing in reach it is just the dash,
 and nothing *he* swings can land on you mid-dash. Once a skill has landed,
 Attack's dash cuts the rest of its clip short, which is how you get out from
 under him mid-move. It buys room, not time: the rest of that move's turn
@@ -96,14 +97,16 @@ they connect, and novas, swipes and gales take whatever is in their shape.
 
 ### Skills over Attack
 
-In playtesting, spamming Attack was the best play. A ×1 Attack once a turn is
-easy to land and lets you move freely between swipes. Using skills as well
-added only about 15%, because the game's shared cooldown leaves every other
-turn to Attack anyway, and the skills that go off round your own pet rarely
-reached anything. So:
+In playtesting, spamming Attack was the best play. Attack goes off at once
+and dashes you onto the target, while a skill plays its clip first. A first
+fix, Attack at ×0.75, still left it too strong, so:
 
-- **Attack hits at ×0.75.** Using your skills as they come up now does about
-  a third more damage than spamming Attack.
+- **Attack hits at ×0.1**, 90% under the game's plain attack. It's there for
+  its dash, to get out from under him or to cut a landed skill short. The
+  damage comes from skills.
+- **No shared cooldown.** With Attack worth nothing, the game's rhythm of a
+  skill then an Attack would be a dead turn after every skill. Here a pet
+  chains its skills: about 95% of moves are skills.
 - **Shorter cooldowns, so the moves a pet learns first come round more.** The
   first damaging move of each form comes back every 2 turns. The rest come
   back one turn sooner than in the game, never under 2. A Nap is still once a
@@ -122,17 +125,26 @@ reached anything. So:
   a target, so they hardly ever caught anything. Novas are about 40% wider:
   Cinder Sweep 105→150, Flame Stomp 115→160, Spark 95→135, Static Shock
   110→150. The fireball's puff goes from 85 to 120.
-- **The shared cooldown stays.** That keeps the game's rhythm of a skill, then
-  an Attack. Without it, every weaker-Attack variant tipped the matchups
-  Verdant's way, by up to 40 points. Nimbus's speed buys it extra turns, and
-  in the game most of those are Attacks, so a weaker Attack costs Nimbus
-  most.
+**What it costs in balance.** Measured against the game's engine, simulated at
+levels 12, 26 and 40 with 320 fights a pairing, species matchups now land
+**about 22 points from the game on average**. They were 12 with the game's
+Attack, and 14 at ×0.75. Every way of making Attack this weak measured 22 to
+25; keeping the shared cooldown didn't help. Where it shows:
 
-Measured against the game's engine, simulated at levels 12, 26 and 40 with
-320 fights a pairing, species matchups land **about 14 points from the game
-on average**. The old rules (Attack ×1) measured 12 in the same run. Verdant
-v Nimbus is still the outlier, now 20 to 40 points Verdant's way (it was 7 to
-25 before). Every variant with Attack at ×0.5 measured 16 to 17.
+- **Blazewyrm v Zephyrite: Ember wins 13–17%** (game about 48%). Ember's high
+  Power showed up mostly in its plain attacks, which now do nothing, and
+  Zephyrite gets more skills in a fight that lasts three moves a side.
+- **Bamboo Cub wins about 80%** against both Lv 12 rivals (game about 50%).
+- **Pets with a single skill are weak.** A Lv 8 Cinderling has only its ×0.4
+  fireball, and a Lv 15–21 Blazewyrm only Fireball. In the raid, the Lv 8
+  Cinderling takes 13 to 19 swings to fell him alone; most pets take 2 to 5.
+
+The fix for these is per-species tuning, which would move away from the
+game's numbers, so it is left as an open question (§8).
+
+While measuring this I found and fixed an AI bug. Wild pets only looked at
+their skills when their Attack was ready, so an Attack taken in a gap held
+their skills back for a turn.
 
 ### Keeping it close to the game's balance
 
@@ -216,8 +228,9 @@ time, the pool is the sum of their shares, so a group fells him about as
 fast as one pet would, together.
 
 In simulation, a player who steps out of his marks and doesn't start a skill
-under one fells him alone in 2 to 7 swings, mostly 4 or 5. Attempts last 21
-to 45 s.
+under one fells him alone in 2 to 5 swings at most levels. Pets with a single
+skill take longer: 5 to 9 for a Lv 18 Blazewyrm, 13 to 19 for a Lv 8
+Cinderling. Attempts last 16 to 48 s.
 
 **After he falls**, everyone who was on him sees the death clip and a card of
 who took what off him. He is back on his hill 20 seconds later, unmarked.
@@ -333,6 +346,10 @@ the page plays solo. From the repo, served locally, it is always solo.
    the natural place for the game's battles to happen.
 4. **Wild pets as a reason to visit.** They give nothing yet. Cosmetics, and
    never power, would keep running as the only way to grow.
+
+5. **Attack at ×0.1 moves species balance a long way** from the game's (§3).
+   Is a skills-only feel worth that? If so, the fix is per-species tuning of
+   the live cooldowns, which the game itself doesn't need.
 
 ## 9. If it graduates
 
