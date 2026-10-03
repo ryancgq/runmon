@@ -151,24 +151,30 @@ tuned so the forms of a stage meet about as they do in the game's battles:
 
 | Form | Pace | Form | Pace |
 | --- | --- | --- | --- |
-| Cinderling | ×1.06 | Blazewyrm | ×1.06 |
+| Cinderling | ×1.10 | Blazewyrm | ×1.06 |
 | Sparky | ×1.00 | Zephyrite | ×1.00 |
-| Bamboo Cub | ×0.93 | Panda | ×1.05 |
+| Bamboo Cub | ×0.91 | Panda | ×1.40 |
 
-How the forms of a stage meet, simulated at levels 12, 26 and 40 with 320
-fights a pairing, against the game's engine. The first-named pet's win rate:
+How the forms of a stage meet: 320 simulated fights a pairing, against the
+current game's own battle engine. The first-named pet's win rate, live / game:
 
-| Matchup | Lv 12 | Lv 26 | Lv 40 | Game |
+| Matchup | Lv 12 | Lv 14 | Lv 26 | Lv 40 |
 | --- | --- | --- | --- | --- |
-| Verdant v Ember | 49–53% | 65–71% | 65–66% | 45–46% |
-| Verdant v Nimbus | 50–54% | 48–50% | 43–46% | 52–56% |
-| Ember v Nimbus | 39–40% | 46–51% | 41–43% | 48–49% |
+| Verdant v Ember | 40–43 / 47 | 51–52 / 49 | 43–45 / 44 | 43–44 / 43 |
+| Verdant v Nimbus | 49–50 / 53 | 45–52 / 56 | **84–85** / 55 | **79–83** / 53 |
+| Ember v Nimbus | 42–49 / 49 | 54–57 / 51 | 45–52 / 47 | 46–47 / 46 |
 
-On average that's **about 9 points from the game**, the closest any version
-has been. Before the paces it was about 18. One matchup is still off: a Panda
-beats a Blazewyrm about two times in three. Speeding Blazewyrm up would tip it
-against Zephyrite, so this is left until the evolved forms get their new
-skills.
+On average that's **7 to 8 points from the game**. The paces were retuned
+when the game's new Verdant skills came in (Cuddle, Forest Slam, and Nap's
+new heal and guard). Panda lost the most: the game's old Nap quietly made
+Panda's next hit 1.6×, and without it Panda gets two Landslides off in a
+fight while a Blazewyrm uses six skills.
+
+**One matchup is still off: Panda beats Zephyrite about four times in five.**
+Nap's new Defence blunts Zephyrite's skills, while Blazewyrm's Flame Stomp
+cuts through it, and Zephyrite has lost most of its plain-attack damage. Any
+pace that fixes Panda v Zephyrite breaks Panda v Blazewyrm, so this is left
+for the evolved forms' coming skills.
 
 The fights are short, about three moves a side, and a pet's pace decides
 whether it gets the extra move. So the simulation starts each pet up to half
@@ -285,9 +291,9 @@ simulation:
 
 | Level | Average player | Near-perfect player | Swings for 400,000, average / near-perfect | Time for 7 runners, average / near-perfect |
 | --- | --- | --- | --- | --- |
-| Lv 14 | ~1,100 | ~3,500 | ~360 / ~115 | ~2 months / ~3 weeks |
-| Lv 26 | ~2,400 | ~9,500 | ~165 / ~42 | ~4 weeks / ~1 week |
-| Lv 40 | ~3,600 | ~15,100 | ~110 / ~26 | ~3 weeks / ~4.5 days |
+| Lv 14 | ~1,100 | ~3,300 | ~360 / ~120 | ~2 months / ~3 weeks |
+| Lv 26 | ~2,650 | ~9,700 | ~150 / ~41 | ~3.5 weeks / ~1 week |
+| Lv 40 | ~4,600 | ~16,700 | ~87 / ~24 | ~2 weeks / ~4 days |
 
 The average player steps out of his marks but gets caught mid-skill. The
 near-perfect one is touched only by his roar. A Lv 26 field halfway between
