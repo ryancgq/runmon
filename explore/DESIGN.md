@@ -235,31 +235,28 @@ attempts means more running.
 You get three swings; the menu gives you ten more. The game earns one per 5 km
 run.
 
-**His health is one fixed pool: 500,000.** It is the same for one player or
+**His health is one fixed pool: 400,000.** It is the same for one player or
 twenty, and it never regenerates. Every swing anyone takes stays off him,
 across attempts, sessions and days, until he is felled. He is meant to be a
-group's month of work at the very end of the game.
+group's weeks of work at the very end of the game.
 
-**He hits 15% harder than the game's Power 90** (`BOSS_POW`), so attempts are
+**He hits 8% harder than the game's Power 90** (`BOSS_POW`), so attempts are
 a little shorter.
 
-**Sized for seven runners over a month.** The game assumes about 30 km a week
-per runner, which is 6 swings a week. Seven of them earn about 180 swings a
-month between them. Average damage per attempt and the total swings needed,
-from simulation:
+**Sized for seven runners.** The game assumes about 30 km a week per runner,
+which is 6 swings a week. Seven of them earn about 180 swings a month between
+them. Average damage per attempt and the total swings needed, from
+simulation:
 
-| Level | Average player | Near-perfect player | Swings for 500,000, average / near-perfect |
-| --- | --- | --- | --- |
-| Lv 14 | ~570 | ~2,100 | ~880 / ~235 |
-| Lv 26 | ~1,400 | ~6,200 | ~350 / ~80 |
-| Lv 40 | ~2,800 | ~10,600 | ~180 / ~47 |
+| Level | Average player | Near-perfect player | Swings for 400,000, average / near-perfect | Time for 7 runners, average / near-perfect |
+| --- | --- | --- | --- | --- |
+| Lv 14 | ~590 | ~2,400 | ~680 / ~165 | ~4 months / ~4 weeks |
+| Lv 26 | ~1,500 | ~6,400 | ~270 / ~63 | ~6 weeks / ~1.5 weeks |
+| Lv 40 | ~2,600 | ~10,600 | ~155 / ~38 | ~3.5 weeks / ~1 week |
 
 The average player steps out of his marks but gets caught mid-skill. The
-near-perfect one is touched only by his roar. For seven Lv 26 runners, that's
-about two months if everyone plays like the first, about two weeks if
-everyone plays like the second, and about a month for a field halfway
-between (about 2,800 a swing). A higher-level field brings him down sooner:
-a Lv 40 field of average players takes about a month.
+near-perfect one is touched only by his roar. A Lv 26 field halfway between
+the two takes about three weeks.
 
 **After he falls**, everyone who was on him sees the death clip and a card of
 who took what off him this round. He is back on his hill 20 seconds later
@@ -288,7 +285,7 @@ server of our own.
 - **Each page settles his blows on its own pet only**, at the moment the mark
   fills. The page running him decides where he goes, and your page decides
   whether you were standing in it.
-- **His health** is 500,000 less the sum of what every tab has taken off him
+- **His health** is 400,000 less the sum of what every tab has taken off him
   this round. Each tab keeps its own figure, which survives a reload, so two
   tabs never overwrite each other. Figures only ever grow, so every copy of
   the account (the store, the presence of the page running him, this
