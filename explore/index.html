@@ -1708,7 +1708,7 @@ function raidPool(p){
   const K = attrTotal(p.level) * BT.MIT;
   return Math.round(p.pow * K / (K + RAID_BOSS.battle.def) * RAID_SHARE);
 }
-const RAID_SHARE = 55;
+const RAID_SHARE = 80;
 const RESPAWN = 20;   // seconds before he is back on his hill after a felling
 /* BS: his one shared account. An epoch (a fresh one each time he respawns),
    the pool's size, whether he's down, and what each page has taken off him -

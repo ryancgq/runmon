@@ -223,19 +223,20 @@ You get three swings; the menu gives you more. The game earns one per 5 km
 run.
 
 **His health pool.** The game's pool is 25,000, sized for a whole field of
-runners over weeks. Here each pet that takes him on brings a share: 55
-full-strength blows (×1) at its level, cut from 80 to 55 when he got
-faster. With other people on him at the same
+runners over weeks. Here each pet that takes him on brings a share: 80
+full-strength blows (×1) at its level. He is meant to be hard to kill, so
+his health stayed put when he got faster. With other people on him at the same
 time, the pool is the sum of their shares, so a group fells him about as
 fast as one pet would, together.
 
 In simulation, the test player steps out of his marks, waits for a following
 mark to lock before it dashes, and doesn't start a skill under one. His plain
 swing still lands on it 60 to 75% of the time, because a skill's clip often
-holds it in place when the mark locks. It fells him alone in 2 to 6 swings at
-most levels, with attempts of 11 to 24 s. Pets with a single skill struggle:
-7 to 10 swings for a Lv 18 Blazewyrm, and about 27 for a Lv 8 Cinderling,
-which is not a realistic solo kill.
+holds it in place when the mark locks. Alone, it takes 4 to 10 swings at Lv 14,
+3 to 6 at Lv 26 and 2 or 3 at Lv 40, with attempts of 10 to 25 s. Pets with a
+single skill struggle: 9 to 12 swings for a Lv 18 Blazewyrm, and more than 30
+for a Lv 8 Cinderling. A group's pool grows with each pet that joins, so
+friends don't make him easier, just faster to bring down.
 
 **After he falls**, everyone who was on him sees the death clip and a card of
 who took what off him. He is back on his hill 20 seconds later, unmarked.
