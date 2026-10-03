@@ -19,6 +19,11 @@ job is to show whether the idea works before any of it goes into the game.
   be saved. A Viewer still plays with everyone, and their damage is saved
   while a Contributor is in the world. A public link opens the same game,
   solo.
+- **On the game's site, no Claude needed:** `ryancgq.github.io/runmon/explore/`.
+  It's the same page. Here the shared world (players, PvP and his health)
+  comes from Runmon Explore's own server, `explore-worker/` (see
+  [Publishing](#7-publishing)). Anyone with the link can join. It is a
+  separate page: the game doesn't link to it and nothing in the game changed.
 - **Locally:** serve the repo root (`python3 -m http.server`) and open
   `/explore/` with a phone-sized window or the device toolbar.
 - **Deep links for testing:** `#explore`, `#raid`, `#raid.blazewyrm`,
@@ -404,7 +409,24 @@ Artifact and lists the files that go with it (`art/*.png` and
 only strips the outer `<html>`, `<head>` and `<body>` tags that the host
 supplies.
 
-The page is published with `capabilities: {room: {}, db: {}}`, using the
+**Two homes, one page.** The page finds its world in one of three ways:
+1. **Inside Claude:** the Artifact page's `room` and `db`.
+2. **On the game's site:** its own server, `explore-worker/`. This is a
+   separate Cloudflare Worker (`runmon-explore`), not the Strava broker,
+   reached at `wss://runmon-explore.runmon-gq.workers.dev/world`. You can
+   also point the page at any server with `?server=` on its link.
+3. **Neither:** solo, with his health kept in the browser.
+
+The server speaks the same two shapes as the Artifact page's `room` and `db`
+(`openServer` in `index.html`), so the game code has one path for all
+three. It relays presence in memory and keeps his account in its Durable
+Object's SQLite storage. Values there only move forward: a round never goes
+back, and a tab's damage never goes down. It only accepts connections from
+the game's site, and an optional `JOIN_CODE` can require `?code=` on the
+link. Pushing a change under `explore-worker/` deploys it
+(`.github/workflows/deploy-explore.yml`).
+
+The Artifact page is published with `capabilities: {room: {}, db: {}}`, using the
 store's default rules: everyone admitted reads, and Contributors and above
 write. Only people signed in to Claude whom the owner has shared it with join
 the shared world. Opened any other way, both resolve `null` and the page
@@ -432,9 +454,26 @@ it is always solo.
 
 ## 9. If it graduates
 
-1. Move the attribute, engine, `SKILLS` and `RAID_BOSS` tables into one shared
+It is laid out so it can move into the game without a rewrite:
+
+- **The page** is one folder, `explore/`, already served at
+  `/runmon/explore/` beside the game. Graduating it means a link from the pet
+  screen, and reading the player's real pet and level from the save
+  (read-only) in place of the select screen.
+- **The world server** is already a separate worker on the same Cloudflare
+  account. It can stay as it is, or its `World` class can move into the
+  Strava broker as a second Durable Object, which would let it check players'
+  sessions.
+- **One seam for the network.** Everything the game needs from "the world"
+  goes through two shapes, a room and a store (`connectNet`, `openServer`).
+  Swapping the transport touches nothing else.
+- **What has to change before real players:**
+
+1. Make the server check who is playing (a game session) and settle damage
+   itself, rather than trusting each page's word.
+2. Move the attribute, engine, `SKILLS` and `RAID_BOSS` tables into one shared
    script that both pages load, instead of the copies here.
-2. Read the real save **read-only** for species and level. Have the raid use
+3. Read the real save **read-only** for species and level. Have the raid use
    the real attempts and the broker's shared pool.
-3. Commission the art in §5.
-4. Add an Explore entry on the pet screen.
+4. Commission the art in §5.
+5. Add an Explore entry on the pet screen.

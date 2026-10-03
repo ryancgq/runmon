@@ -1915,6 +1915,151 @@ function tabKey(){
 NET.key = tabKey();
 
 /* =========================================================================
+   WHERE THE WORLD IS
+   =========================================================================
+   Three ways to be in the world, tried in order:
+   1. Inside Claude, the Artifact page's own `room` and `db`.
+   2. Anywhere else, Runmon Explore's own server (explore-worker/), when the
+      page knows of one: on the game's site, or with ?server= on the link.
+      It speaks the same two shapes (openServer, below), so nothing past
+      this point knows which it got.
+   3. Neither: the same game, alone, his wounds kept in this browser. */
+const EXPLORE_SERVER = "wss://runmon-explore.runmon-gq.workers.dev/world";
+function serverUrl(){
+  let q = null;
+  try { q = new URLSearchParams(location.search).get("server"); } catch(e){}
+  if (q && /^wss?:\/\//.test(q)) return q;
+  return /(^|\.)github\.io$/.test(location.hostname) ? EXPLORE_SERVER : null;
+}
+async function connectNet(){
+  const use = n => {
+    try { return window.claude && typeof window.claude.use === "function" ? Promise.resolve(window.claude.use(n)).catch(() => null) : Promise.resolve(null); }
+    catch(e){ return Promise.resolve(null); }
+  };
+  let [room, db] = await Promise.all([use("room"), use("db")]);
+  const url = !room && !db && serverUrl();
+  if (url){
+    NET.serverTried = true;
+    const s = openServer(url);
+    if (await s.ready){ room = s.room; db = s.db; NET.server = s; }
+  }
+  connectStore(db);
+  connectRoom(room);
+}
+/* The server, wearing the room and db shapes the game already speaks. It
+   reconnects on its own; while it is away the page plays on alone. */
+function openServer(base){
+  let code = null;
+  try { code = new URLSearchParams(location.search).get("code"); } catch(e){}
+  const url = base + (code ? (base.includes("?") ? "&" : "?") + "code=" + encodeURIComponent(code) : "");
+  const S = { ws:null, me:null, up:false, peers:new Map(), mine:{}, snap:Object.freeze([]), onPeers:new Set(), onConn:new Set(),
+              subs:new Map(), pend:new Map(), n:0, retry:600 };
+  const peerRec = (id, p, mine) => Object.freeze({ peer:id, by:null, isMe:!!mine, sameTab:!!mine, kind:"viewer", guest:false,
+                                                   presence:Object.freeze(p || {}), updatedAt:Date.now() });
+  const rebuild = () => {
+    const arr = S.me ? [peerRec(S.me, { ...S.mine }, true)] : [];
+    for (const [id, p] of S.peers) arr.push(peerRec(id, p, false));
+    S.snap = Object.freeze(arr);
+    for (const f of S.onPeers){ try { f({ peers:S.snap, joined:[], left:[], updated:[] }); } catch(e){} }
+  };
+  const send = m => { if (S.ws && S.up){ try { S.ws.send(JSON.stringify(m)); } catch(e){} } };
+  const conn = up => { S.up = up; for (const f of S.onConn){ try { f(up); } catch(e){} } };
+  // a document as the game's store hands it out
+  const docSnap = (path, data) => ({ id:path.split("/").pop(), exists:data != null, data:() => data == null ? undefined : data,
+                                     metadata:{ fromCache:false, hasPendingWrites:false } });
+  const deliver = sub => {
+    if (sub.exact) for (const f of sub.cbs) f(docSnap(sub.prefix, sub.docs.get(sub.prefix)));
+    else {
+      const docs = [...sub.docs].filter(([, d]) => d != null).map(([p, d]) => docSnap(p, d));
+      for (const f of sub.cbs) f({ docs, size:docs.length, empty:!docs.length, docChanges:() => [], metadata:{} });
+    }
+  };
+  const subscribe = (prefix, exact, cb) => {
+    let sub = S.subs.get(prefix);
+    if (!sub){ sub = { prefix, exact, docs:new Map(), cbs:new Set(), got:false }; S.subs.set(prefix, sub); send({ t:"sub", prefix }); }
+    sub.cbs.add(cb);
+    if (sub.got) deliver(sub);
+    return () => { sub.cbs.delete(cb); if (!sub.cbs.size){ S.subs.delete(prefix); send({ t:"unsub", prefix }); } };
+  };
+  const inSub = (sub, path) => sub.exact ? path === sub.prefix : path.startsWith(sub.prefix + "/") && !path.slice(sub.prefix.length + 1).includes("/");
+  let readyDone, firstTry = true;
+  const ready = new Promise(res => { readyDone = res; setTimeout(() => res(false), 6000); });
+  const connect = () => {
+    let ws;
+    try { ws = new WebSocket(url); } catch(e){ readyDone(false); return; }
+    S.ws = ws;
+    ws.onmessage = ev => {
+      let m; try { m = JSON.parse(ev.data); } catch(e){ return; }
+      if (!m || typeof m !== "object") return;
+      if (m.t === "hello"){
+        S.me = String(m.id); S.retry = 600; S.peers.clear();
+        for (const x of Array.isArray(m.peers) ? m.peers : []) if (x && x.id !== S.me) S.peers.set(String(x.id), x.p || {});
+        conn(true); readyDone(true);
+        send({ t:"p", p:S.mine });
+        for (const sub of S.subs.values()) send({ t:"sub", prefix:sub.prefix });
+        rebuild();
+      } else if (m.t === "join"){ if (!S.peers.has(m.id)){ S.peers.set(String(m.id), {}); rebuild(); } }
+      else if (m.t === "p"){ S.peers.set(String(m.id), m.p || {}); rebuild(); }
+      else if (m.t === "left"){ S.peers.delete(String(m.id)); rebuild(); }
+      else if (m.t === "docs" || m.t === "doc"){
+        const list = m.t === "docs" ? (Array.isArray(m.docs) ? m.docs : []) : [{ path:m.path, data:m.data }];
+        for (const sub of S.subs.values()){
+          let hit = false;
+          if (m.t === "docs" && m.prefix === sub.prefix){ sub.got = true; hit = true; }
+          for (const d of list) if (d && typeof d.path === "string" && inSub(sub, d.path)){ sub.docs.set(d.path, d.data); hit = true; }
+          if (hit) deliver(sub);
+        }
+      } else if (m.t === "ack" || m.t === "err"){
+        const p = S.pend.get(m.n); if (!p) return;
+        S.pend.delete(m.n);
+        if (m.t === "ack") p.res(); else p.rej({ code:String(m.code || "unavailable"), message:"refused by the server" });
+      }
+    };
+    ws.onclose = () => {
+      const was = S.up; S.ws = null; S.peers.clear();
+      if (was) conn(false);
+      rebuild();
+      for (const p of S.pend.values()) p.rej({ code:"unavailable", message:"no connection" });
+      S.pend.clear();
+      if (firstTry && !was){ firstTry = false; readyDone(false); }
+      setTimeout(connect, S.retry); S.retry = Math.min(S.retry * 2, 15000);
+    };
+  };
+  connect();
+  const room = {
+    presence(patch){
+      for (const k in patch){ if (patch[k] === null) delete S.mine[k]; else S.mine[k] = patch[k]; }
+      if (JSON.stringify(S.mine).length > 4096) return Promise.reject({ code:"invalid_argument", message:"presence too big" });
+      send({ t:"p", p:S.mine }); rebuild();
+      return Promise.resolve();
+    },
+    peers(){ return S.snap; },
+    onPeers(f){ S.onPeers.add(f); setTimeout(() => f({ peers:S.snap, joined:S.snap, left:[], updated:[] })); return () => S.onPeers.delete(f); },
+    connected(){ return S.up; },
+    onConnection(f){ S.onConn.add(f); return () => S.onConn.delete(f); },
+    emit(){ return Promise.resolve(); }, on(){ return () => {}; }
+  };
+  const docRef = path => ({
+    id:path.split("/").pop(), path,
+    onSnapshot(next){ return subscribe(path, true, next); },
+    set(data){
+      if (!S.up) return Promise.reject({ code:"unavailable", message:"no connection" });
+      const n = ++S.n;
+      return new Promise((res, rej) => { S.pend.set(n, { res, rej }); send({ t:"set", n, path, data }); });
+    }
+  });
+  const db = {
+    doc:docRef,
+    collection(path){
+      const q = { path, limit:() => q, where:() => q, orderBy:() => q, doc:id => docRef(path + "/" + id),
+                  onSnapshot(next){ return subscribe(path, false, next); } };
+      return q;
+    }
+  };
+  return { ready, room, db };
+}
+
+/* =========================================================================
    KEEPING HIS WOUNDS
    =========================================================================
    With the page's shared store (db), every tab's damage this round is a
@@ -1926,9 +2071,7 @@ NET.key = tabKey();
    while someone who can write is about. Without the store (signed out, a
    public link, the repo copy) the account lives in this browser. */
 const STORE = { db:null, ok:true, seen:{}, hitsE:null, unHits:null, writing:false, lastT:0, stateBusy:false, statePending:false, localJson:"" };
-async function connectStore(){
-  let db = null;
-  try { db = window.claude && typeof window.claude.use === "function" ? await window.claude.use("db") : null; } catch(e){ db = null; }
+function connectStore(db){
   if (!db) return;
   STORE.db = db;
   // the shared account replaces this browser's own - solo damage never leaks into it
@@ -2001,9 +2144,7 @@ function loadLocal(){
 }
 function cleanNick(s){ return String(s || "").replace(/[\u0000-\u001f\u007f-\u009f<>&"'`\\]/g, "").trim().slice(0, 14); }
 function nick(){ return cleanNick(G.nick) || "Runner"; }
-async function connectRoom(){
-  let room = null;
-  try { room = window.claude && typeof window.claude.use === "function" ? await window.claude.use("room") : null; } catch(e){ room = null; }
+function connectRoom(room){
   if (!room) return showLobby();
   NET.room = room; NET.on = true;
   room.onPeers(() => { NET.dirty = true; if (!G.running) showLobby(); });
@@ -2209,7 +2350,11 @@ function netFx(e, c){
 /* The select screen says who's here before you go in. */
 function showLobby(){
   const el = $("lobby"); if (!el) return;
-  if (!NET.room){ el.textContent = "Solo. To play together, open the shared link while signed in to Claude."; return; }
+  if (!NET.room){
+    el.textContent = NET.serverTried ? "Couldn't reach the world just now, so you're playing solo. Reload to try again."
+                                     : "Solo. To play together, open the shared link while signed in to Claude.";
+    return;
+  }
   const peers = viewers(), inWorld = peers.filter(p => !p.sameTab && p.presence && p.presence.g === 1);
   const names = inWorld.map(p => cleanNick(p.presence.n) || "Runner").slice(0, 4);
   el.textContent = inWorld.length
@@ -2726,8 +2871,7 @@ function bindMenus(){
   G.nick = cleanNick(store("rx.nick")) || "Runner " + (10 + Math.floor(Math.random() * 90));
   store("rx.nick", G.nick); $("nick").value = G.nick;
   loadLocal();     // his wounds as this browser last saw them...
-  connectStore();  // ...or as everyone left them, when the page has its shared store
-  connectRoom();   // with others if the page has a room; alone, the same game, if not
+  connectNet();    // ...or as everyone left them, with everyone else in the world
   await loadAll();
   genWorld();
   bindTouch(); bindMenus();
