@@ -858,9 +858,14 @@ function btHit(x, y, mult, pierce){
    closest to the game's matchups. Walking is untouched: every pet moves at
    the same pace. */
 function speedTempo(spd, level){ return (1 + 5 * spd / attrTotal(level)) / 1.5; }
+/* Each form's own pace on top of its Speed, tuned so the forms of a stage
+   meet each other about as the game's battles have them meet (§3 in the
+   design notes). Live, with Attack worth almost nothing, a species' kit
+   decides more than it does in a battle, and these even it out. */
+let FORM_PACE = { cinderling:1.06, sparky:1, cub:.93, blazewyrm:1.06, zephyrite:1, panda:1.05 };
 function tempoOf(e){
   if (e.boss) return 1;
-  return e.tempo = speedTempo(e.spd * (e.spdMul || 1), e.level);
+  return e.tempo = speedTempo(e.spd * (e.spdMul || 1), e.level) * (FORM_PACE[e.formId] || 1);
 }
 
 function strike(x, y, mult, pierce, o = {}){

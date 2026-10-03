@@ -138,22 +138,42 @@ species' edge the same at every level. With it, the matchups land about 18
 points from the game's, closer than the opponent-comparison rule managed
 (about 22).
 
-**What it costs in balance.** Measured against the game's engine, simulated at
-levels 12, 26 and 40 with 320 fights a pairing, species matchups now land
-**about 22 points from the game on average**. They were 12 with the game's
-Attack, and 14 at ×0.75. Every way of making Attack this weak measured 22 to
-25; keeping the shared cooldown didn't help. Where it shows:
+**Each form's own pace.** With Attack worth almost nothing, a species' kit
+decides more than it does in a battle. Ember lost its high-Power plain
+attacks, and Nimbus came out on top: a Zephyrite beat a Blazewyrm 85% of the
+time. Each form now has a pace multiplier on top of its Speed (`FORM_PACE`),
+tuned so the forms of a stage meet about as they do in the game's battles:
 
-- **Blazewyrm v Zephyrite: Ember wins 13–17%** (game about 48%). Ember's high
-  Power showed up mostly in its plain attacks, which now do nothing, and
-  Zephyrite gets more skills in a fight that lasts three moves a side.
-- **Bamboo Cub wins about 80%** against both Lv 12 rivals (game about 50%).
-- **Pets with a single skill are weak.** A Lv 8 Cinderling has only its ×0.4
-  fireball, and a Lv 15–21 Blazewyrm only Fireball. In the raid, the Lv 8
-  Cinderling takes 13 to 19 swings to fell him alone; most pets take 2 to 5.
+| Form | Pace | Form | Pace |
+| --- | --- | --- | --- |
+| Cinderling | ×1.06 | Blazewyrm | ×1.06 |
+| Sparky | ×1.00 | Zephyrite | ×1.00 |
+| Bamboo Cub | ×0.93 | Panda | ×1.05 |
 
-The fix for these is per-species tuning, which would move away from the
-game's numbers, so it is left as an open question (§8).
+How the forms of a stage meet, simulated at levels 12, 26 and 40 with 320
+fights a pairing, against the game's engine. The first-named pet's win rate:
+
+| Matchup | Lv 12 | Lv 26 | Lv 40 | Game |
+| --- | --- | --- | --- | --- |
+| Verdant v Ember | 49–53% | 65–71% | 65–66% | 45–46% |
+| Verdant v Nimbus | 50–54% | 48–50% | 43–46% | 52–56% |
+| Ember v Nimbus | 39–40% | 46–51% | 41–43% | 48–49% |
+
+On average that's **about 9 points from the game**, the closest any version
+has been. Before the paces it was about 18. One matchup is still off: a Panda
+beats a Blazewyrm about two times in three. Speeding Blazewyrm up would tip it
+against Zephyrite, so this is left until the evolved forms get their new
+skills.
+
+The fights are short, about three moves a side, and a pet's pace decides
+whether it gets the extra move. So the simulation starts each pet up to half
+a second late at random, as real reactions would. In lockstep, whichever pet
+was even a hair quicker won 90% of the time.
+
+**Not balanced across stages.** An evolved form learns its first skill at Lv
+18, as in the game. From Lv 15 to 17 it has none, and with Attack this weak
+it barely fights, so a Lv 14 Sparky with four skills beats it. The same goes
+for a stage-1 form at Lv 5 to 7. More evolved skills are planned.
 
 While measuring this I found and fixed an AI bug. Wild pets only looked at
 their skills when their Attack was ready, so an Attack taken in a gap held
@@ -260,9 +280,9 @@ simulation:
 
 | Level | Average player | Near-perfect player | Swings for 400,000, average / near-perfect | Time for 7 runners, average / near-perfect |
 | --- | --- | --- | --- | --- |
-| Lv 14 | ~910 | ~3,400 | ~440 / ~118 | ~2.4 months / ~3 weeks |
-| Lv 26 | ~2,250 | ~8,500 | ~180 / ~47 | ~1 month / ~1 week |
-| Lv 40 | ~3,450 | ~14,800 | ~116 / ~27 | ~3 weeks / ~4.5 days |
+| Lv 14 | ~1,100 | ~3,500 | ~360 / ~115 | ~2 months / ~3 weeks |
+| Lv 26 | ~2,400 | ~9,500 | ~165 / ~42 | ~4 weeks / ~1 week |
+| Lv 40 | ~3,600 | ~15,100 | ~110 / ~26 | ~3 weeks / ~4.5 days |
 
 The average player steps out of his marks but gets caught mid-skill. The
 near-perfect one is touched only by his roar. A Lv 26 field halfway between
