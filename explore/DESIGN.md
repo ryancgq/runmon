@@ -136,12 +136,12 @@ fix, Attack at ×0.75, still left it too strong, so:
 
   | Pet | Moves and cooldowns | Nothing ready for at least |
   | --- | --- | --- |
-  | Cinderling Lv 14 | fireball 11.7 s, Horn Rush 8.8, Tail Swipe 8.8, Cinder Sweep 8.8 | 3.2 s |
-  | Sparky Lv 14 | Spark 8.2 s, Static Shock 8.2, Acorn Flick 13.7, Pocket Storm 16.4 | 2.6 s |
-  | Bamboo Cub Lv 14 | Green Gale 16.3 s, Cuddle 16.3, Bamboo Tasting 16.3, Forest Slam 27.2 | 10.7 s |
-  | Blazewyrm Lv 26 | Fireball 10.0 s, Flame Stomp 10.0, Flying Swoop 10.0 | 5.8 s |
-  | Zephyrite Lv 26 | Lightning Bolt 5.2 s, Arc Lash 5.2 | 2.4 s |
-  | Panda Lv 26 | Landslide 8.1 s (and a Nap) | 6.7 s |
+  | Cinderling Lv 14 | fireball 12.1 s, Horn Rush 9.1, Tail Swipe 9.1, Cinder Sweep 9.1 | 4.9 s |
+  | Sparky Lv 14 | Spark 7.7 s, Static Shock 7.7, Acorn Flick 12.8, Pocket Storm 15.4 | 4.0 s |
+  | Bamboo Cub Lv 14 | Green Gale 16.6 s, Cuddle 16.6, Bamboo Tasting 16.6, Forest Slam 27.7 | 12.9 s |
+  | Blazewyrm Lv 26 | Fireball 9.7 s, Flame Stomp 9.7, Flying Swoop 9.7 | 6.5 s |
+  | Zephyrite Lv 26 | Lightning Bolt 5.2 s, Arc Lash 5.2 | 3.6 s |
+  | Panda Lv 26 | Landslide 8.3 s (and a Nap) | 7.4 s |
 
   The Bamboo Cub waits longest. It is the slowest and toughest, and its kit
   is worth the most per turn in a battle.
@@ -169,9 +169,9 @@ stage are even with each other:
 
 | Form | Pace | Form | Pace |
 | --- | --- | --- | --- |
-| Cinderling | ×1.10 | Blazewyrm | ×0.84 |
-| Sparky | ×1.00 | Zephyrite | ×1.17 |
-| Bamboo Cub | ×0.90 | Panda | ×1.02 |
+| Cinderling | ×1.06 | Blazewyrm | ×0.86 |
+| Sparky | ×1.06 | Zephyrite | ×1.16 |
+| Bamboo Cub | ×0.885 | Panda | ×1.00 |
 
 **How they were measured.** 200 simulated fights per pairing, two AI pets
 that play exactly alike. Both the win rate and how close the fights were are
@@ -185,15 +185,21 @@ rates:
 
 | Matchup | Lv 12 | Lv 14 | Lv 26 | Lv 40 |
 | --- | --- | --- | --- | --- |
-| Verdant v Ember | 85% · +10% HP | 56% · +3% | 34% · −1% | 36% · 0% |
-| Verdant v Nimbus | 4% · −14% | 46% · +2% | 35% · +3% | 24% · −2% |
-| Ember v Nimbus | 18% · −6% | 68% · +12% | 38% · −2% | 36% · −2% |
+| Verdant v Ember | 75% · +6% HP | 89% · +14% | 38% · +4% | 25% · −1% |
+| Verdant v Nimbus | 1% · −17% | 7% · −16% | 34% · +2% | 33% · −2% |
+| Ember v Nimbus | 7% · −12% | 58% · +9% | 35% · +1% | 33% · 0% |
 
-- **Stage 2:** every pairing is within 3% of HP.
-- **Stage 1:** even at Lv 14, but spread at Lv 12. Sparky is ahead at Lv 12
-  and Cinderling at Lv 14: their HP grows differently between the two
-  levels, and Cinder Sweep comes in at 14. No single pace fixes both levels,
-  so the pace splits the difference. Fights run 20 to 60 seconds.
+- **Stage 2:** every pairing is within 4% of HP.
+- **Stage 1, Lv 14 (the full kits):** a loop, as in rock-paper-scissors.
+  The Bamboo Cub beats the Cinderling, the Sparky beats the Cub, and the
+  Cinderling beats the Sparky, each by 9 to 16% of HP. No set of paces
+  undoes a loop, so these leave each pet even overall: one good matchup and
+  one bad.
+- **Stage 1, Lv 12:** the Sparky is ahead, by 12 to 17% of HP. Every pet has
+  three moves at 12 and gets its fourth at 14, and no single pace suits
+  both levels, so Lv 14, where pets spend Lv 14 to 17, came first.
+
+Fights run 20 to 60 seconds.
 
 **Not balanced across stages.** An evolved form learns its first skill at Lv
 18, as in the game. From Lv 15 to 17 it has none, and with Attack this weak
@@ -221,8 +227,22 @@ way:
 | Charge (rush) | Horn Rush, Flying Swoop, Cuddle, Landslide | straight down its lane, stopping on the first pet it hits | step aside |
 | Shot | Fireball, Acorn Flick, Bamboo Tasting | flies straight at where you were when it's let go, hitting the first one in its path | move across its line; the further off, the more time you have |
 
-Shots are the hardest to land, so they are let go 0.35 s into the move (they
-were 0.6 to 0.8 s) and fly at 760 rather than 460. Their range is unchanged.
+**Wind-ups are short**, so a move lands before its target can walk out of it.
+From the press to the hit:
+
+| Kind | Wind-up | Was |
+| --- | --- | --- |
+| Shot | 0.1 s | 0.6 to 0.8 s |
+| Charge (to its launch) | 0.1 s | 0.3 to 0.7 s |
+| Burst, swipe, gale, puff | 0.12 s | 0.5 to 0.8 s |
+| Bolt | 0.15 s | 0.8 to 1.0 s |
+
+Only the frames before the hit are sped up; the rest of each clip plays as
+before, so a whole move now takes 0.55 to 1.2 s and your pet stands still for
+less of it. A bolt keeps a little longer because it's dropped right under
+you. Shots also fly at 760 rather than 460, with their range unchanged.
+Dodging is now mostly about reading the other pet: keeping out of reach,
+moving while its moves are ready, and stepping in once it's thrown them.
 
 **Aiming.** Tap a move and it goes at the nearest foe. Press and hold one
 that has a direction (a shot, a bolt, a swipe, a gale, a charge) and drag:
@@ -233,7 +253,7 @@ the nearest foe again. To call it off, let go on the ✕ that shows above the
 buttons while you hold: nothing is thrown and the move stays ready. Bursts and the Nap go off round your pet, so they
 fire on the press. It works the same on the raid.
 
-Other wind-ups run about 0.3 to 1.1 s and are the same for every pet. Speed buys
+Wind-ups are the same for every pet. Speed buys
 shorter cooldowns, not quicker moves. A pet that takes a move also stands
 still for it: committing is a risk.
 
@@ -301,7 +321,7 @@ attempts means more running.
 You get three swings; the menu gives you ten more. The game earns one per 5 km
 run.
 
-**His health is one fixed pool: 200,000.** It is the same for one player or
+**His health is one fixed pool: 150,000.** It is the same for one player or
 twenty, and it never regenerates. Every swing anyone takes stays off him,
 across attempts, sessions and days, until he is felled. He is meant to be a
 group's weeks of work at the very end of the game.
@@ -314,17 +334,17 @@ which is 6 swings a week. Seven of them earn about 180 swings a month between
 them. Average damage per attempt and the total swings needed, from
 simulation:
 
-| Level | Average player | Near-perfect player | Swings for 200,000, average / near-perfect | Time for 7 runners, average / near-perfect |
+| Level | Average player | Near-perfect player | Swings for 150,000, average / near-perfect | Time for 7 runners, average / near-perfect |
 | --- | --- | --- | --- | --- |
-| Lv 14 | ~440 | ~1,700 | ~460 / ~120 | ~2.5 months / ~3 weeks |
-| Lv 26 | ~910 | ~3,600 | ~220 / ~56 | ~5 weeks / ~10 days |
-| Lv 40 | ~1,150 | ~5,800 | ~175 / ~35 | ~4 weeks / ~6 days |
+| Lv 14 | ~470 | ~1,470 | ~320 / ~100 | ~1.8 months / ~2.5 weeks |
+| Lv 26 | ~850 | ~3,500 | ~175 / ~43 | ~1 month / ~1 week |
+| Lv 40 | ~1,200 | ~5,300 | ~125 / ~28 | ~3 weeks / ~5 days |
 
 The average player steps out of his marks but gets caught mid-skill. The
 near-perfect one is touched only by his roar. These figures are after the
 long cooldowns, which cut what a pet takes off him per attempt to about a
 third (quicker shots won some of it back), so his health came down from
-400,000 to 200,000: about five weeks for an average Lv 26 field.
+400,000 to 150,000: about a month for an average Lv 26 field.
 
 **After he falls**, everyone who was on him sees the death clip and a card of
 who took what off him this round. He is back on his hill 20 seconds later
@@ -353,7 +373,7 @@ server of our own.
 - **Each page settles his blows on its own pet only**, at the moment the mark
   fills. The page running him decides where he goes, and your page decides
   whether you were standing in it.
-- **His health** is 200,000 less the sum of what every tab has taken off him
+- **His health** is 150,000 less the sum of what every tab has taken off him
   this round. Each tab keeps its own figure, which survives a reload, so two
   tabs never overwrite each other. Figures only ever grow, so every copy of
   the account (the store, the presence of the page running him, this

@@ -391,7 +391,7 @@ const SKILLS = {
         aspect:1.6452, scale:1.50, dx:-26.38, dy:-7.99 } },
     { id:"fireball", name:"Fireball", ico:"🔥", stage:2, level:18,
       battle:{ dmg:1.20, cd:3, burn:{ pct:0.20, turns:2 } },
-      fx:{ kind:"shot", impact:8, reach:320, tint:"fire", wind:.35 },
+      fx:{ kind:"shot", impact:8, reach:320, tint:"fire" },
       sprite:{ src:"skill-fireball.png", frames:16,
         durations:[150,150,140,130, 120,110,100, 90,90,90, 110,110,120,130,140,200],
         aspect:1.270, scale:1.85, dx:12, dy:-31 } },
@@ -424,7 +424,7 @@ const SKILLS = {
         aspect:1.1699, scale:1.562, dx:5.9, dy:-1.0 } },
     { id:"acorn-flick", name:"Acorn Flick", ico:"🌰", stage:1, level:12,
       battle:{ dmg:1.50, cd:5 },
-      fx:{ kind:"shot", impact:7, reach:300, tint:"acorn", wind:.35 },
+      fx:{ kind:"shot", impact:7, reach:300, tint:"acorn" },
       sprite:{ src:"skill-acorn-flick.png", frames:16,
         durations:[300, 260, 240, 260, 180, 150, 90, 110, 150, 170, 190, 240, 200, 220, 300, 340],
         aspect:1.4822, scale:1.439, dx:13.05, dy:-12.87 } },
@@ -468,7 +468,7 @@ const SKILLS = {
        and the chunk spat at them on frame 8. */
     { id:"bamboo-toss", name:"Bamboo Tasting", ico:"🎋", stage:1, level:12,
       battle:{ dmg:1.40, cd:3 },
-      fx:{ kind:"shot", impact:8, reach:300, tint:"bamboo", wind:.35 },
+      fx:{ kind:"shot", impact:8, reach:300, tint:"bamboo" },
       sprite:{ src:"skill-bamboo-tasting.png", frames:16,
         durations:[300, 220, 260, 240, 260, 220, 240, 420, 100, 110, 120, 160, 260, 200, 260, 340],
         aspect:1.5097, scale:1.219, dx:13.58, dy:-0.84 } },
@@ -495,16 +495,21 @@ const SKILLS = {
   ]
 };
 const MOVE = {};
-/* Shots are the hardest moves to land - aimed when let go, and a sidestep
-   beats them - so they wind up quicker (fx.wind: seconds to the throw) and
-   fly faster than they used to (460). A shot's range is unchanged. */
+/* Wind-ups are short, so a move lands before its target can walk out of
+   it: the frames up to the hit (a charge's launch) play in WIND seconds for
+   its kind, or fx.wind for one move; the rest of the clip plays as it did.
+   A bolt keeps a little longer - it's dropped right under you - and a shot
+   the least, since a sidestep beats it. Shots also fly faster than they
+   used to (460). A shot's range is unchanged. */
+const WIND = { shot:.1, nova:.12, cone:.12, gale:.12, puff:.12, rush:.1, strike:.15 };
 const SHOT_SPEED = 760;
 const shotLife = fx => (fx.reach + 180) / SHOT_SPEED;
 /* Each clip is played back to fit inside one turn - the time the move costs
    in a battle. A clip that ran longer would cost its pet part of its next turn,
    and the long ones (the fizzle at 4.9s, Nap at 4.65s) cost enough to swing a
    fight; they play quick rather than unfairly. */
-for (const sp in SKILLS) for (const s of SKILLS[sp]){ s.species = sp; s.clip = makeClip(s.sprite, TURN, s.fx.wind ? { at:s.fx.impact, wind:s.fx.wind } : null); MOVE[s.id] = s; }
+for (const sp in SKILLS) for (const s of SKILLS[sp]){ s.species = sp; const wind = s.fx.wind ?? WIND[s.fx.kind];
+  s.clip = makeClip(s.sprite, TURN, wind ? { at:s.fx.kind === "rush" ? s.fx.from : s.fx.impact, wind } : null); MOVE[s.id] = s; }
 /* Skills are the fight. Live, a plain Attack is instant and dashes you onto
    the target, while a skill plays its clip first - so at anything near the
    game's ×1, spamming Attack was the better button. So:
@@ -573,9 +578,9 @@ function makeClip(c, fit, wind){
   const k = fit ? Math.min(1, fit / natural) : 1;
   let durs = raw.map(d => d * k);
   if (wind && fit){
-    // the frames up to the throw squeezed into `wind`, the rest stretched over what's left of the turn
-    const pre = raw.slice(0, wind.at).reduce((a, b) => a + b, 0), post = raw.slice(wind.at).reduce((a, b) => a + b, 0);
-    durs = raw.map((d, i) => i < wind.at ? d * wind.wind * 1000 / pre : d * (fit - wind.wind) * 1000 / post);
+    // the frames up to the hit squeezed into `wind` (never slowed down); the rest as they were
+    const pre = durs.slice(0, wind.at).reduce((a, b) => a + b, 0), k2 = Math.min(1, wind.wind * 1000 / (pre || 1));
+    durs = durs.map((d, i) => i < wind.at ? d * k2 : d);
   }
   const starts = []; let t = 0;
   for (const d of durs){ starts.push(t); t += d; }
@@ -953,7 +958,7 @@ function speedTempo(spd, level){ return (1 + 5 * spd / attrTotal(level)) / 1.5; 
    meet each other about as the game's battles have them meet (§3 in the
    design notes). Live, with Attack worth almost nothing, a species' kit
    decides more than it does in a battle, and these even it out. */
-let FORM_PACE = { cinderling:1.1, sparky:1, cub:.9, blazewyrm:.84, zephyrite:1.17, panda:1.02 };
+let FORM_PACE = { cinderling:1.063, sparky:1.064, cub:.885, blazewyrm:.862, zephyrite:1.164, panda:.996 };
 function tempoOf(e){
   if (e.boss) return 1;
   return e.tempo = speedTempo(e.spd * (e.spdMul || 1), e.level) * (FORM_PACE[e.formId] || 1);
@@ -1894,11 +1899,11 @@ function playerFainted(){
 
    He is a group's work over weeks. Seven runners at the game's 30 km a
    week earn about 180 swings a month between them. At level 26 a swing takes
-   about 900 off him for a player who dodges but gets caught mid-skill, and
-   about 3,600 for one only his roar ever touches. At 200,000 that is about
-   five weeks for a field of the first kind and ten days for a field of the
+   about 850 off him for a player who dodges but gets caught mid-skill, and
+   about 3,500 for one only his roar ever touches. At 150,000 that is about
+   a month for a field of the first kind and a week for a field of the
    second. The bar shows a percentage, as in the game. */
-const RAID_HP = 200000;
+const RAID_HP = 150000;
 /* He hits a little harder than the game's Power 90 (×1.08), so attempts are
    a little shorter and the fight is a long one for a whole group (see RAID_HP). */
 const BOSS_POW = 1.08;
