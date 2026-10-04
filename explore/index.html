@@ -115,6 +115,11 @@
 
   /* The right thumb: Attack, and the pet's own skills in an arc round it,
      each with its cooldown sweeping down. */
+  #aim-cancel{position:absolute;right:26px;bottom:calc(env(safe-area-inset-bottom,0px) + 250px);width:64px;height:64px;border-radius:50%;
+    display:grid;place-items:center;font-size:26px;font-weight:900;color:#ffd0d6;background:rgba(20,24,34,.72);border:2px solid rgba(255,107,125,.55);
+    pointer-events:none;transition:transform .08s,background .08s}
+  #aim-cancel[hidden]{display:none}
+  #aim-cancel.on{transform:scale(1.18);background:rgba(200,40,60,.85);border-color:#ff8a98;color:#fff}
   #actions{position:absolute;right:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 22px);width:84px;height:84px}
   .act{position:absolute;border-radius:50%;border:2px solid rgba(255,255,255,.18);background:rgba(16,19,30,.86);
     display:grid;place-items:center;pointer-events:auto;touch-action:none;padding:0}
@@ -223,6 +228,7 @@
     <div id="party"></div>
   </div>
   <div id="stick"><div id="stick-base" class="rest"><div id="stick-knob"></div></div></div>
+  <div id="aim-cancel" hidden aria-label="Let go here to cancel">✕</div>
   <div id="actions">
     <button class="act" id="act-attack" aria-label="Attack"><span class="ico">👊</span><span class="cd"></span><span class="cdn"></span></button>
   </div>
@@ -1329,7 +1335,7 @@ function bindTouch(){
 const ARC = [[-104, 0], [-86, -62], [-36, -102], [26, -106]];
 function buildSkillButtons(){
   const host = $("actions");
-  host.querySelectorAll(".act.s").forEach(b => b.remove()); G.aiming = null;
+  host.querySelectorAll(".act.s").forEach(b => b.remove()); stopAiming();
   G.player.kit.forEach((sk, i) => {
     const b = document.createElement("button");
     b.className = "act s"; b.dataset.id = sk.id; b.setAttribute("aria-label", sk.name);
@@ -1344,7 +1350,8 @@ function buildSkillButtons(){
    one that is aimed - a shot, a bolt, a swipe, a gale, a charge - and drag:
    its shape follows your thumb out from your pet, and it goes where it
    points when you let go. A bolt goes further the further you drag. Drag
-   back onto the button and it's the nearest foe again. A burst and the Nap
+   back onto the button and it's the nearest foe again; let go on the ✕
+   that shows above the buttons and it isn't thrown at all. A burst and the Nap
    go off round your pet, so they fire on the press, and so does everything
    on the raid, where moves find him by themselves. */
 const AIM = { dead:16, full:90 };
@@ -1355,19 +1362,30 @@ function bindAim(b, sk){
     if (!G.running || G.paused) return;
     if (!aimable(sk) || inRaid() || G.aiming){ useSkill(G.player, sk.id); return; }
     try { b.setPointerCapture(ev.pointerId); } catch(e){}
-    G.aiming = { sk, id:ev.pointerId, ox:ev.clientX, oy:ev.clientY, dx:0, dy:0 };
-    b.classList.add("aiming");
+    G.aiming = { sk, id:ev.pointerId, ox:ev.clientX, oy:ev.clientY, dx:0, dy:0, cancel:false };
+    b.classList.add("aiming"); $("aim-cancel").hidden = false;
   });
   b.addEventListener("pointermove", ev => {
     const a = G.aiming; if (!a || a.id !== ev.pointerId) return;
     a.dx = ev.clientX - a.ox; a.dy = ev.clientY - a.oy;
+    a.cancel = overCancel(ev.clientX, ev.clientY); $("aim-cancel").classList.toggle("on", a.cancel);
   });
   const end = fire => ev => {
     const a = G.aiming; if (!a || a.id !== ev.pointerId) return;
-    G.aiming = null; b.classList.remove("aiming");
-    if (fire && G.running && !G.paused) useSkill(G.player, sk.id, aimFrom(a));
+    const cancel = overCancel(ev.clientX, ev.clientY);   // before the ✕ is put away
+    stopAiming();
+    if (fire && !cancel && G.running && !G.paused) useSkill(G.player, sk.id, aimFrom(a));
   };
   b.addEventListener("pointerup", end(true)); b.addEventListener("pointercancel", end(false));
+}
+function overCancel(x, y){
+  const r = $("aim-cancel").getBoundingClientRect(), pad = 14;
+  return r.width > 0 && x > r.left - pad && x < r.right + pad && y > r.top - pad && y < r.bottom + pad;
+}
+function stopAiming(){
+  G.aiming = null;
+  $("aim-cancel").hidden = true; $("aim-cancel").classList.remove("on");
+  for (const b of document.querySelectorAll(".act.s.aiming")) b.classList.remove("aiming");
 }
 // a drag's aim: a direction, and how far out (0-1) - or null, for the nearest foe
 function aimFrom(a){
@@ -1378,7 +1396,7 @@ function aimFrom(a){
    go on release, grey while it's still cooling or your pet is busy. */
 function drawAim(){
   const a = G.aiming, p = G.player;
-  if (!a || !p || !p.alive) return;
+  if (!a || !p || !p.alive || a.cancel) return;   // over the ✕: nothing will go
   const fx = a.sk.fx, man = aimFrom(a);
   let dir = man, k = man ? man.k : 1;
   if (!man){
@@ -2418,7 +2436,7 @@ function catchUp(sec){
 function wallGap(){ const now = performance.now(), gap = (now - wallLast) / 1000; wallLast = now; return gap; }
 document.addEventListener("visibilitychange", () => {
   if (document.hidden){
-    stick.on = false; stick.x = stick.y = 0; G.aiming = null;
+    stick.on = false; stick.x = stick.y = 0; stopAiming();
     if (!bgTimer) bgTimer = setInterval(() => catchUp(wallGap()), 500);
   } else if (bgTimer){ clearInterval(bgTimer); bgTimer = null; }
 });

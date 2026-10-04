@@ -225,7 +225,8 @@ that has a direction (a shot, a bolt, a swipe, a gale, a charge) and drag:
 its shape follows your thumb out from your pet, blue while it's ready and
 grey while it's cooling, and it goes where it points when you let go. A bolt
 lands further out the further you drag. Drag back onto the button and it's
-the nearest foe again. Bursts and the Nap go off round your pet, so they
+the nearest foe again. To call it off, let go on the ✕ that shows above the
+buttons while you hold: nothing is thrown and the move stays ready. Bursts and the Nap go off round your pet, so they
 fire on the press. So does everything on the raid, where moves find him by
 themselves.
 
