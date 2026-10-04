@@ -185,17 +185,17 @@ rates:
 
 | Matchup | Lv 12 | Lv 14 | Lv 26 | Lv 40 |
 | --- | --- | --- | --- | --- |
-| Verdant v Ember | 87% · +10% HP | 81% · +12% | 33% · +2% | 25% · 0% |
-| Verdant v Nimbus | 1% · −19% | 19% · −10% | 34% · 0% | 31% · +1% |
-| Ember v Nimbus | 2% · −14% | 65% · +9% | 29% · 0% | 27% · 0% |
+| Verdant v Ember | 75% · +6% HP | 89% · +14% | 38% · +4% | 25% · −1% |
+| Verdant v Nimbus | 1% · −17% | 7% · −16% | 34% · +2% | 33% · −2% |
+| Ember v Nimbus | 7% · −12% | 58% · +9% | 35% · +1% | 33% · 0% |
 
-- **Stage 2:** every pairing is within 2% of HP.
+- **Stage 2:** every pairing is within 4% of HP.
 - **Stage 1, Lv 14 (the full kits):** a loop, as in rock-paper-scissors.
   The Bamboo Cub beats the Cinderling, the Sparky beats the Cub, and the
-  Cinderling beats the Sparky, each by about 10% of HP. No set of paces
+  Cinderling beats the Sparky, each by 9 to 16% of HP. No set of paces
   undoes a loop, so these leave each pet even overall: one good matchup and
   one bad.
-- **Stage 1, Lv 12:** the Sparky is ahead, by 14 to 19% of HP. Every pet has
+- **Stage 1, Lv 12:** the Sparky is ahead, by 12 to 17% of HP. Every pet has
   three moves at 12 and gets its fourth at 14, and no single pace suits
   both levels, so Lv 14, where pets spend Lv 14 to 17, came first.
 
@@ -232,13 +232,13 @@ From the press to the hit:
 
 | Kind | Wind-up | Was |
 | --- | --- | --- |
-| Shot | 0.2 s | 0.6 to 0.8 s |
-| Charge (to its launch) | 0.2 s | 0.3 to 0.7 s |
-| Burst, swipe, gale, puff | 0.25 s | 0.5 to 0.8 s |
-| Bolt | 0.3 s | 0.8 to 1.0 s |
+| Shot | 0.1 s | 0.6 to 0.8 s |
+| Charge (to its launch) | 0.1 s | 0.3 to 0.7 s |
+| Burst, swipe, gale, puff | 0.12 s | 0.5 to 0.8 s |
+| Bolt | 0.15 s | 0.8 to 1.0 s |
 
 Only the frames before the hit are sped up; the rest of each clip plays as
-before, so a whole move now takes 0.7 to 1.3 s and your pet stands still for
+before, so a whole move now takes 0.55 to 1.2 s and your pet stands still for
 less of it. A bolt keeps a little longer because it's dropped right under
 you. Shots also fly at 760 rather than 460, with their range unchanged.
 Dodging is now mostly about reading the other pet: keeping out of reach,
