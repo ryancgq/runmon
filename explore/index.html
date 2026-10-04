@@ -128,6 +128,7 @@
   #act-attack{width:84px;height:84px;right:0;bottom:0;border-color:rgba(255,210,63,.5)}
   #act-attack .ico{font-size:32px}
   .act.s{width:58px;height:58px}
+  .act.s.aiming{border-color:#7ddcff;box-shadow:0 0 18px rgba(125,220,255,.55);transform:scale(.93)}
 
   #fight-btn{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 150px);
     padding:13px 20px;border-radius:16px;border:0;font-weight:900;font-size:15px;color:#2a1204;white-space:nowrap;text-align:center;
@@ -1111,16 +1112,19 @@ function useAttack(e){
   dust(e.x, e.y, 5);
   return true;
 }
-function useSkill(e, id){
+function useSkill(e, id, hand){
   const sk = MOVE[id];
   if (!skillReady(e, sk)) return false;
   const fx = sk.fx;
-  const target = aimAt(e, fx.kind === "self" ? 400 : Math.max(reachOf(fx), 160));
+  // aimed by hand (aimFrom): that way, at nothing in particular; else the nearest foe
+  let target = null;
+  if (hand){ e.aim = { x:hand.x, y:hand.y }; if (Math.abs(hand.x) > .08) e.face = hand.x > 0 ? 1 : -1; }
+  else target = aimAt(e, fx.kind === "self" ? 400 : Math.max(reachOf(fx), 160));
   if (fx.kind === "gale") e.face = e.aim.x > 0 ? -1 : 1;   // the gale comes out the back
   e.cds[id] = cdTurns(e, sk) * TURN; e.gcd = LIVE_GCD * TURN; e.used[id] = true;
   e.atkCd = Math.max(e.atkCd, sk.clip.total / 1000);       // a skill is the turn: no Attack on top of it
   e.turnT = sk.clip.total / 1000;                          // nor another skill, even if the clip is cut short
-  e.clip = { sk, t:0, fired:false, target, aim:{ ...e.aim }, hit:new Map(), lock:!G.raid };
+  e.clip = { sk, t:0, fired:false, target, aim:{ ...e.aim }, hit:new Map(), lock:!G.raid, far:hand ? hand.k : null };
   if (e.clip.lock) lockMove(e, e.clip);
   if (e === G.player) NET.ks++;
   e.ksN = (e.ksN || 0) + 1;
@@ -1146,7 +1150,8 @@ function lockMove(e, c){
   const fx = c.sk.fx, t = c.target;
   if (fx.kind === "strike"){
     const h = t ? t.hitCircle() : null;
-    let x = h ? h.x : e.x + c.aim.x * 160, y = h ? t.y : e.y + c.aim.y * 160;
+    const r = c.far !== null && c.far !== undefined ? Math.max(40, fx.reach * c.far) : 160;
+    let x = h ? h.x : e.x + c.aim.x * r, y = h ? t.y : e.y + c.aim.y * r;
     const d = Math.hypot(x - e.x, y - e.y);
     if (d > fx.reach){ x = e.x + (x - e.x) / d * fx.reach; y = e.y + (y - e.y) / d * fx.reach; }
     c.spot = { x, y };
@@ -1324,16 +1329,76 @@ function bindTouch(){
 const ARC = [[-104, 0], [-86, -62], [-36, -102], [26, -106]];
 function buildSkillButtons(){
   const host = $("actions");
-  host.querySelectorAll(".act.s").forEach(b => b.remove());
+  host.querySelectorAll(".act.s").forEach(b => b.remove()); G.aiming = null;
   G.player.kit.forEach((sk, i) => {
     const b = document.createElement("button");
     b.className = "act s"; b.dataset.id = sk.id; b.setAttribute("aria-label", sk.name);
     const [dx, dy] = ARC[i];
     b.style.right = (42 - 29 - dx) + "px"; b.style.bottom = (42 - 29 - dy) + "px";
     b.innerHTML = `<span class="ico">${sk.ico}</span><span class="cd"></span><span class="cdn"></span>`;
-    b.addEventListener("pointerdown", ev => { ev.preventDefault(); if (G.running && !G.paused) useSkill(G.player, sk.id); });
+    bindAim(b, sk);
     host.appendChild(b);
   });
+}
+/* Aiming by hand. Tap a move and it goes at the nearest foe. Press and hold
+   one that is aimed - a shot, a bolt, a swipe, a gale, a charge - and drag:
+   its shape follows your thumb out from your pet, and it goes where it
+   points when you let go. A bolt goes further the further you drag. Drag
+   back onto the button and it's the nearest foe again. A burst and the Nap
+   go off round your pet, so they fire on the press, and so does everything
+   on the raid, where moves find him by themselves. */
+const AIM = { dead:16, full:90 };
+const aimable = sk => ["shot", "strike", "cone", "gale", "puff", "rush"].includes(sk.fx.kind);
+function bindAim(b, sk){
+  b.addEventListener("pointerdown", ev => {
+    ev.preventDefault();
+    if (!G.running || G.paused) return;
+    if (!aimable(sk) || inRaid() || G.aiming){ useSkill(G.player, sk.id); return; }
+    try { b.setPointerCapture(ev.pointerId); } catch(e){}
+    G.aiming = { sk, id:ev.pointerId, ox:ev.clientX, oy:ev.clientY, dx:0, dy:0 };
+    b.classList.add("aiming");
+  });
+  b.addEventListener("pointermove", ev => {
+    const a = G.aiming; if (!a || a.id !== ev.pointerId) return;
+    a.dx = ev.clientX - a.ox; a.dy = ev.clientY - a.oy;
+  });
+  const end = fire => ev => {
+    const a = G.aiming; if (!a || a.id !== ev.pointerId) return;
+    G.aiming = null; b.classList.remove("aiming");
+    if (fire && G.running && !G.paused) useSkill(G.player, sk.id, aimFrom(a));
+  };
+  b.addEventListener("pointerup", end(true)); b.addEventListener("pointercancel", end(false));
+}
+// a drag's aim: a direction, and how far out (0-1) - or null, for the nearest foe
+function aimFrom(a){
+  const m = Math.hypot(a.dx, a.dy);
+  return m < AIM.dead ? null : { x:a.dx / m, y:a.dy / m, k:Math.min(1, m / AIM.full) };
+}
+/* The move you're holding, drawn where it will go: blue when it's ready to
+   go on release, grey while it's still cooling or your pet is busy. */
+function drawAim(){
+  const a = G.aiming, p = G.player;
+  if (!a || !p || !p.alive) return;
+  const fx = a.sk.fx, man = aimFrom(a);
+  let dir = man, k = man ? man.k : 1;
+  if (!man){
+    const t = nearestFoe(p, Math.max(reachOf(fx), 160));
+    if (t){ const h = t.hitCircle(), d = Math.hypot(h.x - p.x, h.y - p.y) || 1; dir = { x:(h.x - p.x) / d, y:(h.y - p.y) / d }; k = Math.min(1, d / fx.reach); }
+    else dir = { ...p.aim };
+  }
+  const col = skillReady(p, a.sk) ? "125,220,255" : "170,170,180", ang = Math.atan2(dir.y, dir.x);
+  ctx.save(); ctx.lineWidth = 2; ctx.strokeStyle = `rgba(${col},.85)`; ctx.fillStyle = `rgba(${col},.18)`;
+  ctx.beginPath();
+  if (fx.kind === "strike"){
+    const r = Math.max(40, fx.reach * k), x = p.x + dir.x * r, y = p.y + dir.y * r;
+    ctx.save(); ctx.setLineDash([6, 8]); ctx.strokeStyle = `rgba(${col},.35)`; ctx.beginPath(); ctx.arc(p.x, p.y, fx.reach, 0, 7); ctx.stroke(); ctx.restore();
+    ctx.beginPath(); ctx.arc(x, y, fx.radius, 0, 7);
+  } else if (fx.kind === "rush" || fx.kind === "shot"){
+    const L = fx.kind === "rush" ? fx.dist + p.r + 16 : fx.reach, H = fx.kind === "rush" ? p.r + 16 : 14, ca = Math.cos(ang), sa = Math.sin(ang);
+    ctx.moveTo(p.x - sa * H, p.y + ca * H); ctx.lineTo(p.x + ca * L - sa * H, p.y + sa * L + ca * H);
+    ctx.lineTo(p.x + ca * L + sa * H, p.y + sa * L - ca * H); ctx.lineTo(p.x + sa * H, p.y - ca * H); ctx.closePath();
+  } else { const arc = fx.arc || .9; ctx.moveTo(p.x, p.y); ctx.arc(p.x, p.y, fx.reach, ang - arc, ang + arc); ctx.closePath(); }
+  ctx.fill(); ctx.stroke(); ctx.restore();
 }
 
 /* =========================================================================
@@ -2353,7 +2418,7 @@ function catchUp(sec){
 function wallGap(){ const now = performance.now(), gap = (now - wallLast) / 1000; wallLast = now; return gap; }
 document.addEventListener("visibilitychange", () => {
   if (document.hidden){
-    stick.on = false; stick.x = stick.y = 0;
+    stick.on = false; stick.x = stick.y = 0; G.aiming = null;
     if (!bgTimer) bgTimer = setInterval(() => catchUp(wallGap()), 500);
   } else if (bgTimer){ clearInterval(bgTimer); bgTimer = null; }
 });
@@ -3002,7 +3067,7 @@ function render(){
     ctx.save(); ctx.strokeStyle = `rgba(255,179,71,${.4 + Math.sin(G.time * 5) * .15})`; ctx.lineWidth = 5;
     ctx.beginPath(); ctx.arc(ARENA_PX.x, ARENA_PX.y, ARENA_PX.r - 8, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
   }
-  drawFxGround();
+  drawFxGround(); drawAim();
   for (const k of G.pickups) drawPickup(k);
   const list = [];
   for (const pr of world.props) if (pr.x > vx0 - 60 && pr.x < vx0 + halfW * 2 + 60 && pr.y > vy0 - 10 && pr.y < vy0 + halfH * 2 + 100) list.push(pr);
