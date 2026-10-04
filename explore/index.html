@@ -391,7 +391,7 @@ const SKILLS = {
         aspect:1.6452, scale:1.50, dx:-26.38, dy:-7.99 } },
     { id:"fireball", name:"Fireball", ico:"🔥", stage:2, level:18,
       battle:{ dmg:1.20, cd:3, burn:{ pct:0.20, turns:2 } },
-      fx:{ kind:"shot", impact:8, reach:320, tint:"fire" },
+      fx:{ kind:"shot", impact:8, reach:320, tint:"fire", wind:.35 },
       sprite:{ src:"skill-fireball.png", frames:16,
         durations:[150,150,140,130, 120,110,100, 90,90,90, 110,110,120,130,140,200],
         aspect:1.270, scale:1.85, dx:12, dy:-31 } },
@@ -424,7 +424,7 @@ const SKILLS = {
         aspect:1.1699, scale:1.562, dx:5.9, dy:-1.0 } },
     { id:"acorn-flick", name:"Acorn Flick", ico:"🌰", stage:1, level:12,
       battle:{ dmg:1.50, cd:5 },
-      fx:{ kind:"shot", impact:7, reach:300, tint:"acorn" },
+      fx:{ kind:"shot", impact:7, reach:300, tint:"acorn", wind:.35 },
       sprite:{ src:"skill-acorn-flick.png", frames:16,
         durations:[300, 260, 240, 260, 180, 150, 90, 110, 150, 170, 190, 240, 200, 220, 300, 340],
         aspect:1.4822, scale:1.439, dx:13.05, dy:-12.87 } },
@@ -468,7 +468,7 @@ const SKILLS = {
        and the chunk spat at them on frame 8. */
     { id:"bamboo-toss", name:"Bamboo Tasting", ico:"🎋", stage:1, level:12,
       battle:{ dmg:1.40, cd:3 },
-      fx:{ kind:"shot", impact:8, reach:300, tint:"bamboo" },
+      fx:{ kind:"shot", impact:8, reach:300, tint:"bamboo", wind:.35 },
       sprite:{ src:"skill-bamboo-tasting.png", frames:16,
         durations:[300, 220, 260, 240, 260, 220, 240, 420, 100, 110, 120, 160, 260, 200, 260, 340],
         aspect:1.5097, scale:1.219, dx:13.58, dy:-0.84 } },
@@ -495,11 +495,16 @@ const SKILLS = {
   ]
 };
 const MOVE = {};
+/* Shots are the hardest moves to land - aimed when let go, and a sidestep
+   beats them - so they wind up quicker (fx.wind: seconds to the throw) and
+   fly faster than they used to (460). A shot's range is unchanged. */
+const SHOT_SPEED = 760;
+const shotLife = fx => (fx.reach + 180) / SHOT_SPEED;
 /* Each clip is played back to fit inside one turn - the time the move costs
    in a battle. A clip that ran longer would cost its pet part of its next turn,
    and the long ones (the fizzle at 4.9s, Nap at 4.65s) cost enough to swing a
    fight; they play quick rather than unfairly. */
-for (const sp in SKILLS) for (const s of SKILLS[sp]){ s.species = sp; s.clip = makeClip(s.sprite, TURN); MOVE[s.id] = s; }
+for (const sp in SKILLS) for (const s of SKILLS[sp]){ s.species = sp; s.clip = makeClip(s.sprite, TURN, s.fx.wind ? { at:s.fx.impact, wind:s.fx.wind } : null); MOVE[s.id] = s; }
 /* Skills are the fight. Live, a plain Attack is instant and dashes you onto
    the target, while a skill plays its clip first - so at anything near the
    game's ×1, spamming Attack was the better button. So:
@@ -561,12 +566,18 @@ function kitPace(e){
   e.cdMin = (e.kit.filter(k => !k.battle.once).length + 1.5) * speedTempo(e.spd, e.level) * (FORM_PACE[e.formId] || 1);
   e.cdLv = e.formId + e.level;
 }
-function makeClip(c, fit){
+function makeClip(c, fit, wind){
   const order = c.order || [...Array(c.frames).keys()];
   const raw = c.durations || order.map(() => 1000 / (c.fps || 8));
   const natural = raw.reduce((a, b) => a + b, 0) / 1000;
   const k = fit ? Math.min(1, fit / natural) : 1;
-  const durs = raw.map(d => d * k), starts = []; let t = 0;
+  let durs = raw.map(d => d * k);
+  if (wind && fit){
+    // the frames up to the throw squeezed into `wind`, the rest stretched over what's left of the turn
+    const pre = raw.slice(0, wind.at).reduce((a, b) => a + b, 0), post = raw.slice(wind.at).reduce((a, b) => a + b, 0);
+    durs = raw.map((d, i) => i < wind.at ? d * wind.wind * 1000 / pre : d * (fit - wind.wind) * 1000 / post);
+  }
+  const starts = []; let t = 0;
   for (const d of durs){ starts.push(t); t += d; }
   return { order, durs, starts, total:t };
 }
@@ -1130,15 +1141,15 @@ function useSkill(e, id, hand){
   e.cds[id] = cdTurns(e, sk) * TURN; e.gcd = LIVE_GCD * TURN; e.used[id] = true;
   e.atkCd = Math.max(e.atkCd, sk.clip.total / 1000);       // a skill is the turn: no Attack on top of it
   e.turnT = sk.clip.total / 1000;                          // nor another skill, even if the clip is cut short
-  e.clip = { sk, t:0, fired:false, target, aim:{ ...e.aim }, hit:new Map(), lock:!G.raid, far:hand ? hand.k : null };
-  if (e.clip.lock) lockMove(e, e.clip);
+  e.clip = { sk, t:0, fired:false, target, aim:{ ...e.aim }, hit:new Map(), far:hand ? hand.k : null };
+  lockMove(e, e.clip);
   if (e === G.player) NET.ks++;
   e.ksN = (e.ksN || 0) + 1;
   floatText(e.x, e.y - e.box * 1.35, sk.name, "#ffffff", 13);
   return true;
 }
-/* Between pets, a move is aimed when it is taken and lands on its impact
-   frame, where it was aimed - so it can miss. What you're aimed at is
+/* A move is aimed when it is taken and lands on its impact frame, where it
+   was aimed - so it can miss, a pet or him alike. What you're aimed at is
    marked on the ground for the wind-up (warnMove), and each kind of move
    is dodged its own way:
    - a burst (nova) hits all round its user: get out of its ring;
@@ -1149,9 +1160,8 @@ function useSkill(e, id, hand){
      thing it hits: step aside;
    - a shot flies straight at where you are when it's let go, and hits the
      first thing in its path: move across its line, the further off the
-     better.
-   On the raid his size makes all of that moot, and moves find him as they
-   always have. */
+     better. Shots wind up quickest and fly fastest (SHOT_SPEED, fx.wind),
+     since they are the hardest to land. */
 function lockMove(e, c){
   const fx = c.sk.fx, t = c.target;
   if (fx.kind === "strike"){
@@ -1180,8 +1190,7 @@ function warnMove(e, c, mine){
 }
 function skillImpact(e, c){
   const sk = c.sk, fx = sk.fx, b = sk.battle, hits = [];
-  // on the raid a strike and a cone land on him, where he is now; between
-  // pets they land where they were aimed (lockMove)
+  // a bolt and a swipe land where they were aimed (lockMove), not where the target has got to
   const tgt = c.target && c.target.alive ? c.target : null;
   let tx = tgt ? tgt.hitCircle().x : e.x + c.aim.x * 140, ty = tgt ? (tgt.boss ? tgt.y - 6 : tgt.y) : e.y + c.aim.y * 140;
   if (c.spot){ tx = c.spot.x; ty = c.spot.y; }
@@ -1190,8 +1199,8 @@ function skillImpact(e, c){
   };
   if (fx.kind === "shot"){
     const sx = e.x + e.face * e.box * .6, sy = e.y - 6, a = Math.atan2(ty - sy, tx - sx);
-    G.projs.push({ x:sx, y:sy, z:e.box * .32, vx:Math.cos(a) * 460, vy:Math.sin(a) * 460, r:14,
-      life:fx.reach / 460 + .4, owner:e, sk, side:e.side, tint:fx.tint, target:c.lock ? null : tgt, free:c.lock });
+    G.projs.push({ x:sx, y:sy, z:e.box * .32, vx:Math.cos(a) * SHOT_SPEED, vy:Math.sin(a) * SHOT_SPEED, r:14,
+      life:shotLife(fx), owner:e, sk, side:e.side, tint:fx.tint });
     riders(e, { battle:{ ...b, rattle:null, burn:null } }, [], tgt);   // the hit's own riders go on when it lands
     return;
   }
@@ -1209,7 +1218,6 @@ function skillImpact(e, c){
     hitAll((o, h) => Math.hypot(h.x - tx, (h.y - ty) * (o.boss ? .5 : 1)) < fx.radius + h.r, { knock:40, fromX:tx, fromY:ty });
   }
   if (fx.kind === "cone" || fx.kind === "gale" || fx.kind === "puff"){
-    if (tgt && !c.lock){ const a = Math.atan2(ty - e.y, tx - e.x); c.aim = { x:Math.cos(a), y:Math.sin(a) }; }
     const ax = c.aim.x, ay = c.aim.y, arc = fx.arc || .9;
     if (fx.kind === "gale"){
       for (let i = 0; i < 24; i++){ const s = rnd(-.45, .45), sp = rnd(90, 250), ca = Math.cos(s), sa = Math.sin(s);
@@ -1243,12 +1251,6 @@ function updateClip(e, dt){
     const a = sk.clip.starts[fx.from], b = sk.clip.starts[fx.to] ?? sk.clip.total;
     if (c.t >= a && c.t < b && !c.stopped){
       e.inv = Math.max(e.inv, .1);
-      // a rush steers onto what it was aimed at
-      if (!c.lock && c.target && c.target.alive && !c.hit.has(c.target)){
-        const h = c.target.hitCircle(), ang = Math.atan2(h.y - e.y, h.x - e.x);
-        c.aim = { x:Math.cos(ang), y:Math.sin(ang) };
-        if (Math.abs(c.aim.x) > .1) e.face = c.aim.x > 0 ? 1 : -1;
-      }
       const sp = fx.dist / ((b - a) / 1000);
       moveEnt(e, c.aim.x * sp * dt, c.aim.y * sp * dt);
       if (fx.tint === "fire" && Math.random() < .8) embers(e.x - e.face * 20, e.y - 10, 2, .3);
@@ -1258,7 +1260,7 @@ function updateClip(e, dt){
         const h = o.hitCircle();
         if (Math.hypot(h.x - e.x, h.y - (e.y - 10)) < h.r + e.r + 16){
           const d = strike(e, o, sk.battle.dmg, sk.battle.pierce, { knock:110 }); c.hit.set(o, d);
-          if (o === c.target || c.lock) c.stopped = true;
+          c.stopped = true;   // it stops on the first thing it hits
           if (fx.tint !== "fire") floatText(o.x, o.y - (o.boss ? 230 : o.box * 1.2), "★", "#ffd23f", 16);
         }
       }
@@ -1352,15 +1354,14 @@ function buildSkillButtons(){
    points when you let go. A bolt goes further the further you drag. Drag
    back onto the button and it's the nearest foe again; let go on the ✕
    that shows above the buttons and it isn't thrown at all. A burst and the Nap
-   go off round your pet, so they fire on the press, and so does everything
-   on the raid, where moves find him by themselves. */
+   go off round your pet, so they fire on the press. The same on the raid. */
 const AIM = { dead:16, full:90 };
 const aimable = sk => ["shot", "strike", "cone", "gale", "puff", "rush"].includes(sk.fx.kind);
 function bindAim(b, sk){
   b.addEventListener("pointerdown", ev => {
     ev.preventDefault();
     if (!G.running || G.paused) return;
-    if (!aimable(sk) || inRaid() || G.aiming){ useSkill(G.player, sk.id); return; }
+    if (!aimable(sk) || G.aiming){ useSkill(G.player, sk.id); return; }
     try { b.setPointerCapture(ev.pointerId); } catch(e){}
     G.aiming = { sk, id:ev.pointerId, ox:ev.clientX, oy:ev.clientY, dx:0, dy:0, cancel:false };
     b.classList.add("aiming"); $("aim-cancel").hidden = false;
@@ -1764,32 +1765,13 @@ function followBoss(b, dt){
 /* ---------- projectiles, fx ---------- */
 function updateProjs(dt){
   for (const p of G.projs){
-    // it finds what it was thrown at: in the game every move lands
-    if (p.target && p.target.alive){
-      const h = p.target.hitCircle(), a = Math.atan2((p.target.boss ? p.target.y - 6 : h.y) - p.y, h.x - p.x);
-      p.vx = Math.cos(a) * 460; p.vy = Math.sin(a) * 460;
-    }
+    // a shot flies straight and takes the first foe in its path; another page's is only the look of it
     p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; p.spin = (p.spin || 0) + dt * 14;
     if (p.tint === "fire" && Math.random() < .9) part({ x:p.x + rnd(-4, 4), y:p.y, z:p.z, vx:-p.vx * .1 + rnd(-20, 20), vy:-p.vy * .1, size:rnd(3, 6), colour:Math.random() < .5 ? "#ffd23f" : "#ff6b35", glow:true, life:rnd(.2, .4) });
-    if (!p.target && blocked(p.x, p.y, 4)) p.life = 0;
-    if (p.free && !p.clip){
-      for (const o of foesOf(p.owner)){
-        const h = o.hitCircle();
-        if (p.life > 0 && Math.hypot(h.x - p.x, h.y - p.y) < h.r + p.r){
-          const d = strike(p.owner, o, p.sk.battle.dmg, p.sk.battle.pierce, {});
-          riders(p.owner, { battle:{ rattle:p.sk.battle.rattle, burn:p.sk.battle.burn } }, [[o, d]]);
-          p.life = 0;
-        }
-      }
-    }
-    if (p.clip){
-      const t = p.target;
-      if ((t && (!t.alive || Math.hypot(t.hitCircle().x - p.x, t.y - p.y) < t.r + p.r + 4)) || p.life < 1.2){ p.life = 0; }
-    }
-    else if (!p.free) for (const o of G.ents){
-      if (p.life <= 0 || !o.alive || !hostile(p, o) || (o.boss && !o.awake)) continue;
+    if (blocked(p.x, p.y, 4)) p.life = 0;
+    if (!p.look) for (const o of foesOf(p.owner)){
       const h = o.hitCircle();
-      if (Math.hypot(h.x - p.x, (h.y - p.y) * (o.boss ? .7 : 1)) < h.r + p.r){
+      if (p.life > 0 && Math.hypot(h.x - p.x, (h.y - p.y) * (o.boss ? .7 : 1)) < h.r + p.r){
         const d = strike(p.owner, o, p.sk.battle.dmg, p.sk.battle.pierce, { knock:80, fromX:p.x - p.vx, fromY:p.y - p.vy });
         riders(p.owner, { battle:{ rattle:p.sk.battle.rattle, burn:p.sk.battle.burn } }, [[o, d]]);
         p.life = 0;
@@ -2390,13 +2372,14 @@ function bossState(b){
    for a bolt, the spot it will come down on. */
 function moveState(c){
   const t = c && c.target, sp = c && c.spot;
-  return { tg:t ? (t.net ? t.peer : t.wild ? "w" + t.wi : "") : "", sp:sp ? [Math.round(sp.x), Math.round(sp.y)] : null };
+  return { tg:t ? (t.boss ? "b" : t.net ? t.peer : t.wild ? "w" + t.wi : "") : "", sp:sp ? [Math.round(sp.x), Math.round(sp.y)] : null };
 }
 /* ...and on the other side: the pet a move named, as this page has it. */
 function netTarget(tg){
   tg = String(tg || "");
   if (!tg) return null;
   if (tg === NET.me) return G.player;
+  if (tg === "b") return G.boss;
   if (tg[0] === "w") return (G.wild && G.wild[+tg.slice(1) | 0]) || null;
   return NET.pets.get(tg) || null;
 }
@@ -2643,7 +2626,7 @@ function syncNetPet(id, pr){
     if (n.ks !== undefined && MOVE[pr.k] && !RAID_BOSS.kit.includes(MOVE[pr.k])){
       const sp = Array.isArray(pr.sp) && Number.isFinite(+pr.sp[0]) && Number.isFinite(+pr.sp[1]) ? { x:+pr.sp[0], y:+pr.sp[1] } : null;
       n.clip = { sk:MOVE[pr.k], t:0, fired:false, aim:{ ...n.aim }, net:true, target:netTarget(pr.tg), spot:sp };
-      if (!pr.rd){ n.x = n.tx; n.y = n.ty; warnMove(n, n.clip, false); }   // out in the world: show where it will land
+      n.x = n.tx; n.y = n.ty; warnMove(n, n.clip, false);   // show where it will land
     }
     n.ks = pr.ks;
   }
@@ -2669,11 +2652,10 @@ function animNetPet(n, dt){
 /* The look of another pet's move - no hits, those are its own page's. */
 function netFx(e, c){
   const fx = c.sk.fx, b = G.boss;
-  const onHim = e.rd && b.alive && dist(e, b) < 420;
-  // out in the world: a shot flies at what it was aimed at, as this page has it; a bolt comes down on its spot
-  const t = !onHim && c.target && c.target.alive ? c.target : null;
-  let tx = onHim ? b.x : t ? t.hitCircle().x : e.x + c.aim.x * 140, ty = onHim ? b.y - 6 : t ? t.y : e.y + c.aim.y * 140;
-  if (!onHim && c.spot && fx.kind === "strike"){ tx = c.spot.x; ty = c.spot.y; }
+  // a shot flies at what it was aimed at, as this page has it; a bolt comes down on its spot
+  const t = c.target && c.target.alive ? c.target : null;
+  let tx = t ? t.hitCircle().x : e.x + c.aim.x * 140, ty = t ? (t.boss ? t.y - 6 : t.y) : e.y + c.aim.y * 140;
+  if (c.spot && fx.kind === "strike"){ tx = c.spot.x; ty = c.spot.y; }
   const ax = Math.cos(Math.atan2(ty - e.y, tx - e.x)), ay = Math.sin(Math.atan2(ty - e.y, tx - e.x));
   if (fx.kind === "nova"){
     const fire = fx.tint === "fire";
@@ -2683,8 +2665,8 @@ function netFx(e, c){
   if (fx.kind === "strike"){ G.fx.push({ kind:"bolt", x:tx, y:ty, t:0, dur:.42, seed:Math.random() * 1e4, small:fx.tint === "small" }); sparks(tx, ty, 18, 1); }
   if (fx.kind === "shot"){
     const sx = e.x + e.face * e.box * .6, sy = e.y - 6, a = Math.atan2(ty - sy, tx - sx);
-    G.projs.push({ x:sx, y:sy, z:e.box * .32, vx:Math.cos(a) * 460, vy:Math.sin(a) * 460, r:14, life:2, owner:e, sk:c.sk, side:"net",
-      tint:fx.tint, target:onHim ? b : null, clip:{ shown:true } });
+    G.projs.push({ x:sx, y:sy, z:e.box * .32, vx:Math.cos(a) * SHOT_SPEED, vy:Math.sin(a) * SHOT_SPEED, r:14, life:shotLife(fx), owner:e, sk:c.sk, side:"net",
+      tint:fx.tint, look:true });
   }
   if (fx.kind === "cone") G.fx.push({ kind:"arc", x:e.x, y:e.y - 10, a:Math.atan2(ay, ax), r:fx.reach, arc:fx.arc || .9, t:0, dur:.32, colour:fx.tint });
   if (fx.kind === "gale") for (let i = 0; i < 16; i++){ const s = rnd(-.45, .45), sp = rnd(90, 250), ca = Math.cos(s), sa = Math.sin(s);
