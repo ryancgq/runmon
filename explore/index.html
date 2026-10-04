@@ -502,17 +502,58 @@ for (const sp in SKILLS) for (const s of SKILLS[sp]){ s.species = sp; s.clip = m
    - No shared cooldown (LIVE_GCD 0). With Attack worth nothing, the game's
      skill-then-Attack rhythm would be a dead turn after every skill; here a
      pet chains its skills.
-   - Cooldowns are shorter, so the moves a pet learns first come round more:
-     the first damaging move of each form every 2 turns, the rest one turn
-     sooner than in the game, never under 2. A Nap is still once a fight. */
-let ATTACK_MULT = 0.1, LIVE_GCD = 0, ATTACK_CD = 1;
-function liveCds(short){
-  for (const sp in SKILLS) for (const st of [1, 2]){
-    const kit = SKILLS[sp].filter(k => k.stage === st), first = kit.find(k => k.battle.dmg > 0);
-    for (const k of kit) k.cd = !short || k.battle.once ? k.battle.cd : k === first ? 2 : Math.max(2, k.battle.cd - 1);
-  }
+   - Cooldowns are long: about CD_MULT times the game's, in turns, so a
+     pet fires its kit and then has to wait, and a fight has stretches of
+     moving and dodging with nothing ready. What you spend a move on matters
+     more than how fast you press. See cdTurns. A Nap is still once a fight.
+   - Pets hit each other for PET_DMG of a battle's blow (and their moves cost
+     them that much less of themselves). At a battle's numbers one round of
+     moves decides a fight, and the cooldowns never come into it; this way
+     a fight runs through several, with time in between to move. His blows,
+     and theirs on him, are a battle's. */
+let ATTACK_MULT = 0.1, LIVE_GCD = 0, ATTACK_CD = 1, CD_MULT = 3, PET_DMG = 0.3;
+/* A move's cooldown for a given pet, in its own turns (Speed runs them).
+   - The game's cooldown × CD_MULT, scaled by the pet's kit as a whole. In a
+     battle the turns between moves are Attacks at full weight; here they
+     are nothing, so a kit's moves alone would decide - and a pet that has
+     just learnt its third move would be twice the pet it was. Scaling by
+     what the kit's moves do per turn against what the pet does per turn in
+     a battle (kitPace) keeps each pet as strong, next to the others, as it
+     is in the game.
+   - Never under the time it takes to throw the whole kit plus a turn and a
+     half: every pet, the quickest included, spends part of each fight with
+     everything waiting. */
+function cdTurns(e, sk){
+  if (sk.battle.once) return sk.battle.cd;
+  if (e.cdLv !== e.formId + e.level) kitPace(e);
+  return Math.max(sk.battle.cd * CD_MULT * e.cdK, e.cdMin);
 }
-liveCds(true);
+/* What a move is worth a turn, near enough, in Attacks: its hit, a burn's
+   ticks, what gets through guard, the hits a stoke or a charge makes
+   bigger, and the hits that land on a guard it has opened or rattled. */
+let KIT = { burn:.5, pierce:.5, stoke:.5, charge:.5, open:.5, rattle:.5 };
+function moveWorth(b){
+  let w = b.dmg * (1 + (b.burn ? b.burn.pct * b.burn.turns * KIT.burn : 0) + (b.pierce || 0) * KIT.pierce);
+  if (b.stoke) w += (b.stoke.mult - 1) * b.stoke.hits * KIT.stoke;
+  if (b.charge) w += b.charge.pow * b.charge.max * KIT.charge;
+  if (b.open) w += b.open.pct * b.open.turns * KIT.open;
+  if (b.rattle) w += b.rattle.pct * b.rattle.turns * KIT.rattle;
+  return w;
+}
+function kitPace(e){
+  const kit = e.kit.filter(k => k.battle.dmg > 0), cd = {};
+  let game = 0;
+  for (let t = 0; t < 600; t++){   // a battle's turns: the best move that's ready, else Attack
+    let best = null;
+    for (const k of kit) if (!(cd[k.id] > 0) && (!best || moveWorth(k.battle) > moveWorth(best.battle))) best = k;
+    if (best){ game += moveWorth(best.battle); cd[best.id] = best.battle.cd; } else game += 1;
+    for (const id in cd) cd[id]--;
+  }
+  const live = kit.reduce((a, k) => a + moveWorth(k.battle) / k.battle.cd, 0);
+  e.cdK = live > 0 ? live / (game / 600) : 1;
+  e.cdMin = (e.kit.filter(k => !k.battle.once).length + 1.5) * speedTempo(e.spd, e.level) * (FORM_PACE[e.formId] || 1);
+  e.cdLv = e.formId + e.level;
+}
 function makeClip(c, fit){
   const order = c.order || [...Array(c.frames).keys()];
   const raw = c.durations || order.map(() => 1000 / (c.fps || 8));
@@ -806,7 +847,7 @@ class Pet {
     resetFight(this);
   }
   get busy(){ return !!this.clip || this.dashT > 0; }
-  get canAct(){ return this.alive && !this.doomed; }
+  get canAct(){ return this.alive; }
   hitCircle(){ return { x:this.x, y:this.y, r:this.r }; }
 }
 /* Everything a battle builds up and throws away: buffs, a guard left open,
@@ -835,8 +876,9 @@ class Boss {
 const hostile = (a, b) => a.side !== b.side;
 // he is only fair game for a page that has taken a swing at him
 function foesOf(e){
-  const out = G.ents.filter(o => o.alive && !o.doomed && hostile(e, o) && !(o.boss && (!o.awake || !G.raid || G.raid.over)));
+  const out = G.ents.filter(o => o.alive && hostile(e, o) && !(o.boss && (!o.awake || !G.raid || G.raid.over)));
   if (e === G.player) for (const n of NET.pets.values()) if (pvpOk(n)) out.push(n);
+  if (e.wild && !e.mirror) for (const n of NET.pets.values()) if (n.alive && !n.rd) out.push(n);
   return out;
 }
 /* Open PvP: out in the world, other people's pets are fair game, and yours
@@ -873,8 +915,8 @@ function btHit(x, y, mult, pierce){
   if (y.exposed){ d *= y.exposed; y.exposed = 0; }
   return Math.max(1, Math.round(d));
 }
-/* Speed, out here, is how fast a pet's own clock runs - its Attack, its
-   skills' cooldowns and their clips - by a fixed amount for its own Speed,
+/* Speed, out here, is how fast a pet's cooldowns run - its Attack's and its
+   skills' - by a fixed amount for its own Speed,
    whoever it is fighting. (The ranked battles keep the game's rule, where
    Speed buys extra turns against the opponent's.)
 
@@ -886,13 +928,14 @@ function btHit(x, y, mult, pierce){
    1.5× (cooldowns a third shorter) and Nimbus about 1.6× (two-fifths), and a
    charge's Speed adds to it. Of the forms tried, this kept the species
    closest to the game's matchups. Walking is untouched: every pet moves at
-   the same pace. */
+   the same pace, and every move plays at the same pace, so a move's wind-up
+   reads the same whoever throws it. */
 function speedTempo(spd, level){ return (1 + 5 * spd / attrTotal(level)) / 1.5; }
 /* Each form's own pace on top of its Speed, tuned so the forms of a stage
    meet each other about as the game's battles have them meet (§3 in the
    design notes). Live, with Attack worth almost nothing, a species' kit
    decides more than it does in a battle, and these even it out. */
-let FORM_PACE = { cinderling:1.1, sparky:1, cub:.91, blazewyrm:1.06, zephyrite:1, panda:1.4 };
+let FORM_PACE = { cinderling:1.1, sparky:1, cub:.9, blazewyrm:.84, zephyrite:1.17, panda:1.02 };
 function tempoOf(e){
   if (e.boss) return 1;
   return e.tempo = speedTempo(e.spd * (e.spdMul || 1), e.level) * (FORM_PACE[e.formId] || 1);
@@ -904,13 +947,18 @@ function strike(x, y, mult, pierce, o = {}){
      could dash through each other's attacks stop trading blows at all. */
   if (y.inv > 0 && x.boss && !o.unblockable){ floatText(y.x, y.y - y.box, "dodged", "#ffd23f", 12); return 0; }
   let dmg = btHit(x, y, mult, pierce);
+  if (!x.boss && !y.boss) dmg = Math.max(1, Math.round(dmg * PET_DMG));
   if (G.god && y.side === "hero") dmg = 0;
-  if (y.net) pvpHit(y, { d:dmg });   // their page takes it off their pet
+  if (y.net){
+    if (!y.stale) pvpHit(y, { d:dmg, ...wildTag(x) });   // their page takes it off their pet
+    else if (NET.leads()) standIn(y);                    // they're idle: this page keeps their health
+    else idleHit(y, { d:dmg });                          // they're idle: the page that runs him keeps it
+  }
+  if (y.mirror) wildHit(y, { d:dmg });              // the page running the wild pets takes it off this one
   y.cur -= dmg;
   x.dealt = (x.dealt || 0) + dmg;
   if (y.boss && x === G.player) NET.dm += dmg;   // what this page has taken off his shared pool
   x.lastFight = y.lastFight = G.time;
-  if (o.defer){ if (y.cur <= 0 && !y.net){ y.cur = 0; y.doomed = true; } return dmg; }
   y.flash = y.boss ? .06 : .12;
   // his blows throw you. A pet's don't shove at all: walking back into reach
   // costs time a battle never charges, and the slowest walker paid the most
@@ -923,26 +971,13 @@ function strike(x, y, mult, pierce, o = {}){
   const ty = big ? y.y - rnd(150, 230) : y.y - y.box * .95;
   if (dmg > 0) floatText(h.x + rnd(-14, 14) * (big ? 5 : 1), ty, String(dmg), y.side === "hero" ? "#ff6b7d" : "#ffffff", big ? 17 : 15);
   if (y === G.player && dmg > 0){ G.cam.shake = Math.max(G.cam.shake, 5); buzz(25); }
-  if (y.cur <= 0 && !y.net) knockOut(y, x);
+  if (y.cur <= 0 && !y.net && !y.mirror) knockOut(y, x);
+  if (y.cur <= 0 && y.net && y.stale && NET.leads()) standIn(y);
   return dmg;
-}
-/* Show a hit the engine already settled: the number, the flash, and - if it
-   was the last blow - the faint, all on the frame the art lands. */
-function showHit(x, y, dmg){
-  y.flash = y.boss ? .06 : .12;
-  const h = y.hitCircle(), big = y.boss;
-  if (dmg > 0) floatText(h.x + rnd(-14, 14) * (big ? 5 : 1), big ? y.y - rnd(150, 230) : y.y - y.box * .95, String(dmg), y.side === "hero" ? "#ff6b7d" : "#ffffff", big ? 17 : 15);
-  if (y === G.player && dmg > 0){ G.cam.shake = Math.max(G.cam.shake, 5); buzz(25); }
-  if (y.doomed && y.alive){ y.doomed = false; faint(y, x); }
-}
-function showPending(x, c){
-  if (!c || !c.pre || c.shown) return;
-  c.shown = true;
-  for (const [y, d] of c.pre) showHit(x, y, d);
 }
 function selfHurt(x, frac, label){
   if (G.god && x.side === "hero") return;
-  const n = Math.max(1, Math.round(x.max * frac));
+  const n = Math.max(1, Math.round(x.max * frac * (G.raid ? 1 : PET_DMG)));
   x.cur -= n; floatText(x.x, x.y - x.box * 1.2, label + " -" + n, "#9aa3b8", 12);
   if (x.cur <= 0) faint(x, null);
 }
@@ -966,12 +1001,12 @@ function riders(x, sk, hits, foe){
   }
   for (const [y, dmg] of hits){
     if (!y.alive || !dmg) continue;
-    if (y.net){
+    if (y.net || y.mirror){
       const r = {};
       if (b.rattle) r.rt = [b.rattle.pct, b.rattle.turns];
       if (b.burn) r.bn = [Math.max(1, Math.round(dmg * b.burn.pct)), b.burn.turns];
       if (b.hug) r.hg = [b.hug.pct, b.hug.turns];
-      if (r.rt || r.bn || r.hg) pvpHit(y, r);
+      if (r.rt || r.bn || r.hg){ if (y.net) pvpHit(y, { ...r, ...wildTag(x) }); else wildHit(y, r); }
     }
     if (b.rattle){ y.openT = Math.max(y.openT, b.rattle.turns * TURN); y.openPct = Math.max(y.openPct, b.rattle.pct);
       floatText(y.x, y.y - (y.boss ? 240 : y.box * 1.2), "guard rattled", "#9fd8ff", 12); }
@@ -1007,8 +1042,7 @@ function knockOut(e, src){
   faint(e, src);
 }
 function faint(e, src){
-  if (e.clip) showPending(e, e.clip);
-  e.cur = 0; e.alive = false; e.doomed = false; e.clip = null; e.dashT = 0; e.burn = null;
+  e.cur = 0; e.alive = false; e.clip = null; e.dashT = 0; e.burn = null;
   if (e.type === "pet"){
     e.faintT = 0;
     if (e.wild){ e.respawnT = 25; puff(e.x, e.y - 20, "#ffffff", 14); if (Math.random() < .35) G.pickups.push({ kind:"berry", x:e.x, y:e.y, t:0 }); }
@@ -1065,7 +1099,6 @@ function useAttack(e){
   if (e.clip){
     const c = e.clip;
     if (!c.fired) return false;
-    if (c.resolved && c.sk.fx.kind !== "shot") showPending(e, c);
     e.clip = null; e.dashT = .2; e.inv = .26; e.hitSet = new Set(); e.lunge = false;
     if (e === G.player) NET.ds++;
     dust(e.x, e.y, 5);
@@ -1084,52 +1117,70 @@ function useSkill(e, id){
   const fx = sk.fx;
   const target = aimAt(e, fx.kind === "self" ? 400 : Math.max(reachOf(fx), 160));
   if (fx.kind === "gale") e.face = e.aim.x > 0 ? -1 : 1;   // the gale comes out the back
-  e.cds[id] = sk.cd * TURN; e.gcd = LIVE_GCD * TURN; e.used[id] = true;
+  e.cds[id] = cdTurns(e, sk) * TURN; e.gcd = LIVE_GCD * TURN; e.used[id] = true;
   e.atkCd = Math.max(e.atkCd, sk.clip.total / 1000);       // a skill is the turn: no Attack on top of it
   e.turnT = sk.clip.total / 1000;                          // nor another skill, even if the clip is cut short
-  e.clip = { sk, t:0, fired:false, target, aim:{ ...e.aim }, hit:new Map() };
+  e.clip = { sk, t:0, fired:false, target, aim:{ ...e.aim }, hit:new Map(), lock:!G.raid };
+  if (e.clip.lock) lockMove(e, e.clip);
   if (e === G.player) NET.ks++;
+  e.ksN = (e.ksN || 0) + 1;
   floatText(e.x, e.y - e.box * 1.35, sk.name, "#ffffff", 13);
-  /* Between pets a move resolves the moment it is taken, as btAct() does:
-     the damage and the riders are settled now, and the clip only shows them,
-     landing on its impact frame. Left until the impact frame, a slow clip
-     lost races a battle would have given it - whoever died first took their
-     hit in the air with them. His blows still land on impact: those you can
-     dodge. */
-  if (!G.raid) resolveNow(e, e.clip);
   return true;
 }
-function resolveNow(e, c){
-  const sk = c.sk, fx = sk.fx, b = sk.battle, tgt = c.target;
-  const hits = [];
-  const hit = o => { if (!o || !o.alive || o.doomed) return; hits.push([o, b.dmg > 0 ? strike(e, o, b.dmg, b.pierce, { defer:true }) : 0]); };
-  if (fx.kind === "self"){ /* nothing to hit */ }
-  else if (fx.kind === "shot" || fx.kind === "strike" || fx.kind === "rush"){ if (tgt) hit(tgt); }
-  else {
-    // novas, swipes and gales take whatever is in their shape right now
-    const ax = c.aim.x, ay = c.aim.y, arc = fx.arc || .9;
-    for (const o of foesOf(e)){
-      const h = o.hitCircle(), dx = h.x - e.x, dy = h.y - e.y, d = Math.hypot(dx, dy);
-      if (fx.kind === "nova" ? d < fx.reach + h.r : d <= fx.reach + h.r && (d < h.r + 20 || (dx * ax + dy * ay) / (d || 1) > Math.cos(arc))) hit(o);
-    }
+/* Between pets, a move is aimed when it is taken and lands on its impact
+   frame, where it was aimed - so it can miss. What you're aimed at is
+   marked on the ground for the wind-up (warnMove), and each kind of move
+   is dodged its own way:
+   - a burst (nova) hits all round its user: get out of its ring;
+   - a swipe or a gale (cone) goes the way it was facing: get behind it or
+     out of reach;
+   - a bolt (strike) comes down on the spot you were standing on: leave it;
+   - a charge (rush) runs straight down its lane and stops on the first
+     thing it hits: step aside;
+   - a shot flies straight at where you are when it's let go, and hits the
+     first thing in its path: move across its line, the further off the
+     better.
+   On the raid his size makes all of that moot, and moves find him as they
+   always have. */
+function lockMove(e, c){
+  const fx = c.sk.fx, t = c.target;
+  if (fx.kind === "strike"){
+    const h = t ? t.hitCircle() : null;
+    let x = h ? h.x : e.x + c.aim.x * 160, y = h ? t.y : e.y + c.aim.y * 160;
+    const d = Math.hypot(x - e.x, y - e.y);
+    if (d > fx.reach){ x = e.x + (x - e.x) / d * fx.reach; y = e.y + (y - e.y) / d * fx.reach; }
+    c.spot = { x, y };
   }
-  c.pre = hits; c.resolved = true;
-  riders(e, sk, hits, tgt || nearestFoe(e, 300));
+  warnMove(e, c, e === G.player);
+}
+/* The mark on the ground for a move's wind-up: where it will land. Yours
+   faint, everyone else's amber. */
+function warnMove(e, c, mine){
+  const sk = c.sk, fx = sk.fx;
+  if (fx.kind === "self" || fx.kind === "shot") return;
+  const at = fx.kind === "rush" ? fx.from : fx.impact;
+  const dur = Math.max(.15, (sk.clip.starts[at] || 0) / 1000 - c.t / 1000);
+  const w = { kind:"warn", t:0, dur, mine, by:e, x:e.x, y:e.y, a:Math.atan2(c.aim.y, c.aim.x) };
+  if (fx.kind === "nova") Object.assign(w, { shape:"circle", r:fx.reach });
+  else if (fx.kind === "strike"){ if (!c.spot) return; Object.assign(w, { shape:"circle", x:c.spot.x, y:c.spot.y, r:fx.radius }); }
+  else if (fx.kind === "rush") Object.assign(w, { shape:"lane", r:fx.dist + e.r + 16, half:e.r + 16 });
+  else Object.assign(w, { shape:"cone", r:fx.reach, arc:fx.arc || .9 });
+  G.fx.push(w);
 }
 function skillImpact(e, c){
   const sk = c.sk, fx = sk.fx, b = sk.battle, hits = [];
-  if (c.resolved) return showImpact(e, c);
-  // a strike and a cone land on what they were aimed at, where it is now -
-  // in the game every move lands
+  // on the raid a strike and a cone land on him, where he is now; between
+  // pets they land where they were aimed (lockMove)
   const tgt = c.target && c.target.alive ? c.target : null;
-  const tx = tgt ? tgt.hitCircle().x : e.x + c.aim.x * 140, ty = tgt ? (tgt.boss ? tgt.y - 6 : tgt.y) : e.y + c.aim.y * 140;
+  let tx = tgt ? tgt.hitCircle().x : e.x + c.aim.x * 140, ty = tgt ? (tgt.boss ? tgt.y - 6 : tgt.y) : e.y + c.aim.y * 140;
+  if (c.spot){ tx = c.spot.x; ty = c.spot.y; }
   const hitAll = (test, opts = {}) => {
     for (const o of foesOf(e)){ const h = o.hitCircle(); if (test(o, h)){ const d = b.dmg > 0 ? strike(e, o, b.dmg, b.pierce, opts) : 0; hits.push([o, d]); } }
   };
   if (fx.kind === "shot"){
     const sx = e.x + e.face * e.box * .6, sy = e.y - 6, a = Math.atan2(ty - sy, tx - sx);
     G.projs.push({ x:sx, y:sy, z:e.box * .32, vx:Math.cos(a) * 460, vy:Math.sin(a) * 460, r:14,
-      life:fx.reach / 460 + .4, owner:e, sk, side:e.side, tint:fx.tint, target:tgt });
+      life:fx.reach / 460 + .4, owner:e, sk, side:e.side, tint:fx.tint, target:c.lock ? null : tgt, free:c.lock });
     riders(e, { battle:{ ...b, rattle:null, burn:null } }, [], tgt);   // the hit's own riders go on when it lands
     return;
   }
@@ -1147,7 +1198,7 @@ function skillImpact(e, c){
     hitAll((o, h) => Math.hypot(h.x - tx, (h.y - ty) * (o.boss ? .5 : 1)) < fx.radius + h.r, { knock:40, fromX:tx, fromY:ty });
   }
   if (fx.kind === "cone" || fx.kind === "gale" || fx.kind === "puff"){
-    if (tgt){ const a = Math.atan2(ty - e.y, tx - e.x); c.aim = { x:Math.cos(a), y:Math.sin(a) }; }
+    if (tgt && !c.lock){ const a = Math.atan2(ty - e.y, tx - e.x); c.aim = { x:Math.cos(a), y:Math.sin(a) }; }
     const ax = c.aim.x, ay = c.aim.y, arc = fx.arc || .9;
     if (fx.kind === "gale"){
       for (let i = 0; i < 24; i++){ const s = rnd(-.45, .45), sp = rnd(90, 250), ca = Math.cos(s), sa = Math.sin(s);
@@ -1173,46 +1224,6 @@ function skillImpact(e, c){
   }
   riders(e, sk, hits, tgt || nearestFoe(e, 300));
 }
-/* The look of a move whose hits were settled when it was taken. */
-function showImpact(e, c){
-  const sk = c.sk, fx = sk.fx, tgt = c.target && c.target.alive ? c.target : null;
-  const tx = tgt ? tgt.hitCircle().x : e.x + c.aim.x * 140, ty = tgt ? tgt.y : e.y + c.aim.y * 140;
-  if (fx.kind === "shot"){
-    const sx = e.x + e.face * e.box * .6, sy = e.y - 6, a = Math.atan2(ty - sy, tx - sx);
-    G.projs.push({ x:sx, y:sy, z:e.box * .32, vx:Math.cos(a) * 460, vy:Math.sin(a) * 460, r:14,
-      life:2, owner:e, sk, side:e.side, tint:fx.tint, target:tgt, clip:c });
-    return;
-  }
-  if (fx.kind === "nova"){
-    const fire = fx.tint === "fire";
-    ring(e.x, e.y, fx.reach, fire ? "#ff8a3d" : "#7ff0ff", .5, fire ? 14 : 8);
-    if (fire) embers(e.x, e.y, 30, 1.1); else sparks(e.x, e.y - e.box * .4, 34, 1.1);
-    G.cam.shake = Math.max(G.cam.shake, 4);
-  }
-  if (fx.kind === "strike"){
-    G.fx.push({ kind:"bolt", x:tx, y:ty, t:0, dur:.42, seed:Math.random() * 1e4, small:fx.tint === "small" });
-    sparks(tx, ty, 26, 1); ring(tx, ty, fx.radius + 10, "#fff3a8", .3, 6);
-  }
-  if (fx.kind === "cone" || fx.kind === "gale" || fx.kind === "puff"){
-    if (tgt){ const a = Math.atan2(ty - e.y, tx - e.x); c.aim = { x:Math.cos(a), y:Math.sin(a) }; }
-    const ax = c.aim.x, ay = c.aim.y;
-    if (fx.kind === "gale"){
-      for (let i = 0; i < 24; i++){ const s = rnd(-.45, .45), sp = rnd(90, 250), ca = Math.cos(s), sa = Math.sin(s);
-        part({ x:e.x - e.face * e.box * .3, y:e.y - 14, vx:(ax * ca - ay * sa) * sp, vy:(ax * sa + ay * ca) * sp * .8,
-          size:rnd(7, 14), colour:Math.random() < .5 ? "rgba(150,220,90,.55)" : "rgba(190,240,120,.45)", life:rnd(.6, 1.2), shrink:false, grow:14 }); }
-    } else if (fx.kind === "puff"){
-      const px = e.x + e.face * e.box * .45;
-      for (let i = 0; i < 12; i++) part({ x:px, y:e.y - e.box * .3, vx:rnd(-30, 30) + e.face * 30, vy:rnd(-30, 10), vz:rnd(10, 50),
-        size:rnd(6, 12), colour:"rgba(140,140,150,.55)", life:rnd(.7, 1.3), shrink:false, grow:10 });
-      floatText(e.x, e.y - e.box * 1.15, "*cough*", "#c9c9d6", 13);
-    } else {
-      G.fx.push({ kind:"arc", x:e.x, y:e.y - 10, a:Math.atan2(ay, ax), r:fx.reach, arc:fx.arc || .9, t:0, dur:.32, colour:fx.tint });
-      if (fx.tint === "#ffd23f") sparks(e.x + ax * 80, e.y + ay * 80, 20, .8);
-    }
-  }
-  if (fx.kind === "self") for (let i = 0; i < 12; i++) part({ x:e.x + rnd(-20, 20), y:e.y - rnd(0, 40), vy:-30, size:3, colour:"#5fd38a", glow:true, life:.9 });
-  showPending(e, c);
-}
 function updateClip(e, dt){
   const c = e.clip; if (!c) return;
   const sk = c.sk, fx = sk.fx;
@@ -1222,7 +1233,7 @@ function updateClip(e, dt){
     if (c.t >= a && c.t < b && !c.stopped){
       e.inv = Math.max(e.inv, .1);
       // a rush steers onto what it was aimed at
-      if (c.target && c.target.alive && !c.hit.has(c.target)){
+      if (!c.lock && c.target && c.target.alive && !c.hit.has(c.target)){
         const h = c.target.hitCircle(), ang = Math.atan2(h.y - e.y, h.x - e.x);
         c.aim = { x:Math.cos(ang), y:Math.sin(ang) };
         if (Math.abs(c.aim.x) > .1) e.face = c.aim.x > 0 ? 1 : -1;
@@ -1231,30 +1242,22 @@ function updateClip(e, dt){
       moveEnt(e, c.aim.x * sp * dt, c.aim.y * sp * dt);
       if (fx.tint === "fire" && Math.random() < .8) embers(e.x - e.face * 20, e.y - 10, 2, .3);
       else if (Math.random() < .6) dust(e.x - e.face * 14, e.y, 1);
-      if (c.resolved){
-        const t = c.target;
-        if (t && !c.shown && Math.hypot(t.hitCircle().x - e.x, t.y - e.y) < t.r + e.r + 16){
-          // it stops where it lands: carried on past, it would spend its next turn walking back
-          showPending(e, c); dust(t.x, t.y, 8); c.stopped = true;
-          if (fx.tint !== "fire") floatText(t.x, t.y - t.box * 1.2, "★", "#ffd23f", 16);
-        }
-      } else for (const o of foesOf(e)){
+      for (const o of foesOf(e)){
         if (c.hit.has(o)) continue;
         const h = o.hitCircle();
         if (Math.hypot(h.x - e.x, h.y - (e.y - 10)) < h.r + e.r + 16){
           const d = strike(e, o, sk.battle.dmg, sk.battle.pierce, { knock:110 }); c.hit.set(o, d);
-          if (o === c.target) c.stopped = true;
+          if (o === c.target || c.lock) c.stopped = true;
           if (fx.tint !== "fire") floatText(o.x, o.y - (o.boss ? 230 : o.box * 1.2), "★", "#ffd23f", 16);
         }
       }
     }
-    if (!c.fired && c.t >= b){ c.fired = true; if (c.resolved) showPending(e, c); else riders(e, sk, [...c.hit], c.target); }
+    if (!c.fired && c.t >= b){ c.fired = true; riders(e, sk, [...c.hit], c.target); }
   } else if (!c.fired && c.t >= sk.clip.starts[fx.impact]){
     c.fired = true; skillImpact(e, c);
   }
   if (c.t >= sk.clip.total){
-    if (!c.fired){ c.fired = true; if (fx.kind === "rush"){ if (c.resolved) showPending(e, c); else riders(e, sk, [...c.hit], c.target); } else skillImpact(e, c); }
-    if (fx.kind !== "shot") showPending(e, c);
+    if (!c.fired){ c.fired = true; if (fx.kind === "rush") riders(e, sk, [...c.hit], c.target); else skillImpact(e, c); }
     e.clip = null;
   }
 }
@@ -1337,6 +1340,7 @@ function buildSkillButtons(){
    UPDATE
    ========================================================================= */
 function updatePet(e, dt){
+  if (e.mirror){ animNetPet(e, dt); return; }
   e.flash = Math.max(0, e.flash - dt); e.inv = Math.max(0, e.inv - dt);
   if (!e.alive){
     e.faintT += dt;
@@ -1346,7 +1350,7 @@ function updatePet(e, dt){
   const tdt = dt * tempoOf(e);   // the pet's own clock, run by its Speed
   e.atkCd = Math.max(0, e.atkCd - tdt); e.gcd = Math.max(0, e.gcd - tdt);
   for (const k in e.cds) e.cds[k] = Math.max(0, e.cds[k] - tdt);
-  e.turnT = Math.max(0, (e.turnT || 0) - tdt);
+  e.turnT = Math.max(0, (e.turnT || 0) - dt);
   tickRiders(e, tdt);
   if (!e.alive) return;
   // out of a fight for a while: the next one starts clean, and you get your breath back
@@ -1370,7 +1374,7 @@ function updatePet(e, dt){
       }
     }
     e.moving = 1;
-  } else if (e.clip){ updateClip(e, tdt); e.moving = 0; }
+  } else if (e.clip){ updateClip(e, dt); e.moving = 0; }   // a move plays at one pace for every pet: its wind-up is what you read to dodge it
   else {
     const m = Math.hypot(want.x, want.y);
     if (m > .05){
@@ -1390,13 +1394,25 @@ function updatePet(e, dt){
    btChoose(): any skill it has ready, at random, a Nap only once it is hurt,
    and a plain Attack when nothing is - taken the moment its turn comes round. */
 const TEMPER = { ember:200, nimbus:0, verdant:0 };   // Ember pets pick fights; the others wait to be hit
+/* Who a wild pet may go for: any player out in the world - this page's and
+   everyone else's - but never someone fighting him. */
+function wildPrey(){
+  const out = [];
+  if (G.player && G.player.alive && !inRaid()) out.push(G.player);
+  for (const n of NET.pets.values()) if (n.alive && !n.rd) out.push(n);
+  return out;
+}
 function petAI(e, dt){
   if (!e.canAct) return { x:0, y:0 };
   if (e.bot) return raidBot(e, dt);
-  const p = G.player;
   e.calm = Math.max(0, e.calm - dt);
-  if (e.aggro && (!e.aggro.alive || dist(e, e.home) > 520)){ e.aggro = null; e.calm = 4; }
-  if (!e.aggro && !e.calm && p.alive && !G.raid && (dist(e, p) < TEMPER[e.sp] || (e.cur < e.max && dist(e, p) < 360))) e.aggro = p;
+  const prey = wildPrey();
+  if (e.aggro && (!e.aggro.alive || dist(e, e.home) > 520 || !prey.includes(e.aggro))){ e.aggro = null; e.calm = 4; }
+  if (!e.aggro && !e.calm){
+    let best = null, bd = 1e9;
+    for (const q of prey){ const d = dist(e, q); if ((d < TEMPER[e.sp] || (e.cur < e.max && d < 360)) && d < bd){ bd = d; best = q; } }
+    if (best) e.aggro = best;
+  }
   if (e.aggro) return fightAI(e, e.aggro, dt);
   if (e.cur < e.max) e.cur = Math.min(e.max, e.cur + e.max * .08 * dt);
   e.wanderT -= dt;
@@ -1599,7 +1615,13 @@ function runBossAct(b, dt){
 function landBlow(b, a){
   const p = G.player, mine = !!(G.raid && !G.raid.over && p.alive);
   const inMark = o => Math.hypot(o.x - a.mx, (o.y - a.my) * 1.4) < a.r + o.r * .5;
+  /* An idle player is still on him: their page has gone quiet (a locked
+     phone, a frozen tab) and can't take his blows itself, so the page that
+     runs him takes them for it, standing still, until it falls. */
+  const idle = NET.leads() ? [...NET.pets.values()].filter(n => n.stale && n.rd && n.alive) : [];
+  const onIdle = (mult, pierce, all) => { for (const n of idle) if (all || inMark(n)) strike(b, n, mult, pierce, { unblockable:true }); };
   if (!a.sk){
+    onIdle(a.m, 0);
     if (mine && inMark(p)) strike(b, p, a.m, 0, { knock:200, fromX:a.mx, fromY:a.my });
     dust(a.mx, a.my, 10); G.cam.shake = Math.max(G.cam.shake, 5);
     return;
@@ -1607,10 +1629,12 @@ function landBlow(b, a){
   const k = a.sk, fx = k.fx;
   if (fx.kind === "slam"){
     G.cam.shake = 14; dust(a.mx, a.my, 24); embers(a.mx, a.my, 18, 1); ring(a.mx, a.my, a.r, "#ffb347", .35, 10);
+    onIdle(k.battle.dmg * a.m, k.battle.pierce);
     if (mine && inMark(p)) strike(b, p, k.battle.dmg * a.m, k.battle.pierce, { knock:240, fromX:a.mx, fromY:a.my });
   }
   if (fx.kind === "sweep"){
     G.cam.shake = 8; embers(b.x, b.y - 40, 30, 1.6);
+    onIdle(k.battle.dmg * a.m, 0);
     if (mine && inMark(p)) strike(b, p, k.battle.dmg * a.m, 0, { knock:260, fromX:a.mx, fromY:a.my });
   }
   if (fx.kind === "roar"){
@@ -1621,6 +1645,7 @@ function landBlow(b, a){
        fight, so however well you move, he wears you down. Then, as in the
        game, his next two blows land 60% harder and he charges, faster and
        stronger, up to twice. */
+    onIdle(a.rm || ROAR_HIT, 0, true);
     if (mine) strike(b, p, a.rm || ROAR_HIT, 0, { knock:160, fromX:b.x, fromY:b.y, unblockable:true });
     if (NET.leads()){
       b.stokeHits = k.battle.stoke.hits;
@@ -1664,11 +1689,21 @@ function updateProjs(dt){
     p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; p.spin = (p.spin || 0) + dt * 14;
     if (p.tint === "fire" && Math.random() < .9) part({ x:p.x + rnd(-4, 4), y:p.y, z:p.z, vx:-p.vx * .1 + rnd(-20, 20), vy:-p.vy * .1, size:rnd(3, 6), colour:Math.random() < .5 ? "#ffd23f" : "#ff6b35", glow:true, life:rnd(.2, .4) });
     if (!p.target && blocked(p.x, p.y, 4)) p.life = 0;
+    if (p.free && !p.clip){
+      for (const o of foesOf(p.owner)){
+        const h = o.hitCircle();
+        if (p.life > 0 && Math.hypot(h.x - p.x, h.y - p.y) < h.r + p.r){
+          const d = strike(p.owner, o, p.sk.battle.dmg, p.sk.battle.pierce, {});
+          riders(p.owner, { battle:{ rattle:p.sk.battle.rattle, burn:p.sk.battle.burn } }, [[o, d]]);
+          p.life = 0;
+        }
+      }
+    }
     if (p.clip){
       const t = p.target;
-      if ((t && (!t.alive || Math.hypot(t.hitCircle().x - p.x, t.y - p.y) < t.r + p.r + 4)) || p.life < 1.2){ showPending(p.owner, p.clip); p.life = 0; }
+      if ((t && (!t.alive || Math.hypot(t.hitCircle().x - p.x, t.y - p.y) < t.r + p.r + 4)) || p.life < 1.2){ p.life = 0; }
     }
-    else for (const o of G.ents){
+    else if (!p.free) for (const o of G.ents){
       if (p.life <= 0 || !o.alive || !hostile(p, o) || (o.boss && !o.awake)) continue;
       const h = o.hitCircle();
       if (Math.hypot(h.x - p.x, (h.y - p.y) * (o.boss ? .7 : 1)) < h.r + p.r){
@@ -1715,18 +1750,25 @@ function ambient(dt){
    ========================================================================= */
 /* Wild pets are near the player's own level, so a fight is a fight at
    whatever level is being tested. Their form follows their level. */
+/* Everyone shares one world, so the wild pets are the same for everyone:
+   each spawn has a fixed level, rising the further it is from the Trailhead,
+   and a fixed place (no random nudge - every page must put it in the same
+   spot). Their form follows their level. */
 const WILD_SPAWNS = [
-  ["ember", 63, 46, -1], ["ember", 72, 50, 0], ["ember", 74, 36, 2], ["ember", 68, 30, 1], ["ember", 78, 56, 3],
-  ["verdant", 12, 42, -1], ["verdant", 18, 54, 0], ["verdant", 8, 33, 2], ["verdant", 22, 38, 1], ["verdant", 15, 58, 3],
-  ["nimbus", 10, 18, -1], ["nimbus", 20, 22, 0], ["nimbus", 8, 10, 2], ["nimbus", 24, 6, 1], ["nimbus", 16, 4, 3]
+  ["ember", 63, 46, 8], ["ember", 72, 50, 12], ["ember", 74, 36, 14], ["ember", 68, 30, 24], ["ember", 78, 56, 34],
+  ["verdant", 12, 42, 8], ["verdant", 18, 54, 12], ["verdant", 8, 33, 14], ["verdant", 22, 38, 24], ["verdant", 15, 58, 34],
+  ["nimbus", 10, 18, 8], ["nimbus", 20, 22, 12], ["nimbus", 8, 10, 14], ["nimbus", 24, 6, 24], ["nimbus", 16, 4, 34]
 ];
 function spawnWild(){
-  for (const [sp, tx, ty, off] of WILD_SPAWNS){
-    const lv = clamp(G.player.level + off, 5, 40), form = formFor(sp, lv);
+  G.wild = [];
+  WILD_SPAWNS.forEach(([sp, tx, ty, lv], wi) => {
+    const form = formFor(sp, lv);
     let x = (tx + .5) * TILE, y = (ty + .5) * TILE;
-    for (let k = 0; k < 30 && blocked(x, y, 20); k++){ x += rnd(-40, 40); y += rnd(-40, 40); }
-    G.ents.push(new Pet(form, lv, "foe", { x, y, wild:true, name:"Wild " + FORMS[form].name }));
-  }
+    for (let k = 0; k < 30 && blocked(x, y, 20); k++){ x += ((k * 37) % 81) - 40; y += ((k * 53) % 81) - 40; }
+    const e = new Pet(form, lv, "foe", { x, y, wild:true, name:"Wild " + FORMS[form].name });
+    e.wi = wi; e.tx = x; e.ty = y;
+    G.ents.push(e); G.wild.push(e);
+  });
   const R = rng32(99);
   for (let i = 0; i < 22; i++){
     const tx = 2 + Math.floor(R() * (MW - 4)), ty = 2 + Math.floor(R() * (MH - 4));
@@ -1736,7 +1778,7 @@ function spawnWild(){
 }
 function respawnPet(e){
   if (e.wild){
-    if (dist(e.home, G.player) < 420){ e.respawnT = 5; return; }
+    if (wildPrey().some(q => dist(e.home, q) < 420)){ e.respawnT = 5; return; }
     resetFight(e);
     Object.assign(e, { alive:true, cur:e.max, x:e.home.x, y:e.home.y, aggro:null });
   }
@@ -1753,13 +1795,15 @@ function newGame(toRaid){
   if (toRaid){ G.player.x = ARENA_PX.x; G.player.y = ARENA_PX.y + ARENA_PX.r - 50; }
   G.cam.x = G.player.x; G.cam.y = G.player.y;
   buildSkillButtons(); setupHud();
-  G.running = true; G.paused = false;
+  G.running = true; G.paused = false; NET.note = null;
   $("select").hidden = true; $("result").hidden = true; $("hud").hidden = false;
   resize();
   if (toRaid) setTimeout(startAttempt, 300);
   else banner("The Trailhead", "Sir Uwaaarghhhh is up on the hill to the north.", 2.6);
 }
 function playerFainted(){
+  // fallen while away (a hidden tab, or a page that froze): out of Explore
+  if (document.hidden || NET.away){ setTimeout(disconnectIdle, 900); return; }
   if (G.raid){
     // falling after he does is still his fall - the felling card comes from bossFelled
     if (G.boss.alive) setTimeout(() => endAttempt(false), 1100);
@@ -2190,7 +2234,7 @@ function netTick(dt){
   const others = NET.others;
   // who runs him: whoever has longest, else the lowest label on screen
   const here = document.hidden ? [] : [{ id:NET.me, lt:NET.leader ? G.time - NET.since : -1 }];
-  for (const p of others) if (!p.presence.hd) here.push({ id:p.peer, lt:p.presence.b && typeof p.presence.b === "object" ? +p.presence.lt || 0 : -1 });
+  for (const p of others) if (!p.presence.hd && !(NET.pets.get(p.peer) || {}).stale) here.push({ id:p.peer, lt:p.presence.b && typeof p.presence.b === "object" ? +p.presence.lt || 0 : -1 });
   let lead = null;
   const runs = here.filter(c => c.lt >= 0);
   if (runs.length){
@@ -2199,6 +2243,8 @@ function netTick(dt){
   } else if (here.length) lead = here.map(c => c.id).sort()[0];
   const was = NET.leader;
   NET.leader = lead === null || lead === NET.me;
+  NET.leadId = lead;
+  if (NET.on) setWildRunner(NET.leader);
   if (NET.leader && !was) NET.since = G.time;
   const lp = NET.leader ? null : others.find(p => p.peer === lead);
   const hb = lp && lp.presence.b && typeof lp.presence.b === "object" ? lp.presence.b : null;
@@ -2206,7 +2252,11 @@ function netTick(dt){
   if (NET.leader && !was) takeOver(b);
   // everyone else's pet
   const seen = new Set();
+  NET.px = lp && lp.presence.px && typeof lp.presence.px === "object" ? lp.presence.px : null;
+  const away = NET.px && NET.px[NET.me];
+  if (Array.isArray(away) && away[2] !== NET.pxSeen){ NET.pxSeen = away[2]; cameBack(away); }
   for (const p of others){ seen.add(p.peer); syncNetPet(p.peer, p.presence); takeHits(p); }
+  if (lp) followWilds(lp.presence.wl);
   NET.hits = NET.hits.filter(h => G.time - h.t < 3);   // a hit stays in presence long enough to be read
   for (const id of [...NET.pets.keys()]) if (!seen.has(id)) NET.pets.delete(id);
   for (const n of NET.pets.values()) animNetPet(n, dt);
@@ -2214,7 +2264,7 @@ function netTick(dt){
   if (hb) followPool(hb);
   if (NET.dmE !== BS.e){ NET.dmE = BS.e; NET.dm = 0; }
   if (NET.dm > 0) mergeHit(NET.key, NET.dm, nick(), G.formId);
-  for (const p of others){ const pr = p.presence; if ((pr.ep | 0) === BS.e) mergeHit(String(pr.k || ""), pr.dm, pr.n, pr.f); }
+  for (const p of others){ const pr = p.presence; if ((pr.ep | 0) === BS.e) mergeHit(String(pr.tk || ""), pr.dm, pr.n, pr.f); }
   let total = 0; for (const k in BS.dd) total += BS.dd[k][0];
   b.max = BS.mx; b.cur = Math.max(0, BS.mx - total);
   if (NET.leader){
@@ -2244,14 +2294,28 @@ function takeOver(b){
 }
 function bossState(b){
   const a = b.act, dd = {};
-  // the biggest 40 - a page coming in without the store gets the rest from their own pages
-  Object.entries(BS.dd).sort((x, y) => y[1][0] - x[1][0]).slice(0, 40).forEach(([k, v]) => { dd[k] = [Math.round(v[0]), v[1].slice(0, 10), v[2]]; });
+  // the biggest 25 - a page coming in without the store gets the rest from their own pages
+  Object.entries(BS.dd).sort((x, y) => y[1][0] - x[1][0]).slice(0, 25).forEach(([k, v]) => { dd[k] = [Math.round(v[0]), v[1].slice(0, 10), v[2]]; });
   const r2 = v => Math.round(v * 100) / 100;
   return { e:BS.e, dead:BS.dead ? 1 : 0, da:BS.deadAt, dd, x:Math.round(b.x), y:Math.round(b.y), f:b.face, w:b.awake ? 1 : 0,
     pw:r2(b.powMul), sm:r2(b.spdMul), ch:b.charges, st:b.stokeHits || 0, ro:b.roars || 0,
     a:a && a.t < a.end ? { n:a.n, k:a.k, t:r2(a.t), impact:r2(a.impact), end:r2(a.end), sx:Math.round(a.sx), sy:Math.round(a.sy),
       lx:Math.round(a.lx), ly:Math.round(a.ly), mx:Math.round(a.mx), my:Math.round(a.my), r:a.r, from:a.from, m:a.m,
       rate:a.rate, pre:a.pre || 1, q:a.q, lock:r2(a.lock || 0), rm:r2(a.rm || 0) } : null };
+}
+/* What others need to see a move of yours coming: who it's aimed at and,
+   for a bolt, the spot it will come down on. */
+function moveState(c){
+  const t = c && c.target, sp = c && c.spot;
+  return { tg:t ? (t.net ? t.peer : t.wild ? "w" + t.wi : "") : "", sp:sp ? [Math.round(sp.x), Math.round(sp.y)] : null };
+}
+/* ...and on the other side: the pet a move named, as this page has it. */
+function netTarget(tg){
+  tg = String(tg || "");
+  if (!tg) return null;
+  if (tg === NET.me) return G.player;
+  if (tg[0] === "w") return (G.wild && G.wild[+tg.slice(1) | 0]) || null;
+  return NET.pets.get(tg) || null;
 }
 function publish(dt){
   if (!NET.room) return;
@@ -2260,9 +2324,11 @@ function publish(dt){
   const p = G.player, pr = { g:G.running ? 1 : 0, hd:document.hidden ? 1 : 0, n:nick(), rd:0, b:null, lt:null };
   if (G.running && p){
     Object.assign(pr, { f:p.formId, l:p.level, x:Math.round(p.x), y:Math.round(p.y), fc:p.face, mv:p.moving > .1 ? 1 : 0,
-      k:p.clip ? p.clip.sk.id : "", ks:NET.ks, ds:NET.ds, am:Math.round(Math.atan2(p.aim.y, p.aim.x) * 100),
+      k:p.clip ? p.clip.sk.id : "", ks:NET.ks, ...moveState(p.clip), ds:NET.ds, am:Math.round(Math.atan2(p.aim.y, p.aim.x) * 100),
       hp:Math.round(p.cur), al:p.alive ? 1 : 0, rd:G.raid && !G.raid.over ? 1 : 0,
-      ep:BS.e, dm:Math.round(NET.dm), k:NET.key, b:NET.leader ? bossState(G.boss) : null,
+      ts:Math.floor(Date.now() / 1000), wl:NET.leader && NET.on ? wildState() : null,
+      px:NET.leader && NET.on ? standInState() : null,
+      ep:BS.e, dm:Math.round(NET.dm), tk:NET.key, b:NET.leader ? bossState(G.boss) : null,
       pv:NET.hits.length ? NET.hits.map(h => h.o) : null,
       lt:NET.leader ? Math.round(G.time - NET.since) : null });
   }
@@ -2270,13 +2336,146 @@ function publish(dt){
 }
 // a page whose screen goes off stops running him at once, and won't take him back when it returns
 document.addEventListener("visibilitychange", () => { if (document.hidden && NET.on) NET.leader = false; NET.sendT = 0; publish(1); });
+/* A page out of sight is still in the world. Browsers stop drawing a hidden
+   tab, so it runs on a timer instead (they allow about one a second) and
+   catches up the time it missed: your pet stands where you left it and he
+   can still hit it. A page the phone froze outright (a locked screen) goes
+   quiet, and the page that runs him stands in for it (standIn): its pet stays
+   on him, taking his blows, until it falls. */
+let wallLast = performance.now(), bgTimer = null;
+function catchUp(sec){
+  // back from a long freeze: whoever ran him meanwhile keeps running him
+  if (sec > 4 && NET.leader && NET.others.length){ NET.leader = false; NET.since = 0; }
+  sec = Math.min(sec, 3);
+  const n = Math.min(Math.ceil(sec * 30), 1800);
+  for (let i = 0; i < n && G.running && !G.paused; i++) step(1 / 30);
+}
+function wallGap(){ const now = performance.now(), gap = (now - wallLast) / 1000; wallLast = now; return gap; }
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden){
+    stick.on = false; stick.x = stick.y = 0;
+    if (!bgTimer) bgTimer = setInterval(() => catchUp(wallGap()), 500);
+  } else if (bgTimer){ clearInterval(bgTimer); bgTimer = null; }
+});
+/* An idle player whose pet falls is taken out of Explore, back to the
+   start, rather than left standing in the world. */
+function disconnectIdle(){
+  NET.away = false;
+  if (G.raid){ G.fx = G.fx.filter(f => f.kind !== "tele"); G.raid = null; castLabel(""); }
+  G.running = false; G.paused = false;
+  for (const id of ["menu", "result", "hud"]) $(id).hidden = true;
+  $("select").hidden = false;
+  NET.pets.clear(); NET.sendT = 0; NET.note = "Your pet was knocked out while you were away, so you were taken out of Explore.";
+  buildPicks(); showLobby();
+}
+/* The wild pets, as the page that runs them tells it: one row each -
+   [spawn, x, y, facing, health in thousandths, alive, clip, clip serial,
+   who it's after]. Every other page draws its copy from these. */
+function wildState(){
+  return (G.wild || []).map(e => [e.wi, Math.round(e.x), Math.round(e.y), e.face, Math.round(e.cur / e.max * 1000), e.alive ? 1 : 0,
+    e.clip ? e.clip.sk.id : "", e.ksN || 0, e.aggro ? (e.aggro === G.player ? NET.me : e.aggro.peer || "") : "",
+    e.clip && e.clip.spot ? [Math.round(e.clip.spot.x), Math.round(e.clip.spot.y)] : 0]);
+}
+function followWilds(list){
+  if (!Array.isArray(list)) return;
+  for (const r of list){
+    if (!Array.isArray(r)) continue;
+    const e = G.wild && G.wild[r[0] | 0]; if (!e) continue;
+    if (Number.isFinite(+r[1])) e.tx = +r[1];
+    if (Number.isFinite(+r[2])) e.ty = +r[2];
+    if (r[3] === 1 || r[3] === -1) e.face = r[3];
+    const cur = clamp(+r[4] || 0, 0, 1000) / 1000 * e.max;
+    if (cur < e.cur - .5) e.flash = .12;
+    e.cur = cur;
+    const alive = !!r[5];
+    if (e.alive && !alive){ e.faintT = 0; puff(e.x, e.y - 20, "#ffffff", 14); }
+    e.alive = alive;
+    const who = String(r[8] || "");
+    e.aggro = !who ? null : who === NET.me ? G.player : NET.pets.get(who) || null;
+    if (r[7] !== e.ks0){
+      if (e.ks0 !== undefined && MOVE[r[6]] && !RAID_BOSS.kit.includes(MOVE[r[6]])){
+        const t = e.aggro, a = t ? Math.atan2(t.y - e.y, t.x - e.x) : (e.face > 0 ? 0 : Math.PI);
+        e.aim = { x:Math.cos(a), y:Math.sin(a) };
+        const sp = Array.isArray(r[9]) && Number.isFinite(+r[9][0]) && Number.isFinite(+r[9][1]) ? { x:+r[9][0], y:+r[9][1] } : null;
+        e.clip = { sk:MOVE[r[6]], t:0, fired:false, aim:{ ...e.aim }, net:true, target:t, spot:sp };
+        warnMove(e, e.clip, false);
+      }
+      e.ks0 = r[7];
+    }
+  }
+}
+/* Which page runs the wild pets changes with who runs him: the page that
+   takes over carries on from its copy, and one that hands over starts
+   following. */
+function setWildRunner(lead){
+  for (const e of G.wild || []){
+    if (lead && e.mirror){ e.mirror = false; e.x = e.tx; e.y = e.ty; e.clip = null; e.wanderTo = null; }
+    else if (!lead && !e.mirror){ e.mirror = true; e.tx = e.x; e.ty = e.y; e.clip = null; e.dashT = 0; e.burn = null; e.respawnT = 0; }
+  }
+}
+
 /* PvP, sent: a hit on another player's pet goes into this page's presence,
    addressed to that pet's page, which takes it off its own pet. Each hit has
    a number so it is taken once. */
 function pvpHit(n, fields){
   if (!n.peer) return;
   NET.hits.push({ t:G.time, o:{ i:++NET.hitN, to:n.peer, ...fields } });
-  if (NET.hits.length > 12) NET.hits.shift();
+  if (NET.hits.length > 16) NET.hits.shift();
+}
+// a wild pet's hit says so: it lands even while the page running it is on the raid
+const wildTag = x => x && x.wild ? { w:1, wn:x.name } : {};
+/* A hit on a wild pet this page only mirrors goes to the page that runs them. */
+function wildHit(e, fields){
+  if (!NET.leadId || NET.leader) return;
+  NET.hits.push({ t:G.time, o:{ i:++NET.hitN, to:NET.leadId, wi:e.wi, ...fields } });
+  if (NET.hits.length > 16) NET.hits.shift();
+}
+/* Standing in for an idle player. The page that runs him keeps an idle
+   player's health (the copy of their pet it already draws) and says what it
+   is in its presence (px), so every page shows it, and so their own page,
+   when it wakes, learns what happened while it was away. */
+function standIn(n){
+  n.proxied = true; n.pxSeq = (n.pxSeq || 0) + 1;
+  if (n.cur <= 0 && n.alive){ n.cur = 0; n.alive = false; n.faintT = 0; }
+}
+function idleHit(n, fields){
+  if (!NET.leadId) return;
+  NET.hits.push({ t:G.time, o:{ i:++NET.hitN, to:NET.leadId, sp:n.peer, ...fields } });
+  if (NET.hits.length > 16) NET.hits.shift();
+}
+function standInState(){
+  const out = {}; let any = false;
+  for (const [id, n] of NET.pets){
+    if (n.proxied && n.stale){ out[id] = [Math.round(n.cur), n.alive ? 0 : 1, n.pxSeq]; any = true; }
+    else if (n.pxRec && Date.now() < (n.pxKeep || 0)){ out[id] = n.pxRec; any = true; }
+    else if (n.proxied && !n.stale){ n.proxied = false; n.pxRec = null; }
+  }
+  return any ? out : null;
+}
+/* This page, back from being away: take on what happened to its pet. */
+function cameBack(rec){
+  const me = G.player, hp = Math.max(0, +rec[0] || 0);
+  if (!me || !me.alive) return;
+  if (rec[1] || hp <= 0){ NET.away = true; me.cur = 0; faint(me, null); return; }
+  if (hp < me.cur){ floatText(me.x, me.y - me.box * 1.2, "hit while you were away", "#ff9aa8", 12); me.cur = hp; }
+}
+
+/* The page that runs the wild pets takes another page's hit on one. */
+function takeWildHit(p, h){
+  const e = G.wild && G.wild[h.wi | 0];
+  if (!e || e.mirror || !e.alive) return;
+  const by = NET.pets.get(p.peer);
+  e.lastFight = G.time;
+  if (by && by.alive && !e.calm) e.aggro = by;   // it turns on whoever hit it
+  if (h.d > 0){
+    const d = clamp(Math.round(+h.d), 0, e.max);
+    e.cur -= d; e.flash = .12;
+    floatText(e.x + rnd(-14, 14), e.y - e.box * .95, String(d), "#ffffff", 15);
+  }
+  if (Array.isArray(h.rt)){ e.openT = Math.max(e.openT, clamp(+h.rt[1] || 0, 0, 4) * TURN); e.openPct = Math.max(e.openPct, clamp(+h.rt[0] || 0, 0, .5)); }
+  if (Array.isArray(h.bn)) e.burn = { dmg:clamp(Math.round(+h.bn[0]) || 1, 1, e.max), left:clamp(h.bn[1] | 0, 1, 4), t:TURN, src:null };
+  if (Array.isArray(h.hg)){ e.weakT = Math.max(e.weakT || 0, clamp(h.hg[1] | 0, 0, 4) * TURN); e.weakPct = Math.max(e.weakPct || 0, clamp(+h.hg[0] || 0, 0, .5)); }
+  if (e.cur <= 0){ e.cur = 0; faint(e, null); }
 }
 /* PvP, received: hits another page says it landed on this page's pet. Not
    while fighting him, and never from someone who is. */
@@ -2287,8 +2486,16 @@ function takeHits(p){
   for (const h of pv){
     if (!h || typeof h !== "object" || h.to !== NET.me || (h.i | 0) <= last) continue;
     NET.seen[p.peer] = Math.max(NET.seen[p.peer] || 0, h.i | 0);
-    if (!me || !me.alive || inRaid() || p.presence.rd) continue;
-    const who = cleanNick(p.presence.n) || "Someone";
+    if (h.wi !== undefined){ takeWildHit(p, h); continue; }
+    if (h.sp !== undefined){
+      // another page hit an idle player's pet: this page keeps its health
+      const n = NET.pets.get(String(h.sp));
+      if (NET.leader && n && n.stale && n.alive){ n.cur -= clamp(Math.round(+h.d || 0), 0, n.max); n.flash = .12; standIn(n); }
+      continue;
+    }
+    // a player on the raid can't hit you, but the wild pets their page runs can
+    if (!me || !me.alive || inRaid() || (p.presence.rd && !h.w)) continue;
+    const who = h.w ? cleanNick(h.wn) || "A wild pet" : cleanNick(p.presence.n) || "Someone";
     me.lastFight = G.time; NET.lastBy = { who, t:G.time };
     if (h.d > 0){
       let d = clamp(Math.round(+h.d), 0, me.max);
@@ -2322,14 +2529,41 @@ function syncNetPet(id, pr){
   n.tx = Number.isFinite(+pr.x) ? +pr.x : n.tx; n.ty = Number.isFinite(+pr.y) ? +pr.y : n.ty;
   if (pr.fc === 1 || pr.fc === -1) n.face = pr.fc;
   n.mv = pr.mv ? 1 : 0; n.rd = !!pr.rd;
-  const hp = clamp(+pr.hp || 0, 0, n.max);
-  if (hp < n.cur - .5) n.flash = .12;
-  n.cur = hp;
-  const alive = pr.al !== 0;
-  if (n.alive && !alive) n.faintT = 0;
-  n.alive = alive;
+  // a page that has gone quiet (frozen, lost) is idle: the page that runs him keeps its health
+  if (pr.ts !== n.ts){ n.ts = pr.ts; n.seenAt = Date.now(); }
+  const wasStale = n.stale;
+  n.stale = Date.now() - (n.seenAt || Date.now()) > 4000;
+  if (wasStale && !n.stale && n.proxied){   // back: keep saying what happened long enough for their page to read it
+    n.pxKeep = Date.now() + 6000; n.pxRec = [Math.round(n.cur), n.alive ? 0 : 1, n.pxSeq];
+  }
+  // what others take off him shows over him, as your own hits do
+  const odm = +pr.dm || 0, b = G.boss;
+  if ((pr.ep | 0) === BS.e && n.lastDm !== undefined && odm > n.lastDm && b && b.alive && b.awake)
+    floatText(b.x + rnd(-60, 60), b.y - rnd(150, 230), String(Math.round(odm - n.lastDm)), "#9fe8ff", 14);
+  n.lastDm = (pr.ep | 0) === BS.e ? odm : 0;
+  const rec = !NET.leader && NET.px && NET.px[id];
+  if (n.stale && NET.leader && n.proxied){ /* this page is keeping their health */ }
+  else if (n.stale && Array.isArray(rec)){
+    const hp = clamp(+rec[0] || 0, 0, n.max);
+    if (hp < n.cur - .5) n.flash = .12;
+    n.cur = hp; if (n.alive && rec[1]) n.faintT = 0; n.alive = !rec[1];
+  } else {
+    const hp = clamp(+pr.hp || 0, 0, n.max);
+    if (hp < n.cur - .5) n.flash = .12;
+    n.cur = hp;
+    const alive = pr.al !== 0;
+    if (n.alive && !alive) n.faintT = 0;
+    n.alive = alive;
+  }
   const ang = (+pr.am || 0) / 100; n.aim = { x:Math.cos(ang), y:Math.sin(ang) };
-  if (pr.ks !== n.ks){ if (n.ks !== undefined && MOVE[pr.k] && !RAID_BOSS.kit.includes(MOVE[pr.k])) n.clip = { sk:MOVE[pr.k], t:0, fired:false, aim:{ ...n.aim }, net:true }; n.ks = pr.ks; }
+  if (pr.ks !== n.ks){
+    if (n.ks !== undefined && MOVE[pr.k] && !RAID_BOSS.kit.includes(MOVE[pr.k])){
+      const sp = Array.isArray(pr.sp) && Number.isFinite(+pr.sp[0]) && Number.isFinite(+pr.sp[1]) ? { x:+pr.sp[0], y:+pr.sp[1] } : null;
+      n.clip = { sk:MOVE[pr.k], t:0, fired:false, aim:{ ...n.aim }, net:true, target:netTarget(pr.tg), spot:sp };
+      if (!pr.rd){ n.x = n.tx; n.y = n.ty; warnMove(n, n.clip, false); }   // out in the world: show where it will land
+    }
+    n.ks = pr.ks;
+  }
   if (pr.ds !== n.ds){ if (n.ds !== undefined) n.dashT = .2; n.ds = pr.ds; }
 }
 function animNetPet(n, dt){
@@ -2353,7 +2587,10 @@ function animNetPet(n, dt){
 function netFx(e, c){
   const fx = c.sk.fx, b = G.boss;
   const onHim = e.rd && b.alive && dist(e, b) < 420;
-  const tx = onHim ? b.x : e.x + c.aim.x * 140, ty = onHim ? b.y - 6 : e.y + c.aim.y * 140;
+  // out in the world: a shot flies at what it was aimed at, as this page has it; a bolt comes down on its spot
+  const t = !onHim && c.target && c.target.alive ? c.target : null;
+  let tx = onHim ? b.x : t ? t.hitCircle().x : e.x + c.aim.x * 140, ty = onHim ? b.y - 6 : t ? t.y : e.y + c.aim.y * 140;
+  if (!onHim && c.spot && fx.kind === "strike"){ tx = c.spot.x; ty = c.spot.y; }
   const ax = Math.cos(Math.atan2(ty - e.y, tx - e.x)), ay = Math.sin(Math.atan2(ty - e.y, tx - e.x));
   if (fx.kind === "nova"){
     const fire = fx.tint === "fire";
@@ -2377,16 +2614,17 @@ function netFx(e, c){
 /* The select screen says who's here before you go in. */
 function showLobby(){
   const el = $("lobby"); if (!el) return;
+  const say = t => { el.textContent = NET.note ? NET.note + " " + t : t; };   // the note stays until you set out again
   if (!NET.room){
-    el.textContent = NET.serverTried ? "Couldn't reach the world just now, so you're playing solo. Reload to try again."
-                                     : "Solo. To play together, open the shared link while signed in to Claude.";
+    say(NET.serverTried ? "Couldn't reach the world just now, so you're playing solo. Reload to try again."
+                                     : "Solo. To play together, open the shared link while signed in to Claude.");
     return;
   }
   const peers = viewers(), inWorld = peers.filter(p => !p.sameTab && p.presence && p.presence.g === 1);
   const names = inWorld.map(p => cleanNick(p.presence.n) || "Runner").slice(0, 4);
-  el.textContent = inWorld.length
+  say(inWorld.length
     ? `${inWorld.length} in the world now: ${names.join(", ")}${inWorld.length > names.length ? "…" : ""}`
-    : peers.length > 1 ? `${peers.length - 1} other${peers.length > 2 ? "s" : ""} here, not out yet.` : "Nobody else here yet. Send someone the link.";
+    : peers.length > 1 ? `${peers.length - 1} other${peers.length > 2 ? "s" : ""} here, not out yet.` : "Nobody else here yet. Send someone the link.");
 }
 
 /* =========================================================================
@@ -2476,7 +2714,7 @@ function updateHud(dt){
   for (const btn of $("actions").querySelectorAll(".act.s")){
     const sk = MOVE[btn.dataset.id], own = p.cds[sk.id] || 0, wait = Math.max(own, p.gcd);
     const spent = sk.battle.once && p.used[sk.id];
-    const full = own >= p.gcd ? sk.cd * TURN : LIVE_GCD * TURN;
+    const full = own >= p.gcd ? cdTurns(p, sk) * TURN : LIVE_GCD * TURN;
     btn.querySelector(".cd").style.setProperty("--p", spent ? "100%" : (wait / full * 100) + "%");
     // seconds left on the clock, at this pet's tempo
     btn.querySelector(".cdn").textContent = spent ? "✓" : wait > 0 ? Math.ceil(wait / tempo) : "";
@@ -2648,6 +2886,23 @@ function drawFxGround(){
       ctx.beginPath(); ctx.ellipse(f.x, f.y, f.r * k, ry * k, 0, 0, 7); ctx.fill();
       ctx.restore();
     }
+    if (f.kind === "warn" && !(f.by && !f.by.alive)){
+      // a pet's move on its way: its shape on the ground, filling in as it comes
+      ctx.save();
+      const col = f.mine ? "255,255,255" : "255,170,60";
+      const path = s => {
+        ctx.beginPath();
+        if (f.shape === "circle") ctx.arc(f.x, f.y, f.r * s, 0, 7);
+        else if (f.shape === "cone"){ ctx.moveTo(f.x, f.y); ctx.arc(f.x, f.y, f.r * s, f.a - f.arc, f.a + f.arc); ctx.closePath(); }
+        else { const ca = Math.cos(f.a), sa = Math.sin(f.a), L = f.r * s, H = f.half;
+          ctx.moveTo(f.x - sa * H, f.y + ca * H); ctx.lineTo(f.x + ca * L - sa * H, f.y + sa * L + ca * H);
+          ctx.lineTo(f.x + ca * L + sa * H, f.y + sa * L - ca * H); ctx.lineTo(f.x + sa * H, f.y - ca * H); ctx.closePath(); }
+      };
+      path(1); ctx.fillStyle = `rgba(${col},${f.mine ? .05 : .1})`; ctx.fill();
+      ctx.strokeStyle = `rgba(${col},${f.mine ? .3 : .75})`; ctx.lineWidth = 2; ctx.setLineDash(f.mine ? [6, 6] : []); ctx.stroke();
+      path(Math.max(.05, k)); ctx.fillStyle = `rgba(${col},${f.mine ? .12 : .26})`; ctx.fill();
+      ctx.restore();
+    }
     if (f.kind === "ring"){
       ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.strokeStyle = f.colour; ctx.globalAlpha = 1 - k; ctx.lineWidth = f.width * (1 - k * .6);
       const r = f.r * (.35 + .65 * Math.sqrt(k)); ctx.beginPath(); ctx.ellipse(f.x, f.y, r, r * .55, 0, 0, 7); ctx.stroke(); ctx.restore();
@@ -2775,6 +3030,7 @@ function render(){
 let last = 0;
 function frame(now){
   requestAnimationFrame(frame);
+  { const gap = wallGap(); if (G.running && !G.paused && gap > .25) catchUp(gap); }
   const dt = Math.min(.05, (now - last) / 1000 || 0); last = now;
   if (!G.running){ drawPicks(now); publish(dt); return; }
   if (!G.paused) step(dt);
@@ -2821,7 +3077,7 @@ function step(dt){
    MENUS
    ========================================================================= */
 function store(k, v){ try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch(e){ return null; } }
-function moveNote(sk){
+function moveNote(sk, pet){
   const b = sk.battle, bits = [];
   if (b.dmg) bits.push("×" + b.dmg);
   if (b.pierce) bits.push(`${Math.round(b.pierce * 100)}% through guard`);
@@ -2832,7 +3088,7 @@ function moveNote(sk){
   if (b.heal) bits.push(`heals ${Math.round(b.heal * 100)}%`);
   if (b.guard) bits.push(`Defence +${Math.round(b.guard * 100)}%`);
   if (b.hug) bits.push("squeezes");
-  bits.push(`every ${(sk.cd * TURN).toFixed(1)}s`);
+  bits.push(sk.battle.once ? "once a fight" : `every ${(cdTurns(pet, sk) * TURN / tempoOf(pet)).toFixed(1)}s`);
   return bits.slice(0, 3).join(" · ");
 }
 function buildPicks(){
@@ -2853,11 +3109,11 @@ function showDetail(){
   $("lv-n").textContent = "Lv " + G.level;
   $("stats").innerHTML = [["HP", a.hp * BT.POOL], ["Defence", a.def], ["Power", a.pow], ["Speed", a.spd]]
     .map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join("");
-  const kit = SKILLS[f.species].filter(k => k.stage === f.stage);
+  const kit = SKILLS[f.species].filter(k => k.stage === f.stage), pet = new Pet(G.formId, G.level, "hero", { x:0, y:0 });
   const cut = Math.round((1 - 1 / speedTempo(a.spd, G.level)) * 100);
   $("kit").innerHTML = `<div><span>⏱ Speed ${a.spd}</span><em>${cut > 0 ? `cooldowns ${cut}% shorter` : "cooldowns at the base pace"}</em></div>` + kit.map(k => {
     const has = G.level >= k.level;
-    return `<div class="${has ? "" : "no"}"><span>${k.ico} ${k.name}</span><em>${has ? moveNote(k) : "learnt at Lv " + k.level}</em></div>`;
+    return `<div class="${has ? "" : "no"}"><span>${k.ico} ${k.name}</span><em>${has ? moveNote(k, pet) : "learnt at Lv " + k.level}</em></div>`;
   }).join("");
 }
 function drawPicks(now){

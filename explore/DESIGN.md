@@ -58,9 +58,9 @@ time.
 | Nimbus Heights | north-west, cloudstone and crystals | Sparky / Zephyrite |
 | The hill | north, a ring of standing stones | Sir Uwaaarghhhh |
 
-Wild pets are within a few levels of yours, and their form follows their
-level, the same way your pet's does. So there is a fight worth having at any
-level you test.
+Wild pets are the same for everyone in the world. Each spawn has a fixed
+level that rises further from the Trailhead: 8, 12, 14, 24 and 34 in each
+region. Their form follows their level, the same way your pet's does.
 
 Each species has a temperament:
 
@@ -87,9 +87,9 @@ Everything a fight is made of comes from the game's battle engine:
 | Damage: `btHit`, divisive Defence, K, ±35% jitter, no crits | the same function |
 | Each move's multiplier, pierce and riders (burn, rattle, stoke, charge, soften, open, Cuddle's squeeze, Nap's heal and guard) | the same, applied the same way |
 | One move per turn | one turn = **1.4 s** of the pet's own clock |
-| Cooldown `cd` turns, a 2-turn shared cooldown after any skill | shorter cooldowns (below), × 1.4 s, and **no shared cooldown** |
+| Cooldown `cd` turns, a 2-turn shared cooldown after any skill | **long cooldowns**, about 3× the game's (below), × 1.4 s, and no shared cooldown |
 | Attack ×1, once a turn | **Attack ×0.1**, once a turn (below) |
-| Speed buys extra turns against the opponent, up to 35%, chaining | **a fixed tempo for the pet's own Speed, whoever it fights.** Its Attack, skill cooldowns and clips run `(1 + 5 × Speed / total stats) / 1.5` times as fast: Verdant at the base pace, Ember about 1.5× (cooldowns a third shorter), Nimbus about 1.6× (two-fifths shorter), plus whatever a charge adds. Walking is the same for every pet (165 px/s). The comparison with the opponent stays in the ranked battles only. |
+| Speed buys extra turns against the opponent, up to 35%, chaining | **a fixed tempo for the pet's own Speed, whoever it fights.** Its Attack and skill cooldowns run `(1 + 5 × Speed / total stats) / 1.5` times as fast: Verdant at the base pace, Ember about 1.5× (cooldowns a third shorter), Nimbus about 1.6× (two-fifths shorter), plus whatever a charge adds. Walking is the same for every pet (165 px/s), and so is the pace a move plays at, so its wind-up reads the same whoever throws it. The comparison with the opponent stays in the ranked battles only. |
 | The boss never gets extra turns | the same |
 | Opponent picks any ready move at random (`btChoose`) | the wild pets' AI picks the same way, the moment its turn comes round |
 
@@ -100,10 +100,10 @@ Attack's dash cuts the rest of its clip short, which is how you get out from
 under him mid-move. It buys room, not time: the rest of that move's turn
 still runs before the next skill.
 
-**Skills** play their real clip from the game, sped up to fit inside one turn
-so a long clip never costs extra time. The hit is drawn on the clip's impact
-frame. Shots and strikes find their target, rushes steer onto it and stop when
-they connect, and novas, swipes and gales take whatever is in their shape.
+**Skills** play their real clip from the game, fitted inside one turn (1.4 s)
+so a long clip never costs extra time. Your pet stands still while it plays
+(a rush carries it). The hit lands on the clip's impact frame, and between
+pets it can miss: see *Aim, wind-ups and dodging* below.
 
 ### Skills over Attack
 
@@ -117,20 +117,40 @@ fix, Attack at ×0.75, still left it too strong, so:
 - **No shared cooldown.** With Attack worth nothing, the game's rhythm of a
   skill then an Attack would be a dead turn after every skill. Here a pet
   chains its skills: about 95% of moves are skills.
-- **Shorter cooldowns, so the moves a pet learns first come round more.** The
-  first damaging move of each form comes back every 2 turns. The rest come
-  back one turn sooner than in the game, never under 2. A Nap is still once a
-  fight.
+- **Long cooldowns, so a fight isn't a race to press buttons.** Every pet,
+  the quickest included, throws its whole kit and then waits with nothing
+  ready, so there are stretches of just moving: getting into place, stepping
+  out of the other pet's marks. Each move's cooldown is the game's × 3
+  (`CD_MULT`), scaled by the pet's kit as a whole (`cdTurns`, `kitPace`).
+  In a battle the turns between moves are Attacks at full weight. Here they
+  are nothing, so a kit's moves alone would decide, and a pet that has just
+  learnt its third move would be twice the pet it was. So each pet's
+  cooldowns are stretched or shrunk until its moves do, per turn, what the
+  pet does per turn in a battle. A move counts its hit, a burn's ticks, what
+  gets through guard, and the hits a stoke, charge, open or rattle makes
+  bigger. And no cooldown is ever shorter than the time it takes to throw the
+  whole kit plus a turn and a half. A Nap is still once a fight.
 
-  | Form | Skill | Game | Here |
-  | --- | --- | --- | --- |
-  | Cinderling | fireball, Horn Rush, Tail Swipe, Cinder Sweep | 4, 3, 3, 3 | 2, 2, 2, 2 |
-  | Blazewyrm | Fireball, Flame Stomp, Flying Swoop | 3, 3, 3 | 2, 2, 2 |
-  | Sparky | Spark, Static Shock, Acorn Flick, Pocket Storm | 3, 3, 5, 6 | 2, 2, 4, 5 |
-  | Zephyrite | Lightning Bolt, Arc Lash | 3, 3 | 2, 2 |
-  | Bamboo Cub | Green Gale, Cuddle, Bamboo Tasting, Forest Slam | 3, 3, 3, 5 | 2, 2, 2, 4 |
-  | Panda | Nap, Landslide | 4 (once), 5 | 4 (once), 2 |
+  Cooldowns in seconds, with each pet's own Speed and pace, and the shortest
+  spell with nothing ready once its whole kit is thrown:
 
+  | Pet | Moves and cooldowns | Nothing ready for at least |
+  | --- | --- | --- |
+  | Cinderling Lv 14 | fireball 11.7 s, Horn Rush 8.8, Tail Swipe 8.8, Cinder Sweep 8.8 | 3.2 s |
+  | Sparky Lv 14 | Spark 8.2 s, Static Shock 8.2, Acorn Flick 13.7, Pocket Storm 16.4 | 2.6 s |
+  | Bamboo Cub Lv 14 | Green Gale 16.3 s, Cuddle 16.3, Bamboo Tasting 16.3, Forest Slam 27.2 | 10.7 s |
+  | Blazewyrm Lv 26 | Fireball 10.0 s, Flame Stomp 10.0, Flying Swoop 10.0 | 5.8 s |
+  | Zephyrite Lv 26 | Lightning Bolt 5.2 s, Arc Lash 5.2 | 2.4 s |
+  | Panda Lv 26 | Landslide 8.1 s (and a Nap) | 6.7 s |
+
+  The Bamboo Cub waits longest. It is the slowest and toughest, and its kit
+  is worth the most per turn in a battle.
+- **Pets hit each other for 30% of a battle's blow** (`PET_DMG`), and their
+  moves cost them 30% as much of themselves. At a battle's numbers a pet's
+  HP is about four hits, so one round of moves decided a fight and the
+  cooldowns never came into it. Now a fight between pets of a stage runs
+  20 to 60 seconds, through several rounds. His blows, and pets' blows on
+  him, are unchanged.
 - **Bigger areas for the moves that go off around your pet.** They don't seek
   a target, so they hardly ever caught anything. Novas are about 40% wider:
   Cinder Sweep 105→150, Flame Stomp 115→160, Spark 95→135, Static Shock
@@ -143,43 +163,37 @@ species' edge the same at every level. With it, the matchups land about 18
 points from the game's, closer than the opponent-comparison rule managed
 (about 22).
 
-**Each form's own pace.** With Attack worth almost nothing, a species' kit
-decides more than it does in a battle. Ember lost its high-Power plain
-attacks, and Nimbus came out on top: a Zephyrite beat a Blazewyrm 85% of the
-time. Each form now has a pace multiplier on top of its Speed (`FORM_PACE`),
-tuned so the forms of a stage meet about as they do in the game's battles:
+**Each form's own pace.** On top of its Speed, each form has a pace
+multiplier (`FORM_PACE`) for its cooldowns. It is tuned so the forms of a
+stage are even with each other:
 
 | Form | Pace | Form | Pace |
 | --- | --- | --- | --- |
-| Cinderling | ×1.10 | Blazewyrm | ×1.06 |
-| Sparky | ×1.00 | Zephyrite | ×1.00 |
-| Bamboo Cub | ×0.91 | Panda | ×1.40 |
+| Cinderling | ×1.10 | Blazewyrm | ×0.84 |
+| Sparky | ×1.00 | Zephyrite | ×1.17 |
+| Bamboo Cub | ×0.90 | Panda | ×1.02 |
 
-How the forms of a stage meet: 320 simulated fights a pairing, against the
-current game's own battle engine. The first-named pet's win rate, live / game:
+**How they were measured.** 200 simulated fights per pairing, two AI pets
+that play exactly alike. Both the win rate and how close the fights were are
+recorded. Closeness is the winner's HP left: + means the first-named pet
+comes out ahead by that share of its HP.
+
+Two identical bots turn any edge into a lopsided win rate: a pet 3% stronger
+wins most of its fights. Real players, who aim and dodge, swamp an edge that
+size. So the paces were tuned for close fights rather than the game's win
+rates:
 
 | Matchup | Lv 12 | Lv 14 | Lv 26 | Lv 40 |
 | --- | --- | --- | --- | --- |
-| Verdant v Ember | 40–43 / 47 | 51–52 / 49 | 43–45 / 44 | 43–44 / 43 |
-| Verdant v Nimbus | 49–50 / 53 | 45–52 / 56 | **84–85** / 55 | **79–83** / 53 |
-| Ember v Nimbus | 42–49 / 49 | 54–57 / 51 | 45–52 / 47 | 46–47 / 46 |
+| Verdant v Ember | 85% · +10% HP | 56% · +3% | 34% · −1% | 36% · 0% |
+| Verdant v Nimbus | 4% · −14% | 46% · +2% | 35% · +3% | 24% · −2% |
+| Ember v Nimbus | 18% · −6% | 68% · +12% | 38% · −2% | 36% · −2% |
 
-On average that's **7 to 8 points from the game**. The paces were retuned
-when the game's new Verdant skills came in (Cuddle, Forest Slam, and Nap's
-new heal and guard). Panda lost the most: the game's old Nap quietly made
-Panda's next hit 1.6×, and without it Panda gets two Landslides off in a
-fight while a Blazewyrm uses six skills.
-
-**One matchup is still off: Panda beats Zephyrite about four times in five.**
-Nap's new Defence blunts Zephyrite's skills, while Blazewyrm's Flame Stomp
-cuts through it, and Zephyrite has lost most of its plain-attack damage. Any
-pace that fixes Panda v Zephyrite breaks Panda v Blazewyrm, so this is left
-for the evolved forms' coming skills.
-
-The fights are short, about three moves a side, and a pet's pace decides
-whether it gets the extra move. So the simulation starts each pet up to half
-a second late at random, as real reactions would. In lockstep, whichever pet
-was even a hair quicker won 90% of the time.
+- **Stage 2:** every pairing is within 3% of HP.
+- **Stage 1:** even at Lv 14, but spread at Lv 12. Sparky is ahead at Lv 12
+  and Cinderling at Lv 14: their HP grows differently between the two
+  levels, and Cinder Sweep comes in at 14. No single pace fixes both levels,
+  so the pace splits the difference. Fights run 20 to 60 seconds.
 
 **Not balanced across stages.** An evolved form learns its first skill at Lv
 18, as in the game. From Lv 15 to 17 it has none, and with Attack this weak
@@ -190,38 +204,35 @@ While measuring this I found and fixed an AI bug. Wild pets only looked at
 their skills when their Attack was ready, so an Attack taken in a gap held
 their skills back for a turn.
 
-### Keeping it close to the game's balance
+### Aim, wind-ups and dodging
 
-Live fights do not reproduce turn-based win rates by themselves. Things a
-battle never charges for showed up as large swings:
+Between pets, a move is aimed when it's taken and lands on its impact frame
+where it was aimed, so it can miss. For the wind-up, its shape is marked on
+the ground where it will land. Other players' and wild pets' marks are amber
+and solid; your own are faint and dashed. Each kind of move is dodged its own
+way:
 
-- walking back into reach after a shove
-- a rush that carries on past its target
-- a slow clip whose hit was still in the air when its pet died
+| Kind | Moves | Lands | To dodge it |
+| --- | --- | --- | --- |
+| Burst (nova) | Cinder Sweep, Flame Stomp, Spark, Static Shock | all round its user | get out of its ring |
+| Swipe (cone), gale, puff | Tail Swipe, Arc Lash, Forest Slam, Green Gale, fireball | the way it was facing | get behind it or out of reach |
+| Bolt (strike) | Pocket Storm, Lightning Bolt | on the spot you stood on when it was taken | leave the circle |
+| Charge (rush) | Horn Rush, Flying Swoop, Cuddle, Landslide | straight down its lane, stopping on the first pet it hits | step aside |
+| Shot | Fireball, Acorn Flick, Bamboo Tasting | flies straight at where you were when it's let go, hitting the first pet in its path | move across its line; the further off, the more time you have |
 
-Each was measured against the game's engine and removed:
+Wind-ups run about 0.3 to 1.1 s and are the same for every pet. Speed buys
+shorter cooldowns, not quicker moves. A pet that takes a move also stands
+still for it: committing is a risk.
+
+On the raid, his size makes all of this moot. Moves find him as before, and
+his own marks work as they always have.
+
+Other rules kept from earlier tuning:
 
 - **Pets don't shove each other.** Only his blows knock you back.
 - **Rushes stop when they connect.**
-- **Between pets, a move resolves the moment it's taken**, as `btAct` does.
-  The clip shows the number, flash and knockout on its impact frame. His
-  blows still land on impact, so they can be dodged.
 - **No opening coin.** The game weights who moves first by Speed. Adding that
   live made every matchup worse, so both pets start together.
-
-Per move, the live version now matches the game: the same moves per fight and
-the same damage per move. For example, in Panda v Blazewyrm at Lv 26, Attack
-averages 69 and Landslide 99, against 69 and 101 in the game.
-
-With the old rules, simulated AI v AI at levels 12, 26 and 40, the species
-matchups landed 9 to 12 points from the game's on average. Fights are short,
-about five moves a side, so one extra action swings a result by 20 points,
-and much of that difference is noise.
-
-Some difference is unavoidable. Verdant's matchups are knife-edge races in the
-game too, decided by a fraction of an action, and real time moves those
-fractions about. A player who dodges and spaces well will beat these numbers;
-that is the point of making it live.
 
 **Out of a fight** you get your breath back slowly, faster at the campfire.
 Berries heal 30%. Lose to a wild pet and you wake at the campfire.
@@ -291,13 +302,15 @@ simulation:
 
 | Level | Average player | Near-perfect player | Swings for 400,000, average / near-perfect | Time for 7 runners, average / near-perfect |
 | --- | --- | --- | --- | --- |
-| Lv 14 | ~1,100 | ~3,300 | ~360 / ~120 | ~2 months / ~3 weeks |
-| Lv 26 | ~2,650 | ~9,700 | ~150 / ~41 | ~3.5 weeks / ~1 week |
-| Lv 40 | ~4,600 | ~16,700 | ~87 / ~24 | ~2 weeks / ~4 days |
+| Lv 14 | ~370 | ~1,370 | ~1,070 / ~290 | ~6 months / ~7 weeks |
+| Lv 26 | ~700 | ~3,600 | ~570 / ~110 | ~3 months / ~3 weeks |
+| Lv 40 | ~1,200 | ~5,700 | ~330 / ~70 | ~2 months / ~12 days |
 
 The average player steps out of his marks but gets caught mid-skill. The
-near-perfect one is touched only by his roar. A Lv 26 field halfway between
-the two takes about two weeks.
+near-perfect one is touched only by his roar. These figures are after the
+long cooldowns, which cut what a pet takes off him per attempt to about a
+third. At 400,000, an average Lv 26 field now needs about three months, not
+one. Keeping it to a month would mean about 105,000.
 
 **After he falls**, everyone who was on him sees the death clip and a card of
 who took what off him this round. He is back on his hill 20 seconds later
@@ -352,8 +365,28 @@ server of our own.
   out, they wake at the campfire and are told who got them. **Nobody fighting
   the boss can hit or be hit by another player.** Both pages check this. No
   win/loss record for now.
-- **Wild pets stay per player.** Each page has its own, so nobody steals
-  anybody's fight.
+- **Wild pets are shared.** The page that runs the boss also runs the wild
+  pets and puts them in its presence: where each is, its health, the move
+  it's playing, and who it's after. Every other page draws its copy from
+  that. A hit on a wild pet from another page goes to the running page,
+  which takes it off and turns the pet on whoever hit it. The wild pets go
+  for any player out in the world, never anyone on the raid. When the page
+  running them changes, the next one carries on from its copy.
+- **Everyone sees everyone's moves.** Each page plays other players' skills
+  from their presence, and the damage another player does to the boss shows
+  over him in blue.
+- **No hiding from him.** An idle player is still a player. A hidden tab
+  still plays: browsers stop drawing it, so it runs on a timer and catches
+  up, and your pet stays where he can hit it. A phone that freezes the page
+  outright (a locked screen) goes quiet, and after 4 seconds of silence the
+  page running him **stands in** for it: it keeps that pet's health, lets
+  his blows land on it where it stands (and other players' and wild pets'
+  hits too), and shares the figure in its presence (`px`) so every page
+  shows it. A page that runs him and freezes hands him to the next page.
+  - Wake up while your pet still stands, and your page takes the health it
+    was left with ("hit while you were away").
+  - If your pet falls while you are away (frozen or hidden), you are taken
+    out of Explore, back to the start, with a note saying why.
 - **Alone, it's the same game.** With no room (a public link, or the page
   outside Claude) the page runs him itself and nothing else changes.
 
