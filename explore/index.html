@@ -837,14 +837,14 @@ const hostile = (a, b) => a.side !== b.side;
 function foesOf(e){
   const out = G.ents.filter(o => o.alive && !o.doomed && hostile(e, o) && !(o.boss && (!o.awake || !G.raid || G.raid.over)));
   if (e === G.player) for (const n of NET.pets.values()) if (pvpOk(n)) out.push(n);
-  if (e.wild && !e.mirror) for (const n of NET.pets.values()) if (n.alive && !n.rd && !n.stale) out.push(n);
+  if (e.wild && !e.mirror) for (const n of NET.pets.values()) if (n.alive && !n.rd) out.push(n);
   return out;
 }
 /* Open PvP: out in the world, other people's pets are fair game, and yours
    is theirs - except on the raid. Anyone fighting him can neither hit nor be
    hit by another player. */
 const inRaid = () => !!(G.raid && !G.raid.over);
-function pvpOk(n){ return n.alive && !n.rd && !n.stale && !inRaid() && G.player && G.player.alive; }
+function pvpOk(n){ return n.alive && !n.rd && !inRaid() && G.player && G.player.alive; }
 function nearestFoe(e, range){
   let best = null, bd = range;
   for (const o of foesOf(e)){
@@ -906,7 +906,11 @@ function strike(x, y, mult, pierce, o = {}){
   if (y.inv > 0 && x.boss && !o.unblockable){ floatText(y.x, y.y - y.box, "dodged", "#ffd23f", 12); return 0; }
   let dmg = btHit(x, y, mult, pierce);
   if (G.god && y.side === "hero") dmg = 0;
-  if (y.net) pvpHit(y, { d:dmg, ...wildTag(x) });   // their page takes it off their pet
+  if (y.net){
+    if (!y.stale) pvpHit(y, { d:dmg, ...wildTag(x) });   // their page takes it off their pet
+    else if (NET.leads()) standIn(y);                    // they're idle: this page keeps their health
+    else idleHit(y, { d:dmg });                          // they're idle: the page that runs him keeps it
+  }
   if (y.mirror) wildHit(y, { d:dmg });              // the page running the wild pets takes it off this one
   y.cur -= dmg;
   x.dealt = (x.dealt || 0) + dmg;
@@ -926,6 +930,7 @@ function strike(x, y, mult, pierce, o = {}){
   if (dmg > 0) floatText(h.x + rnd(-14, 14) * (big ? 5 : 1), ty, String(dmg), y.side === "hero" ? "#ff6b7d" : "#ffffff", big ? 17 : 15);
   if (y === G.player && dmg > 0){ G.cam.shake = Math.max(G.cam.shake, 5); buzz(25); }
   if (y.cur <= 0 && !y.net && !y.mirror) knockOut(y, x);
+  if (y.cur <= 0 && y.net && y.stale && NET.leads()) standIn(y);
   return dmg;
 }
 /* Show a hit the engine already settled: the number, the flash, and - if it
@@ -1399,7 +1404,7 @@ const TEMPER = { ember:200, nimbus:0, verdant:0 };   // Ember pets pick fights; 
 function wildPrey(){
   const out = [];
   if (G.player && G.player.alive && !inRaid()) out.push(G.player);
-  for (const n of NET.pets.values()) if (n.alive && !n.rd && !n.stale) out.push(n);
+  for (const n of NET.pets.values()) if (n.alive && !n.rd) out.push(n);
   return out;
 }
 function petAI(e, dt){
@@ -1482,7 +1487,7 @@ function bossPhase(cur, max){ const f = cur / max; return RAID_BOSS.phases.find(
 function bossQuarries(){
   const out = [], p = G.player;
   if (G.raid && !G.raid.over && p.alive) out.push({ id:NET.me, x:p.x, y:p.y });
-  for (const [id, n] of NET.pets) if (n.rd && n.alive && !n.stale) out.push({ id, x:n.x, y:n.y });
+  for (const [id, n] of NET.pets) if (n.rd && n.alive) out.push({ id, x:n.x, y:n.y });
   return out;
 }
 function keepInArena(o, margin){
@@ -1615,7 +1620,13 @@ function runBossAct(b, dt){
 function landBlow(b, a){
   const p = G.player, mine = !!(G.raid && !G.raid.over && p.alive);
   const inMark = o => Math.hypot(o.x - a.mx, (o.y - a.my) * 1.4) < a.r + o.r * .5;
+  /* An idle player is still on him: their page has gone quiet (a locked
+     phone, a frozen tab) and can't take his blows itself, so the page that
+     runs him takes them for it, standing still, until it falls. */
+  const idle = NET.leads() ? [...NET.pets.values()].filter(n => n.stale && n.rd && n.alive) : [];
+  const onIdle = (mult, pierce, all) => { for (const n of idle) if (all || inMark(n)) strike(b, n, mult, pierce, { unblockable:true }); };
   if (!a.sk){
+    onIdle(a.m, 0);
     if (mine && inMark(p)) strike(b, p, a.m, 0, { knock:200, fromX:a.mx, fromY:a.my });
     dust(a.mx, a.my, 10); G.cam.shake = Math.max(G.cam.shake, 5);
     return;
@@ -1623,10 +1634,12 @@ function landBlow(b, a){
   const k = a.sk, fx = k.fx;
   if (fx.kind === "slam"){
     G.cam.shake = 14; dust(a.mx, a.my, 24); embers(a.mx, a.my, 18, 1); ring(a.mx, a.my, a.r, "#ffb347", .35, 10);
+    onIdle(k.battle.dmg * a.m, k.battle.pierce);
     if (mine && inMark(p)) strike(b, p, k.battle.dmg * a.m, k.battle.pierce, { knock:240, fromX:a.mx, fromY:a.my });
   }
   if (fx.kind === "sweep"){
     G.cam.shake = 8; embers(b.x, b.y - 40, 30, 1.6);
+    onIdle(k.battle.dmg * a.m, 0);
     if (mine && inMark(p)) strike(b, p, k.battle.dmg * a.m, 0, { knock:260, fromX:a.mx, fromY:a.my });
   }
   if (fx.kind === "roar"){
@@ -1637,6 +1650,7 @@ function landBlow(b, a){
        fight, so however well you move, he wears you down. Then, as in the
        game, his next two blows land 60% harder and he charges, faster and
        stronger, up to twice. */
+    onIdle(a.rm || ROAR_HIT, 0, true);
     if (mine) strike(b, p, a.rm || ROAR_HIT, 0, { knock:160, fromX:b.x, fromY:b.y, unblockable:true });
     if (NET.leads()){
       b.stokeHits = k.battle.stoke.hits;
@@ -1776,13 +1790,15 @@ function newGame(toRaid){
   if (toRaid){ G.player.x = ARENA_PX.x; G.player.y = ARENA_PX.y + ARENA_PX.r - 50; }
   G.cam.x = G.player.x; G.cam.y = G.player.y;
   buildSkillButtons(); setupHud();
-  G.running = true; G.paused = false;
+  G.running = true; G.paused = false; NET.note = null;
   $("select").hidden = true; $("result").hidden = true; $("hud").hidden = false;
   resize();
   if (toRaid) setTimeout(startAttempt, 300);
   else banner("The Trailhead", "Sir Uwaaarghhhh is up on the hill to the north.", 2.6);
 }
 function playerFainted(){
+  // fallen while away (a hidden tab, or a page that froze): out of Explore
+  if (document.hidden || NET.away){ setTimeout(disconnectIdle, 900); return; }
   if (G.raid){
     // falling after he does is still his fall - the felling card comes from bossFelled
     if (G.boss.alive) setTimeout(() => endAttempt(false), 1100);
@@ -2213,7 +2229,7 @@ function netTick(dt){
   const others = NET.others;
   // who runs him: whoever has longest, else the lowest label on screen
   const here = document.hidden ? [] : [{ id:NET.me, lt:NET.leader ? G.time - NET.since : -1 }];
-  for (const p of others) if (!p.presence.hd) here.push({ id:p.peer, lt:p.presence.b && typeof p.presence.b === "object" ? +p.presence.lt || 0 : -1 });
+  for (const p of others) if (!p.presence.hd && !(NET.pets.get(p.peer) || {}).stale) here.push({ id:p.peer, lt:p.presence.b && typeof p.presence.b === "object" ? +p.presence.lt || 0 : -1 });
   let lead = null;
   const runs = here.filter(c => c.lt >= 0);
   if (runs.length){
@@ -2231,6 +2247,9 @@ function netTick(dt){
   if (NET.leader && !was) takeOver(b);
   // everyone else's pet
   const seen = new Set();
+  NET.px = lp && lp.presence.px && typeof lp.presence.px === "object" ? lp.presence.px : null;
+  const away = NET.px && NET.px[NET.me];
+  if (Array.isArray(away) && away[2] !== NET.pxSeen){ NET.pxSeen = away[2]; cameBack(away); }
   for (const p of others){ seen.add(p.peer); syncNetPet(p.peer, p.presence); takeHits(p); }
   if (lp) followWilds(lp.presence.wl);
   NET.hits = NET.hits.filter(h => G.time - h.t < 3);   // a hit stays in presence long enough to be read
@@ -2289,6 +2308,7 @@ function publish(dt){
       k:p.clip ? p.clip.sk.id : "", ks:NET.ks, ds:NET.ds, am:Math.round(Math.atan2(p.aim.y, p.aim.x) * 100),
       hp:Math.round(p.cur), al:p.alive ? 1 : 0, rd:G.raid && !G.raid.over ? 1 : 0,
       ts:Math.floor(Date.now() / 1000), wl:NET.leader && NET.on ? wildState() : null,
+      px:NET.leader && NET.on ? standInState() : null,
       ep:BS.e, dm:Math.round(NET.dm), tk:NET.key, b:NET.leader ? bossState(G.boss) : null,
       pv:NET.hits.length ? NET.hits.map(h => h.o) : null,
       lt:NET.leader ? Math.round(G.time - NET.since) : null });
@@ -2300,11 +2320,14 @@ document.addEventListener("visibilitychange", () => { if (document.hidden && NET
 /* A page out of sight is still in the world. Browsers stop drawing a hidden
    tab, so it runs on a timer instead (they allow about one a second) and
    catches up the time it missed: your pet stands where you left it and he
-   can still hit it. A page the phone froze outright (a locked screen) can't
-   be caught up honestly, so coming back from more than a few seconds of
-   that in the middle of a raid counts as falling: you left the fight. */
+   can still hit it. A page the phone froze outright (a locked screen) goes
+   quiet, and the page that runs him stands in for it (standIn): its pet stays
+   on him, taking his blows, until it falls. */
 let wallLast = performance.now(), bgTimer = null;
 function catchUp(sec){
+  // back from a long freeze: whoever ran him meanwhile keeps running him
+  if (sec > 4 && NET.leader && NET.others.length){ NET.leader = false; NET.since = 0; }
+  sec = Math.min(sec, 3);
   const n = Math.min(Math.ceil(sec * 30), 1800);
   for (let i = 0; i < n && G.running && !G.paused; i++) step(1 / 30);
 }
@@ -2312,14 +2335,19 @@ function wallGap(){ const now = performance.now(), gap = (now - wallLast) / 1000
 document.addEventListener("visibilitychange", () => {
   if (document.hidden){
     stick.on = false; stick.x = stick.y = 0;
-    if (!bgTimer) bgTimer = setInterval(() => { const gap = wallGap(); if (gap > 3 && inRaid()) return leftTheFight(); catchUp(Math.min(gap, 3)); }, 500);
+    if (!bgTimer) bgTimer = setInterval(() => catchUp(wallGap()), 500);
   } else if (bgTimer){ clearInterval(bgTimer); bgTimer = null; }
 });
-function leftTheFight(){
-  const p = G.player;
-  if (!inRaid() || !p.alive) return;
-  banner("You left mid-fight", "and he didn't wait", 2);
-  p.cur = 0; faint(p, null);
+/* An idle player whose pet falls is taken out of Explore, back to the
+   start, rather than left standing in the world. */
+function disconnectIdle(){
+  NET.away = false;
+  if (G.raid){ G.fx = G.fx.filter(f => f.kind !== "tele"); G.raid = null; castLabel(""); }
+  G.running = false; G.paused = false;
+  for (const id of ["menu", "result", "hud"]) $(id).hidden = true;
+  $("select").hidden = false;
+  NET.pets.clear(); NET.sendT = 0; NET.note = "Your pet was knocked out while you were away, so you were taken out of Explore.";
+  buildPicks(); showLobby();
 }
 /* The wild pets, as the page that runs them tells it: one row each -
    [spawn, x, y, facing, health in thousandths, alive, clip, clip serial,
@@ -2380,6 +2408,36 @@ function wildHit(e, fields){
   NET.hits.push({ t:G.time, o:{ i:++NET.hitN, to:NET.leadId, wi:e.wi, ...fields } });
   if (NET.hits.length > 16) NET.hits.shift();
 }
+/* Standing in for an idle player. The page that runs him keeps an idle
+   player's health (the copy of their pet it already draws) and says what it
+   is in its presence (px), so every page shows it, and so their own page,
+   when it wakes, learns what happened while it was away. */
+function standIn(n){
+  n.proxied = true; n.pxSeq = (n.pxSeq || 0) + 1;
+  if (n.cur <= 0 && n.alive){ n.cur = 0; n.alive = false; n.faintT = 0; }
+}
+function idleHit(n, fields){
+  if (!NET.leadId) return;
+  NET.hits.push({ t:G.time, o:{ i:++NET.hitN, to:NET.leadId, sp:n.peer, ...fields } });
+  if (NET.hits.length > 16) NET.hits.shift();
+}
+function standInState(){
+  const out = {}; let any = false;
+  for (const [id, n] of NET.pets){
+    if (n.proxied && n.stale){ out[id] = [Math.round(n.cur), n.alive ? 0 : 1, n.pxSeq]; any = true; }
+    else if (n.pxRec && Date.now() < (n.pxKeep || 0)){ out[id] = n.pxRec; any = true; }
+    else if (n.proxied && !n.stale){ n.proxied = false; n.pxRec = null; }
+  }
+  return any ? out : null;
+}
+/* This page, back from being away: take on what happened to its pet. */
+function cameBack(rec){
+  const me = G.player, hp = Math.max(0, +rec[0] || 0);
+  if (!me || !me.alive) return;
+  if (rec[1] || hp <= 0){ NET.away = true; me.cur = 0; faint(me, null); return; }
+  if (hp < me.cur){ floatText(me.x, me.y - me.box * 1.2, "hit while you were away", "#ff9aa8", 12); me.cur = hp; }
+}
+
 /* The page that runs the wild pets takes another page's hit on one. */
 function takeWildHit(p, h){
   const e = G.wild && G.wild[h.wi | 0];
@@ -2407,6 +2465,12 @@ function takeHits(p){
     if (!h || typeof h !== "object" || h.to !== NET.me || (h.i | 0) <= last) continue;
     NET.seen[p.peer] = Math.max(NET.seen[p.peer] || 0, h.i | 0);
     if (h.wi !== undefined){ takeWildHit(p, h); continue; }
+    if (h.sp !== undefined){
+      // another page hit an idle player's pet: this page keeps its health
+      const n = NET.pets.get(String(h.sp));
+      if (NET.leader && n && n.stale && n.alive){ n.cur -= clamp(Math.round(+h.d || 0), 0, n.max); n.flash = .12; standIn(n); }
+      continue;
+    }
     // a player on the raid can't hit you, but the wild pets their page runs can
     if (!me || !me.alive || inRaid() || (p.presence.rd && !h.w)) continue;
     const who = h.w ? cleanNick(h.wn) || "A wild pet" : cleanNick(p.presence.n) || "Someone";
@@ -2443,20 +2507,32 @@ function syncNetPet(id, pr){
   n.tx = Number.isFinite(+pr.x) ? +pr.x : n.tx; n.ty = Number.isFinite(+pr.y) ? +pr.y : n.ty;
   if (pr.fc === 1 || pr.fc === -1) n.face = pr.fc;
   n.mv = pr.mv ? 1 : 0; n.rd = !!pr.rd;
-  // a page that has gone quiet (frozen, lost) is out of the fight until it speaks again
+  // a page that has gone quiet (frozen, lost) is idle: the page that runs him keeps its health
   if (pr.ts !== n.ts){ n.ts = pr.ts; n.seenAt = Date.now(); }
+  const wasStale = n.stale;
   n.stale = Date.now() - (n.seenAt || Date.now()) > 4000;
+  if (wasStale && !n.stale && n.proxied){   // back: keep saying what happened long enough for their page to read it
+    n.pxKeep = Date.now() + 6000; n.pxRec = [Math.round(n.cur), n.alive ? 0 : 1, n.pxSeq];
+  }
   // what others take off him shows over him, as your own hits do
   const odm = +pr.dm || 0, b = G.boss;
   if ((pr.ep | 0) === BS.e && n.lastDm !== undefined && odm > n.lastDm && b && b.alive && b.awake)
     floatText(b.x + rnd(-60, 60), b.y - rnd(150, 230), String(Math.round(odm - n.lastDm)), "#9fe8ff", 14);
   n.lastDm = (pr.ep | 0) === BS.e ? odm : 0;
-  const hp = clamp(+pr.hp || 0, 0, n.max);
-  if (hp < n.cur - .5) n.flash = .12;
-  n.cur = hp;
-  const alive = pr.al !== 0;
-  if (n.alive && !alive) n.faintT = 0;
-  n.alive = alive;
+  const rec = !NET.leader && NET.px && NET.px[id];
+  if (n.stale && NET.leader && n.proxied){ /* this page is keeping their health */ }
+  else if (n.stale && Array.isArray(rec)){
+    const hp = clamp(+rec[0] || 0, 0, n.max);
+    if (hp < n.cur - .5) n.flash = .12;
+    n.cur = hp; if (n.alive && rec[1]) n.faintT = 0; n.alive = !rec[1];
+  } else {
+    const hp = clamp(+pr.hp || 0, 0, n.max);
+    if (hp < n.cur - .5) n.flash = .12;
+    n.cur = hp;
+    const alive = pr.al !== 0;
+    if (n.alive && !alive) n.faintT = 0;
+    n.alive = alive;
+  }
   const ang = (+pr.am || 0) / 100; n.aim = { x:Math.cos(ang), y:Math.sin(ang) };
   if (pr.ks !== n.ks){ if (n.ks !== undefined && MOVE[pr.k] && !RAID_BOSS.kit.includes(MOVE[pr.k])) n.clip = { sk:MOVE[pr.k], t:0, fired:false, aim:{ ...n.aim }, net:true }; n.ks = pr.ks; }
   if (pr.ds !== n.ds){ if (n.ds !== undefined) n.dashT = .2; n.ds = pr.ds; }
@@ -2506,16 +2582,17 @@ function netFx(e, c){
 /* The select screen says who's here before you go in. */
 function showLobby(){
   const el = $("lobby"); if (!el) return;
+  const say = t => { el.textContent = NET.note ? NET.note + " " + t : t; };   // the note stays until you set out again
   if (!NET.room){
-    el.textContent = NET.serverTried ? "Couldn't reach the world just now, so you're playing solo. Reload to try again."
-                                     : "Solo. To play together, open the shared link while signed in to Claude.";
+    say(NET.serverTried ? "Couldn't reach the world just now, so you're playing solo. Reload to try again."
+                                     : "Solo. To play together, open the shared link while signed in to Claude.");
     return;
   }
   const peers = viewers(), inWorld = peers.filter(p => !p.sameTab && p.presence && p.presence.g === 1);
   const names = inWorld.map(p => cleanNick(p.presence.n) || "Runner").slice(0, 4);
-  el.textContent = inWorld.length
+  say(inWorld.length
     ? `${inWorld.length} in the world now: ${names.join(", ")}${inWorld.length > names.length ? "…" : ""}`
-    : peers.length > 1 ? `${peers.length - 1} other${peers.length > 2 ? "s" : ""} here, not out yet.` : "Nobody else here yet. Send someone the link.";
+    : peers.length > 1 ? `${peers.length - 1} other${peers.length > 2 ? "s" : ""} here, not out yet.` : "Nobody else here yet. Send someone the link.");
 }
 
 /* =========================================================================
@@ -2904,7 +2981,7 @@ function render(){
 let last = 0;
 function frame(now){
   requestAnimationFrame(frame);
-  { const gap = wallGap(); if (G.running && !G.paused && gap > .25){ if (gap > 3 && inRaid()) leftTheFight(); else catchUp(Math.min(gap, 3)); } }
+  { const gap = wallGap(); if (G.running && !G.paused && gap > .25) catchUp(gap); }
   const dt = Math.min(.05, (now - last) / 1000 || 0); last = now;
   if (!G.running){ drawPicks(now); publish(dt); return; }
   if (!G.paused) step(dt);

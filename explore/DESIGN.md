@@ -362,12 +362,18 @@ server of our own.
 - **Everyone sees everyone's moves.** Each page plays other players' skills
   from their presence, and the damage another player does to the boss shows
   over him in blue.
-- **No hiding from him.** A hidden tab still plays. Browsers stop drawing it,
-  so it runs on a timer and catches up, and your idle pet stays where he can
-  hit it. A phone that freezes the page outright (a locked screen) can't be
-  caught up honestly, so coming back from more than a few seconds of that in
-  the middle of a raid counts as falling ("You left mid-fight"). A page that
-  goes quiet for 4 seconds stops being a target until it speaks again.
+- **No hiding from him.** An idle player is still a player. A hidden tab
+  still plays: browsers stop drawing it, so it runs on a timer and catches
+  up, and your pet stays where he can hit it. A phone that freezes the page
+  outright (a locked screen) goes quiet, and after 4 seconds of silence the
+  page running him **stands in** for it: it keeps that pet's health, lets
+  his blows land on it where it stands (and other players' and wild pets'
+  hits too), and shares the figure in its presence (`px`) so every page
+  shows it. A page that runs him and freezes hands him to the next page.
+  - Wake up while your pet still stands, and your page takes the health it
+    was left with ("hit while you were away").
+  - If your pet falls while you are away (frozen or hidden), you are taken
+    out of Explore, back to the start, with a note saying why.
 - **Alone, it's the same game.** With no room (a public link, or the page
   outside Claude) the page runs him itself and nothing else changes.
 
