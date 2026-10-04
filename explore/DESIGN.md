@@ -220,6 +220,16 @@ way:
 | Charge (rush) | Horn Rush, Flying Swoop, Cuddle, Landslide | straight down its lane, stopping on the first pet it hits | step aside |
 | Shot | Fireball, Acorn Flick, Bamboo Tasting | flies straight at where you were when it's let go, hitting the first pet in its path | move across its line; the further off, the more time you have |
 
+**Aiming.** Tap a move and it goes at the nearest foe. Press and hold one
+that has a direction (a shot, a bolt, a swipe, a gale, a charge) and drag:
+its shape follows your thumb out from your pet, blue while it's ready and
+grey while it's cooling, and it goes where it points when you let go. A bolt
+lands further out the further you drag. Drag back onto the button and it's
+the nearest foe again. To call it off, let go on the ✕ that shows above the
+buttons while you hold: nothing is thrown and the move stays ready. Bursts and the Nap go off round your pet, so they
+fire on the press. So does everything on the raid, where moves find him by
+themselves.
+
 Wind-ups run about 0.3 to 1.1 s and are the same for every pet. Speed buys
 shorter cooldowns, not quicker moves. A pet that takes a move also stands
 still for it: committing is a risk.
