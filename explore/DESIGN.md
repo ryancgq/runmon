@@ -206,8 +206,9 @@ their skills back for a turn.
 
 ### Aim, wind-ups and dodging
 
-Between pets, a move is aimed when it's taken and lands on its impact frame
-where it was aimed, so it can miss. For the wind-up, its shape is marked on
+A move is aimed when it's taken and lands on its impact frame where it was
+aimed, so it can miss: a pet, or him on the raid, with the same rules for
+both. For the wind-up, its shape is marked on
 the ground where it will land. Other players' and wild pets' marks are amber
 and solid; your own are faint and dashed. Each kind of move is dodged its own
 way:
@@ -218,7 +219,10 @@ way:
 | Swipe (cone), gale, puff | Tail Swipe, Arc Lash, Forest Slam, Green Gale, fireball | the way it was facing | get behind it or out of reach |
 | Bolt (strike) | Pocket Storm, Lightning Bolt | on the spot you stood on when it was taken | leave the circle |
 | Charge (rush) | Horn Rush, Flying Swoop, Cuddle, Landslide | straight down its lane, stopping on the first pet it hits | step aside |
-| Shot | Fireball, Acorn Flick, Bamboo Tasting | flies straight at where you were when it's let go, hitting the first pet in its path | move across its line; the further off, the more time you have |
+| Shot | Fireball, Acorn Flick, Bamboo Tasting | flies straight at where you were when it's let go, hitting the first one in its path | move across its line; the further off, the more time you have |
+
+Shots are the hardest to land, so they are let go 0.35 s into the move (they
+were 0.6 to 0.8 s) and fly at 760 rather than 460. Their range is unchanged.
 
 **Aiming.** Tap a move and it goes at the nearest foe. Press and hold one
 that has a direction (a shot, a bolt, a swipe, a gale, a charge) and drag:
@@ -227,15 +231,15 @@ grey while it's cooling, and it goes where it points when you let go. A bolt
 lands further out the further you drag. Drag back onto the button and it's
 the nearest foe again. To call it off, let go on the ✕ that shows above the
 buttons while you hold: nothing is thrown and the move stays ready. Bursts and the Nap go off round your pet, so they
-fire on the press. So does everything on the raid, where moves find him by
-themselves.
+fire on the press. It works the same on the raid.
 
-Wind-ups run about 0.3 to 1.1 s and are the same for every pet. Speed buys
+Other wind-ups run about 0.3 to 1.1 s and are the same for every pet. Speed buys
 shorter cooldowns, not quicker moves. A pet that takes a move also stands
 still for it: committing is a risk.
 
-On the raid, his size makes all of this moot. Moves find him as before, and
-his own marks work as they always have.
+On the raid it is all the same: tap and a move goes at him; hold and drag to
+aim it anywhere, a charge away from him included, to get out of a mark. He
+is big and slow, so a move aimed at him rarely misses; one aimed away does.
 
 Other rules kept from earlier tuning:
 
@@ -297,7 +301,7 @@ attempts means more running.
 You get three swings; the menu gives you ten more. The game earns one per 5 km
 run.
 
-**His health is one fixed pool: 400,000.** It is the same for one player or
+**His health is one fixed pool: 200,000.** It is the same for one player or
 twenty, and it never regenerates. Every swing anyone takes stays off him,
 across attempts, sessions and days, until he is felled. He is meant to be a
 group's weeks of work at the very end of the game.
@@ -310,17 +314,17 @@ which is 6 swings a week. Seven of them earn about 180 swings a month between
 them. Average damage per attempt and the total swings needed, from
 simulation:
 
-| Level | Average player | Near-perfect player | Swings for 400,000, average / near-perfect | Time for 7 runners, average / near-perfect |
+| Level | Average player | Near-perfect player | Swings for 200,000, average / near-perfect | Time for 7 runners, average / near-perfect |
 | --- | --- | --- | --- | --- |
-| Lv 14 | ~370 | ~1,370 | ~1,070 / ~290 | ~6 months / ~7 weeks |
-| Lv 26 | ~700 | ~3,600 | ~570 / ~110 | ~3 months / ~3 weeks |
-| Lv 40 | ~1,200 | ~5,700 | ~330 / ~70 | ~2 months / ~12 days |
+| Lv 14 | ~440 | ~1,700 | ~460 / ~120 | ~2.5 months / ~3 weeks |
+| Lv 26 | ~910 | ~3,600 | ~220 / ~56 | ~5 weeks / ~10 days |
+| Lv 40 | ~1,150 | ~5,800 | ~175 / ~35 | ~4 weeks / ~6 days |
 
 The average player steps out of his marks but gets caught mid-skill. The
 near-perfect one is touched only by his roar. These figures are after the
 long cooldowns, which cut what a pet takes off him per attempt to about a
-third. At 400,000, an average Lv 26 field now needs about three months, not
-one. Keeping it to a month would mean about 105,000.
+third (quicker shots won some of it back), so his health came down from
+400,000 to 200,000: about five weeks for an average Lv 26 field.
 
 **After he falls**, everyone who was on him sees the death clip and a card of
 who took what off him this round. He is back on his hill 20 seconds later
@@ -349,7 +353,7 @@ server of our own.
 - **Each page settles his blows on its own pet only**, at the moment the mark
   fills. The page running him decides where he goes, and your page decides
   whether you were standing in it.
-- **His health** is 400,000 less the sum of what every tab has taken off him
+- **His health** is 200,000 less the sum of what every tab has taken off him
   this round. Each tab keeps its own figure, which survives a reload, so two
   tabs never overwrite each other. Figures only ever grow, so every copy of
   the account (the store, the presence of the page running him, this
