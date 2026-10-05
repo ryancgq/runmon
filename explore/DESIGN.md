@@ -83,7 +83,7 @@ Everything a fight is made of comes from the game's battle engine:
 
 | Game (turn-based) | Here (live) |
 | --- | --- |
-| Attributes `attrsFor`, HP pool ×5 | the same |
+| Attributes `attrsFor`, HP pool ×5 | the same, but HP is a fifth lower (`LIVE_HP` ×0.8), for every pet, wild ones included, so fights end sooner |
 | Damage: `btHit`, divisive Defence, K, ±35% jitter, no crits | the same function |
 | Each move's multiplier, pierce and riders (burn, rattle, stoke, charge, soften, open, Cuddle's squeeze, Nap's heal and guard) | the same, applied the same way |
 | One move per turn | one turn = **1.4 s** of the pet's own clock |
@@ -93,12 +93,11 @@ Everything a fight is made of comes from the game's battle engine:
 | The boss never gets extra turns | the same |
 | Opponent picks any ready move at random (`btChoose`) | the wild pets' AI picks the same way, the moment its turn comes round |
 
-**Attack** is mostly a dash: it lunges at whatever is closest, but its swipe
-barely scratches (×0.1). With nothing in reach it is just the dash,
-and nothing *he* swings can land on you mid-dash. Once a skill has landed,
-Attack's dash cuts the rest of its clip short, which is how you get out from
-under him mid-move. It buys room, not time: the rest of that move's turn
-still runs before the next skill.
+**Attack** is a swipe where you stand at the nearest foe within arm's
+length (60 px), once a turn, and it barely scratches (×0.1). It doesn't move
+your pet. It used to be a dash that lunged at the target, dodged his blows
+and cut a landed skill short. All of that was removed, so the only ways out
+of a mark are walking and a charge.
 
 **Skills** play their real clip from the game, fitted inside one turn (1.4 s)
 so a long clip never costs extra time. Your pet stands still while it plays
@@ -107,13 +106,12 @@ pets it can miss: see *Aim, wind-ups and dodging* below.
 
 ### Skills over Attack
 
-In playtesting, spamming Attack was the best play. Attack goes off at once
-and dashes you onto the target, while a skill plays its clip first. A first
-fix, Attack at ×0.75, still left it too strong, so:
+In playtesting, spamming Attack was the best play. Attack goes off at once,
+while a skill plays its clip first. A first fix, Attack at ×0.75, still left
+it too strong, so:
 
-- **Attack hits at ×0.1**, 90% under the game's plain attack. It's there for
-  its dash, to get out from under him or to cut a landed skill short. The
-  damage comes from skills.
+- **Attack hits at ×0.1**, 90% under the game's plain attack. The damage
+  comes from skills.
 - **No shared cooldown.** With Attack worth nothing, the game's rhythm of a
   skill then an Attack would be a dead turn after every skill. Here a pet
   chains its skills: about 95% of moves are skills.
@@ -136,12 +134,12 @@ fix, Attack at ×0.75, still left it too strong, so:
 
   | Pet | Moves and cooldowns | Nothing ready for at least |
   | --- | --- | --- |
-  | Cinderling Lv 14 | fireball 12.1 s, Horn Rush 9.1, Tail Swipe 9.1, Cinder Sweep 9.1 | 4.9 s |
-  | Sparky Lv 14 | Spark 7.7 s, Static Shock 7.7, Acorn Flick 12.8, Pocket Storm 15.4 | 4.0 s |
-  | Bamboo Cub Lv 14 | Green Gale 16.6 s, Cuddle 16.6, Bamboo Tasting 16.6, Forest Slam 27.7 | 12.9 s |
-  | Blazewyrm Lv 26 | Fireball 9.7 s, Flame Stomp 9.7, Flying Swoop 9.7 | 6.5 s |
-  | Zephyrite Lv 26 | Lightning Bolt 5.2 s, Arc Lash 5.2 | 3.6 s |
-  | Panda Lv 26 | Landslide 8.3 s (and a Nap) | 7.4 s |
+  | Cinderling Lv 14 | fireball 12.5 s, Horn Rush 9.4, Tail Swipe 9.4, Cinder Sweep 9.4 | 5.7 s |
+  | Sparky Lv 14 | Spark 7.7 s, Static Shock 7.7, Acorn Flick 12.7, Pocket Storm 15.3 | 4.5 s |
+  | Bamboo Cub Lv 14 | Green Gale 16.2 s, Cuddle 16.2, Bamboo Tasting 16.2, Forest Slam 26.9 | 12.9 s |
+  | Blazewyrm Lv 26 | Fireball 10.2 s, Flame Stomp 10.2, Flying Swoop 10.2 | 7.3 s |
+  | Zephyrite Lv 26 | Lightning Bolt 5.0 s, Arc Lash 5.0 | 3.6 s |
+  | Panda Lv 26 | Landslide 8.3 s (and a Nap) | 7.6 s |
 
   The Bamboo Cub waits longest. It is the slowest and toughest, and its kit
   is worth the most per turn in a battle.
@@ -149,7 +147,7 @@ fix, Attack at ×0.75, still left it too strong, so:
   moves cost them 30% as much of themselves. At a battle's numbers a pet's
   HP is about four hits, so one round of moves decided a fight and the
   cooldowns never came into it. Now a fight between pets of a stage runs
-  20 to 60 seconds, through several rounds. His blows, and pets' blows on
+  15 to 45 seconds, through several rounds. His blows, and pets' blows on
   him, are unchanged.
 - **Bigger areas for the moves that go off around your pet.** They don't seek
   a target, so they hardly ever caught anything. Novas are about 40% wider:
@@ -169,9 +167,9 @@ stage are even with each other:
 
 | Form | Pace | Form | Pace |
 | --- | --- | --- | --- |
-| Cinderling | ×1.06 | Blazewyrm | ×0.86 |
-| Sparky | ×1.06 | Zephyrite | ×1.16 |
-| Bamboo Cub | ×0.885 | Panda | ×1.00 |
+| Cinderling | ×1.02 | Blazewyrm | ×0.825 |
+| Sparky | ×1.07 | Zephyrite | ×1.225 |
+| Bamboo Cub | ×0.91 | Panda | ×0.99 |
 
 **How they were measured.** 200 simulated fights per pairing, two AI pets
 that play exactly alike. Both the win rate and how close the fights were are
@@ -185,21 +183,21 @@ rates:
 
 | Matchup | Lv 12 | Lv 14 | Lv 26 | Lv 40 |
 | --- | --- | --- | --- | --- |
-| Verdant v Ember | 75% · +6% HP | 89% · +14% | 38% · +4% | 25% · −1% |
-| Verdant v Nimbus | 1% · −17% | 7% · −16% | 34% · +2% | 33% · −2% |
-| Ember v Nimbus | 7% · −12% | 58% · +9% | 35% · +1% | 33% · 0% |
+| Verdant v Ember | 98% · +20% HP | 77% · +12% | 63% · +10% | 51% · +7% |
+| Verdant v Nimbus | 10% · −21% | 6% · −12% | 5% · −10% | 7% · −11% |
+| Ember v Nimbus | 8% · −15% | 69% · +14% | 55% · +4% | 72% · +8% |
 
-- **Stage 2:** every pairing is within 4% of HP.
-- **Stage 1, Lv 14 (the full kits):** a loop, as in rock-paper-scissors.
-  The Bamboo Cub beats the Cinderling, the Sparky beats the Cub, and the
-  Cinderling beats the Sparky, each by 9 to 16% of HP. No set of paces
-  undoes a loop, so these leave each pet even overall: one good matchup and
-  one bad.
-- **Stage 1, Lv 12:** the Sparky is ahead, by 12 to 17% of HP. Every pet has
+- **Both stages at their full kits (Lv 14, Lv 26 and 40) form a loop**, as
+  in rock-paper-scissors: Verdant beats Ember, Nimbus beats Verdant, and
+  Ember beats Nimbus, each by about 4 to 14% of HP. No set of paces undoes
+  a loop, so these leave each pet about even overall: one good matchup and
+  one bad. (Before Attack lost its dash, stage 2 was within 4% all round;
+  the dash's lunge was worth more to some forms than others.)
+- **Stage 1, Lv 12:** the loop is wider, 15 to 21% of HP. Every pet has
   three moves at 12 and gets its fourth at 14, and no single pace suits
   both levels, so Lv 14, where pets spend Lv 14 to 17, came first.
 
-Fights run 20 to 60 seconds.
+Fights run 15 to 45 seconds.
 
 **Not balanced across stages.** An evolved form learns its first skill at Lv
 18, as in the game. From Lv 15 to 17 it has none, and with Attack this weak
@@ -290,14 +288,14 @@ to stay away from.
 **He moves.** Standing still, he was easy to read. Now he walks at whoever he
 has picked between blows, and circles once he's close. He switches targets
 now and then, and every blow carries him somewhere new. **Every blow is still
-marked on the ground first**, so you can walk or dash out of it:
+marked on the ground first**, so you can walk (or charge) out of it:
 
 | Move | How he moves | The mark | What it does |
 | --- | --- | --- | --- |
 | Plain swing | rears back, then lunges up to 260 px at you | **harder:** marked only 0.7 s ahead, and the mark **follows you** until 0.42 s before it lands (dashed and flickering while it follows, solid once it locks). Step away early and it comes with you; you have to react. | ×1 |
 | **Torchswing** | charges up to 220 px towards you, then spins | **harder:** played 35% faster after a wind-up 15% longer (lands about 0.76 s after the mark appears), with a wider ring (210 px) round where he stops | ×1.35 to anything within reach |
 | **Splitter** | leaps up to 420 px, landing beside you | a large red mark under you, landing about 1.28 s later (the sheet's wind-up, 15% longer). The big, readable one. | ×2.2, 70% through guard. It deletes a low-level pet, as in the game |
-| **UWAAAARGH!** | stands and roars | **the whole hill turns red**, filling in as the roar builds. There is nowhere to stand out of it, and a dash doesn't help. He winds up for **about 2.6 s**, twice his sheet's wind-up, while a line of narration reads *"Sir Uwaaarghhhh is getting very upset and starts to…"*. As it lands, **UUUWWAAAARRGGHHHHHHHHH** comes out a letter at a time over about a second, faster as it goes, with the text shaking (and a phone buzzing) as he shouts it. | hits **everyone** on him, at ×0.6 for the first roar of a fight, plus ×0.25 for each roar after (×0.85, ×1.1, ×1.35 ...). Then, as in the game, his next two blows hit ×1.6 and he charges, getting faster and stronger, up to twice. |
+| **UWAAAARGH!** | stands and roars | **the whole hill turns red**, filling in as the roar builds. There is nowhere to stand out of it, and a charge doesn't help. He winds up for **about 2.6 s**, twice his sheet's wind-up, while a line of narration reads *"Sir Uwaaarghhhh is getting very upset and starts to…"*. As it lands, **UUUWWAAAARRGGHHHHHHHHH** comes out a letter at a time over about a second, faster as it goes, with the text shaking (and a phone buzzing) as he shouts it. | hits **everyone** on him, at ×0.6 for the first roar of a fight, plus ×0.25 for each roar after (×0.85, ×1.1, ×1.35 ...). Then, as in the game, his next two blows hit ×1.6 and he charges, getting faster and stronger, up to twice. |
 
 If he lands on you, you're shoved clear of him.
 
@@ -336,15 +334,19 @@ simulation:
 
 | Level | Average player | Near-perfect player | Swings for 150,000, average / near-perfect | Time for 7 runners, average / near-perfect |
 | --- | --- | --- | --- | --- |
-| Lv 14 | ~470 | ~1,470 | ~320 / ~100 | ~1.8 months / ~2.5 weeks |
-| Lv 26 | ~850 | ~3,500 | ~175 / ~43 | ~1 month / ~1 week |
-| Lv 40 | ~1,200 | ~5,300 | ~125 / ~28 | ~3 weeks / ~5 days |
+| Lv 14 | ~200 | ~1,450 | ~740 / ~100 | ~4 months / ~2.5 weeks |
+| Lv 26 | ~400 | ~3,000 | ~375 / ~50 | ~2 months / ~8 days |
+| Lv 40 | ~640 | ~5,500 | ~235 / ~27 | ~5.5 weeks / ~5 days |
 
 The average player steps out of his marks but gets caught mid-skill. The
 near-perfect one is touched only by his roar. These figures are after the
 long cooldowns, which cut what a pet takes off him per attempt to about a
 third (quicker shots won some of it back), so his health came down from
-400,000 to 150,000: about a month for an average Lv 26 field.
+400,000 to 150,000: about a month for an average Lv 26 field. Then Attack
+lost its dash, the average player's best way out of his marks, and pets lost
+a fifth of their HP. An average player now lasts about 13 s on him, not 25,
+and takes about half as much off him, so that field needs about two months.
+A near-perfect one is hardly touched.
 
 **After he falls**, everyone who was on him sees the death clip and a card of
 who took what off him this round. He is back on his hill 20 seconds later
