@@ -254,7 +254,7 @@
   <ul class="how">
     <li><b>Move</b> with your left thumb, anywhere on the left half of the screen.</li>
     <li><b>Skills</b> are the fight: your pet's own moves at its level, live, each on its cooldown. Damage and effects are the game's battle numbers; one battle turn is 1.4 seconds.</li>
-    <li><b>👊 Attack</b> is mostly a dash: its swipe barely scratches. Nothing he swings can land on you mid-dash, and it cuts a skill short once the skill has landed.</li>
+    <li><b>👊 Attack</b> is a swipe at whatever is right next to you. It barely scratches; the damage is in your skills.</li>
     <li><b>Together:</b> everyone with this link open is in the same world. Take him on at the same time and his health is shared.</li>
     <li><b>Open PvP:</b> out in the world, other players' pets can fight yours, and yours theirs. While anyone is fighting him, nobody can touch them.</li>
     <li>Sit by the campfire to heal. Berries heal too.</li>
@@ -510,12 +510,11 @@ const shotLife = fx => (fx.reach + 180) / SHOT_SPEED;
    fight; they play quick rather than unfairly. */
 for (const sp in SKILLS) for (const s of SKILLS[sp]){ s.species = sp; const wind = s.fx.wind ?? WIND[s.fx.kind];
   s.clip = makeClip(s.sprite, TURN, wind ? { at:s.fx.kind === "rush" ? s.fx.from : s.fx.impact, wind } : null); MOVE[s.id] = s; }
-/* Skills are the fight. Live, a plain Attack is instant and dashes you onto
-   the target, while a skill plays its clip first - so at anything near the
-   game's ×1, spamming Attack was the better button. So:
-   - Attack hits at ×0.1 (ATTACK_MULT), 90% under the game's plain attack.
-     It is for its dash: getting out from under him, or cutting a landed
-     skill's clip short. The damage is the skills'.
+/* Skills are the fight. Live, a plain Attack is instant while a skill plays
+   its clip first - so at anything near the game's ×1, spamming Attack was
+   the better button. So:
+   - Attack hits at ×0.1 (ATTACK_MULT), 90% under the game's plain attack: a
+     swipe at arm's length, with no dash. The damage is the skills'.
    - No shared cooldown (LIVE_GCD 0). With Attack worth nothing, the game's
      skill-then-Attack rhythm would be a dead turn after every skill; here a
      pet chains its skills.
@@ -853,14 +852,18 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const $ = id => document.getElementById(id);
 
 /* ---------- entities ---------- */
+/* A pet's health out here: the game's pool (HP × 5) less a fifth (LIVE_HP),
+   so fights between pets end sooner. Every pet alike, wild ones included. */
+const LIVE_HP = .8;
+const liveHp = a => Math.round(a.hp * BT.POOL * LIVE_HP);
 class Pet {
   constructor(formId, level, side, o = {}){
     const f = FORMS[formId], a = attrsFor(f.species, level);
     Object.assign(this, {
       type:"pet", formId, form:f, sp:f.species, level, side,
-      pow:a.pow, def:a.def, spd:a.spd, max:a.hp * BT.POOL, cur:a.hp * BT.POOL,
+      pow:a.pow, def:a.def, spd:a.spd, max:liveHp(a), cur:liveHp(a),
       kit:kitFor(formId, level), x:o.x || 0, y:o.y || 0, r:f.box * .27, box:f.box, face:1, aim:{ x:1, y:0 },
-      kx:0, ky:0, cds:{}, gcd:0, atkCd:0, dashT:0, clip:null, flash:0, inv:0,
+      kx:0, ky:0, cds:{}, gcd:0, atkCd:0, swipeT:0, clip:null, flash:0, inv:0,
       alive:true, faintT:0, moving:0, walkT:Math.random() * 10, idleT:Math.random() * 6,
       name:o.name || f.name, isPlayer:!!o.player, wild:!!o.wild,
       home:{ x:o.x || 0, y:o.y || 0 }, aggro:null, wanderT:0, wanderTo:null, dealt:0, respawnT:0, lastFight:-99, calm:0
@@ -869,7 +872,7 @@ class Pet {
     this.footOff = ((c.dy || 0) / 100) * vh + (f.foot - .5) * vh * (c.scale || 1);
     resetFight(this);
   }
-  get busy(){ return !!this.clip || this.dashT > 0; }
+  get busy(){ return !!this.clip; }
   get canAct(){ return this.alive; }
   hitCircle(){ return { x:this.x, y:this.y, r:this.r }; }
 }
@@ -958,7 +961,7 @@ function speedTempo(spd, level){ return (1 + 5 * spd / attrTotal(level)) / 1.5; 
    meet each other about as the game's battles have them meet (§3 in the
    design notes). Live, with Attack worth almost nothing, a species' kit
    decides more than it does in a battle, and these even it out. */
-let FORM_PACE = { cinderling:1.063, sparky:1.064, cub:.885, blazewyrm:.862, zephyrite:1.164, panda:.996 };
+let FORM_PACE = { cinderling:1.024, sparky:1.074, cub:.909, blazewyrm:.825, zephyrite:1.225, panda:.99 };
 function tempoOf(e){
   if (e.boss) return 1;
   return e.tempo = speedTempo(e.spd * (e.spdMul || 1), e.level) * (FORM_PACE[e.formId] || 1);
@@ -966,8 +969,8 @@ function tempoOf(e){
 
 function strike(x, y, mult, pierce, o = {}){
   if (!y.alive) return 0;
-  /* Dodging is for his blows only: a battle has no such thing, and pets that
-     could dash through each other's attacks stop trading blows at all. */
+  /* A pet in the middle of a charge can't be caught by his blows (inv); a
+     battle has nothing like it, so between pets there is no such thing. */
   if (y.inv > 0 && x.boss && !o.unblockable){ floatText(y.x, y.y - y.box, "dodged", "#ffd23f", 12); return 0; }
   let dmg = btHit(x, y, mult, pierce);
   if (!x.boss && !y.boss) dmg = Math.max(1, Math.round(dmg * PET_DMG));
@@ -1065,7 +1068,7 @@ function knockOut(e, src){
   faint(e, src);
 }
 function faint(e, src){
-  e.cur = 0; e.alive = false; e.clip = null; e.dashT = 0; e.burn = null;
+  e.cur = 0; e.alive = false; e.clip = null; e.burn = null;
   if (e.type === "pet"){
     e.faintT = 0;
     if (e.wild){ e.respawnT = 25; puff(e.x, e.y - 20, "#ffffff", 14); if (Math.random() < .35) G.pickups.push({ kind:"berry", x:e.x, y:e.y, t:0 }); }
@@ -1111,28 +1114,22 @@ function skillReady(e, sk){
 }
 const reachOf = fx => fx.kind === "nova" ? fx.reach * .85 : fx.kind === "rush" ? fx.dist * .75 : fx.kind === "self" ? 1e9 : fx.reach;
 
-/* Attack: a dash, once a turn, with a token swipe at the end (ATTACK_MULT).
-   A lunge at whatever is closest; with nothing in reach just the dash -
-   which is how you get out from under his blows. */
+/* Attack: a swipe where you stand, once a turn, at the nearest foe in reach
+   (ATTACK_REACH) for a token blow (ATTACK_MULT). No dash: it doesn't move
+   your pet, and it is no way out from under him. With nothing in reach it
+   swipes at the air. */
+const ATTACK_REACH = 60;
 function useAttack(e){
-  if (!e.canAct || e.dashT > 0) return false;
-  /* Once a move has landed, Attack's dash cuts the rest of its clip short -
-     the way out from under him mid-move. It buys room, not time: the rest
-     of the move's turn still has to run before anything else (turnT). */
-  if (e.clip){
-    const c = e.clip;
-    if (!c.fired) return false;
-    e.clip = null; e.dashT = .2; e.inv = .26; e.hitSet = new Set(); e.lunge = false;
-    if (e === G.player) NET.ds++;
-    dust(e.x, e.y, 5);
-    return true;
-  }
-  if (e.atkCd > 0) return false;
-  const t = aimAt(e, 120);
-  e.atkCd = ATTACK_CD * TURN; e.dashT = .2; e.inv = .26; e.hitSet = new Set(); e.lunge = !!t;
+  if (!e.canAct || e.clip || e.atkCd > 0) return false;
+  const t = aimAt(e, ATTACK_REACH);
+  e.atkCd = ATTACK_CD * TURN; e.swipeT = .18;
   if (e === G.player) NET.ds++;
-  dust(e.x, e.y, 5);
+  swipeFx(e);
+  if (t) strike(e, t, ATTACK_MULT, 0, {});
   return true;
+}
+function swipeFx(e){
+  G.fx.push({ kind:"arc", x:e.x, y:e.y - 10, a:Math.atan2(e.aim.y, e.aim.x), r:e.r + ATTACK_REACH, arc:.7, t:0, dur:.2, colour:"#ffffff" });
 }
 function useSkill(e, id, hand){
   const sk = MOVE[id];
@@ -1451,19 +1448,8 @@ function updatePet(e, dt){
   else e.kx = e.ky = 0;
 
   const want = e.isPlayer ? { x:stick.x, y:stick.y } : petAI(e, dt);
-  if (e.dashT > 0){
-    e.dashT -= dt;
-    moveEnt(e, e.aim.x * 560 * dt, e.aim.y * 560 * dt);
-    if (e.lunge) for (const o of foesOf(e)){
-      if (e.hitSet.has(o)) continue;
-      const h = o.hitCircle();
-      if (Math.hypot(h.x - e.x, h.y - (e.y - 8)) < h.r + e.r + 12){
-        e.hitSet.add(o); strike(e, o, ATTACK_MULT, 0, { knock:150 }); e.dashT = Math.min(e.dashT, .04); dust(e.x, e.y, 4);
-        break;   // a plain attack is one blow
-      }
-    }
-    e.moving = 1;
-  } else if (e.clip){ updateClip(e, dt); e.moving = 0; }   // a move plays at one pace for every pet: its wind-up is what you read to dodge it
+  e.swipeT = Math.max(0, e.swipeT - dt);
+  if (e.clip){ updateClip(e, dt); e.moving = 0; }   // a move plays at one pace for every pet: its wind-up is what you read to dodge it
   else {
     const m = Math.hypot(want.x, want.y);
     if (m > .05){
@@ -1519,10 +1505,10 @@ function fightAI(e, t, dt){
     // a skill whenever one is ready - an Attack taken in a gap never holds one back
     const ready = e.kit.filter(sk => skillReady(e, sk) && d < reachOf(sk.fx));
     if (ready.length){ useSkill(e, ready[Math.floor(Math.random() * ready.length)].id); return { x:0, y:0 }; }
-    if (d < 80 && e.atkCd <= 0){ useAttack(e); return { x:0, y:0 }; }
+    if (d < ATTACK_REACH && e.atkCd <= 0){ useAttack(e); return { x:0, y:0 }; }
   }
   const n = d + h.r || 1;
-  if (d > 30) return { x:dx / n, y:dy / n };     // everyone closes in: a plain Attack is a lunge
+  if (d > 30) return { x:dx / n, y:dy / n };     // everyone closes in: a plain Attack is a swipe at arm's length
   const s = Math.sin(G.time * 1.3 + e.home.x) > 0 ? 1 : -1;
   return { x:-dy / n * .3 * s, y:dx / n * .3 * s };
 }
@@ -1531,16 +1517,12 @@ function fightAI(e, t, dt){
 function raidBot(e, dt){
   for (const f of G.fx){
     if (f.kind !== "tele" || f.full) continue;   // nowhere to run from the roar: keep fighting
-    // marked: no skill now - walk out, and maybe dash the last of it
+    // marked: no skill now - walk out
     const d = Math.hypot(e.x - f.x, (e.y - f.y) * 1.4);
     if (d < f.r + 20){
       const a = Math.atan2(e.y - f.y, e.x - f.x);
       // a mark still following you can't be outrun: wait for it to lock, then go
       if (f.lock && f.t < f.lock) return { x:0, y:0 };
-      if ((f.dur - f.t) < .9 && e.dashT <= 0 && (e.clip ? e.clip.fired : e.atkCd <= 0) && Math.random() < .35){
-        useAttack(e); e.aim = { x:Math.cos(a), y:Math.sin(a) }; e.lunge = false;
-        return { x:0, y:0 };
-      }
       return { x:Math.cos(a), y:Math.sin(a) };
     }
   }
@@ -1728,7 +1710,7 @@ function landBlow(b, a){
   }
   if (fx.kind === "roar"){
     /* UWAAAARGH: the whole hill is marked red - there is nowhere to stand
-       out of it, and a dash won't carry you through it. It hits everyone on
+       out of it, and a charge won't carry you through it. It hits everyone on
        him. Its own hit
        is the lightest of his (ROAR_HIT) but grows with every roar of the
        fight, so however well you move, he wears you down. Then, as in the
@@ -1899,10 +1881,10 @@ function playerFainted(){
 
    He is a group's work over weeks. Seven runners at the game's 30 km a
    week earn about 180 swings a month between them. At level 26 a swing takes
-   about 850 off him for a player who dodges but gets caught mid-skill, and
-   about 3,500 for one only his roar ever touches. At 150,000 that is about
-   a month for a field of the first kind and a week for a field of the
-   second. The bar shows a percentage, as in the game. */
+   about 400 off him for a player who dodges but gets caught mid-skill, and
+   about 3,000 for one only his roar ever touches. At 150,000 that is about
+   two months for a field of the first kind and eight days for a field of
+   the second. The bar shows a percentage, as in the game. */
 const RAID_HP = 150000;
 /* He hits a little harder than the game's Power 90 (×1.08), so attempts are
    a little shorter and the fight is a long one for a whole group (see RAID_HP). */
@@ -2480,7 +2462,7 @@ function followWilds(list){
 function setWildRunner(lead){
   for (const e of G.wild || []){
     if (lead && e.mirror){ e.mirror = false; e.x = e.tx; e.y = e.ty; e.clip = null; e.wanderTo = null; }
-    else if (!lead && !e.mirror){ e.mirror = true; e.tx = e.x; e.ty = e.y; e.clip = null; e.dashT = 0; e.burn = null; e.respawnT = 0; }
+    else if (!lead && !e.mirror){ e.mirror = true; e.tx = e.x; e.ty = e.y; e.clip = null; e.swipeT = 0; e.burn = null; e.respawnT = 0; }
   }
 }
 
@@ -2634,7 +2616,7 @@ function syncNetPet(id, pr){
     }
     n.ks = pr.ks;
   }
-  if (pr.ds !== n.ds){ if (n.ds !== undefined) n.dashT = .2; n.ds = pr.ds; }
+  if (pr.ds !== n.ds){ if (n.ds !== undefined){ n.swipeT = .18; swipeFx(n); } n.ds = pr.ds; }
 }
 function animNetPet(n, dt){
   const ox = n.x, oy = n.y, k = Math.min(1, dt * 12);
@@ -2643,7 +2625,7 @@ function animNetPet(n, dt){
   const sp = Math.hypot(n.x - ox, n.y - oy) / Math.max(dt, 1e-3);
   n.moving = n.alive && (n.mv || sp > 30) ? 1 : 0;
   n.walkT += dt * 2.2 * n.moving; n.idleT += dt;
-  n.dashT = Math.max(0, n.dashT - dt); n.flash = Math.max(0, n.flash - dt);
+  n.swipeT = Math.max(0, (n.swipeT || 0) - dt); n.flash = Math.max(0, n.flash - dt);
   if (!n.alive) n.faintT += dt;
   const c = n.clip;
   if (c){
@@ -2870,13 +2852,13 @@ function drawPet(e){
   else if (e.moving > .1) frame = f.walk[Math.floor(e.walkT * 2.2) % 2];
   else frame = Math.floor(e.idleT * cfg.fps) % frames;
   let hop = 0, sx = 1, sy = 1, tilt = 0, alpha = 1;
-  if (!e.clip && e.alive && e.moving > .1 && e.dashT <= 0){
+  if (!e.clip && e.alive && e.moving > .1){
     const ph = e.walkT * 2.2 % 1;
     hop = Math.abs(Math.sin(ph * Math.PI)) * 7 * e.moving;
     const land = ph < .12 || ph > .88;
     sx = land ? 1.06 : .97; sy = land ? .93 : 1.04; tilt = Math.sin(ph * Math.PI * 2) * .05 * e.face;
   }
-  if (e.dashT > 0){ sx = 1.14; sy = .9; tilt = .12 * e.face; }
+  if (e.swipeT > 0){ sx = 1.1; sy = .92; tilt = .1 * e.face; }
   if (!e.alive){ alpha = e.wild ? Math.max(0, 1 - e.faintT / 1.2) : .55; sy = .85; tilt = .45 * e.face; }
   if (alpha <= 0) return;
   ctx.fillStyle = "rgba(0,0,0,.28)";
@@ -2888,7 +2870,7 @@ function drawPet(e){
   if (e.burn && Math.random() < .3) embers(e.x + rnd(-10, 10), e.y - e.box * .4, 1, .2);
   drawSheet(cfg, frames, frame, e, e.box, {
     hop, sx, sy, tilt, white:e.flash > 0,
-    alpha:alpha * (e.inv > 0 && e.isPlayer && !e.dashT && !e.clip && Math.floor(G.time * 20) % 2 ? .55 : 1),
+    alpha:alpha * (e.inv > 0 && e.isPlayer && !e.clip && Math.floor(G.time * 20) % 2 ? .55 : 1),
     filter:!e.alive ? "saturate(.5) brightness(.8)" : null
   });
 }
@@ -3176,7 +3158,7 @@ function buildPicks(){
 function showDetail(){
   const f = FORMS[G.formId], a = attrsFor(f.species, G.level);
   $("lv-n").textContent = "Lv " + G.level;
-  $("stats").innerHTML = [["HP", a.hp * BT.POOL], ["Defence", a.def], ["Power", a.pow], ["Speed", a.spd]]
+  $("stats").innerHTML = [["HP", liveHp(a)], ["Defence", a.def], ["Power", a.pow], ["Speed", a.spd]]
     .map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join("");
   const kit = SKILLS[f.species].filter(k => k.stage === f.stage), pet = new Pet(G.formId, G.level, "hero", { x:0, y:0 });
   const cut = Math.round((1 - 1 / speedTempo(a.spd, G.level)) * 100);
