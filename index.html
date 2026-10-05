@@ -1921,10 +1921,10 @@ const ENDURANCE_CAP_KM = 12;     // rate tops out at x1.12 at 12 km
      factor(n) = 1 + 0.5 * LEVEL_DECAY^(n-1)
 
    n=1 gives exactly x1.5, and it relaxes towards ~x1.02 near level 50. At
-   5 km a day, elated and on a streak, the third form arrives at ~180 lifetime
-   km, level 50 at ~1,440 and level 99 at ~3,355. (Stages four and five are
+   5 km a day, elated and on a streak, the third form arrives at ~205 lifetime
+   km (it was ~180 when it came at 15), level 50 at ~1,440 and level 99 at ~3,355. (Stages four and five are
    written into this curve at levels 30 and 50 and STAGE_CAP holds the pet
-   below them, so the last reachable form is the one at 15.)
+   below them, so the last reachable form is the one at 16.)
 
    The egg is the exception. Four levels at the base curve hatched it after
    about 21 km - three or four runs - which is before anybody has really begun,
@@ -1942,7 +1942,7 @@ const EARLY_MULT  = 2;           // ...this much extra
    twice for one habit. The consecutive-day count stays: it is a stat on the
    home screen and several badges test it. */
 
-const EVO_LEVELS = [1, 5, 15, 30, 50];   // stage index -> level required
+const EVO_LEVELS = [1, 5, 16, 30, 50];   // stage index -> level required
 
 /* Evolution stops at the third form for now. The fourth and fifth have no art
    - they draw a placeholder with a ? in it - and a form nobody has drawn is
@@ -1958,7 +1958,7 @@ const STAGE_CAP = 2;
 
 /* Moves a pet picks up as it grows. Each one belongs to a single form and is
    learnt inside that form's own stretch of levels, so evolving is not the end
-   of a stage - it is the start of one. The Blazewyrm holds levels 15-29 and
+   of a stage - it is the start of one. The Blazewyrm holds levels 16-29 and
    learns all three of its moves there, well before the next form arrives. */
 /* Every form's celebration runs to one clock, so a level-up feels the same
    whichever pet you are watching. A celebration's frames do not all hold for
@@ -2056,7 +2056,27 @@ function levelUpBeats(beats, gather, burst){
    Since then the Cinderling has gained Horn Rush (10) and Tail Swipe (12),
    and Cinder Sweep moved to 14 as its last and strongest move - see there;
    and the Bamboo Cub has gained Cuddle (11) and Forest Slam (14), its last
-   and strongest. */
+   and strongest.
+
+   Then the third form moved from level 15 to 16, and the second forms' moves
+   were spread over the extra level: each keeps its first two where they
+   were, its third moves from 12 to 13 and its strongest from 14 to 15, so
+   the last thing a form learns is still learnt the level before it evolves.
+     Cinderling 8 / 10 / 13 / 15    Sparky and Bamboo Cub 8 / 11 / 13 / 15
+   Checked against two other spreads (the Sparky's third left at 12; every
+   third left at 12, only the fourth moved), all within noise of this one.
+   Win rates for the first-named, both sides on btChoose(), 5,000 fights each
+   way per level:
+                         8     9    10    11    12    13    14    15
+     Ember v Verdant   49.9  47.4  52.4  47.8  51.8  54.5  52.2  49.3
+     Ember v Nimbus    49.4  50.6  48.3  50.0  52.8  48.7  51.0  47.5
+     Nimbus v Verdant  51.1  47.1  44.8  45.2  45.2  46.5  42.4  47.5
+   42.4-54.5, against 39.4-59.6 on the same rig before. Most of that is level
+   15 itself, which used to be three newly evolved forms with no moves yet and
+   is now three full kits. The cub's edge over the Sparky at 14 is the same in
+   all three spreads - it is the two three-move kits meeting there. Levels
+   6-7 (no moves yet) and 16-17 (the third forms' first moves come at 18) are
+   as they were. */
 const SKILLS = {
   ember: [
     // the id stays "fizzle" - the Blazewyrm's real one already owns "fireball",
@@ -2110,7 +2130,7 @@ const SKILLS = {
        two of their turns, Static Shock's trick with more behind it. The same
        quarter more than an attack as Horn Rush, and worth more over a fight
        for the guard it opens rather than its own. */
-    { id:"tail-swipe", name:"Tail Swipe", ico:"\u{1F4A8}", stage:1, level:12,
+    { id:"tail-swipe", name:"Tail Swipe", ico:"\u{1F4A8}", stage:1, level:13,
       blurb:"Spins round and cracks its tail like a whip. The gust knocks their guard wide open.",
       battle:{ dmg:1.25, cd:3, rattle:{ pct:0.20, turns:2 } },
       sprite:{ src:"art/skill-tail-swipe.png", frames:16, fps:5,
@@ -2127,8 +2147,9 @@ const SKILLS = {
         durations:[280, 240, 180, 150, 130, 110, 100, 240,
                    120, 150, 170, 180, 160, 200, 280, 340],
         aspect:1.6071, scale:1.454, dx:-11.03, dy:14.14 } },
-    /* The last thing the Cinderling learns, at 14, the level before it
-       becomes the Blazewyrm, and the strongest of its four: the tail flame
+    /* The last thing the Cinderling learns, at 15, the level before it
+       becomes the Blazewyrm, and the strongest of its four (at 14 until the
+       Blazewyrm moved to 16): the tail flame
        whipped all the way round into a ring, close enough that the dragon
        catches some of it too. It first came at 10 as a 1.05 hit with a 6%
        singe, and was 1.20 with 5% from the random-picking retune until the
@@ -2151,7 +2172,7 @@ const SKILLS = {
        balanced against these when they land. Pushing the new moves hard
        enough to rank above Fizzle on the ladder put the Cinderling at 60-67%
        against everybody, which is why they do not. */
-    { id:"cinder-sweep", name:"Cinder Sweep", ico:"\u2B55", stage:1, level:14,
+    { id:"cinder-sweep", name:"Cinder Sweep", ico:"\u2B55", stage:1, level:15,
       blurb:"Whips its tail flame round in a full circle. Whatever is close gets burnt - and so, a little, does the Cinderling.",
       battle:{ dmg:1.30, self:0.05, cd:3, burn:{ pct:0.20, turns:2 } },
       sprite:{ src:"art/skill-cinder-sweep.png", frames:16, fps:5,
@@ -2259,7 +2280,7 @@ const SKILLS = {
        swatting an acorn does not hurt the one swatting it, and Pocket Storm
        to 1.40, still through 30% of the guard, so it stays the harder of the
        two. See the note over SKILLS. */
-    { id:"acorn-flick", name:"Acorn Flick", ico:"\u{1F330}", stage:1, level:12,
+    { id:"acorn-flick", name:"Acorn Flick", ico:"\u{1F330}", stage:1, level:13,
       blurb:"Winds its whole tail round and swats the acorn at them. It will want that acorn back.",
       battle:{ dmg:1.50, cd:5 },
       sprite:{ src:"art/skill-acorn-flick.png", frames:16, fps:5,
@@ -2287,7 +2308,7 @@ const SKILLS = {
        shallower pierce. Six turns to call the cloud back - once a fight,
        twice if it runs long - because the storm is the event, not the
        rhythm. */
-    { id:"pocket-storm", name:"Pocket Storm", ico:"\u26C8\uFE0F", stage:1, level:14,
+    { id:"pocket-storm", name:"Pocket Storm", ico:"\u26C8\uFE0F", stage:1, level:15,
       blurb:"Brews a thundercloud the size of a teacup and points it at them. It is a very angry teacup.",
       battle:{ dmg:1.40, pierce:0.30, cd:6 },
       sprite:{ src:"art/skill-pocket-storm.png", frames:16, fps:5,
@@ -2450,7 +2471,7 @@ const SKILLS = {
        and who won, and st.moves is never read), so it could be renamed
        safely. The battle numbers are the toss's, as measured above - only
        the drawing changed. */
-    { id:"bamboo-toss", name:"Bamboo Tasting", ico:"\u{1F38B}", stage:1, level:12,
+    { id:"bamboo-toss", name:"Bamboo Tasting", ico:"\u{1F38B}", stage:1, level:13,
       blurb:"Takes a thoughtful bite, chews it over, and spits out the verdict. At them. Hard.",
       battle:{ dmg:1.40, cd:3 },
       sprite:{ src:"art/skill-bamboo-tasting.png", frames:16, fps:4.5,
@@ -2474,8 +2495,8 @@ const SKILLS = {
         durations:[300, 220, 260, 240, 260, 220, 240, 420,
                    100, 110, 120, 160, 260, 200, 260, 340],
         aspect:1.5097, scale:1.219, dx:13.58, dy:-0.84 } },
-    /* The Bamboo Cub's last move, at 14, the level before it becomes the
-       Panda, and its strongest: it leaps as high as a cub can and comes down
+    /* The Bamboo Cub's last move, at 15, the level before it becomes the
+       Panda, and its strongest (at 14 until the Panda moved to 16): it leaps as high as a cub can and comes down
        on the forest floor, and the ground erupts. 1.70x with 30% pierce, and
        the landing costs the cub 9% of its own health - the price of its
        biggest hit, as Cinder Sweep's singe is the Cinderling's. Worth over six
@@ -2493,7 +2514,7 @@ const SKILLS = {
        cooldown, 5, barely changes how often the random picker reaches it;
        it is there so a player cannot open with it and repeat it straight
        away. */
-    { id:"forest-slam", name:"Forest Slam", ico:"\u{1F33F}", stage:1, level:14,
+    { id:"forest-slam", name:"Forest Slam", ico:"\u{1F33F}", stage:1, level:15,
       blurb:"Leaps as high as a cub can and comes down on the forest floor. The ground erupts - and so, a little, does the cub.",
       battle:{ dmg:1.70, pierce:0.30, cd:5, self:0.09 },
       sprite:{ src:"art/skill-forest-slam.png", frames:16, fps:5,
@@ -3200,7 +3221,7 @@ const BADGES = [
   { id:"first",    ico:"\u{1F356}", name:"First Meal",    desc:"Fed its first run.",                         test:s=>s.runCount>=1 },
   { id:"evolved",  ico:"\u{1F423}", name:"Hatched",       desc:"Hatched out of its egg, at level 5.",        test:s=>s.stage>=1 },
   { id:"lv10",     ico:"\u{1F51F}", name:"Double Digits", desc:"Reached level 10.",                          test:s=>s.level>=10 },
-  { id:"teen",     ico:"\u{1F9EC}", name:"Evolved",       desc:"Grew into its third form, at level 15.",     test:s=>s.stage>=2 },
+  { id:"teen",     ico:"\u{1F9EC}", name:"Evolved",       desc:"Grew into its third form, at level 16.",     test:s=>s.stage>=2 },
   { id:"lv20",     ico:"\u2B50",    name:"Level 20",      desc:"Reached level 20.",                          test:s=>s.level>=20 },
   { id:"lv30",     ico:"\u{1F31F}", name:"Level 30",      desc:"Reached level 30.",                          test:s=>s.level>=30 },
   // learning moves - "known" counts every move learnt, outgrown ones too
@@ -4890,7 +4911,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-10-03 cdc5be2";
+const BUILD_ID = "2026-10-05 8bfb263";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;

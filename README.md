@@ -658,11 +658,11 @@ use them.
 ## Skills
 
 A form is not the end of a stage, it is the start of one: a pet keeps learning
-inside the form it grew into. The Cinderling and the Sparky have four moves
-each, the last of them - Cinder Sweep and Pocket Storm - at 14, the level
-before they evolve; the Bamboo Cub has two for now, at 8 and 12, with more
-being drawn; the
-Blazewyrm learns all three of its own between level 15, where the form
+inside the form it grew into. The three second forms have four moves each,
+spread over levels 5-15 - the Cinderling at 8, 10, 13 and 15, the Sparky and
+the Bamboo Cub at 8, 11, 13 and 15 - the last and strongest of them (Cinder
+Sweep, Pocket Storm, Forest Slam) at 15, the level before they evolve; the
+Blazewyrm learns all three of its own between level 16, where the form
 arrives, and level 30, where the next one does; and the Zephyrite has the
 first of its own at 18, the same level the Blazewyrm starts.
 
@@ -670,16 +670,16 @@ first of its own at 18, the same level the Blazewyrm starts.
 | --- | --- | --- | --- |
 | 🔥 fireball | Cinderling | Level 8 | Sold as the strongest fire you will ever see. Three seconds of winding up, then a cough and some smoke. |
 | 💢 Horn Rush | Cinderling | Level 10 | Lowers its horns and charges. It never quite works out how to stop, so it hits hard - and then sees stars. |
-| 💨 Tail Swipe | Cinderling | Level 12 | Spins round and cracks its tail like a whip. The gust knocks their guard wide open. |
-| ⭕ Cinder Sweep | Cinderling | Level 14 | Whips its tail flame round in a full circle. Whatever is close gets burnt - and so, a little, does the Cinderling. |
+| 💨 Tail Swipe | Cinderling | Level 13 | Spins round and cracks its tail like a whip. The gust knocks their guard wide open. |
+| ⭕ Cinder Sweep | Cinderling | Level 15 | Whips its tail flame round in a full circle. Whatever is close gets burnt - and so, a little, does the Cinderling. |
 | ⚡ Spark | Sparky | Level 8 | Guaranteed to leave something scorched. The something is the squirrel. |
 | 💫 Static Shock | Sparky | Level 11 | Bottles up every spark it has and goes off like a flashbulb. Whatever it hits forgets how to block. |
-| 🌰 Acorn Flick | Sparky | Level 12 | Winds its whole tail round and swats the acorn at them. It will want that acorn back. |
-| ⛈️ Pocket Storm | Sparky | Level 14 | Brews a thundercloud the size of a teacup and points it at them. It is a very angry teacup. |
+| 🌰 Acorn Flick | Sparky | Level 13 | Winds its whole tail round and swats the acorn at them. It will want that acorn back. |
+| ⛈️ Pocket Storm | Sparky | Level 15 | Brews a thundercloud the size of a teacup and points it at them. It is a very angry teacup. |
 | 🍃 Green Gale | Bamboo Cub | Level 8 | The forest's strength, gathered and released. Out of the wrong end. |
 | 🤗 Cuddle | Bamboo Cub | Level 11 | Charges in arms first for the biggest hug it can manage. Whatever it catches comes out squished, and swings softer for a while. |
-| 🎋 Bamboo Tasting | Bamboo Cub | Level 12 | Takes a thoughtful bite, chews it over, and spits out the verdict. At them. Hard. |
-| 🌿 Forest Slam | Bamboo Cub | Level 14 | Leaps as high as a cub can and comes down on the forest floor. The ground erupts - and so, a little, does the cub. |
+| 🎋 Bamboo Tasting | Bamboo Cub | Level 13 | Takes a thoughtful bite, chews it over, and spits out the verdict. At them. Hard. |
+| 🌿 Forest Slam | Bamboo Cub | Level 15 | Leaps as high as a cub can and comes down on the forest floor. The ground erupts - and so, a little, does the cub. |
 | 🔥 Fireball | Blazewyrm | Level 18 | Draws a breath and spits a packed ball of flame |
 | 💥 Flame Stomp | Blazewyrm | Level 22 | Lands hard enough to throw a ring of fire out around it |
 | ☄️ Flying Swoop | Blazewyrm | Level 26 | A low, fast pass trailing fire |
@@ -932,17 +932,17 @@ reward — the same reasoning that put `EARLY_MULT` on the egg.
 | Evolution | Total before → after | Worth |
 |---|---|---|
 | Lv 5 → stage 2 | 118 → 124 | nothing extra — an ordinary level |
-| Lv 15 → stage 3 | 178 → 202 | **4 levels** at once |
+| Lv 16 → stage 3 | 184 → 208 | **4 levels** at once |
 | Lv 30 → stage 4 | — | waiting on the art |
 | Lv 50 → stage 5 | — | waiting on the art |
 
 The last two steps are written and unreachable, because `STAGE_CAP` holds the
 pet at its third form. A bonus for evolving is not paid for an evolution that
-does not happen, so past level 15 the pool grows by a flat 6 a level: 202 at
-15, 292 at 30, 706 at 99.
+does not happen, so past level 16 the pool grows by a flat 6 a level: 208 at
+16, 292 at 30, 706 at 99.
 
-At level 15 a Blazewyrm reads 38 / 38 / 75 / 51 and a Panda 75 / 53 / 55 / 20,
-off the same 202 points.
+At level 16 a Blazewyrm reads 40 / 40 / 77 / 52 and a Panda 77 / 54 / 56 / 21,
+off the same 208 points.
 
 The bars are drawn against the widest slice anyone has (37%), not against the
 row's own biggest number, so a Panda's Speed reads as short next to a
@@ -1265,7 +1265,7 @@ The curve as tuned:
 | Form | Level | Total XP | Roughly |
 | --- | --- | --- | --- |
 | Baby | 5 | 3,033 | ~22 km |
-| Teen | 15 | 21,533 | ~160 km |
+| Teen | 16 | 24,676 | ~183 km |
 | Adult | 30 | 82,005 | ~607 km |
 | Final | 50 | 176,744 | ~1,309 km |
 
@@ -1294,7 +1294,7 @@ longer shown or counted.
 | 🍖 | First Meal | Its first run |
 | 🐣 | Hatched | Out of the egg, at level 5 |
 | 🔟 | Double Digits | Level 10 |
-| 🧬 | Evolved | Its third form, at level 15 |
+| 🧬 | Evolved | Its third form, at level 16 |
 | ⭐ 🌟 | Level 20, Level 30 | Those levels |
 | 🎓 | First Move | Its first move learnt |
 | 📚 | Quick Study | Three moves learnt |
@@ -1307,7 +1307,7 @@ longer shown or counted.
 | 🔥 | Never Hungry | A seven-day streak |
 
 **Runmon firsts** are races: the first player in the whole game to level 12,
-to evolve twice (level 15), and to levels 20, 25 and 30. The broker decides
+to evolve twice (level 16), and to levels 20, 25 and 30. The broker decides
 them as saves land — one roster object, one thread, so a tie cannot have two
 winners — and each has one holder for good. Everybody sees who holds each, by
 pet name. Level 5 and the first evolution are not races: every player was past

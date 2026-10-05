@@ -325,7 +325,10 @@ async function handleWebhook(env, ev){
    which every player sees in Rankings already. */
 const FIRSTS = [
   { id:"1st-lv12",  level:12, name:"First to Level 12" },
-  { id:"1st-form3", level:15, name:"First to Evolve Twice" },
+  // 16 since the third form moved there from 15. A race already won at 15
+  // stays won - it is decided once and kept - so this only moves the line
+  // for a race still open.
+  { id:"1st-form3", level:16, name:"First to Evolve Twice" },
   { id:"1st-lv20",  level:20, name:"First to Level 20" },
   { id:"1st-lv25",  level:25, name:"First to Level 25" },
   { id:"1st-lv30",  level:30, name:"First to Level 30" }
