@@ -319,7 +319,7 @@ attempts means more running.
 You get three swings; the menu gives you ten more. The game earns one per 5 km
 run.
 
-**His health is one fixed pool: 150,000.** It is the same for one player or
+**His health is one fixed pool: 110,000.** It is the same for one player or
 twenty, and it never regenerates. Every swing anyone takes stays off him,
 across attempts, sessions and days, until he is felled. He is meant to be a
 group's weeks of work at the very end of the game.
@@ -332,11 +332,11 @@ which is 6 swings a week. Seven of them earn about 180 swings a month between
 them. Average damage per attempt and the total swings needed, from
 simulation:
 
-| Level | Average player | Near-perfect player | Swings for 150,000, average / near-perfect | Time for 7 runners, average / near-perfect |
+| Level | Average player | Near-perfect player | Swings for 110,000, average / near-perfect | Time for 7 runners, average / near-perfect |
 | --- | --- | --- | --- | --- |
-| Lv 14 | ~200 | ~1,450 | ~740 / ~100 | ~4 months / ~2.5 weeks |
-| Lv 26 | ~400 | ~3,000 | ~375 / ~50 | ~2 months / ~8 days |
-| Lv 40 | ~640 | ~5,500 | ~235 / ~27 | ~5.5 weeks / ~5 days |
+| Lv 14 | ~200 | ~1,450 | ~550 / ~76 | ~3 months / ~2 weeks |
+| Lv 26 | ~400 | ~3,000 | ~275 / ~37 | ~6 weeks / ~6 days |
+| Lv 40 | ~640 | ~5,500 | ~170 / ~20 | ~4 weeks / ~3.5 days |
 
 The average player steps out of his marks but gets caught mid-skill. The
 near-perfect one is touched only by his roar. These figures are after the
@@ -345,8 +345,9 @@ third (quicker shots won some of it back), so his health came down from
 400,000 to 150,000: about a month for an average Lv 26 field. Then Attack
 lost its dash, the average player's best way out of his marks, and pets lost
 a fifth of their HP. An average player now lasts about 13 s on him, not 25,
-and takes about half as much off him, so that field needs about two months.
-A near-perfect one is hardly touched.
+and takes about half as much off him, so his health came down again, to
+110,000: about six weeks for that field. A near-perfect one is hardly
+touched by the change.
 
 **After he falls**, everyone who was on him sees the death clip and a card of
 who took what off him this round. He is back on his hill 20 seconds later
@@ -375,7 +376,7 @@ server of our own.
 - **Each page settles his blows on its own pet only**, at the moment the mark
   fills. The page running him decides where he goes, and your page decides
   whether you were standing in it.
-- **His health** is 150,000 less the sum of what every tab has taken off him
+- **His health** is 110,000 less the sum of what every tab has taken off him
   this round. Each tab keeps its own figure, which survives a reload, so two
   tabs never overwrite each other. Figures only ever grow, so every copy of
   the account (the store, the presence of the page running him, this
