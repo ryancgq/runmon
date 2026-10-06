@@ -17,6 +17,9 @@ the game's saves and never sees a run.
     level could do (`ATTEMPT_CAP`); outside one it can't;
   - the round follows the broker's raid epoch. When he is felled he stays down
     until the admin switch (`/admin/raid` on the broker) starts a new one;
+  - a pet is what its roster level makes it: its presence is rewritten to its
+    name, level and form, and a pet that hasn't evolved yet (below Lv 5) is
+    neither relayed nor allowed an attempt;
   - the first round carries over the old raid's health and shares
     (`/explore/legacy`), scaled to his health here (`RAID_HP`, 110,000).
 - **`/demo`, the sandbox.** Anyone, any pet, nothing checked. Its own boss,

@@ -644,6 +644,21 @@ badge stays earned.
 **Levels.** Explore uses the game's own levels: pets evolve into their third
 form at 16, and the second forms learn their last two moves at 13 and 15.
 
+**Only your own pet, and only once it has evolved.** The page plays the pet
+the server names, at its level, and nothing else. The world has no first-stage
+pets, so a pet below Lv 5 can't go in: the game's Explore tab says "Evolve to
+explore" with its level and the level it evolves at, and still shows the
+board; the page says the same and keeps its buttons off. The world server
+enforces it too: it won't relay an unevolved pet's presence or start its
+attempt, and it rewrites every player's presence to the name, level and form
+their roster level makes them (`formOf`), so no page can show itself as
+another form. (Before this, the page lifted a Lv 4 pet to Lv 5.)
+
+**The leaderboard** draws each pet small, as the Rankings tab does: your own
+from the save, everyone else's from their roster card (the board gives each
+row's roster handle), with its form and level. A row with no roster card, an
+old raid's share say, gets its species' first evolved form.
+
 **No third forms in the game's world yet.** The game's players haven't met
 the third forms, so its wild pets stop at Lv 15, the last level before them
 (`spawnWild`): the Lv 24 and 34 spawns come out as Lv 15 Cinderlings, Sparkys

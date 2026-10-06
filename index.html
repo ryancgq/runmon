@@ -6168,6 +6168,20 @@ function renderExplore(){
   const tier = frac <= 0.22 ? " low" : frac <= 0.5 ? " mid" : "";
   const sw = B && B.you && B.you.swings;
   const rows = B ? B.rows : [];
+  /* Explore plays your own pet, and the world has nothing for a first-stage
+     one to be: its pets start at the second form. So an unhatched or
+     unevolved pet can read the tab and watch the board, but not go in. */
+  const young = linked && !(save.species && derived && derived.species && derived.stage >= 1);
+  /* Each pet as it is now, the way the Rankings tab draws it: your own from
+     the save, everyone else's from their roster card. The board only knows
+     the species, which is all an old raid's share or a pet that has since
+     left the roster gets - drawn at its first evolved form. */
+  const mineNow = save.species && derived && derived.species;
+  const cardOf = r => {
+    if (r.you && mineNow) return { species:save.species, stage:derived.stage, level:derived.level, form:derived.species.stages[derived.stage].name };
+    const f = r.id && playerList().find(x => x.id === r.id);
+    return f ? safeCard(f.card) : null;
+  };
   body.innerHTML = `
     <div class="card" style="padding:14px 16px;font-size:13.5px;line-height:1.6;font-weight:700;color:var(--muted)">
       Walk the trails with other runners' pets, fight the wild pets you meet, and take on
@@ -6175,9 +6189,12 @@ function renderExplore(){
       You explore as ${DEMO ? "any pet you like in the sandbox" : "your own pet, at its level, with its moves"}.
       ${DEMO ? "" : "Every attempt at him spends one swing, and every 5 km you run earns one."}
     </div>
-    <button class="btn primary" id="explore-go" style="margin-top:12px">${
-      DEMO ? "Open the Explore sandbox" : linked ? "Enter the world" : "Link Strava to explore"}</button>
-    ${B && sw && !down && !sw.left ? `<div class="muted" style="font-size:11px;font-weight:700;margin-top:8px;text-align:center">No swings left: run ${(+sw.toNext || 5).toFixed(1)} km for the next one. You can still explore.</div>` : ""}
+    <button class="btn primary" id="explore-go" style="margin-top:12px${young ? ";opacity:.5;box-shadow:none" : ""}">${
+      DEMO ? "Open the Explore sandbox" : young ? "Evolve to explore" : linked ? "Enter the world" : "Link Strava to explore"}</button>
+    ${young ? `<div class="muted" style="font-size:11.5px;font-weight:700;margin-top:8px;text-align:center;line-height:1.5">Your pet has to evolve before it can explore.
+      ${save.species && derived && derived.species ? `It evolves at Lv ${EVO_LEVELS[1]}${derived.level ? ` - it's Lv ${derived.level} now` : ""}.` : "Hatch it first, then raise it to Lv " + EVO_LEVELS[1] + "."}
+      Keep running, and come back when it has.</div>` : ""}
+    ${B && sw && !down && !sw.left && !young ? `<div class="muted" style="font-size:11px;font-weight:700;margin-top:8px;text-align:center">No swings left: run ${(+sw.toNext || 5).toFixed(1)} km for the next one. You can still explore.</div>` : ""}
     ${!DEMO && !linked ? `<div class="muted" style="font-size:11px;font-weight:700;margin-top:8px;text-align:center">Explore is played together, so it needs your pet linked. Link it in Settings.</div>` : ""}
     <div class="raid-hero" style="margin-top:14px">
       <div class="pet-holder" style="width:min(44vw,170px)">${spriteHTML(bossSpriteCfg(frac), "okay")}</div>
@@ -6192,12 +6209,19 @@ function renderExplore(){
     </div>` : ""}
     ${rows.length ? `<h3 style="margin:22px 2px 8px;font-size:14px">Who has hurt him most</h3>
     <div class="card" style="padding:4px 14px">${rows.map(r => `
-      <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);${r.rank === 1 ? "border-top:0;" : ""}${r.you ? "color:var(--accent);" : ""}">
-        <b style="width:24px;text-align:right;font-size:12px;color:var(--muted)">${r.rank}</b>
-        <span style="flex:1;font-weight:800">${esc(r.pet || "A pet")}<span class="muted" style="font-size:11px;font-weight:700"> \u00B7 ${esc((SPECIES[r.species] || {}).name || "")}</span></span>
+      <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--line);${r.rank === 1 ? "border-top:0;" : ""}${r.you ? "color:var(--accent);" : ""}">
+        <b style="width:20px;text-align:right;font-size:12px;color:var(--muted)">${r.rank}</b>
+        <div class="pet-holder mood-okay" data-board-art="${r.rank}" style="flex:0 0 38px;width:38px;height:38px"></div>
+        <span style="flex:1;font-weight:800">${esc(r.pet || "A pet")}<span class="muted" style="font-size:11px;font-weight:700"> \u00B7 ${(c => c ? `${esc(c.form)} \u00B7 Lv ${c.level}` : esc((SPECIES[r.species] || {}).name || ""))(cardOf(r))}</span></span>
         <b style="font-size:13px">${(r.dm / max * 100).toFixed(1)}%</b>
       </div>`).join("")}</div>` : B ? `<div class="muted" style="font-size:12px;font-weight:700;margin-top:18px;text-align:center">Nobody has landed a blow yet.</div>` : ""}`;
+  for (const r of rows){
+    const el = body.querySelector(`[data-board-art="${r.rank}"]`), c = cardOf(r);
+    if (c) paintPet(el, c.species, c.stage, "okay", c.level);
+    else if (SPECIES[r.species]) paintPet(el, r.species, 1, "okay");
+  }
   $("#explore-go").addEventListener("click", () => {
+    if (young) return toast(`Your pet can explore once it evolves, at Lv ${EVO_LEVELS[1]}.`, "", "\u{1F95A}");
     if (DEMO) location.href = "explore/?demo=1";
     else if (linked) location.href = "explore/";
     else go("settings");

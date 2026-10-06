@@ -57,6 +57,15 @@ const PREFIX = /^raids(\/(state|e\d{1,7}(\/hits)?))?$/;
    best a pet that only his roar ever touches managed in simulation. It stops
    an absurd report; a swing still costs five kilometres. */
 const ATTEMPT_CAP = [[1, 900], [5, 1500], [15, 4500], [16, 6000], [26, 9000], [40, 16500], [99, 40000]];
+/* Each species' forms, by the level it reaches them (the page's FORMS and the
+   game's EVO_LEVELS). Below the first there is nothing in the world to be. */
+const FORM_AT = { ember:[[5, "cinderling"], [16, "blazewyrm"]], nimbus:[[5, "sparky"], [16, "zephyrite"]],
+                  verdant:[[5, "cub"], [16, "panda"]] };
+function formOf(species, level){
+  let f = null;
+  for (const [lv, id] of FORM_AT[species] || []) if (level >= lv) f = id;
+  return f;
+}
 function attemptCap(level){
   const lv = Math.max(1, Math.min(99, Number(level) || 1)), t = ATTEMPT_CAP;
   for (let i = 1; i < t.length; i++) if (lv <= t[i][0]){
@@ -194,7 +203,7 @@ export class World {
     const dealt = rows.reduce((a, r) => a + r.dm, 0), mine = rows.findIndex(r => r.key === me.handle);
     return new Response(JSON.stringify({
       round:st.e, max:RAID_HP, dealt:Math.min(RAID_HP, dealt), felledAt:st.felledAt || null,
-      rows:rows.slice(0, 50).map((r, i) => ({ rank:i + 1, pet:r.pet, species:r.species, dm:r.dm, you:r.key === me.handle })),
+      rows:rows.slice(0, 50).map((r, i) => ({ rank:i + 1, id:r.key, pet:r.pet, species:r.species, dm:r.dm, you:r.key === me.handle })),
       you:{ pet:me.pet, species:me.species, level:me.level, rank:mine >= 0 ? mine + 1 : null, dm:mine >= 0 ? rows[mine].dm : 0, swings:me.swings }
     }));
   }
@@ -258,7 +267,12 @@ export class World {
 
     if (m.t === "p"){
       if (!m.p || typeof m.p !== "object" || Array.isArray(m.p) || JSON.stringify(m.p).length > MAX_PRESENCE) return;
-      if (me.me){ m.p.n = me.me.pet; m.p.l = me.me.level; }   // a pet is what the roster says it is
+      if (me.me){
+        // a pet is what the roster says it is: its name, its level and the form that level makes it
+        const f = formOf(me.me.species, me.me.level);
+        if (!f) return;   // not evolved yet: it can't be in the world
+        m.p.n = me.me.pet; m.p.l = me.me.level; m.p.f = f;
+      }
       this.pres.set(me.id, m.p);
       this.broadcast({ t:"p", id:me.id, p:m.p }, ws);
       return;
@@ -292,6 +306,7 @@ export class World {
      player's damage may grow - by no more than a pet of its level could do. */
   async attempt(ws, meta, n){
     const me = meta.me, say = o => { try { ws.send(JSON.stringify({ t:"attempt", n, ...o })); } catch(e){} };
+    if (!formOf(me.species, me.level)) return say({ ok:false, why:"your pet has to evolve first" });
     let st = this.read(STATE);
     if (st && st.felledAt){
       // down - unless the switch has been thrown since: ask the game for its round
