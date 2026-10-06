@@ -371,6 +371,12 @@ Everyone who has the page open is in the same world. You see each other's
 pets walking about, with their names, health and skills. You can take him on
 at the same time, and his health is one pool for everybody.
 
+**Who's here.** Under your own panel, a list of everyone else in the world,
+nearest first (`updateRoster`, up to six, then "+ N more"): their pet's
+portrait, name, form and level, whether they're away, knocked out or on the
+raid, and an arrow pointing to them with how far (a tile is a metre). Tap the
+👥 count to hide or show it. On the raid it gives way to the party list.
+
 **How it works.** It uses two capabilities of the Artifact page: `room` for
 who's here now, and `db`, a small shared store, for his health. There is no
 server of our own.
@@ -637,3 +643,8 @@ badge stays earned.
 
 **Levels.** Explore uses the game's own levels: pets evolve into their third
 form at 16, and the second forms learn their last two moves at 13 and 15.
+
+**No third forms in the game's world yet.** The game's players haven't met
+the third forms, so its wild pets stop at Lv 15, the last level before them
+(`spawnWild`): the Lv 24 and 34 spawns come out as Lv 15 Cinderlings, Sparkys
+and Cubs. The sandbox keeps its evolved wild pets.

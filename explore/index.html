@@ -85,7 +85,20 @@
   #party .ally .bar{height:4px;margin-top:2px}
   #party .ally .bar i{background:var(--nimbus)}
   #party .ally.out{opacity:.45}
-  #online{color:var(--nimbus)}
+  #online{color:var(--nimbus);cursor:pointer;pointer-events:auto}
+  #roster{margin-top:6px;padding:6px 9px 4px;border-radius:12px;font-size:11px;width:max-content;max-width:68%;pointer-events:auto}
+  #roster .rh{font-size:9.5px;letter-spacing:.8px;color:var(--nimbus);font-weight:900;margin-bottom:3px}
+  #roster .rw{display:flex;align-items:center;gap:6px;padding:2px 0;min-width:0}
+  #roster .rw canvas{width:22px;height:22px;flex:0 0 auto}
+  #roster .rw .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #roster .rw .t b{color:#fff}
+  #roster .rw .t small{color:var(--dim);margin-left:4px}
+  #roster .rw .st{color:var(--gold);font-size:9.5px;margin-left:4px}
+  #roster .rw .dir{flex:0 0 auto;color:var(--nimbus);font-size:10px;white-space:nowrap}
+  #roster .rw .dir i{display:inline-block;font-style:normal}
+  #roster .rw.out{opacity:.5}
+  #roster .more{color:var(--dim);font-size:10px;padding-top:2px}
+  #hud.raiding #roster{display:none}
   .nick{display:flex;align-items:center;gap:10px;font-size:13px;margin:0 0 10px}
   .nick input{flex:1;min-width:0;font:inherit;font-size:16px;color:var(--ink);background:rgba(255,255,255,.05);
     border:1px solid var(--line);border-radius:12px;padding:10px 12px;-webkit-user-select:text;user-select:text}
@@ -229,6 +242,7 @@
       </div>
     </div>
     <div id="party"></div>
+    <div id="roster" class="panel" hidden></div>
   </div>
   <div id="stick"><div id="stick-base" class="rest"><div id="stick-knob"></div></div></div>
   <div id="aim-cancel" hidden aria-label="Let go here to cancel">✕</div>
@@ -1818,6 +1832,8 @@ const WILD_SPAWNS = [
 function spawnWild(){
   G.wild = [];
   WILD_SPAWNS.forEach(([sp, tx, ty, lv], wi) => {
+    // the game's players haven't met the third forms yet: its wild pets stop at the last level before them
+    if (GAME) lv = Math.min(lv, EVO_LEVELS[2] - 1);
     const form = formFor(sp, lv);
     let x = (tx + .5) * TILE, y = (ty + .5) * TILE;
     for (let k = 0; k < 30 && blocked(x, y, 20); k++){ x += ((k * 37) % 81) - 40; y += ((k * 53) % 81) - 40; }
@@ -2849,11 +2865,55 @@ function updateParty(){
   }
   for (const [, n] of on) if (n.hudEl){ n.hudEl.querySelector("i").style.width = Math.max(0, n.cur / n.max * 100) + "%"; n.hudEl.classList.toggle("out", !n.alive); }
 }
+/* Who else is in the world, always on show out in it: each one's pet, name,
+   form and level, what they're up to, and which way and how far away they
+   are. Tap 👥 to fold it away. On the raid the party (updateParty) takes
+   its place. Names go in as text. */
+let rosterKey = null, rosterT = 0, rosterOff = false;
+function updateRoster(dt){
+  const el = $("roster");
+  if (!NET.room || rosterOff || G.raid){ el.hidden = true; return; }
+  el.hidden = false;
+  const p = G.player, all = [...NET.pets.values()];
+  const state = n => n.stale ? "away" : !n.alive ? "knocked out" : n.rd ? "on the raid" : "";
+  all.sort((a, b) => dist(a, p) - dist(b, p));
+  const shown = all.slice(0, 6);
+  const key = all.length + "|" + shown.map(n => n.peer + n.formId + n.level + n.nick + state(n)).join("|");
+  if (key !== rosterKey){
+    rosterKey = key; el.textContent = "";
+    const h = document.createElement("div"); h.className = "rh";
+    h.textContent = all.length ? `WHO'S HERE · ${all.length} OTHER${all.length > 1 ? "S" : ""}` : "WHO'S HERE";
+    el.appendChild(h);
+    if (!all.length){ const m = document.createElement("div"); m.className = "more"; m.textContent = "Only you, for now."; el.appendChild(m); }
+    for (const n of shown){
+      const r = document.createElement("div"); r.className = "rw" + (n.stale || !n.alive ? " out" : "");
+      const c = document.createElement("canvas"); c.width = c.height = 44;
+      const t = document.createElement("div"); t.className = "t";
+      const b = document.createElement("b"); b.textContent = n.nick;
+      const sm = document.createElement("small"); sm.textContent = `${FORMS[n.formId] ? FORMS[n.formId].name : ""} · Lv ${n.level}`;
+      t.append(b, sm);
+      if (state(n)){ const st = document.createElement("span"); st.className = "st"; st.textContent = state(n); t.appendChild(st); }
+      const go = document.createElement("span"); go.className = "dir"; go.innerHTML = "<i>➤</i> <em></em>";
+      r.append(c, t, go); el.appendChild(r);
+      drawPortrait(c, n.formId); n.rosterEl = r;
+    }
+    if (all.length > shown.length){ const m = document.createElement("div"); m.className = "more"; m.textContent = `+ ${all.length - shown.length} more`; el.appendChild(m); }
+    rosterT = 0;
+  }
+  // which way, and how far (a tile is about a metre to a pet)
+  rosterT -= dt; if (rosterT > 0) return; rosterT = .25;
+  for (const n of shown){
+    const r = n.rosterEl; if (!r) continue;
+    const dx = n.x - p.x, dy = n.y - p.y, d = Math.hypot(dx, dy);
+    r.querySelector(".dir i").style.transform = `rotate(${Math.atan2(dy, dx)}rad)`;
+    r.querySelector(".dir em").textContent = d < TILE * 2 ? "here" : Math.round(d / TILE) + " m";
+  }
+}
 function setupHud(){
   const p = G.player;
   $("me-name").textContent = p.form.name; $("me-lv").textContent = "Lv " + p.level;
   drawPortrait($("me-face"), p.formId);
-  partyKey = null;
+  partyKey = null; rosterKey = null;
   $("bossbar").hidden = !G.raid;
   $("hud").classList.toggle("raiding", !!G.raid);
 }
@@ -2869,7 +2929,7 @@ function updateHud(dt){
   $("swings").textContent = "⚔ " + G.swings;
   const ol = $("online"); ol.hidden = !NET.room;
   if (NET.room){ const t = "👥 " + Math.max(1, NET.online); if (ol.textContent !== t) ol.textContent = t; }
-  updateParty();
+  updateParty(); updateRoster(dt);
   const tempo = p.tempo || 1;
   $("act-attack").querySelector(".cd").style.setProperty("--p", Math.min(100, p.atkCd / (ATTACK_CD * TURN) * 100) + "%");
   for (const btn of $("actions").querySelectorAll(".act.s")){
@@ -3309,6 +3369,7 @@ function bindMenus(){
   $("start").onclick = () => newGame(false);
   $("start-raid").onclick = () => newGame(true);
   $("menu-btn").onclick = () => togglePause(true);
+  $("online").onclick = () => { rosterOff = !rosterOff; rosterKey = null; };
   $("m-resume").onclick = () => togglePause(false);
   $("m-camp").onclick = () => { if (G.raid) leaveRaid(); Object.assign(G.player, { x:CAMP_PX.x - 60, y:CAMP_PX.y + 30 }); togglePause(false); };
   $("m-hill").onclick = () => { if (G.raid) leaveRaid(); Object.assign(G.player, { x:ARENA_PX.x, y:ARENA_PX.y + ARENA_PX.r - 50 }); togglePause(false); };
