@@ -35,6 +35,7 @@ const MAX_FRAME = 8192;        // bytes of JSON in one message
 const MAX_PRESENCE = 4096;     // the same bound the page keeps inside Claude
 const MAX_DOCS = 20000;
 const RATE = 60;               // messages a second a page may send
+const IDLE_MS = 120000;        // a page that has said nothing for this long (a frozen or locked phone) is let go
 const STATE = "raids/state";
 const HIT = /^raids\/e(\d{1,7})\/hits\/([a-z0-9]{4,20})$/;
 const PREFIX = /^raids(\/(state|e\d{1,7}(\/hits)?))?$/;
@@ -58,6 +59,8 @@ export class World {
     this.ctx = ctx; this.env = env;
     this.pres = new Map();     // peer id -> presence; rebuilt from the pages' next sends after a sleep
     this.rate = new Map();     // peer id -> [window start, count]
+    this.heard = new Map();    // peer id -> when it last said anything
+    this.swept = 0;
     ctx.storage.sql.exec("CREATE TABLE IF NOT EXISTS docs (path TEXT PRIMARY KEY, data TEXT NOT NULL, at INTEGER NOT NULL)");
   }
 
@@ -93,7 +96,9 @@ export class World {
 
   async webSocketMessage(ws, raw){
     if (typeof raw !== "string" || raw.length > MAX_FRAME) return;
-    const me = this.meta(ws);
+    const me = this.meta(ws), now = Date.now();
+    this.heard.set(me.id, now);
+    if (now - this.swept > 30000) this.sweep(now);   // on someone else's message: costs no request of its own
     if (this.limited(me.id)) return;
     let m; try { m = JSON.parse(raw); } catch(e){ return; }
     if (!m || typeof m !== "object") return;
@@ -170,9 +175,20 @@ export class World {
 
   async webSocketClose(ws, code){ this.gone(ws); try { ws.close(code, "bye"); } catch(e){} }
   async webSocketError(ws){ this.gone(ws); }
+  /* A live page says something at least once a second (its heartbeat), so
+     one that has been silent for IDLE_MS is frozen or gone: let it go. A
+     page that wakes up after that simply connects again. */
+  sweep(now){
+    this.swept = now;
+    for (const ws of this.ctx.getWebSockets()){
+      const id = this.meta(ws).id, last = this.heard.get(id);
+      if (last === undefined){ this.heard.set(id, now); continue; }   // just woken: count from now
+      if (now - last > IDLE_MS){ this.gone(ws); try { ws.close(4000, "idle"); } catch(e){} }
+    }
+  }
   gone(ws){
     const id = this.meta(ws).id;
-    this.pres.delete(id); this.rate.delete(id);
+    this.pres.delete(id); this.rate.delete(id); this.heard.delete(id);
     this.broadcast({ t:"left", id }, ws);
   }
 }

@@ -428,6 +428,16 @@ server of our own.
     was left with ("hit while you were away").
   - If your pet falls while you are away (frozen or hidden), you are taken
     out of Explore, back to the start, with a note saying why.
+- **Idle players are taken out of the world after 2 minutes** without a touch
+  on the screen (`IDLE_KICK`). Their damage on him is saved first, then the
+  page leaves the world (it closes its connection, so it stops counting
+  against the server's allowance) and goes back to the start with a note.
+  Setting out again joins the world again. A phone frozen outright can't do
+  this itself, so the world server lets a connection go after 2 minutes of
+  silence; a live page always sends a heartbeat at least once a second.
+  Explore doesn't touch the main game yet, so its own raid damage is all
+  there is to save; when it joins the game, the game's sync goes in the
+  same place (`saveProgress`).
 - **Alone, it's the same game.** With no room (a public link, or the page
   outside Claude) the page runs him itself and nothing else changes.
 
