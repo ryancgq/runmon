@@ -22,6 +22,9 @@
      GET  /raid          the shared pool, your share of it, and your swings
      POST /raid/claim    spend a swing; answers with the seed and his health
      POST /raid/report   what the swing took off him, clamped and applied
+     GET  /explore/me       Explore: who you are, your pet, your swings, the round
+     POST /explore/attempt  Explore: spend a swing on an attempt
+     GET  /explore/legacy   Explore: the raid as it stands, for the one-time handover
 
    The battle routes are the one place this stops being a pure broker: it
    prices a mark, because the attacker cannot be trusted to price their own.
@@ -1019,6 +1022,64 @@ export default {
                                      felledAt: a.raid.felledAt || null } });
         });
 
+      /* --- Explore ----------------------------------------------------
+         Explore is its own component: its own page (explore/) and its own
+         world server (explore-worker/), which keeps Sir Uwaaarghhhh's health
+         and who has taken what off him. It asks this worker three things and
+         nothing else, always with the player's own session: who they are,
+         to spend one of their swings, and - once, at the handover - what the
+         old raid here had come to. It never sees a run; a swing is still
+         earned from kilometres, but only this worker knows them.
+
+         Who you are: your roster handle, your pet as the roster has it (the
+         level read off the roster, never off a request, as an attack's is),
+         your swings, and the raid's round, which the admin switch moves. */
+      if (path === "/explore/me")
+        return await withAthlete(request, env, async (stub, me) => {
+          const handle = (await hmac(env.SESSION_SECRET, "roster:" + me)).slice(0, 12);
+          const [rr, rs, sw] = await Promise.all([
+            rosterStub(env).fetch("https://do/roster-list"),
+            raidStub(env).fetch("https://do/raid-state", { method:"POST", body:"{}" }),
+            stub.fetch("https://do/raid-swings")
+          ]);
+          const row = ((await rr.json()).rows || []).find(x => x.handle === handle);
+          if (!row || !row.pet || !row.species) return json(env, { error:"no pet yet" }, 404);
+          const { raid } = await rs.json();
+          return json(env, { handle, pet: row.pet, species: row.species, level: Number(row.level) || 1,
+                             swings: await sw.json(), epoch: raid.epoch });
+        });
+
+      /* Spend one swing on an Explore attempt. Refused, with how far the
+         next one is, when the kilometres have not been run. */
+      if (path === "/explore/attempt" && request.method === "POST")
+        return await withAthlete(request, env, async (stub, me) => {
+          const handle = (await hmac(env.SESSION_SECRET, "roster:" + me)).slice(0, 12);
+          const [g, rs, rr] = await Promise.all([
+            stub.fetch("https://do/explore-spend", { method:"POST", body:"{}" }),
+            raidStub(env).fetch("https://do/raid-state", { method:"POST", body:"{}" }),
+            rosterStub(env).fetch("https://do/roster-list")
+          ]);
+          const spend = await g.json(), { raid } = await rs.json();
+          const row = ((await rr.json()).rows || []).find(x => x.handle === handle);
+          return json(env, { ...spend, handle, level: Number(row && row.level) || 1, epoch: raid.epoch },
+                      spend.ok ? 200 : 429);
+        });
+
+      /* The old raid as it stands - his health and everyone's share of the
+         current round, with their pets' names - for Explore to carry over
+         once when it takes the raid's place. */
+      if (path === "/explore/legacy")
+        return await withAthlete(request, env, async () => {
+          const r = await raidStub(env).fetch("https://do/raid-roll", { method:"POST",
+            body: JSON.stringify({ epoch: null }) });
+          const { epoch, roll, raid } = await r.json();
+          const rows = new Map(((await (await rosterStub(env).fetch("https://do/roster-list")).json()).rows || [])
+            .map(x => [x.handle, x]));
+          return json(env, { epoch, max: raid.max, hp: raid.hp, felledAt: raid.felledAt || null,
+            roll: roll.map(x => ({ handle: x.handle, dealt: x.dealt,
+                                   pet: (rows.get(x.handle) || {}).pet || "", species: (rows.get(x.handle) || {}).species || "" })) });
+        });
+
       /* The switch. He does not come back on his own; this is what brings him
          back, and it is behind the admin token like the summary - a wrong
          token gets the same 404 a missing route would, so it does not
@@ -1603,6 +1664,18 @@ export class Athlete {
       if (Date.now() - p.at > 3600e3) return this.ok({ ok:false, why:"that swing took too long" });
       await this.state.storage.delete("raidPending");
       return this.ok({ ok:true, epoch: p.epoch });
+    }
+    /* A swing spent on an Explore attempt. Explore keeps the fight and what
+       it took off him; all this side keeps is that the swing is gone. */
+    if (path === "/explore-spend"){
+      const bank  = await this.raidBank();
+      const spent = await this.state.storage.get("raidSpent") || 0;
+      if (spent >= bank.earned)
+        return this.ok({ ok:false, why:"no swings left", earned: bank.earned, spent, left: 0,
+                         toNext: RAID_KM_PER_SWING - bank.part });
+      await this.state.storage.put("raidSpent", spent + 1);
+      return this.ok({ ok:true, left: bank.earned - spent - 1, earned: bank.earned, spent: spent + 1,
+                       toNext: RAID_KM_PER_SWING - bank.part });
     }
     /* What this pet has banked, for the screen rather than for a decision. */
     if (path === "/raid-swings"){

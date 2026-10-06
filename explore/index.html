@@ -164,6 +164,9 @@
   .screen h1{font-size:28px;margin:8px 0 2px;letter-spacing:.2px;font-weight:900;text-wrap:balance}
   .screen h1 b{background:linear-gradient(96deg,#ff6b35 8%,#ffd23f 92%);-webkit-background-clip:text;background-clip:text;color:transparent}
   .screen p{color:var(--dim);font-size:13.5px;line-height:1.55;margin:8px 0;font-weight:600}
+  .back{display:block;margin:0 0 12px;color:var(--dim);font-size:13px;font-weight:800;text-decoration:none}
+  .back[hidden]{display:none}
+  .detail[hidden]{display:none}
   .tag{display:inline-block;font-size:10px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--gold);letter-spacing:.8px}
   .picks{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0 10px}
   .pick{border:1px solid var(--line);background:rgba(255,255,255,.03);border-radius:14px;padding:8px 9px 9px;text-align:left}
@@ -238,7 +241,8 @@
 </div>
 
 <div id="select" class="screen">
-  <span class="tag">PROTOTYPE · NOT IN THE GAME YET</span>
+  <a class="back" id="back-game" href="../" hidden>← Back to Runmon</a>
+  <span class="tag" id="sel-tag">SANDBOX · NOT YOUR REAL PET</span>
   <h1>Runmon <b>Explore</b></h1>
   <p>Take your pet off the pet screen and out into the world. Fight the wild pets you meet, and take on Sir Uwaaarghhhh on his hill.</p>
   <label class="nick"><span>Your name</span><input id="nick" maxlength="14" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="Runner"></label>
@@ -259,7 +263,7 @@
     <li><b>Open PvP:</b> out in the world, other players' pets can fight yours, and yours theirs. While anyone is fighting him, nobody can touch them.</li>
     <li>Sit by the campfire to heal. Berries heal too.</li>
   </ul>
-  <p style="font-size:12px">Nothing here reads or writes your real pet.</p>
+  <p style="font-size:12px" id="sel-foot">Nothing here reads or writes your real pet.</p>
 </div>
 
 <div id="menu" class="screen" hidden>
@@ -299,7 +303,7 @@
 const GAME_ART = "art/game/";
 const art = s => GAME_ART + s;
 
-const EVO_LEVELS = [1, 5, 15, 30, 50];
+const EVO_LEVELS = [1, 5, 16, 30, 50];
 const STAGE_CAP  = 2;
 function stageForLevel(level){
   let s = 0;
@@ -342,17 +346,17 @@ const SPECIES = {
    frame, measured off each sheet. walk/doze: idle frames used for walking and
    for fainting - the sheets have no walk cycle of their own yet. */
 const FORMS = {
-  cinderling:{ species:"ember", stage:1, name:"Cinderling", min:5, max:14, def:14, box:66, foot:.922, walk:[1,8], doze:10,
+  cinderling:{ species:"ember", stage:1, name:"Cinderling", min:5, max:15, def:15, box:66, foot:.922, walk:[1,8], doze:10,
     idle:{ src:"ember-cinderling.png", frames:12, fps:2, aspect:1.3125, scale:1.18, dx:-3, dy:-5 } },
-  sparky:{ species:"nimbus", stage:1, name:"Sparky", min:5, max:14, def:14, box:66, foot:.936, walk:[0,1], doze:3,
+  sparky:{ species:"nimbus", stage:1, name:"Sparky", min:5, max:15, def:15, box:66, foot:.936, walk:[0,1], doze:3,
     idle:{ src:"nimbus-sparky.png", frames:12, fps:2, aspect:1.031, scale:1.068, dx:3, dy:-9.7 } },
-  cub:{ species:"verdant", stage:1, name:"Bamboo Cub", min:5, max:14, def:14, box:66, foot:.971, walk:[0,2], doze:1,
+  cub:{ species:"verdant", stage:1, name:"Bamboo Cub", min:5, max:15, def:15, box:66, foot:.971, walk:[0,2], doze:1,
     idle:{ src:"verdant-bamboo-cub-v3.png", frames:12, fps:2, aspect:0.9412, scale:1.0508, dx:6.87, dy:-14.98 } },
-  blazewyrm:{ species:"ember", stage:2, name:"Blazewyrm", min:15, max:40, def:26, box:80, foot:.971, walk:[0,1], doze:2,
+  blazewyrm:{ species:"ember", stage:2, name:"Blazewyrm", min:16, max:40, def:26, box:80, foot:.971, walk:[0,1], doze:2,
     idle:{ src:"ember-blazewyrm.png", frames:12, fps:2, aspect:1.268, scale:1.2 } },
-  zephyrite:{ species:"nimbus", stage:2, name:"Zephyrite", min:15, max:40, def:22, box:80, foot:.968, walk:[0,5], doze:10,
+  zephyrite:{ species:"nimbus", stage:2, name:"Zephyrite", min:16, max:40, def:22, box:80, foot:.968, walk:[0,5], doze:10,
     idle:{ src:"nimbus-zephyrite.png", frames:12, fps:2, aspect:1.199, scale:1.2, dx:0.9, dy:-11.3 } },
-  panda:{ species:"verdant", stage:2, name:"Panda", min:15, max:40, def:22, box:80, foot:.977, walk:[0,2], doze:10,
+  panda:{ species:"verdant", stage:2, name:"Panda", min:16, max:40, def:22, box:80, foot:.977, walk:[0,2], doze:10,
     idle:{ src:"verdant-panda.png", frames:12, fps:1.25, aspect:1.168, scale:1.2, dx:3.75, dy:-14.7 } }
 };
 const FORM_FOR = { 1:{ ember:"cinderling", nimbus:"sparky", verdant:"cub" }, 2:{ ember:"blazewyrm", nimbus:"zephyrite", verdant:"panda" } };
@@ -377,13 +381,13 @@ const SKILLS = {
       sprite:{ src:"skill-horn-rush.png", frames:16,
         durations:[300, 260, 240, 200, 180, 140, 120, 100, 90, 90, 240, 260, 220, 240, 280, 340],
         aspect:1.2074, scale:1.009, dx:-17.75, dy:2.63 } },
-    { id:"tail-swipe", name:"Tail Swipe", ico:"💨", stage:1, level:12,
+    { id:"tail-swipe", name:"Tail Swipe", ico:"💨", stage:1, level:13,
       battle:{ dmg:1.25, cd:3, rattle:{ pct:0.20, turns:2 } },
       fx:{ kind:"cone", impact:7, reach:125, arc:1.1, tint:"#9fd8ff" },
       sprite:{ src:"skill-tail-swipe.png", frames:16,
         durations:[280, 240, 180, 150, 130, 110, 100, 240, 120, 150, 170, 180, 160, 200, 280, 340],
         aspect:1.6071, scale:1.454, dx:-11.03, dy:14.14 } },
-    { id:"cinder-sweep", name:"Cinder Sweep", ico:"⭕", stage:1, level:14,
+    { id:"cinder-sweep", name:"Cinder Sweep", ico:"⭕", stage:1, level:15,
       battle:{ dmg:1.30, self:0.05, cd:3, burn:{ pct:0.20, turns:2 } },
       fx:{ kind:"nova", impact:7, reach:150, tint:"fire" },
       sprite:{ src:"skill-cinder-sweep.png", frames:16,
@@ -422,13 +426,13 @@ const SKILLS = {
       sprite:{ src:"skill-static-shock.png", frames:16,
         durations:[300, 260, 230, 210, 190, 170, 150, 130, 120, 120, 170, 250, 200, 200, 230, 320],
         aspect:1.1699, scale:1.562, dx:5.9, dy:-1.0 } },
-    { id:"acorn-flick", name:"Acorn Flick", ico:"🌰", stage:1, level:12,
+    { id:"acorn-flick", name:"Acorn Flick", ico:"🌰", stage:1, level:13,
       battle:{ dmg:1.50, cd:5 },
       fx:{ kind:"shot", impact:7, reach:300, tint:"acorn" },
       sprite:{ src:"skill-acorn-flick.png", frames:16,
         durations:[300, 260, 240, 260, 180, 150, 90, 110, 150, 170, 190, 240, 200, 220, 300, 340],
         aspect:1.4822, scale:1.439, dx:13.05, dy:-12.87 } },
-    { id:"pocket-storm", name:"Pocket Storm", ico:"⛈️", stage:1, level:14,
+    { id:"pocket-storm", name:"Pocket Storm", ico:"⛈️", stage:1, level:15,
       battle:{ dmg:1.40, pierce:0.30, cd:6 },
       fx:{ kind:"strike", impact:8, reach:280, radius:52, tint:"small" },
       sprite:{ src:"skill-pocket-storm.png", frames:16,
@@ -466,15 +470,15 @@ const SKILLS = {
         aspect:1.4872, scale:1.253, dx:-1.28, dy:4.85 } },
     /* Bamboo Tasting (was Bamboo Toss; the game kept its id): a bite, a chew,
        and the chunk spat at them on frame 8. */
-    { id:"bamboo-toss", name:"Bamboo Tasting", ico:"🎋", stage:1, level:12,
+    { id:"bamboo-toss", name:"Bamboo Tasting", ico:"🎋", stage:1, level:13,
       battle:{ dmg:1.40, cd:3 },
       fx:{ kind:"shot", impact:8, reach:300, tint:"bamboo" },
       sprite:{ src:"skill-bamboo-tasting.png", frames:16,
         durations:[300, 220, 260, 240, 260, 220, 240, 420, 100, 110, 120, 160, 260, 200, 260, 340],
         aspect:1.5097, scale:1.219, dx:13.58, dy:-0.84 } },
-    /* Forest Slam (the game's, from level 14): a jump, a ground-pound on frame
+    /* Forest Slam (the game's, from level 15): a jump, a ground-pound on frame
        9, and a wave of leaves rolling out in front - so a wide cone. */
-    { id:"forest-slam", name:"Forest Slam", ico:"🌿", stage:1, level:14,
+    { id:"forest-slam", name:"Forest Slam", ico:"🌿", stage:1, level:15,
       battle:{ dmg:1.70, pierce:0.30, cd:5, self:0.09 },
       fx:{ kind:"cone", impact:9, reach:175, arc:.85, tint:"#8ed06a" },
       sprite:{ src:"skill-forest-slam.png", frames:16,
@@ -844,7 +848,7 @@ function blocked(x, y, r){
 const G = {
   running:false, paused:false, time:0, ents:[], projs:[], fx:[], parts:[], texts:[], pickups:[],
   player:null, boss:null, raid:null, pool:null, swings:3, cam:{ x:0, y:0, shake:0 },
-  god:false, formId:"cinderling", level:14, nick:""
+  god:false, formId:"cinderling", level:15, nick:""
 };
 const rnd = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -1901,7 +1905,7 @@ const RESPAWN = 20;   // seconds before he is back on his hill after a felling
 let BS = null;
 function freshPool(e){ BS = { e:e | 0, mx:RAID_HP, dd:{}, dead:false, deadAt:0 }; }
 function mergeHit(k, dm, n, f){
-  if (typeof k !== "string" || !/^[a-z0-9]{4,20}$/.test(k)) return;
+  if (typeof k !== "string" || !/^[A-Za-z0-9_-]{4,20}$/.test(k)) return;
   dm = clamp(+dm || 0, 0, RAID_HP);
   const o = BS.dd[k];
   if (!dm || (o && o[0] >= dm)) return;
@@ -1914,11 +1918,23 @@ function adoptRound(e, dead, deadAt){
   if (e > BS.e){ freshPool(e); if (G.raid && !G.raid.over){ G.raid.e = e; G.raid.startDm = 0; } }
   if (dead && !BS.dead){ BS.dead = true; BS.deadAt = +deadAt || Date.now(); }
 }
-function startAttempt(){
+async function startAttempt(){
   const b = G.boss;
-  if (G.raid || !b.alive || BS.dead) return;
-  if (G.swings <= 0){ toast("No swings left. Get three more from the menu - in the game, you'd go for a run.", 3); return; }
-  G.swings--;
+  if (G.raid || !b.alive || BS.dead || NET.asking) return;
+  if (GAME){
+    // a swing is spent at the game's server: one per 5 km run
+    NET.asking = true;
+    const r = await NET.server.attempt().catch(() => ({ ok:false, why:"the world didn't answer" }));
+    NET.asking = false;
+    if (Number.isFinite(+r.left)) G.swings = +r.left;
+    if (Number.isFinite(+r.toNext)) NET.toNext = +r.toNext;
+    if (!r.ok){ toast(r.why === "no swings left" ? `No swings left. Run ${(+NET.toNext || 5).toFixed(1)} km for another.` : "Can't fight him right now: " + r.why + ".", 3.4); return; }
+    NET.attemptOpen = true;
+    if (G.raid || !b.alive || BS.dead) return;
+  } else {
+    if (G.swings <= 0){ toast("No swings left. Get three more from the menu - in the game, you'd go for a run.", 3); return; }
+    G.swings--;
+  }
   G.raid = { t:0, e:BS.e, startDm:NET.dm };
   const p = G.player;
   resetFight(p); Object.assign(p, { alive:true, cur:p.max, dealt:0, respawnT:0 });
@@ -1933,6 +1949,7 @@ function endAttempt(felled){
   const r = G.raid; if (!r || r.over) return;
   r.over = true;
   showResult(felled || !G.boss.alive, r);
+  if (GAME) saveProgress().then(() => { NET.attemptOpen = false; if (NET.server) NET.server.attemptEnd(); });
 }
 function bossFelled(b){
   b.deadT = 0; b.act = null; b.hop = 0; castLabel("");
@@ -1973,8 +1990,8 @@ function showResult(felled, r){
   $("r-title").textContent = felled ? "Felled." : `You took ${pct(Math.max(0, took))} off him`;
   const many = shares().length > 1;
   $("r-sub").textContent = felled
-    ? `The hill comes up to meet him. Every swing ${many ? "anybody" : "you"} took is in that fall. He's back in ${RESPAWN} seconds.`
-    : `He is ${bossPhase(b.cur, b.max).note}, at ${pct(left)}, and he keeps his wounds until the next swing${many ? " - anybody's" : ""}. ${G.swings} swing${G.swings === 1 ? "" : "s"} left. In the game, every 5 km you run earns one.`;
+    ? `The hill comes up to meet him. Every swing ${many ? "anybody" : "you"} took is in that fall. ${GAME ? "He stays down until the next raid." : `He's back in ${RESPAWN} seconds.`}`
+    : `He is ${bossPhase(b.cur, b.max).note}, at ${pct(left)}, and he keeps his wounds until the next swing${many ? " - anybody's" : ""}. ${G.swings} swing${G.swings === 1 ? "" : "s"} left. ${GAME ? "Every" : "In the game, every"} 5 km you run earns one.`;
   const t = $("r-table"); t.textContent = "";
   for (const s of shares().slice(0, 8)){
     const tr = document.createElement("tr"), a = document.createElement("td"), c = document.createElement("td");
@@ -1986,6 +2003,7 @@ function showResult(felled, r){
   $("r-leave").hidden = felled;
   if (felled){ again.textContent = "Back to the trail"; again.onclick = closeResult; }
   else if (G.swings > 0){ again.innerHTML = `Swing again <small>${G.swings} left</small>`; again.onclick = () => { closeResult(); startAttempt(); }; }
+  else if (GAME){ again.innerHTML = `No swings left <small>run ${(+NET.toNext || 5).toFixed(1)} km for another</small>`; again.onclick = closeResult; }
   else { again.innerHTML = `Three more swings <small>prototype only - in the game you'd go for a run</small>`; again.onclick = () => { G.swings = 3; closeResult(); startAttempt(); }; }
   drawBossCard(felled);
   $("result").hidden = false;
@@ -2045,36 +2063,50 @@ NET.key = tabKey();
       It speaks the same two shapes (openServer, below), so nothing past
       this point knows which it got.
    3. Neither: the same game, alone, his wounds kept in this browser. */
-const EXPLORE_SERVER = "wss://runmon-explore.runmon-gq.workers.dev/world";
+const EXPLORE_SERVER = "wss://runmon-explore.runmon-gq.workers.dev";
+/* Two Explores from one page:
+   - the game's (GAME): opened from the game at /runmon/explore/. Your own pet
+     as the game has it, in the one world everybody plays, where his health
+     and the leaderboard are kept by the world server and every attempt
+     spends one of your swings (one per 5 km run). Only for linked players:
+     the page shows the server its game session, read from this browser, and
+     the server asks the game who it belongs to.
+   - the sandbox (?demo=1, and anywhere off the game's site, inside Claude
+     included): any pet at any level, free swings, its own world and its
+     own boss, nothing linked to the game. */
+const PARAMS = (() => { try { return new URLSearchParams(location.search); } catch(e){ return new URLSearchParams(""); } })();
+const GAME = PARAMS.get("game") === "1" || (/(^|\.)github\.io$/.test(location.hostname) && !PARAMS.has("demo"));
+const GAME_SESSION = (() => { try { return GAME ? localStorage.getItem("runmon.strava.session") : null; } catch(e){ return null; } })();
 function serverUrl(){
-  let q = null;
-  try { q = new URLSearchParams(location.search).get("server"); } catch(e){}
-  if (q && /^wss?:\/\//.test(q)) return q;
-  return /(^|\.)github\.io$/.test(location.hostname) ? EXPLORE_SERVER : null;
+  const q = PARAMS.get("server"), path = GAME ? "/world" : "/demo";
+  if (q && /^wss?:\/\//.test(q)) return q.replace(/\/(world|demo)?$/, "") + path;
+  return /(^|\.)github\.io$/.test(location.hostname) ? EXPLORE_SERVER + path : null;
 }
 async function connectNet(){
   const use = n => {
     try { return window.claude && typeof window.claude.use === "function" ? Promise.resolve(window.claude.use(n)).catch(() => null) : Promise.resolve(null); }
     catch(e){ return Promise.resolve(null); }
   };
-  let [room, db] = await Promise.all([use("room"), use("db")]);
+  if (GAME && !GAME_SESSION){ NET.game = "unlinked"; showLobby(); return; }
+  let [room, db] = GAME ? [null, null] : await Promise.all([use("room"), use("db")]);
   const url = !room && !db && serverUrl();
   if (url){
     NET.serverTried = true;
-    const s = openServer(url);
-    if (await s.ready){ room = s.room; db = s.db; NET.server = s; }
+    const s = openServer(url, GAME ? GAME_SESSION : null);
+    // the game's Explore is only ever the shared world: wait for it however long it takes
+    if (await s.ready || GAME){ room = s.room; db = s.db; NET.server = s; }
   }
   connectStore(db);
   connectRoom(room);
 }
 /* The server, wearing the room and db shapes the game already speaks. It
    reconnects on its own; while it is away the page plays on alone. */
-function openServer(base){
+function openServer(base, token){
   let code = null;
   try { code = new URLSearchParams(location.search).get("code"); } catch(e){}
   const url = base + (code ? (base.includes("?") ? "&" : "?") + "code=" + encodeURIComponent(code) : "");
   const S = { ws:null, me:null, up:false, peers:new Map(), mine:{}, snap:Object.freeze([]), onPeers:new Set(), onConn:new Set(),
-              subs:new Map(), pend:new Map(), n:0, retry:600 };
+              subs:new Map(), pend:new Map(), att:new Map(), n:0, retry:600 };
   const peerRec = (id, p, mine) => Object.freeze({ peer:id, by:null, isMe:!!mine, sameTab:!!mine, kind:"viewer", guest:false,
                                                    presence:Object.freeze(p || {}), updatedAt:Date.now() });
   const rebuild = () => {
@@ -2109,11 +2141,13 @@ function openServer(base){
     let ws;
     try { ws = new WebSocket(url); } catch(e){ readyDone(false); return; }
     S.ws = ws;
+    if (token) ws.onopen = () => { try { ws.send(JSON.stringify({ t:"auth", token })); } catch(e){} };
     ws.onmessage = ev => {
       let m; try { m = JSON.parse(ev.data); } catch(e){ return; }
       if (!m || typeof m !== "object") return;
       if (m.t === "hello"){
         S.me = String(m.id); S.retry = 600; S.peers.clear();
+        if (m.me) gameHello(m.me);
         for (const x of Array.isArray(m.peers) ? m.peers : []) if (x && x.id !== S.me) S.peers.set(String(x.id), x.p || {});
         conn(true); readyDone(true);
         send({ t:"p", p:S.mine });
@@ -2130,14 +2164,17 @@ function openServer(base){
           for (const d of list) if (d && typeof d.path === "string" && inSub(sub, d.path)){ sub.docs.set(d.path, d.data); hit = true; }
           if (hit) deliver(sub);
         }
+      } else if (m.t === "attempt"){
+        const f = S.att.get(m.n); if (f){ S.att.delete(m.n); f(m); }
       } else if (m.t === "ack" || m.t === "err"){
         const p = S.pend.get(m.n); if (!p) return;
         S.pend.delete(m.n);
         if (m.t === "ack") p.res(); else p.rej({ code:String(m.code || "unavailable"), message:"refused by the server" });
       }
     };
-    ws.onclose = () => {
+    ws.onclose = ev => {
       const was = S.up; S.ws = null; S.peers.clear();
+      if (ev && ev.code === 4001){ S.off = true; NET.game = "unlinked"; readyDone(false); showLobby(); }   // the game doesn't know this session
       if (S.off){ if (was) conn(false); rebuild(); return; }   // left on purpose: stay out
       if (was) conn(false);
       rebuild();
@@ -2181,7 +2218,14 @@ function openServer(base){
   // out of the world (idle) and back in (setting out again)
   const leave = () => { S.off = true; if (S.ws) try { S.ws.close(1000, "left"); } catch(e){} };
   const rejoin = () => { if (!S.off) return; S.off = false; S.retry = 600; if (!S.ws) connect(); };
-  return { ready, room, db, leave, rejoin };
+  // the game world: spend a swing on an attempt, and say when it's over
+  const attempt = () => new Promise(res => {
+    if (!S.up) return res({ ok:false, why:"not connected to the world" });
+    const n = ++S.n; S.att.set(n, res); send({ t:"attempt", n });
+    setTimeout(() => { if (S.att.has(n)){ S.att.delete(n); res({ ok:false, why:"the world didn't answer" }); } }, 12000);
+  });
+  const attemptEnd = () => send({ t:"attempt-end" });
+  return { ready, room, db, leave, rejoin, attempt, attemptEnd };
 }
 
 /* =========================================================================
@@ -2224,7 +2268,7 @@ function watchHits(){
   }, () => { STORE.hitsE = null; });
 }
 function writeState(){
-  if (!STORE.db || !STORE.ok) return;
+  if (!STORE.db || !STORE.ok || GAME) return;   // in the game world the server keeps the round
   if (STORE.stateBusy){ STORE.statePending = true; return; }
   STORE.stateBusy = true;
   STORE.db.doc("raids/state").set({ e:BS.e, felledAt:BS.dead ? BS.deadAt : 0 })
@@ -2235,11 +2279,12 @@ function writeState(){
    first, then (on the page running him) anyone else's the store is behind on. */
 function persist(){
   const now = Date.now();
-  if (STORE.db && STORE.ok && !STORE.writing && now - STORE.lastT > 700 && STORE.hitsE === BS.e){
+  // in the game world a player's damage is only taken during an attempt they have paid for
+  if (STORE.db && STORE.ok && !STORE.writing && now - STORE.lastT > 700 && STORE.hitsE === BS.e && (!GAME || NET.attemptOpen)){
     let k = null;
     const mine = BS.dd[NET.key];
     if (mine && mine[0] > (STORE.seen[NET.key] || 0) + .5) k = NET.key;
-    else if (NET.leader) for (const key in BS.dd) if (BS.dd[key][0] > (STORE.seen[key] || 0) + .5){ k = key; break; }
+    else if (NET.leader && !GAME) for (const key in BS.dd) if (BS.dd[key][0] > (STORE.seen[key] || 0) + .5){ k = key; break; }
     if (k){
       const v = BS.dd[k], e = BS.e, dm = Math.round(v[0]);
       STORE.writing = true; STORE.lastT = now;
@@ -2269,6 +2314,18 @@ function loadLocal(){
 }
 function cleanNick(s){ return String(s || "").replace(/[\u0000-\u001f\u007f-\u009f<>&"'`\\]/g, "").trim().slice(0, 14); }
 function nick(){ return cleanNick(G.nick) || "Runner"; }
+/* The game world says who you are: your pet, its species and level as the
+   game's roster has them, your swings. That is the pet you play, and your
+   damage on him is kept under your roster handle. */
+function gameHello(me){
+  if (!GAME || !me || !SPECIES[me.species]) return;
+  NET.game = "in"; NET.gameMe = me; NET.key = me.handle;
+  G.level = clamp(+me.level || 1, 5, 99);
+  G.formId = formFor(me.species, G.level);
+  G.nick = me.pet;
+  if (me.swings && Number.isFinite(+me.swings.left)){ G.swings = +me.swings.left; NET.toNext = +me.swings.toNext || 0; }
+  if (!G.running){ buildPicks(); showLobby(); }
+}
 function connectRoom(room){
   if (!room) return showLobby();
   NET.room = room; NET.on = true;
@@ -2326,7 +2383,8 @@ function netTick(dt){
   b.max = BS.mx; b.cur = Math.max(0, BS.mx - total);
   if (NET.leader){
     if (b.alive && b.cur <= 0 && !BS.dead) faint(b, null);   // bossFelled marks the round down
-    if (BS.dead && Date.now() - BS.deadAt > RESPAWN * 1000){ freshPool(BS.e + 1); writeState(); }
+    // the sandbox brings him back; in the game he stays down until the next raid
+    if (!GAME && BS.dead && Date.now() - BS.deadAt > RESPAWN * 1000){ freshPool(BS.e + 1); writeState(); }
   }
   // every page draws him as the account has him
   if (BS.dead && b.alive){ b.cur = 0; faint(b, null); }
@@ -2711,6 +2769,12 @@ function netFx(e, c){
 /* The select screen says who's here before you go in. */
 function showLobby(){
   const el = $("lobby"); if (!el) return;
+  if (GAME && NET.game !== "in"){
+    el.textContent = (NET.note ? NET.note + " " : "") + (NET.game === "unlinked"
+      ? "Explore is played with other runners, so it needs your pet linked to Strava. Link it in the game's Settings, then come back."
+      : "Finding your pet and the world…");
+    return;
+  }
   const say = t => { el.textContent = NET.note ? NET.note + " " + t : t; };   // the note stays until you set out again
   if (!NET.room){
     say(NET.serverTried ? "Couldn't reach the world just now, so you're playing solo. Reload to try again."
@@ -2721,7 +2785,7 @@ function showLobby(){
   const names = inWorld.map(p => cleanNick(p.presence.n) || "Runner").slice(0, 4);
   say(inWorld.length
     ? `${inWorld.length} in the world now: ${names.join(", ")}${inWorld.length > names.length ? "…" : ""}`
-    : peers.length > 1 ? `${peers.length - 1} other${peers.length > 2 ? "s" : ""} here, not out yet.` : "Nobody else here yet. Send someone the link.");
+    : peers.length > 1 ? `${peers.length - 1} other${peers.length > 2 ? "s" : ""} here, not out yet.` : GAME ? "Nobody else exploring right now." : "Nobody else here yet. Send someone the link.");
 }
 
 /* =========================================================================
@@ -3190,6 +3254,7 @@ function moveNote(sk, pet){
 }
 function buildPicks(){
   const wrap = $("picks"); wrap.innerHTML = "";
+  if (GAME){ gamePicks(wrap); return; }
   for (const [id, f] of Object.entries(FORMS)){
     const b = document.createElement("button"); b.className = "pick" + (id === G.formId ? " on" : "");
     b.innerHTML = `<canvas width="240" height="148"></canvas><b>${f.name}</b><small style="color:${SPECIES[f.species].colour}">${SPECIES[f.species].name} · Lv ${f.min}–${f.max}</small>`;
@@ -3200,6 +3265,19 @@ function buildPicks(){
   G.level = clamp(G.level || f.def, f.min, f.max);
   lv.min = f.min; lv.max = f.max; lv.value = G.level;
   showDetail();
+}
+/* The game's start screen: your own pet, nothing to choose. */
+function gamePicks(wrap){
+  const inn = NET.game === "in", f = FORMS[G.formId];
+  if (inn){
+    const b = document.createElement("div"); b.className = "pick on";
+    b.innerHTML = `<canvas width="240" height="148"></canvas><b></b><small style="color:${SPECIES[f.species].colour}">${f.name} · Lv ${G.level}</small>`;
+    b.querySelector("b").textContent = G.nick;
+    wrap.appendChild(b);
+    showDetail();
+  }
+  document.querySelector(".detail").hidden = !inn;
+  for (const id of ["start", "start-raid"]) $(id).disabled = !inn;
 }
 function showDetail(){
   const f = FORMS[G.formId], a = attrsFor(f.species, G.level);
@@ -3214,8 +3292,8 @@ function showDetail(){
   }).join("");
 }
 function drawPicks(now){
-  const cards = document.querySelectorAll(".pick canvas"), ids = Object.keys(FORMS);
-  cards.forEach((c, i) => { const f = FORMS[ids[i]]; drawPortrait(c, ids[i], Math.floor(now / 1000 * f.idle.fps) % f.idle.frames); });
+  const cards = document.querySelectorAll(".pick canvas"), ids = GAME ? [G.formId] : Object.keys(FORMS);
+  cards.forEach((c, i) => { const f = FORMS[ids[i]]; if (f) drawPortrait(c, ids[i], Math.floor(now / 1000 * f.idle.fps) % f.idle.frames); });
 }
 function togglePause(on){
   if (!G.running || !$("result").hidden) return;
@@ -3223,7 +3301,7 @@ function togglePause(on){
   G.paused = on && !NET.on; $("menu").hidden = !on;
   if (on){
     $("m-god").checked = G.god;
-    $("m-note").textContent = NET.on ? "Prototype tools. The world keeps going while this is open." : "Prototype tools. None of this touches your real pet.";
+    $("m-note").textContent = GAME ? "The world keeps going while this is open." : NET.on ? "Prototype tools. The world keeps going while this is open." : "Prototype tools. None of this touches your real pet.";
   }
 }
 function bindMenus(){
@@ -3243,6 +3321,18 @@ function bindMenus(){
   $("r-leave").onclick = closeResult;
 }
 
+/* The start screen and menu for the game's Explore: no name to type, no
+   pets to pick and no prototype tools. */
+function gameScreen(){
+  $("back-game").hidden = false;
+  $("sel-tag").textContent = "RUNMON EXPLORE";
+  $("sel-foot").textContent = "Your pet as it is in the game, at its level with its moves. Exploring doesn't change it.";
+  for (const el of [$("nick").closest("label"), document.querySelector(".lvrow"), $("m-heal"), $("m-swings"), $("m-god").closest("label")]) if (el) el.hidden = true;
+  $("m-pet").textContent = "Leave the world";
+  $("start").textContent = "Enter the world";
+  document.querySelectorAll(".how li")[3].innerHTML = "<b>Together:</b> everyone exploring is in the same world. His health is one pool for all of you, and every attempt spends one of your swings - one for every 5 km you run.";
+}
+
 /* =========================================================================
    BOOT
    ========================================================================= */
@@ -3259,9 +3349,10 @@ function bindMenus(){
   bindTouch(); bindMenus();
   // a bare #token deep link for testing: #raid, #explore, #raid.blazewyrm
   const [go, pet] = (location.hash || "").slice(1).split(".");
-  if (pet && FORMS[pet]){ G.formId = pet; G.level = FORMS[pet].def; }
+  if (GAME) gameScreen();
+  else if (pet && FORMS[pet]){ G.formId = pet; G.level = FORMS[pet].def; }
   buildPicks();
-  if (go === "raid" || go === "explore") newGame(go === "raid");
+  if (!GAME && (go === "raid" || go === "explore")) newGame(go === "raid");
   requestAnimationFrame(frame);
   window.__G = G; window.__step = step;
 })();

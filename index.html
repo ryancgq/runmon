@@ -1591,7 +1591,7 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
     <!-- ===================== RAID ===================== -->
     <section class="screen" id="screen-raid">
       <div class="hdr">
-        <div><h2>Raid</h2><div class="sub raid-tag" id="raid-sub">One boss. One shared fight. Every attack brings him closer to defeat. Band together, earn your swings, and take him down!</div></div>
+        <div><h2 id="raid-h2">Raid</h2><div class="sub raid-tag" id="raid-sub">One boss. One shared fight. Every attack brings him closer to defeat. Band together, earn your swings, and take him down!</div></div>
       </div>
       <div id="raid-body"></div>
       <div class="screen-pad"></div>
@@ -1870,6 +1870,15 @@ const NATIVE_RUN = DEMO;
    question, and I only remembered to throw one of them. */
 const RAID_LIVE = true;
 const RAID_UI   = DEMO || RAID_LIVE;
+/* Explore takes the raid's place. The centre button opens the Explore tab:
+   what Explore is, how far down Sir Uwaaarghhhh is, who has taken the most
+   off him, and the way in. The fight itself is in explore/, a separate page
+   with its own world server (explore-worker/), which keeps his health and the
+   leaderboard; this page only reads them. The old raid's fights, swings and
+   alerts are switched off by this; its health and shares were carried over
+   to Explore once, when Explore's world first opened. */
+const EXPLORE_TAB = true;
+const EXPLORE_API = "https://runmon-explore.runmon-gq.workers.dev";
 const SESSION_KEY = "runmon.strava.session";
 /* Saves written before the app was renamed. Read once, copied to SAVE_KEY, and
    deliberately left in place as a backup — but cleared on reset, or a "new game"
@@ -2905,7 +2914,7 @@ const RAID_ARRIVAL = {
 };
 /** Tell this player he is here, once. Silent until the raid is reachable. */
 function raidAnnounce(){
-  if (!RAID_UI) return false;
+  if (!RAID_UI || EXPLORE_TAB) return false;
   /* A shared raid does not know which one it is until the broker has answered.
      Announcing from the default epoch and then learning the real one mints two
      notices under two ids - one boss, arriving twice - which is what a player
@@ -5930,7 +5939,7 @@ async function refreshRaid(){
      first touch, so the raid was quietly being started by people who had no
      way to know it existed, at whatever health the broker was carrying at the
      time. Nothing reads a feature that is not shipped. */
-  if (!RAID_UI || !raidShared()) return;
+  if (!RAID_UI || !raidShared() || EXPLORE_TAB) return;
   const r = await stravaCall("/raid");
   const raid = (r && r.raid) || {}, you = (r && r.you) || {};
   save.raid = Object.assign(save.raid || {}, {
@@ -5969,6 +5978,7 @@ function raidAlerts(marks){
 /* The raid screen: the boss, what is left of him, what you have taken off him,
    and how many swings your running has bought. */
 function renderRaid(){
+  if (EXPLORE_TAB) return renderExplore();
   const body = $("#raid-body");
   if (!body) return;
   const hp = raidHp(), max = raidMax(), frac = Math.max(0, hp / max);
@@ -6104,12 +6114,78 @@ async function raidReport(seed, took){
    else has been swinging at all morning is worth re-reading every time this
    opens. */
 async function openRaidTab(){
+  if (EXPLORE_TAB) return openExploreTab();
   renderRaid();
   if (!raidShared()) return;
   try { await refreshRaid(); }
   catch (err){ toast(raidFail(err), "warn", "\u26A0\uFE0F"); }
   recompute();                          // the badge, if he went down meanwhile
   renderRaid();
+}
+
+/* --- Explore -------------------------------------------------------------
+   The tab in the raid's place. Everything on it comes from Explore's world
+   server (/board), asked with this player's game session so it can tell who
+   "you" are: his health, the leaderboard for this round, and your swings,
+   which are still one per 5 km run - the broker counts them and the world
+   server asks it. Nothing Strava measured is on the board: a pet's name, its
+   species and what it took off him. The sandbox (DEMO) has no session and
+   no board, and its button opens Explore's own sandbox. */
+let exploreBoard = null, exploreErr = null;
+async function openExploreTab(){
+  renderExplore();
+  if (DEMO || !stravaLinked() || !stravaSession) return;
+  try {
+    const r = await fetch(EXPLORE_API + "/board", { headers:{ Authorization:"Bearer " + stravaSession } });
+    if (!r.ok) throw new Error(r.status === 401 ? "Explore doesn't know this pet yet - try again after your next sync." : "Explore's world can't be reached right now.");
+    exploreBoard = await r.json(); exploreErr = null;
+  } catch (err){ exploreErr = String(err && err.message || err); }
+  if (currentScreen === "raid") renderExplore();
+}
+function renderExplore(){
+  const body = $("#raid-body");
+  if (!body) return;
+  $("#raid-h2").textContent = "Explore";
+  const B = exploreBoard, linked = !DEMO && stravaLinked();
+  const max = B ? B.max : 1, dealt = B ? B.dealt : 0, frac = B ? Math.max(0, 1 - dealt / max) : 1, down = !!(B && B.felledAt);
+  $("#raid-sub").textContent = "Take your pet out into a world you share with other runners.";
+  const tier = frac <= 0.22 ? " low" : frac <= 0.5 ? " mid" : "";
+  const sw = B && B.you && B.you.swings;
+  const rows = B ? B.rows : [];
+  body.innerHTML = `
+    <div class="card" style="padding:14px 16px;font-size:13.5px;line-height:1.6;font-weight:700;color:var(--muted)">
+      Walk the trails with other runners' pets, fight the wild pets you meet, and take on
+      <b style="color:var(--text)">${esc(RAID_BOSS.short || "Sir Uwaaarghhhh")}</b> together on his hill.
+      You explore as ${DEMO ? "any pet you like in the sandbox" : "your own pet, at its level, with its moves"}.
+      ${DEMO ? "" : "Every attempt at him spends one swing, and every 5 km you run earns one."}
+    </div>
+    <button class="btn primary" id="explore-go" style="margin-top:12px">${
+      DEMO ? "Open the Explore sandbox" : linked ? "Enter the world" : "Link Strava to explore"}</button>
+    ${B && sw && !down && !sw.left ? `<div class="muted" style="font-size:11px;font-weight:700;margin-top:8px;text-align:center">No swings left: run ${(+sw.toNext || 5).toFixed(1)} km for the next one. You can still explore.</div>` : ""}
+    ${!DEMO && !linked ? `<div class="muted" style="font-size:11px;font-weight:700;margin-top:8px;text-align:center">Explore is played together, so it needs your pet linked. Link it in Settings.</div>` : ""}
+    <div class="raid-hero" style="margin-top:14px">
+      <div class="pet-holder" style="width:min(44vw,170px)">${spriteHTML(bossSpriteCfg(frac), "okay")}</div>
+    </div>
+    <div class="raid-nm">${esc(RAID_BOSS.name)}</div>
+    <div class="raid-cond">${!B ? (DEMO ? "in the sandbox, he's yours to try" : linked ? (exploreErr ? esc(exploreErr) : "finding him\u2026") : "on his hill") : down ? "felled - he stays down until the next raid" : esc(bossPhase(frac).note)}</div>
+    ${B ? `<div class="bt-hp raid-hp"><i class="${tier}" style="width:${(frac * 100).toFixed(1)}%"></i></div>
+    <div class="raid-hpn"><span>${(dealt / max * 100).toFixed(1)}% DEALT</span><span class="pc">${(frac * 100).toFixed(1)}% LEFT</span></div>` : ""}
+    ${B && sw ? `<div class="raid-figs">
+      <div class="raid-fig"><b>${down ? "\u2014" : nf(sw.left || 0)}</b><span>${sw.left === 1 ? "SWING LEFT" : "SWINGS LEFT"}</span></div>
+      <div class="raid-fig"><b>${(B.you.dm / max * 100).toFixed(1)}%</b><span>YOUR SHARE${B.you.rank ? " \u00B7 #" + B.you.rank : ""}</span></div>
+    </div>` : ""}
+    ${rows.length ? `<h3 style="margin:22px 2px 8px;font-size:14px">Who has hurt him most</h3>
+    <div class="card" style="padding:4px 14px">${rows.map(r => `
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);${r.rank === 1 ? "border-top:0;" : ""}${r.you ? "color:var(--accent);" : ""}">
+        <b style="width:24px;text-align:right;font-size:12px;color:var(--muted)">${r.rank}</b>
+        <span style="flex:1;font-weight:800">${esc(r.pet || "A pet")}<span class="muted" style="font-size:11px;font-weight:700"> \u00B7 ${esc((SPECIES[r.species] || {}).name || "")}</span></span>
+        <b style="font-size:13px">${(r.dm / max * 100).toFixed(1)}%</b>
+      </div>`).join("")}</div>` : B ? `<div class="muted" style="font-size:12px;font-weight:700;margin-top:18px;text-align:center">Nobody has landed a blow yet.</div>` : ""}`;
+  $("#explore-go").addEventListener("click", () => {
+    if (DEMO) location.href = "explore/?demo=1";
+    else if (linked) location.href = "explore/";
+    else go("settings");
+  });
 }
 
 /** Is there a swing to take? Both halves: one left to spend, and something to
@@ -9119,7 +9195,13 @@ function wire(){
   // it. Both go together: a floating button over a gap reads as a missing
   // control, and a gap with nothing over it reads as a bug.
   $("#fab").addEventListener("click", () => go(RAID_UI ? "raid" : "track"));
-  if (RAID_UI){
+  if (EXPLORE_TAB){
+    const fab = $("#fab");
+    fab.setAttribute("aria-label", "Explore");
+    // a compass
+    fab.innerHTML = `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/>`
+      + `<polygon points="15.5 8.5 13.4 13.4 8.5 15.5 10.6 10.6 15.5 8.5"/></svg>`;
+  } else if (RAID_UI){
     const fab = $("#fab");
     fab.setAttribute("aria-label", "Raid");
     // Crossed swords. The first attempt was two strokes that met in the middle,

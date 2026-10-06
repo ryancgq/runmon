@@ -6,27 +6,37 @@ cooldowns, and take on the raid boss, Sir Uwaaarghhhh, on his hill.
 Everyone who has the link open is in the same world, and can take him on
 together.
 
-This is a **standalone prototype** for phones. It lives in `explore/`, shares
-nothing with the game's `index.html`, and never reads or writes a save. Its
-job is to show whether the idea works before any of it goes into the game.
+**Explore is in the game, in the raid's place.** The game's centre button
+opens an Explore tab: what Explore is, how far down Sir Uwaaarghhhh is, who
+has taken the most off him, your swings, and a button into the world. The
+old raid's fights, swings and alerts are switched off; its health and every
+player's share were carried over once, when Explore's world first opened
+(§10).
+
+There are two Explores, one page (`explore/`):
+
+- **The game's** (`/runmon/explore/`, from the Explore tab): your own pet, as
+  the game has it, in the one world everybody plays. Only for players who
+  have linked Strava: the page shows the world server its game session, and
+  the server asks the game who it belongs to. Every attempt at him spends
+  one swing (one per 5 km run, counted by the game). His health and the
+  leaderboard are kept by the world server.
+- **The sandbox** (`/runmon/explore/?demo=1`, linked from the game's demo
+  page `demo.html`, and anywhere off the game's site, Claude included): any
+  pet at any level, free swings, prototype tools, its own world and its own
+  boss. Nothing in it touches the game. It is where new things are tried.
 
 ## Try it
 
-- **Hosted link:** an Artifact page built from this folder (see
-  [Publishing](#7-publishing)). Open it on a phone. To play together, share it
-  from the page's Share menu as **Contributor**. Testers must be signed in to
-  Claude to join the shared world, and need Contributor for their damage to
-  be saved. A Viewer still plays with everyone, and their damage is saved
-  while a Contributor is in the world. A public link opens the same game,
-  solo.
-- **On the game's site, no Claude needed:** `ryancgq.github.io/runmon/explore/`.
-  It's the same page. Here the shared world (players, PvP and his health)
-  comes from Runmon Explore's own server, `explore-worker/` (see
-  [Publishing](#7-publishing)). Anyone with the link can join. It is a
-  separate page: the game doesn't link to it and nothing in the game changed.
+- **In the game:** the centre button (a compass), then **Enter the world**.
+- **The sandbox:** `ryancgq.github.io/runmon/demo.html` → **Open the Explore
+  sandbox**, or `ryancgq.github.io/runmon/explore/?demo=1`.
+- **Hosted in Claude:** an Artifact page built from this folder (see
+  [Publishing](#7-publishing)). It is always the sandbox.
 - **Locally:** serve the repo root (`python3 -m http.server`) and open
-  `/explore/` with a phone-sized window or the device toolbar.
-- **Deep links for testing:** `#explore`, `#raid`, `#raid.blazewyrm`,
+  `/explore/` (the sandbox), or `/explore/?game=1&server=ws://127.0.0.1:8787`
+  with a game session in the browser and local copies of both workers.
+- **Deep links for testing (sandbox):** `#explore`, `#raid`, `#raid.blazewyrm`,
   `#explore.sparky`.
 
 It is built for phones held upright. On a desktop it draws itself inside a
@@ -134,9 +144,9 @@ it too strong, so:
 
   | Pet | Moves and cooldowns | Nothing ready for at least |
   | --- | --- | --- |
-  | Cinderling Lv 14 | fireball 12.5 s, Horn Rush 9.4, Tail Swipe 9.4, Cinder Sweep 9.4 | 5.7 s |
-  | Sparky Lv 14 | Spark 7.7 s, Static Shock 7.7, Acorn Flick 12.7, Pocket Storm 15.3 | 4.5 s |
-  | Bamboo Cub Lv 14 | Green Gale 16.2 s, Cuddle 16.2, Bamboo Tasting 16.2, Forest Slam 26.9 | 12.9 s |
+  | Cinderling Lv 15 | fireball 12.5 s, Horn Rush 9.4, Tail Swipe 9.4, Cinder Sweep 9.4 | 5.7 s |
+  | Sparky Lv 15 | Spark 7.7 s, Static Shock 7.7, Acorn Flick 12.7, Pocket Storm 15.3 | 4.5 s |
+  | Bamboo Cub Lv 15 | Green Gale 16.2 s, Cuddle 16.2, Bamboo Tasting 16.2, Forest Slam 26.9 | 12.9 s |
   | Blazewyrm Lv 26 | Fireball 10.2 s, Flame Stomp 10.2, Flying Swoop 10.2 | 7.3 s |
   | Zephyrite Lv 26 | Lightning Bolt 5.0 s, Arc Lash 5.0 | 3.6 s |
   | Panda Lv 26 | Landslide 8.3 s (and a Nap) | 7.6 s |
@@ -181,27 +191,28 @@ wins most of its fights. Real players, who aim and dodge, swamp an edge that
 size. So the paces were tuned for close fights rather than the game's win
 rates:
 
-| Matchup | Lv 12 | Lv 14 | Lv 26 | Lv 40 |
+| Matchup | Lv 13 | Lv 15 | Lv 26 | Lv 40 |
 | --- | --- | --- | --- | --- |
-| Verdant v Ember | 98% · +20% HP | 77% · +12% | 63% · +10% | 51% · +7% |
-| Verdant v Nimbus | 10% · −21% | 6% · −12% | 5% · −10% | 7% · −11% |
-| Ember v Nimbus | 8% · −15% | 69% · +14% | 55% · +4% | 72% · +8% |
+| Verdant v Ember | 98% · +21% HP | 75% · +12% | 63% · +10% | 51% · +7% |
+| Verdant v Nimbus | 9% · −22% | 5% · −12% | 5% · −10% | 7% · −11% |
+| Ember v Nimbus | 5% · −13% | 70% · +11% | 55% · +4% | 72% · +8% |
 
-- **Both stages at their full kits (Lv 14, Lv 26 and 40) form a loop**, as
+- **Both stages at their full kits (Lv 15, Lv 26 and 40) form a loop**, as
   in rock-paper-scissors: Verdant beats Ember, Nimbus beats Verdant, and
   Ember beats Nimbus, each by about 4 to 14% of HP. No set of paces undoes
   a loop, so these leave each pet about even overall: one good matchup and
   one bad. (Before Attack lost its dash, stage 2 was within 4% all round;
   the dash's lunge was worth more to some forms than others.)
-- **Stage 1, Lv 12:** the loop is wider, 15 to 21% of HP. Every pet has
-  three moves at 12 and gets its fourth at 14, and no single pace suits
-  both levels, so Lv 14, where pets spend Lv 14 to 17, came first.
+- **Stage 1, Lv 13:** the loop is wider, 13 to 22% of HP. Every pet has
+  three moves at 13 and gets its fourth at 15, as in the game, and no single
+  pace suits both levels, so Lv 15, the full kit, came first.
 
 Fights run 15 to 45 seconds.
 
-**Not balanced across stages.** An evolved form learns its first skill at Lv
-18, as in the game. From Lv 15 to 17 it has none, and with Attack this weak
-it barely fights, so a Lv 14 Sparky with four skills beats it. The same goes
+**Not balanced across stages.** A pet evolves into its third form at Lv 16
+and learns its first skill there at Lv 18, as in the game. At Lv 16 and 17 it
+has none, and with Attack this weak it barely fights, so a Lv 15 Sparky with
+four skills beats it. The same goes
 for a stage-1 form at Lv 5 to 7. More evolved skills are planned.
 
 While measuring this I found and fixed an AI bug. Wild pets only looked at
@@ -334,7 +345,7 @@ simulation:
 
 | Level | Average player | Near-perfect player | Swings for 110,000, average / near-perfect | Time for 7 runners, average / near-perfect |
 | --- | --- | --- | --- | --- |
-| Lv 14 | ~200 | ~1,450 | ~550 / ~76 | ~3 months / ~2 weeks |
+| Lv 15 | ~200 | ~1,450 | ~550 / ~76 | ~3 months / ~2 weeks |
 | Lv 26 | ~400 | ~3,000 | ~275 / ~37 | ~6 weeks / ~6 days |
 | Lv 40 | ~640 | ~5,500 | ~170 / ~20 | ~4 weeks / ~3.5 days |
 
@@ -542,9 +553,10 @@ it is always solo.
    Is a skills-only feel worth that? If so, the fix is per-species tuning of
    the live cooldowns, which the game itself doesn't need.
 
-## 9. If it graduates
+## 9. How it went into the game
 
-It is laid out so it can move into the game without a rewrite:
+It was laid out so it could move into the game without a rewrite, and it
+did: see §10 for how the game's Explore works. What the notes said before:
 
 - **The page** is one folder, `explore/`, already served at
   `/runmon/explore/` beside the game. Graduating it means a link from the pet
@@ -567,3 +579,56 @@ It is laid out so it can move into the game without a rewrite:
    the real attempts and the broker's shared pool.
 4. Commission the art in §5.
 5. Add an Explore entry on the pet screen.
+
+## 10. Explore in the game
+
+**The pieces.**
+
+| Piece | What it does for Explore |
+| --- | --- |
+| The game (`index.html`) | The Explore tab in the raid's place (`renderExplore`): the intro, his health from the world server's `/board`, the leaderboard, your swings, and the button into `explore/`. It sends the world server this player's game session to ask; it changes nothing. |
+| The page (`explore/`) | In the game's mode (`GAME`), it shows the world server the game session from this browser and plays the pet the server says is yours. An attempt asks the server first (`NET.server.attempt`). The sandbox works as the prototype did. |
+| The world server (`explore-worker/`) | Two worlds: `/world` (the game's, verified) and `/demo` (the sandbox). In the game's world it keeps his health, the rounds, the attempts and the leaderboard (`/board`). |
+| The Strava worker (`worker/`) | Three routes, all with the player's own session: `/explore/me` (roster handle, pet name, species, level, swings, raid round), `/explore/attempt` (spend a swing) and `/explore/legacy` (the old raid's health and shares, for the handover). Nothing about runs leaves it. |
+
+**Who you are.** The page reads the game's session from this browser
+(`runmon.strava.session`) and sends it as its first message. The world server
+asks the Strava worker who it belongs to (`/explore/me`, cached ten minutes)
+and plays that pet: its name, species and level as the game's roster has
+them, so nobody can enter as another pet or another level. A session the game
+doesn't know is turned away (`4001`), and the page says to link Strava.
+
+**Attempts and damage.** An attempt asks the world server, which spends one
+of the player's swings at the Strava worker (`/explore/attempt`). Refused, the
+page says how far the next swing is. Granted, the server opens a window in
+which this player's damage may grow, by no more than a pet of its level could
+do in one attempt (`ATTEMPT_CAP`, about three times the best a near-perfect
+player managed in simulation). Damage outside an attempt, damage under
+someone else's name and writes to the round are refused. A player's damage is
+kept under their roster handle, so it adds up across attempts, devices and
+days.
+
+**Rounds.** The round follows the Strava worker's raid epoch. When he is
+felled he stays down. The admin switch that started a new raid before
+(`/admin/raid`, POST) still does: the next time anyone asks, the world server
+sees the new epoch and starts a new round at full health with an empty
+leaderboard. The leaderboard is for the current round.
+
+**The handover.** The first time the game's world opens, it asks for the old
+raid (`/explore/legacy`) and carries it over: each player's share is scaled
+from the old pool (25,000) to Explore's (110,000), so the same share of him is
+gone and the leaderboard starts with the old raid's contributors. Anything the
+prototype's world had stored was a test, and is cleared then.
+
+**Linked to Strava as little as possible.** Explore's world, his health and
+the leaderboard live in their own worker and storage. All it learns from the
+game is a handle, a pet's name, species and level, and whether a swing was
+spent. Kilometres stay in the Strava worker, which still decides how many
+swings a player has.
+
+**What's left from the old raid.** Its code is still in `index.html`, switched
+off by `EXPLORE_TAB`. The Orc Slayer badge read the old raid's felling, which
+no longer moves, so it can't be earned until it reads Explore's.
+
+**Levels.** Explore uses the game's own levels: pets evolve into their third
+form at 16, and the second forms learn their last two moves at 13 and 15.

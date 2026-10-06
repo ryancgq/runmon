@@ -1,7 +1,8 @@
-# Runmon Explore's own server: the shared world for the Explore prototype
-# (explore/), for when it is opened outside Claude. Separate from the Strava
-# broker in worker/ on purpose - its own name, its own Durable Object, its own
-# deploy - so nothing here can touch the game or its players' saves.
+# Runmon Explore's own server: the shared world for Explore (explore/).
+# Separate from the Strava broker in worker/ on purpose - its own name, its
+# own Durable Object, its own deploy - so nothing here can touch the game or
+# its players' saves. It asks the broker who a player is and to spend their
+# swings (the BROKER binding below), and nothing else.
 name = "runmon-explore"
 main = "src/index.js"
 compatibility_date = "2026-09-01"
@@ -16,6 +17,12 @@ class_name = "World"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["World"]
+
+# The Strava broker, reached directly between the two workers (a fetch from
+# one workers.dev worker to another on the same account is refused).
+[[services]]
+binding = "BROKER"
+service = "runmon-strava"
 
 [vars]
 # Pages allowed to open the world, comma-separated. The browser sends its
