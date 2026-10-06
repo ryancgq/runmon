@@ -2384,6 +2384,13 @@ function publish(dt){
       pv:NET.hits.length ? NET.hits.map(h => h.o) : null,
       lt:NET.leader ? Math.round(G.time - NET.since) : null });
   }
+  /* Nothing new to say - a pet standing still, nothing landing, nothing
+     changing - and once a second is enough: the heartbeat (ts) that keeps
+     it from reading as away. Anything else goes at once. Every message is
+     a request against the world server's daily allowance. */
+  const said = JSON.stringify({ ...pr, ts:0 }), now = Date.now();
+  if (said === NET.said && now - NET.saidAt < 1000) return;
+  NET.said = said; NET.saidAt = now;
   NET.room.presence(pr).catch(() => {});
 }
 // a page whose screen goes off stops running him at once, and won't take him back when it returns

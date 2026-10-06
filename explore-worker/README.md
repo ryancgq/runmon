@@ -8,7 +8,8 @@ rules and nothing from Strava, and it never touches the game or its saves.
 
 It does two things over one websocket at `/world`:
 
-- **Presence.** Each page sends its own state about ten times a second, and
+- **Presence.** Each page sends its own state up to ten times a second, only
+  when it has changed (an idle pet sends a heartbeat once a second), and
   the worker relays it to everyone else. This is kept in memory only.
 - **His health.** Sir Uwaaarghhhh's account is kept as small documents in
   the Durable Object's SQLite storage: the round in `raids/state`, and each

@@ -364,7 +364,11 @@ at the same time, and his health is one pool for everybody.
 who's here now, and `db`, a small shared store, for his health. There is no
 server of our own.
 
-- **Each page sets its own presence** about ten times a second. That is its
+- **Each page sets its own presence** up to ten times a second, and only
+  when something has changed: a pet standing still with nothing happening
+  sends a once-a-second heartbeat instead (the page running him and the wild
+  pets always has something new). Every message counts against the world
+  server's daily allowance on Cloudflare's free plan. Presence is its
   pet's form, level and position, the move it is playing, its health, whether
   it's on him, and how much it has taken off him this time round. Other pages
   draw a pet from that. They never simulate it, and they never take hits on
