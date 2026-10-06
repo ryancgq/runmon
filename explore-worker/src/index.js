@@ -83,11 +83,13 @@ export default {
   async fetch(req, env){
     const url = new URL(req.url);
     if (url.pathname === "/health") return new Response("ok", { headers:{ "content-type":"text/plain", "access-control-allow-origin":"*" } });
-    if (url.pathname === "/board"){
+    if (url.pathname === "/board" || url.pathname === "/demo-board"){
       const origin = req.headers.get("Origin") || "", ok = allowedOrigins(env);
       const h = { ...cors(env), "access-control-allow-origin": ok.includes(origin) ? origin : ok[0] || "*" };
       if (req.method === "OPTIONS") return new Response(null, { headers:h });
-      const r = await world(env, "world").fetch(new Request("https://world/board", { headers:{ authorization: req.headers.get("Authorization") || "" } }));
+      const r = url.pathname === "/board"
+        ? await world(env, "world").fetch(new Request("https://world/board", { headers:{ authorization: req.headers.get("Authorization") || "" } }))
+        : await world(env, "demo").fetch(new Request("https://world/demo-board"));
       return new Response(r.body, { status:r.status, headers:{ ...h, "content-type":"application/json", "cache-control":"no-store" } });
     }
     const mode = url.pathname === "/world" ? "game" : url.pathname === "/demo" ? "demo" : null;
@@ -190,6 +192,22 @@ export class World {
     return sum;
   }
 
+  /* ---------- the sandbox's leaderboard, for the demo's Explore tab ----------
+     Anyone may read it: it is test pets under made-up names. Rows carry the
+     form each was played as, since the sandbox has no roster to look it up. */
+  demoBoard(){
+    if (this.mode !== "demo") return new Response(JSON.stringify({ error:"not the sandbox" }), { status:404 });
+    const st = this.read(STATE) || { e:1, felledAt:0 };
+    const rows = this.ctx.storage.sql.exec("SELECT path, data FROM docs WHERE path LIKE ?", `raids/e${Number(st.e) || 1}/hits/%`).toArray()
+      .map(r => { const d = JSON.parse(r.data); return { pet:String(d.n || "").slice(0, 24), form:String(d.f || "").slice(0, 12), dm:Number(d.dm) || 0 }; })
+      .filter(r => r.dm > 0).sort((a, b) => b.dm - a.dm);
+    const dealt = rows.reduce((a, r) => a + r.dm, 0);
+    return new Response(JSON.stringify({
+      round:Number(st.e) || 1, max:RAID_HP, dealt:Math.min(RAID_HP, dealt), felledAt:st.felledAt || null,
+      rows:rows.slice(0, 50).map((r, i) => ({ rank:i + 1, pet:r.pet, form:r.form, dm:r.dm }))
+    }));
+  }
+
   /* ---------- the leaderboard, for the game's Explore tab ---------- */
   async board(req){
     if (this.mode !== "game") this.mode = "game";   // only the game world has a board
@@ -210,6 +228,7 @@ export class World {
 
   async fetch(req){
     if (new URL(req.url).pathname === "/board") return this.board(req);
+    if (new URL(req.url).pathname === "/demo-board") return this.demoBoard();
     const mode = req.headers.get("x-world") === "game" ? "game" : "demo";
     if (this.mode !== mode) this.mode = mode;
     const live = this.ctx.getWebSockets();

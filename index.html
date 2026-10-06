@@ -6145,19 +6145,25 @@ async function openExploreTab(){
    goes to anyone who took something off him in the round he fell, as it did
    for the old raid, and it stays earned. */
 async function exploreCheck(){
-  if (DEMO || !stravaLinked() || !stravaSession) return;
+  // the demo reads the sandbox world's board instead: open to anyone, nothing to earn from it
+  if (!DEMO && (!stravaLinked() || !stravaSession)) return;
   try {
-    const r = await fetch(EXPLORE_API + "/board", { headers:{ Authorization:"Bearer " + stravaSession } });
+    const r = DEMO ? await fetch(EXPLORE_API + "/demo-board")
+                   : await fetch(EXPLORE_API + "/board", { headers:{ Authorization:"Bearer " + stravaSession } });
     if (!r.ok) throw new Error(r.status === 401 ? "Explore doesn't know this pet yet - try again after your next sync." : "Explore's world can't be reached right now.");
     exploreBoard = await r.json(); exploreErr = null;
   } catch (err){ exploreErr = String(err && err.message || err); }
   const B = exploreBoard;
-  if (B && B.felledAt && B.you && B.you.dm > 0 && !save.exploreSlain){
+  if (!DEMO && B && B.felledAt && B.you && B.you.dm > 0 && !save.exploreSlain){
     save.exploreSlain = { round: B.round, at: Date.now() };
     persist(); recompute(); if (typeof flushBadgeNews === "function") flushBadgeNews();
   }
   if (currentScreen === "raid") renderExplore();
 }
+/* Explore's forms as the game's species and stage, for drawing the sandbox's
+   board, which knows only the form each pet was played as. */
+const EXPLORE_FORMS = { cinderling:["ember", 1], blazewyrm:["ember", 2], sparky:["nimbus", 1], zephyrite:["nimbus", 2],
+                        cub:["verdant", 1], panda:["verdant", 2] };
 function renderExplore(){
   const body = $("#raid-body");
   if (!body) return;
@@ -6171,7 +6177,7 @@ function renderExplore(){
   /* Explore plays your own pet, and the world has nothing for a first-stage
      one to be: its pets start at the second form. So an unhatched or
      unevolved pet can read the tab and watch the board, but not go in. */
-  const young = linked && !(save.species && derived && derived.species && derived.stage >= 1);
+  const young = (DEMO || linked) && !(save.species && derived && derived.species && derived.stage >= 1);
   /* Each pet as it is now, the way the Rankings tab draws it: your own from
      the save, everyone else's from their roster card. The board only knows
      the species, which is all an old raid's share or a pet that has since
@@ -6179,6 +6185,10 @@ function renderExplore(){
   const mineNow = save.species && derived && derived.species;
   const cardOf = r => {
     if (r.you && mineNow) return { species:save.species, stage:derived.stage, level:derived.level, form:derived.species.stages[derived.stage].name };
+    if (r.form && EXPLORE_FORMS[r.form]){   // the sandbox's board: the form it was played as
+      const [species, stage] = EXPLORE_FORMS[r.form], sp = SPECIES[species];
+      return { species, stage, level:0, form:sp.stages[stage].name };
+    }
     const f = r.id && playerList().find(x => x.id === r.id);
     return f ? safeCard(f.card) : null;
   };
@@ -6189,7 +6199,7 @@ function renderExplore(){
       ${DEMO ? "" : "Every attempt at him spends one swing, and every 5 km you run earns one."}
     </div>
     <button class="btn primary" id="explore-go" style="margin-top:12px${young ? ";opacity:.5;box-shadow:none" : ""}">${
-      DEMO ? "Open the Explore sandbox" : young ? "Evolve to explore" : linked ? "Enter the world" : "Link Strava to explore"}</button>
+      young ? "Evolve to explore" : DEMO ? "Open the Explore sandbox" : linked ? "Enter the world" : "Link Strava to explore"}</button>
     ${young ? `<div class="muted" style="font-size:11.5px;font-weight:700;margin-top:8px;text-align:center;line-height:1.5">Your pet has to evolve before it can explore.
       ${save.species && derived && derived.species ? `It evolves at Lv ${EVO_LEVELS[1]}${derived.level ? ` - it's Lv ${derived.level} now` : ""}.` : "Hatch it first, then raise it to Lv " + EVO_LEVELS[1] + "."}
       Keep running, and come back when it has.</div>` : ""}
@@ -6199,7 +6209,7 @@ function renderExplore(){
       <div class="pet-holder" style="width:min(44vw,170px)">${spriteHTML(bossSpriteCfg(frac), "okay")}</div>
     </div>
     <div class="raid-nm">${esc(RAID_BOSS.name)}</div>
-    <div class="raid-cond">${!B ? (DEMO ? "in the sandbox, he's yours to try" : linked ? (exploreErr ? esc(exploreErr) : "finding him\u2026") : "on his hill") : down ? "felled - he stays down until the next raid" : esc(bossPhase(frac).note)}</div>
+    <div class="raid-cond">${!B ? (DEMO ? "in the sandbox, he's yours to try" : linked ? (exploreErr ? esc(exploreErr) : "finding him\u2026") : "on his hill") : down ? (DEMO ? "felled - back on his hill in a moment" : "felled - he stays down until the next raid") : esc(bossPhase(frac).note)}</div>
     ${B ? `<div class="bt-hp raid-hp"><i class="${tier}" style="width:${(frac * 100).toFixed(1)}%"></i></div>
     <div class="raid-hpn"><span>${(dealt / max * 100).toFixed(1)}% DEALT</span><span class="pc">${(frac * 100).toFixed(1)}% LEFT</span></div>` : ""}
     ${B && sw ? `<div class="raid-figs">
@@ -6211,7 +6221,7 @@ function renderExplore(){
       <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--line);${r.rank === 1 ? "border-top:0;" : ""}${r.you ? "color:var(--accent);" : ""}">
         <b style="width:20px;text-align:right;font-size:12px;color:var(--muted)">${r.rank}</b>
         <div class="pet-holder mood-okay" data-board-art="${r.rank}" style="flex:0 0 38px;width:38px;height:38px"></div>
-        <span style="flex:1;font-weight:800">${esc(r.pet || "A pet")}<span class="muted" style="font-size:11px;font-weight:700"> \u00B7 ${(c => c ? `${esc(c.form)} \u00B7 Lv ${c.level}` : esc((SPECIES[r.species] || {}).name || ""))(cardOf(r))}</span></span>
+        <span style="flex:1;font-weight:800">${esc(r.pet || "A pet")}<span class="muted" style="font-size:11px;font-weight:700"> \u00B7 ${(c => c ? esc(c.form) + (c.level ? ` \u00B7 Lv ${c.level}` : "") : esc((SPECIES[r.species] || {}).name || ""))(cardOf(r))}</span></span>
         <b style="font-size:13px">${(r.dm / max * 100).toFixed(1)}%</b>
       </div>`).join("")}</div>` : B ? `<div class="muted" style="font-size:12px;font-weight:700;margin-top:18px;text-align:center">Nobody has landed a blow yet.</div>` : ""}`;
   for (const r of rows){

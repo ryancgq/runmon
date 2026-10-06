@@ -654,6 +654,11 @@ attempt, and it rewrites every player's presence to the name, level and form
 their roster level makes them (`formOf`), so no page can show itself as
 another form. (Before this, the page lifted a Lv 4 pet to Lv 5.)
 
+**The demo** (`index.html?demo=1`) shows the same tab: the evolve notice
+for a pet below Lv 5, and the sandbox world's health and leaderboard
+(`/demo-board`), each pet drawn as the form it was played as. Its button opens
+the sandbox, and demo.html still links the sandbox directly.
+
 **The leaderboard** draws each pet small, as the Rankings tab does: your own
 from the save, everyone else's from their roster card (the board gives each
 row's roster handle), with its form and level. A row with no roster card, an

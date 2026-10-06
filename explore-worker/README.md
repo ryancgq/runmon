@@ -26,6 +26,9 @@ the game's saves and never sees a run.
   back on his hill 20 seconds after he falls.
 - **`/board`.** The game world's leaderboard for the current round, for the
   game's Explore tab. Needs the player's game session.
+- **`/demo-board`.** The sandbox's leaderboard, for the demo's Explore tab:
+  his health and who has hurt him this round, with the form each pet was
+  played as. Open to anyone; it is test pets under made-up names.
 
 Over one websocket each world relays **presence** (each page's own state,
 sent when it changes and as a once-a-second heartbeat; memory only) and keeps
