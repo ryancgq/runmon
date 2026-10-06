@@ -627,8 +627,13 @@ spent. Kilometres stay in the Strava worker, which still decides how many
 swings a player has.
 
 **What's left from the old raid.** Its code is still in `index.html`, switched
-off by `EXPLORE_TAB`. The Orc Slayer badge read the old raid's felling, which
-no longer moves, so it can't be earned until it reads Explore's.
+off by `EXPLORE_TAB`. The centre button keeps its crossed swords.
+
+**Orc Slayer** goes to anyone who took something off him in the round he
+fell, as it did for the old raid. The game reads Explore's board
+(`exploreCheck`) when the Explore tab opens and after every sync, and once he
+is down with your damage on the board it marks the save (`exploreSlain`). The
+badge stays earned.
 
 **Levels.** Explore uses the game's own levels: pets evolve into their third
 form at 16, and the second forms learn their last two moves at 13 and 15.

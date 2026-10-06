@@ -1870,7 +1870,7 @@ const NATIVE_RUN = DEMO;
    question, and I only remembered to throw one of them. */
 const RAID_LIVE = true;
 const RAID_UI   = DEMO || RAID_LIVE;
-/* Explore takes the raid's place. The centre button opens the Explore tab:
+/* Explore takes the raid's place. The centre button (still the crossed swords) opens the Explore tab:
    what Explore is, how far down Sir Uwaaarghhhh is, who has taken the most
    off him, and the way in. The fight itself is in explore/, a separate page
    with its own world server (explore-worker/), which keeps his health and the
@@ -3564,6 +3564,8 @@ function raidEpoch(){
    /raid, `dealt` is the share it reports back, and this reads the same two
    fields either way. In the sandbox they are simply this device's own. */
 function raidSlain(){
+  // Explore's boss (exploreCheck): he fell in a round you had hit him in
+  if (save.exploreSlain) return true;
   return raidFelled() && (save.raid.dealt || 0) > 0;
 }
 /* Attempts are earned by running and spent by swinging, so what is left is the
@@ -5939,7 +5941,8 @@ async function refreshRaid(){
      first touch, so the raid was quietly being started by people who had no
      way to know it existed, at whatever health the broker was carrying at the
      time. Nothing reads a feature that is not shipped. */
-  if (!RAID_UI || !raidShared() || EXPLORE_TAB) return;
+  if (EXPLORE_TAB) return exploreCheck();
+  if (!RAID_UI || !raidShared()) return;
   const r = await stravaCall("/raid");
   const raid = (r && r.raid) || {}, you = (r && r.you) || {};
   save.raid = Object.assign(save.raid || {}, {
@@ -6134,12 +6137,25 @@ async function openRaidTab(){
 let exploreBoard = null, exploreErr = null;
 async function openExploreTab(){
   renderExplore();
+  await exploreCheck();
+}
+/* Read the board: for the tab, and for Orc Slayer. Run when the tab opens and
+   after every sync (in refreshRaid()'s place), so a player whose round ended
+   while they were away gets the badge without opening the tab. The badge
+   goes to anyone who took something off him in the round he fell, as it did
+   for the old raid, and it stays earned. */
+async function exploreCheck(){
   if (DEMO || !stravaLinked() || !stravaSession) return;
   try {
     const r = await fetch(EXPLORE_API + "/board", { headers:{ Authorization:"Bearer " + stravaSession } });
     if (!r.ok) throw new Error(r.status === 401 ? "Explore doesn't know this pet yet - try again after your next sync." : "Explore's world can't be reached right now.");
     exploreBoard = await r.json(); exploreErr = null;
   } catch (err){ exploreErr = String(err && err.message || err); }
+  const B = exploreBoard;
+  if (B && B.felledAt && B.you && B.you.dm > 0 && !save.exploreSlain){
+    save.exploreSlain = { round: B.round, at: Date.now() };
+    persist(); recompute(); if (typeof flushBadgeNews === "function") flushBadgeNews();
+  }
   if (currentScreen === "raid") renderExplore();
 }
 function renderExplore(){
@@ -9195,15 +9211,9 @@ function wire(){
   // it. Both go together: a floating button over a gap reads as a missing
   // control, and a gap with nothing over it reads as a bug.
   $("#fab").addEventListener("click", () => go(RAID_UI ? "raid" : "track"));
-  if (EXPLORE_TAB){
+  if (RAID_UI || EXPLORE_TAB){
     const fab = $("#fab");
-    fab.setAttribute("aria-label", "Explore");
-    // a compass
-    fab.innerHTML = `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/>`
-      + `<polygon points="15.5 8.5 13.4 13.4 8.5 15.5 10.6 10.6 15.5 8.5"/></svg>`;
-  } else if (RAID_UI){
-    const fab = $("#fab");
-    fab.setAttribute("aria-label", "Raid");
+    fab.setAttribute("aria-label", EXPLORE_TAB ? "Explore" : "Raid");
     // Crossed swords. The first attempt was two strokes that met in the middle,
     // which on a large round button is the close icon with extra steps.
     fab.innerHTML = `<svg viewBox="0 0 24 24">`
