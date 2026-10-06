@@ -1847,7 +1847,8 @@ function newGame(toRaid){
   if (toRaid){ G.player.x = ARENA_PX.x; G.player.y = ARENA_PX.y + ARENA_PX.r - 50; }
   G.cam.x = G.player.x; G.cam.y = G.player.y;
   buildSkillButtons(); setupHud();
-  G.running = true; G.paused = false; NET.note = null;
+  G.running = true; G.paused = false; NET.note = null; NET.lastInput = Date.now();
+  if (NET.server) NET.server.rejoin();
   $("select").hidden = true; $("result").hidden = true; $("hud").hidden = false;
   resize();
   if (toRaid) setTimeout(startAttempt, 300);
@@ -2137,6 +2138,7 @@ function openServer(base){
     };
     ws.onclose = () => {
       const was = S.up; S.ws = null; S.peers.clear();
+      if (S.off){ if (was) conn(false); rebuild(); return; }   // left on purpose: stay out
       if (was) conn(false);
       rebuild();
       for (const p of S.pend.values()) p.rej({ code:"unavailable", message:"no connection" });
@@ -2176,7 +2178,10 @@ function openServer(base){
       return q;
     }
   };
-  return { ready, room, db };
+  // out of the world (idle) and back in (setting out again)
+  const leave = () => { S.off = true; if (S.ws) try { S.ws.close(1000, "left"); } catch(e){} };
+  const rejoin = () => { if (!S.off) return; S.off = false; S.retry = 600; if (!S.ws) connect(); };
+  return { ready, room, db, leave, rejoin };
 }
 
 /* =========================================================================
@@ -2275,6 +2280,7 @@ function connectRoom(room){
 function viewers(){ return NET.room ? NET.room.peers().filter(p => p.kind === "viewer") : []; }
 /* One beat of the shared world, before the local one moves. */
 function netTick(dt){
+  checkIdle();
   const room = NET.room, b = G.boss;
   if (room){
     const all = room.peers(), mine = all.find(p => p.sameTab);
@@ -2384,6 +2390,13 @@ function publish(dt){
       pv:NET.hits.length ? NET.hits.map(h => h.o) : null,
       lt:NET.leader ? Math.round(G.time - NET.since) : null });
   }
+  /* Nothing new to say - a pet standing still, nothing landing, nothing
+     changing - and once a second is enough: the heartbeat (ts) that keeps
+     it from reading as away. Anything else goes at once. Every message is
+     a request against the world server's daily allowance. */
+  const said = JSON.stringify({ ...pr, ts:0 }), now = Date.now();
+  if (said === NET.said && now - NET.saidAt < 1000) return;
+  NET.said = said; NET.saidAt = now;
   NET.room.presence(pr).catch(() => {});
 }
 // a page whose screen goes off stops running him at once, and won't take him back when it returns
@@ -2409,16 +2422,49 @@ document.addEventListener("visibilitychange", () => {
     if (!bgTimer) bgTimer = setInterval(() => catchUp(wallGap()), 500);
   } else if (bgTimer){ clearInterval(bgTimer); bgTimer = null; }
 });
-/* An idle player whose pet falls is taken out of Explore, back to the
-   start, rather than left standing in the world. */
-function disconnectIdle(){
-  NET.away = false;
+/* Idle players are taken out of the world: two minutes without a touch on
+   the screen (IDLE_KICK), or a pet knocked out while its player was away.
+   What they've done is saved first, then the page leaves the world and
+   goes back to the start; setting out again joins it again. A page frozen
+   outright can't do this itself, so the world server lets it go after the
+   same two minutes of silence. */
+const IDLE_KICK = 120;   // seconds
+for (const t of ["pointerdown", "touchstart", "keydown"]) addEventListener(t, () => { NET.lastInput = Date.now(); }, { capture:true, passive:true });
+function checkIdle(){
+  if (!G.running || !NET.room || NET.leaving) return;
+  if (stick.on) NET.lastInput = Date.now();   // a thumb held on the stick is someone playing
+  if (Date.now() - (NET.lastInput || Date.now()) > IDLE_KICK * 1000)
+    leaveWorld("You were idle for 2 minutes, so you were taken out of the world. Your damage on Sir Uwaaarghhhh is saved.");
+}
+function disconnectIdle(){ leaveWorld("Your pet was knocked out while you were away, so you were taken out of Explore."); }
+async function leaveWorld(note){
+  if (NET.leaving) return;
+  NET.leaving = true; NET.away = false;
+  await saveProgress();
   if (G.raid){ G.fx = G.fx.filter(f => f.kind !== "tele"); G.raid = null; castLabel(""); }
-  G.running = false; G.paused = false;
+  G.running = false; G.paused = false; stopAiming();
   for (const id of ["menu", "result", "hud"]) $(id).hidden = true;
   $("select").hidden = false;
-  NET.pets.clear(); NET.sendT = 0; NET.note = "Your pet was knocked out while you were away, so you were taken out of Explore.";
+  NET.pets.clear(); NET.sendT = 0; NET.note = note;
+  publish(1);                                 // say we're out of the world before going
+  if (NET.server) NET.server.leave();
+  NET.leaving = false;
   buildPicks(); showLobby();
+}
+/* Everything Explore keeps for a player, saved before they leave: their
+   damage on him this round. (Explore doesn't touch the main game yet; once
+   it does - DESIGN §9 - the game's own sync belongs here too.) */
+async function saveProgress(){
+  const mine = BS && BS.dd[NET.key];
+  if (!mine) return;
+  if (!STORE.db){ store("rx.raid", JSON.stringify({ e:BS.e, dead:BS.dead, deadAt:BS.deadAt, dd:BS.dd })); return; }
+  const dm = Math.round(mine[0]), e = BS.e;
+  if (!STORE.ok || dm <= (STORE.seen[NET.key] || 0)) return;
+  try {
+    await Promise.race([STORE.db.doc("raids/e" + e + "/hits/" + NET.key).set({ dm, n:mine[1], f:mine[2], at:Date.now() }),
+                        new Promise((res, rej) => setTimeout(() => rej(new Error("slow")), 3000))]);
+    STORE.seen[NET.key] = Math.max(STORE.seen[NET.key] || 0, dm);
+  } catch(err){}
 }
 /* The wild pets, as the page that runs them tells it: one row each -
    [spawn, x, y, facing, health in thousandths, alive, clip, clip serial,

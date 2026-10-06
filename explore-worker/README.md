@@ -8,7 +8,8 @@ rules and nothing from Strava, and it never touches the game or its saves.
 
 It does two things over one websocket at `/world`:
 
-- **Presence.** Each page sends its own state about ten times a second, and
+- **Presence.** Each page sends its own state up to ten times a second, only
+  when it has changed (an idle pet sends a heartbeat once a second), and
   the worker relays it to everyone else. This is kept in memory only.
 - **His health.** Sir Uwaaarghhhh's account is kept as small documents in
   the Durable Object's SQLite storage: the round in `raids/state`, and each
@@ -24,6 +25,13 @@ way (see `openServer` in `explore/index.html`).
 Pushing a change under `explore-worker/` to the Pages branch or `main`
 deploys it (`.github/workflows/deploy-explore.yml`). It uses the same two
 Cloudflare credentials as the broker and needs no secrets of its own.
+
+## Idle pages
+
+A live page sends something at least once a second. A connection that has
+been silent for two minutes (a frozen or locked phone) is closed (`IDLE_MS`).
+The check runs while handling other pages' messages, so it costs no request
+of its own. The page also leaves by itself after two minutes without a touch.
 
 ## Settings (`wrangler.toml`)
 
