@@ -109,22 +109,31 @@ mob at the pet's level), win rate and the HP the pet has left:
 
 | Pet | Boar | 3 Beetles | 2 Puffcaps | Wisp |
 | --- | --- | --- | --- | --- |
-| Cinderling Lv 11 | 100% · 34% | 85% · 36% | 63% · 22% | 85% · 33% |
-| Sparky Lv 11 | 100% · 48% | 100% · 58% | 100% · 42% | 98% · 38% |
-| Bamboo Cub Lv 11 | 100% · 44% | 78% · 44% | 80% · 18% | 83% · 29% |
-| Cinderling Lv 15 | 100% · 51% | 100% · 60% | 100% · 52% | 100% · 51% |
-| Sparky Lv 15 | 100% · 57% | 100% · 49% | 100% · 55% | 100% · 47% |
-| Bamboo Cub Lv 15 | 100% · 54% | 98% · 48% | 55% · 28% | 90% · 46% |
+| Cinderling Lv 11 | 100% · 35% | 78% · 34% | 90% · 20% | 90% · 32% |
+| Sparky Lv 11 | 100% · 46% | 100% · 65% | 100% · 42% | 100% · 37% |
+| Bamboo Cub Lv 11 | 100% · 42% | 83% · 51% | 88% · 23% | 88% · 34% |
+| Cinderling Lv 15 | 100% · 51% | 100% · 60% | 100% · 52% | 100% · 56% |
+| Sparky Lv 15 | 100% · 58% | 100% · 54% | 100% · 57% | 100% · 47% |
+| Bamboo Cub Lv 15 | 100% · 52% | 100% · 41% | 73% · 36% | 100% · 48% |
 
 A lone mob costs about half a pet's health; a pack is a real risk, the
 Puffcaps' poison most of all for the slow Bamboo Cub. Before tuning, three
 beetles beat almost every pet and two Puffcaps beat all of them.
 
 **Art.** Each mob is one 16-frame strip (idle 0–3, knocked out 4, its two
-moves 5–9 and 10–15), drawn by `tools/make_assets.py` in the pets' own style
-(a round, fuzzy body lit from the upper left, big glossy eyes, little paws in
-front, a thick dark outline) at 96×80 and upscaled ×3. They're stand-ins
-until real sheets are drawn, as the tiles and props are.
+moves 5–9 and 10–15) in the pets' own style. The sheets were generated from
+the prompts in `art/PROMPTS.md` as 4×4 grids and converted by
+`tools/convert_mob_sheet.py`: the background haze dropped and the body made
+solid, every shape given to the frame its middle is in (the model's cells
+bleed into each other: Cap Bonk swings its cap into the next one), and every
+frame moved so its body is centred with its feet on one line. All four
+strips share one frame, 360×270 with the feet at .917 (256 colours, about
+150 KB a strip), and each mob's
+`scale` sets how big its body draws beside the pets. A first set, drawn in
+code by `make_assets.py`, read as a different game and was dropped.
+
+The table above was re-run with the real art in: its smaller hitboxes moved
+nothing outside the noise.
 
 **Controls.** Drag on the left half of the screen to walk. Every pet walks at
 the same pace (165 px/s); Speed shortens its cooldowns instead (§3). The

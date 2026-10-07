@@ -656,16 +656,18 @@ RAID_BOSS.deathClip = makeClip(RAID_BOSS.death);
      to be hit, as Verdant and Nimbus pets do);
    - keep: a ranged mob backs off to about this far and fights from there;
    - hover: it floats this high, and bobs.
-   Their art is generated (tools/make_assets.py) in the pets' own style, one
-   16-frame strip each: idle 0-3, knocked out 4, first move 5-9, second
-   move 10-15. `species` is the region they belong to, for the minimap's
+   Their art is generated sheets in the pets' own style (art/PROMPTS.md),
+   converted by tools/convert_mob_sheet.py to one 16-frame strip each:
+   idle 0-3, knocked out 4, first move 5-9, second move 10-15. Every strip
+   has the same frame (360x270, feet at .917), and each mob's `scale` draws
+   its body at the size it should be beside the pets. `species` is the region they belong to, for the minimap's
    colours. Moves learnt at a higher level come in the same way a pet's do. */
-const mobSheet = (id, o) => ({ src:"mob-" + id + ".png", path:"art/mob-" + id + ".png", frames:16, aspect:1.2, scale:1, ...o });
+const mobSheet = (id, o) => ({ src:"mob-" + id + ".png", path:"art/mob-" + id + ".png", frames:16, aspect:4 / 3, ...o });
 const MOBS = {
-  boar:{ species:"verdant", name:"Bramble Boar", box:72, foot:.956, walk:[0,1], doze:4, temper:150,
+  boar:{ species:"verdant", name:"Bramble Boar", box:69, foot:.917, walk:[0,1], doze:4, temper:150,
     split:{ hp:.33, def:.22, pow:.33, spd:.12 }, hp:.65, dmg:.8, pace:1,
     blurb:"Roots about in the meadows round the Trailhead. Get close and it charges.",
-    idle:mobSheet("boar", { loop:4, fps:3 }),
+    idle:mobSheet("boar", { loop:4, fps:3, scale:1.26 }),
     kit:[
       { id:"gore", name:"Gore", ico:"🐗", level:1,
         battle:{ dmg:1.30, cd:3 },
@@ -676,10 +678,10 @@ const MOBS = {
         fx:{ kind:"nova", impact:3, reach:115, tint:"dust" },
         sprite:mobSheet("boar", { order:[10,11,11,12,13,14,15], durations:[220,260,160,200,180,200,240] }) }
     ] },
-  beetle:{ species:"ember", name:"Cinder Beetle", box:62, foot:.956, walk:[0,1], doze:4, temper:230,
+  beetle:{ species:"ember", name:"Cinder Beetle", box:53, foot:.917, walk:[0,1], doze:4, temper:230,
     split:{ hp:.20, def:.36, pow:.28, spd:.16 }, hp:.35, dmg:.55, pace:1,
     blurb:"Comes in threes out of the Crags, shells too hot to touch. Each one is small; the pack isn't.",
-    idle:mobSheet("beetle", { loop:4, fps:4 }),
+    idle:mobSheet("beetle", { loop:4, fps:4, scale:1.57 }),
     kit:[
       { id:"shell-ram", name:"Shell Ram", ico:"🪲", level:1,
         battle:{ dmg:1.10, cd:3, open:{ pct:0.10, turns:2 } },
@@ -690,10 +692,10 @@ const MOBS = {
         fx:{ kind:"shot", impact:2, reach:260, tint:"fire" },
         sprite:mobSheet("beetle", { order:[10,11,12,13,14,15], durations:[220,220,140,160,200,240] }) }
     ] },
-  puffcap:{ species:"verdant", name:"Puffcap", box:70, foot:.956, walk:[0,2], doze:4, temper:0,
+  puffcap:{ species:"verdant", name:"Puffcap", box:61, foot:.917, walk:[0,2], doze:4, temper:0,
     split:{ hp:.40, def:.28, pow:.22, spd:.10 }, hp:.5, dmg:.5, pace:1,
     blurb:"A toadstool that walks. Leave it be and it leaves you be; hit it and it coughs.",
-    idle:mobSheet("puffcap", { loop:4, fps:2.5 }),
+    idle:mobSheet("puffcap", { loop:4, fps:2.5, scale:1.48 }),
     kit:[
       { id:"spore-cloud", name:"Spore Cloud", ico:"🍄", level:1,
         battle:{ dmg:0.80, cd:4, burn:{ pct:0.20, turns:3, poison:true } },
@@ -704,24 +706,24 @@ const MOBS = {
         fx:{ kind:"cone", impact:2, reach:100, arc:.9, tint:"#ef7f55" },
         sprite:mobSheet("puffcap", { order:[10,11,12,13,14,15], durations:[220,240,140,200,200,240] }) }
     ] },
-  wisp:{ species:"nimbus", name:"Static Wisp", box:66, foot:.956, walk:[0,1], doze:4, temper:260, keep:190, hover:16,
+  wisp:{ species:"nimbus", name:"Static Wisp", box:59, foot:.917, walk:[0,1], doze:4, temper:260, keep:190, hover:16,
     split:{ hp:.14, def:.14, pow:.40, spd:.32 }, hp:.8, dmg:.9, pace:1,
     blurb:"A scrap of storm loose in the Heights. It won't come close; it doesn't need to.",
-    idle:mobSheet("wisp", { loop:4, fps:5 }),
+    idle:mobSheet("wisp", { loop:4, fps:5, scale:1.78 }),
     kit:[
       { id:"zap", name:"Zap", ico:"⚡", level:1,
         battle:{ dmg:1.05, cd:3 },
-        fx:{ kind:"shot", impact:3, reach:300, tint:"zap" },
+        fx:{ kind:"shot", impact:2, reach:300, tint:"zap" },
         sprite:mobSheet("wisp", { order:[5,6,7,8,9], durations:[220,200,120,200,260] }) },
       { id:"discharge", name:"Discharge", ico:"🌩️", level:10,
         battle:{ dmg:1.30, pierce:0.25, cd:4 },
-        fx:{ kind:"strike", impact:3, reach:280, radius:50, tint:"small" },
+        fx:{ kind:"strike", impact:2, reach:280, radius:50, tint:"small" },
         sprite:mobSheet("wisp", { order:[10,11,12,13,14,15], durations:[220,220,200,180,200,240] }) }
     ] }
 };
 for (const id in MOBS){
   const m = MOBS[id]; m.mob = true; m.id = id;
-  for (const s of m.kit){ s.mob = id; const wind = s.fx.wind ?? WIND[s.fx.kind];
+  for (const s of m.kit){ s.mob = id; s.sprite.scale = m.idle.scale; const wind = s.fx.wind ?? WIND[s.fx.kind];
     s.clip = makeClip(s.sprite, TURN, wind ? { at:s.fx.kind === "rush" ? s.fx.from : s.fx.impact, wind } : null); MOVE[s.id] = s; }
 }
 const formOf = id => FORMS[id] || MOBS[id];
