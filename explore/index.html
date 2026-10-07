@@ -586,7 +586,7 @@ function kitPace(e){
   }
   const live = kit.reduce((a, k) => a + moveWorth(k.battle) / k.battle.cd, 0);
   e.cdK = live > 0 ? live / (game / 600) : 1;
-  e.cdMin = (e.kit.filter(k => !k.battle.once).length + 1.5) * speedTempo(e.spd, e.level) * (FORM_PACE[e.formId] || 1);
+  e.cdMin = (e.kit.filter(k => !k.battle.once).length + 1.5) * speedTempo(e.spd, e.level) * paceOf(e);
   e.cdLv = e.formId + e.level;
 }
 function makeClip(c, fit, wind){
@@ -609,6 +609,7 @@ function clipFrame(clip, ms){
   return clip.order[0];
 }
 function kitFor(formId, level){
+  if (MOBS[formId]) return MOBS[formId].kit.filter(k => level >= k.level);
   const f = FORMS[formId];
   return SKILLS[f.species].filter(k => level >= k.level && k.stage === f.stage && stageForLevel(level) === k.stage);
 }
@@ -644,6 +645,94 @@ const RAID_BOSS = {
 for (const k of RAID_BOSS.kit){ k.clip = makeClip(k.sprite); MOVE[k.id] = k; }
 RAID_BOSS.deathClip = makeClip(RAID_BOSS.death);
 
+/* The world's own creatures: mobs that were never anybody's pet. Out in the
+   world they are wild pets in every way the engine cares about - the same
+   Pet, the same btHit, riders, cooldowns, aim and dodging, shared between
+   pages the same way - and differ only in what this table gives them:
+   - split: how a level's attributes are shared out (as ATTR_SPLIT does a
+     species'), and hp, a share of that pool, so a pack of three is not
+     three whole pets, and dmg, a share of its Power, for the same reason;
+   - temper: how close a player can come before it goes for them (0 waits
+     to be hit, as Verdant and Nimbus pets do);
+   - keep: a ranged mob backs off to about this far and fights from there;
+   - hover: it floats this high, and bobs.
+   Their art is generated (tools/make_assets.py) in the pets' own style, one
+   16-frame strip each: idle 0-3, knocked out 4, first move 5-9, second
+   move 10-15. `species` is the region they belong to, for the minimap's
+   colours. Moves learnt at a higher level come in the same way a pet's do. */
+const mobSheet = (id, o) => ({ src:"mob-" + id + ".png", path:"art/mob-" + id + ".png", frames:16, aspect:1.2, scale:1, ...o });
+const MOBS = {
+  boar:{ species:"verdant", name:"Bramble Boar", box:72, foot:.956, walk:[0,1], doze:4, temper:150,
+    split:{ hp:.33, def:.22, pow:.33, spd:.12 }, hp:.65, dmg:.8, pace:1,
+    blurb:"Roots about in the meadows round the Trailhead. Get close and it charges.",
+    idle:mobSheet("boar", { loop:4, fps:3 }),
+    kit:[
+      { id:"gore", name:"Gore", ico:"🐗", level:1,
+        battle:{ dmg:1.30, cd:3 },
+        fx:{ kind:"rush", from:2, to:5, dist:210, tint:"dust" },
+        sprite:mobSheet("boar", { order:[5,6,6,7,8,7,8,9], durations:[260,240,200,110,110,110,110,300] }) },
+      { id:"stomp", name:"Stomp", ico:"💢", level:9,
+        battle:{ dmg:1.05, cd:3, rattle:{ pct:0.20, turns:2 } },
+        fx:{ kind:"nova", impact:3, reach:115, tint:"dust" },
+        sprite:mobSheet("boar", { order:[10,11,11,12,13,14,15], durations:[220,260,160,200,180,200,240] }) }
+    ] },
+  beetle:{ species:"ember", name:"Cinder Beetle", box:62, foot:.956, walk:[0,1], doze:4, temper:230,
+    split:{ hp:.20, def:.36, pow:.28, spd:.16 }, hp:.35, dmg:.55, pace:1,
+    blurb:"Comes in threes out of the Crags, shells too hot to touch. Each one is small; the pack isn't.",
+    idle:mobSheet("beetle", { loop:4, fps:4 }),
+    kit:[
+      { id:"shell-ram", name:"Shell Ram", ico:"🪲", level:1,
+        battle:{ dmg:1.10, cd:3, open:{ pct:0.10, turns:2 } },
+        fx:{ kind:"rush", from:2, to:5, dist:160, tint:"fire" },
+        sprite:mobSheet("beetle", { order:[5,6,7,8,7,8,9], durations:[240,220,100,100,100,100,280] }) },
+      { id:"cinder-spit", name:"Cinder Spit", ico:"🔥", level:12,
+        battle:{ dmg:0.95, cd:4, burn:{ pct:0.20, turns:2 } },
+        fx:{ kind:"shot", impact:2, reach:260, tint:"fire" },
+        sprite:mobSheet("beetle", { order:[10,11,12,13,14,15], durations:[220,220,140,160,200,240] }) }
+    ] },
+  puffcap:{ species:"verdant", name:"Puffcap", box:70, foot:.956, walk:[0,2], doze:4, temper:0,
+    split:{ hp:.40, def:.28, pow:.22, spd:.10 }, hp:.5, dmg:.5, pace:1,
+    blurb:"A toadstool that walks. Leave it be and it leaves you be; hit it and it coughs.",
+    idle:mobSheet("puffcap", { loop:4, fps:2.5 }),
+    kit:[
+      { id:"spore-cloud", name:"Spore Cloud", ico:"🍄", level:1,
+        battle:{ dmg:0.80, cd:4, burn:{ pct:0.20, turns:3, poison:true } },
+        fx:{ kind:"nova", impact:2, reach:130, tint:"spore" },
+        sprite:mobSheet("puffcap", { order:[5,6,7,8,8,9], durations:[260,240,180,260,200,260] }) },
+      { id:"cap-bonk", name:"Cap Bonk", ico:"🔨", level:8,
+        battle:{ dmg:1.20, cd:3, rattle:{ pct:0.25, turns:2 } },
+        fx:{ kind:"cone", impact:2, reach:100, arc:.9, tint:"#ef7f55" },
+        sprite:mobSheet("puffcap", { order:[10,11,12,13,14,15], durations:[220,240,140,200,200,240] }) }
+    ] },
+  wisp:{ species:"nimbus", name:"Static Wisp", box:66, foot:.956, walk:[0,1], doze:4, temper:260, keep:190, hover:16,
+    split:{ hp:.14, def:.14, pow:.40, spd:.32 }, hp:.8, dmg:.9, pace:1,
+    blurb:"A scrap of storm loose in the Heights. It won't come close; it doesn't need to.",
+    idle:mobSheet("wisp", { loop:4, fps:5 }),
+    kit:[
+      { id:"zap", name:"Zap", ico:"⚡", level:1,
+        battle:{ dmg:1.05, cd:3 },
+        fx:{ kind:"shot", impact:3, reach:300, tint:"zap" },
+        sprite:mobSheet("wisp", { order:[5,6,7,8,9], durations:[220,200,120,200,260] }) },
+      { id:"discharge", name:"Discharge", ico:"🌩️", level:10,
+        battle:{ dmg:1.30, pierce:0.25, cd:4 },
+        fx:{ kind:"strike", impact:3, reach:280, radius:50, tint:"small" },
+        sprite:mobSheet("wisp", { order:[10,11,12,13,14,15], durations:[220,220,200,180,200,240] }) }
+    ] }
+};
+for (const id in MOBS){
+  const m = MOBS[id]; m.mob = true; m.id = id;
+  for (const s of m.kit){ s.mob = id; const wind = s.fx.wind ?? WIND[s.fx.kind];
+    s.clip = makeClip(s.sprite, TURN, wind ? { at:s.fx.kind === "rush" ? s.fx.from : s.fx.impact, wind } : null); MOVE[s.id] = s; }
+}
+const formOf = id => FORMS[id] || MOBS[id];
+function mobAttrs(m, lv){
+  const total = attrTotal(lv), out = {};
+  for (const k of ["hp","def","pow","spd"]) out[k] = Math.round(total * m.split[k]);
+  out.hp = Math.max(1, Math.round(out.hp * (m.hp || 1)));
+  out.pow = Math.max(1, Math.round(out.pow * (m.dmg || 1)));
+  return out;
+}
+
 /* =========================================================================
    ASSETS
    ========================================================================= */
@@ -659,7 +748,8 @@ function loadImg(key, src){
 function loadAll(){
   const jobs = [loadImg("tiles", "art/tiles.png"), loadImg("props", "art/props.png")];
   for (const f of Object.values(FORMS)) jobs.push(loadImg(f.idle.src, art(f.idle.src)));
-  for (const s of Object.values(MOVE)) jobs.push(loadImg(s.sprite.src, art(s.sprite.src)));
+  for (const m of Object.values(MOBS)) jobs.push(loadImg(m.idle.src, m.idle.path));   // a mob's moves are on its idle's strip
+  for (const s of Object.values(MOVE)) if (!s.mob) jobs.push(loadImg(s.sprite.src, art(s.sprite.src)));
   for (const p of RAID_BOSS.phases) jobs.push(loadImg(p.src, art(p.src)));
   jobs.push(loadImg(RAID_BOSS.death.src, art(RAID_BOSS.death.src)));
   return Promise.all(jobs);
@@ -877,14 +967,14 @@ const LIVE_HP = .8;
 const liveHp = a => Math.round(a.hp * BT.POOL * LIVE_HP);
 class Pet {
   constructor(formId, level, side, o = {}){
-    const f = FORMS[formId], a = attrsFor(f.species, level);
+    const f = formOf(formId), a = f.mob ? mobAttrs(f, level) : attrsFor(f.species, level);
     Object.assign(this, {
       type:"pet", formId, form:f, sp:f.species, level, side,
       pow:a.pow, def:a.def, spd:a.spd, max:liveHp(a), cur:liveHp(a),
       kit:kitFor(formId, level), x:o.x || 0, y:o.y || 0, r:f.box * .27, box:f.box, face:1, aim:{ x:1, y:0 },
       kx:0, ky:0, cds:{}, gcd:0, atkCd:0, swipeT:0, clip:null, flash:0, inv:0,
       alive:true, faintT:0, moving:0, walkT:Math.random() * 10, idleT:Math.random() * 6,
-      name:o.name || f.name, isPlayer:!!o.player, wild:!!o.wild,
+      name:o.name || f.name, isPlayer:!!o.player, wild:!!o.wild, mob:!!f.mob,
       home:{ x:o.x || 0, y:o.y || 0 }, aggro:null, wanderT:0, wanderTo:null, dealt:0, respawnT:0, lastFight:-99, calm:0
     });
     const c = f.idle, vh = this.box / c.aspect;
@@ -981,9 +1071,10 @@ function speedTempo(spd, level){ return (1 + 5 * spd / attrTotal(level)) / 1.5; 
    design notes). Live, with Attack worth almost nothing, a species' kit
    decides more than it does in a battle, and these even it out. */
 let FORM_PACE = { cinderling:1.024, sparky:1.074, cub:.909, blazewyrm:.825, zephyrite:1.225, panda:.99 };
+const paceOf = e => FORM_PACE[e.formId] || (e.form && e.form.pace) || 1;   // a mob's is in its own row
 function tempoOf(e){
   if (e.boss) return 1;
-  return e.tempo = speedTempo(e.spd * (e.spdMul || 1), e.level) * (FORM_PACE[e.formId] || 1);
+  return e.tempo = speedTempo(e.spd * (e.spdMul || 1), e.level) * paceOf(e);
 }
 
 function strike(x, y, mult, pierce, o = {}){
@@ -1049,7 +1140,7 @@ function riders(x, sk, hits, foe){
     if (y.net || y.mirror){
       const r = {};
       if (b.rattle) r.rt = [b.rattle.pct, b.rattle.turns];
-      if (b.burn) r.bn = [Math.max(1, Math.round(dmg * b.burn.pct)), b.burn.turns];
+      if (b.burn) r.bn = [Math.max(1, Math.round(dmg * b.burn.pct)), b.burn.turns, b.burn.poison ? 1 : 0];
       if (b.hug) r.hg = [b.hug.pct, b.hug.turns];
       if (r.rt || r.bn || r.hg){ if (y.net) pvpHit(y, { ...r, ...wildTag(x) }); else wildHit(y, r); }
     }
@@ -1057,10 +1148,14 @@ function riders(x, sk, hits, foe){
       floatText(y.x, y.y - (y.boss ? 240 : y.box * 1.2), "guard rattled", "#9fd8ff", 12); }
     if (b.hug){ y.weakT = Math.max(y.weakT || 0, b.hug.turns * TURN); y.weakPct = Math.max(y.weakPct || 0, b.hug.pct);
       floatText(y.x - 20, y.y - (y.boss ? 230 : y.box * 1.15), "squeezed", "#ffb3c7", 12); }
-    if (b.burn){ y.burn = { dmg:Math.max(1, Math.round(dmg * b.burn.pct)), left:b.burn.turns, t:TURN, src:x };
-      floatText(y.x + 20, y.y - (y.boss ? 220 : y.box * 1.1), "burning", "#ff8a3d", 12); }
+    if (b.burn){ y.burn = { dmg:Math.max(1, Math.round(dmg * b.burn.pct)), left:b.burn.turns, t:TURN, src:x, poison:!!b.burn.poison };
+      floatText(y.x + 20, y.y - (y.boss ? 220 : y.box * 1.1), burnWord(y.burn), burnColour(y.burn), 12); }
   }
 }
+/* A Puffcap's spores are a burn by another name: the same rider, ticking
+   the same way, in green. */
+const burnWord = b => b.poison ? "poisoned" : "burning";
+const burnColour = b => b.poison ? "#b8e86a" : "#ff8a3d";
 /* What runs on a pet's own clock: a guard reopening, a burn biting once a turn. */
 function tickRiders(e, dt){
   if (e.openT > 0) e.openT = Math.max(0, e.openT - dt);
@@ -1070,10 +1165,10 @@ function tickRiders(e, dt){
     if (e.burn.t <= 0){
       e.burn.t += TURN;
       if (!(G.god && e.side === "hero")){
-        e.cur -= e.burn.dmg; floatText(e.x, e.y - (e.boss ? 200 : e.box), String(e.burn.dmg), "#ff8a3d", 13);
+        e.cur -= e.burn.dmg; floatText(e.x, e.y - (e.boss ? 200 : e.box), String(e.burn.dmg), burnColour(e.burn), 13);
         if (e.burn.src) e.burn.src.dealt += e.burn.dmg;
         if (e.boss && e.burn.src === G.player) NET.dm += e.burn.dmg;
-        embers(e.x, e.y - 20, 6, .5);
+        if (e.burn.poison) spores(e.x, e.y - 20, 6, .5); else embers(e.x, e.y - 20, 6, .5);
         if (e.cur <= 0){ knockOut(e, e.burn.src); return; }
       }
       if (--e.burn.left <= 0) e.burn = null;
@@ -1106,6 +1201,10 @@ function puff(x, y, colour, n = 10){
 function embers(x, y, n, spread = 1){
   for (let i = 0; i < n; i++){ const a = Math.random() * 6.28, s = rnd(40, 200) * spread;
     part({ x, y, vx:Math.cos(a) * s, vy:Math.sin(a) * s * .5, vz:rnd(60, 200), g:420, size:rnd(2, 4.5), colour:Math.random() < .5 ? "#ffd23f" : "#ff6b35", glow:true, life:rnd(.4, .9) }); }
+}
+function spores(x, y, n, spread = 1){
+  for (let i = 0; i < n; i++){ const a = Math.random() * 6.28, s = rnd(30, 150) * spread;
+    part({ x, y, vx:Math.cos(a) * s, vy:Math.sin(a) * s * .5, vz:rnd(20, 90), g:-20, size:rnd(2, 4), colour:Math.random() < .5 ? "#c8e86a" : "#eeffa8", glow:true, life:rnd(.6, 1.2) }); }
 }
 function sparks(x, y, n, spread = 1){
   for (let i = 0; i < n; i++){ const a = Math.random() * 6.28, s = rnd(60, 260) * spread;
@@ -1209,6 +1308,16 @@ function warnMove(e, c, mine){
   else Object.assign(w, { shape:"cone", r:fx.reach, arc:fx.arc || .9 });
   G.fx.push(w);
 }
+/* A burst going off: fire, a static ring, a Puffcap's spores or a Boar's dust. */
+function novaLook(e, fx, k){
+  const t = fx.tint;
+  const col = { fire:"#ff8a3d", spore:"#b8e86a", dust:"#d9c697" }[t] || "#7ff0ff";
+  ring(e.x, e.y, fx.reach, col, .5, t === "fire" ? 14 : t === "dust" ? 12 : 8);
+  if (t === "fire") embers(e.x, e.y, Math.round(30 * k), 1.1);
+  else if (t === "spore") spores(e.x, e.y - e.box * .5, Math.round(40 * k), 1.1);
+  else if (t === "dust") dust(e.x, e.y, Math.round(14 * k));
+  else sparks(e.x, e.y - e.box * .4, Math.round(34 * k), 1.1);
+}
 function skillImpact(e, c){
   const sk = c.sk, fx = sk.fx, b = sk.battle, hits = [];
   // a bolt and a swipe land where they were aimed (lockMove), not where the target has got to
@@ -1220,15 +1329,14 @@ function skillImpact(e, c){
   };
   if (fx.kind === "shot"){
     const sx = e.x + e.face * e.box * .6, sy = e.y - 6, a = Math.atan2(ty - sy, tx - sx);
-    G.projs.push({ x:sx, y:sy, z:e.box * .32, vx:Math.cos(a) * SHOT_SPEED, vy:Math.sin(a) * SHOT_SPEED, r:14,
+    G.projs.push({ x:sx, y:sy, z:e.box * .32 + (e.form.hover || 0), vx:Math.cos(a) * SHOT_SPEED, vy:Math.sin(a) * SHOT_SPEED, r:14,
       life:shotLife(fx), owner:e, sk, side:e.side, tint:fx.tint });
     riders(e, { battle:{ ...b, rattle:null, burn:null } }, [], tgt);   // the hit's own riders go on when it lands
     return;
   }
   if (fx.kind === "nova"){
     const fire = fx.tint === "fire";
-    ring(e.x, e.y, fx.reach, fire ? "#ff8a3d" : "#7ff0ff", .5, fire ? 14 : 8);
-    if (fire) embers(e.x, e.y, 30, 1.1); else sparks(e.x, e.y - e.box * .4, 34, 1.1);
+    novaLook(e, fx, 1);
     G.cam.shake = Math.max(G.cam.shake, 5);
     hitAll((o, h) => Math.hypot(h.x - e.x, h.y - e.y) < fx.reach + h.r, { knock:fire ? 120 : 60 });
   }
@@ -1473,7 +1581,8 @@ function updatePet(e, dt){
     const m = Math.hypot(want.x, want.y);
     if (m > .05){
       // every pet walks at one pace: Speed buys turns (tempoOf), not legs
-      const sp = WALK * (e.wild && !e.aggro ? .45 : 1);
+      // backing off is slower than walking in: a ranged mob can always be caught
+      const sp = WALK * (e.wild && !e.aggro ? .45 : e.backing ? .6 : 1);
       moveEnt(e, want.x * sp * dt, want.y * sp * dt);
       e.aim = { x:want.x / m, y:want.y / m };
       if (Math.abs(want.x) > .15) e.face = want.x > 0 ? 1 : -1;
@@ -1488,6 +1597,7 @@ function updatePet(e, dt){
    btChoose(): any skill it has ready, at random, a Nap only once it is hurt,
    and a plain Attack when nothing is - taken the moment its turn comes round. */
 const TEMPER = { ember:200, nimbus:0, verdant:0 };   // Ember pets pick fights; the others wait to be hit
+const temperOf = e => e.mob ? e.form.temper : TEMPER[e.sp];   // a mob's is its own
 /* Who a wild pet may go for: any player out in the world - this page's and
    everyone else's - but never someone fighting him. */
 function wildPrey(){
@@ -1504,8 +1614,12 @@ function petAI(e, dt){
   if (e.aggro && (!e.aggro.alive || dist(e, e.home) > 520 || !prey.includes(e.aggro))){ e.aggro = null; e.calm = 4; }
   if (!e.aggro && !e.calm){
     let best = null, bd = 1e9;
-    for (const q of prey){ const d = dist(e, q); if ((d < TEMPER[e.sp] || (e.cur < e.max && d < 360)) && d < bd){ bd = d; best = q; } }
-    if (best) e.aggro = best;
+    for (const q of prey){ const d = dist(e, q); if ((d < temperOf(e) || (e.cur < e.max && d < 360)) && d < bd){ bd = d; best = q; } }
+    if (best){
+      e.aggro = best;
+      // a pack goes together: the rest of its kind close by turn on the same pet
+      if (e.mob) for (const o of G.wild) if (o !== e && o.formId === e.formId && o.alive && !o.aggro && !o.mirror && dist(o, e) < 220) o.aggro = best;
+    }
   }
   if (e.aggro) return fightAI(e, e.aggro, dt);
   if (e.cur < e.max) e.cur = Math.min(e.max, e.cur + e.max * .08 * dt);
@@ -1527,6 +1641,17 @@ function fightAI(e, t, dt){
     if (d < ATTACK_REACH && e.atkCd <= 0){ useAttack(e); return { x:0, y:0 }; }
   }
   const n = d + h.r || 1;
+  /* A ranged mob fights from where it stands: it backs off when you close
+     in and edges round you, so the way to it is through its shots. Its moves
+     outreach `keep`, so it never has to come in to use them. */
+  const keep = e.form.keep;
+  e.backing = false;
+  if (keep){
+    const s = Math.sin(G.time * .9 + e.home.y) > 0 ? 1 : -1;
+    if (d < keep - 50){ e.backing = true; return { x:-dx / n, y:-dy / n }; }
+    if (d > keep + 40) return { x:dx / n, y:dy / n };
+    return { x:-dy / n * .45 * s, y:dx / n * .45 * s };
+  }
   if (d > 30) return { x:dx / n, y:dy / n };     // everyone closes in: a plain Attack is a swipe at arm's length
   const s = Math.sin(G.time * 1.3 + e.home.x) > 0 ? 1 : -1;
   return { x:-dy / n * .3 * s, y:dx / n * .3 * s };
@@ -1773,6 +1898,7 @@ function updateProjs(dt){
   for (const p of G.projs){
     // a shot flies straight and takes the first foe in its path; another page's is only the look of it
     p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; p.spin = (p.spin || 0) + dt * 14;
+    if (p.tint === "zap" && Math.random() < .7) part({ x:p.x + rnd(-5, 5), y:p.y, z:p.z + rnd(-5, 5), vx:rnd(-40, 40), vy:rnd(-40, 40), size:rnd(1.5, 3), colour:Math.random() < .5 ? "#ffe86a" : "#bff8ff", glow:true, life:rnd(.15, .3) });
     if (p.tint === "fire" && Math.random() < .9) part({ x:p.x + rnd(-4, 4), y:p.y, z:p.z, vx:-p.vx * .1 + rnd(-20, 20), vy:-p.vy * .1, size:rnd(3, 6), colour:Math.random() < .5 ? "#ffd23f" : "#ff6b35", glow:true, life:rnd(.2, .4) });
     if (blocked(p.x, p.y, 4)) p.life = 0;
     if (!p.look) for (const o of foesOf(p.owner)){
@@ -1785,6 +1911,7 @@ function updateProjs(dt){
     }
     if (p.life <= 0){
       if (p.tint === "fire"){ embers(p.x, p.y, 14, .8); ring(p.x, p.y, 34, "#ff8a3d", .3, 6); }
+      else if (p.tint === "zap"){ sparks(p.x, p.y - p.z * .5, 14, .6); ring(p.x, p.y, 30, "#bff8ff", .25, 5); }
       else puff(p.x, p.y - 10, p.tint === "bamboo" ? "#94c24a" : "#c23a1c", 6);
     }
   }
@@ -1830,18 +1957,41 @@ const WILD_SPAWNS = [
   ["verdant", 12, 42, 8], ["verdant", 18, 54, 12], ["verdant", 8, 33, 14], ["verdant", 22, 38, 24], ["verdant", 15, 58, 34],
   ["nimbus", 10, 18, 8], ["nimbus", 20, 22, 12], ["nimbus", 8, 10, 14], ["nimbus", 24, 6, 24], ["nimbus", 16, 4, 34]
 ];
+/* The mobs: [kind, tile x, tile y, level, how many]. Boars root about the
+   meadow round the Trailhead, the lowest of them near enough for a pet that
+   has only just evolved; the rest live in the region they're named for,
+   rising in level away from the campfire like the wild pets. None is under
+   Lv 8: below that a pet has no skills, and Attack alone fells nothing.
+   Beetles come in threes and Puffcaps in pairs, each a share of a whole pet
+   (MOBS hp and dmg), sized in simulation so a lone mob is a fight a pet of
+   its level wins with half its health left and a pack is a real risk.
+   They join the wild pets' list after them, in this order, so every page
+   numbers them alike and they're shared the same way. */
+const MOB_SPAWNS = [
+  ["boar", 34, 40, 8, 1], ["boar", 51, 41, 8, 1], ["boar", 36, 55, 9, 1], ["boar", 52, 56, 11, 1], ["boar", 47, 28, 13, 1], ["boar", 33, 24, 15, 1],
+  ["beetle", 61, 58, 8, 3], ["beetle", 66, 41, 11, 3], ["beetle", 77, 45, 15, 3], ["beetle", 70, 21, 20, 3],
+  ["puffcap", 6, 48, 8, 2], ["puffcap", 17, 35, 10, 2], ["puffcap", 25, 61, 13, 1], ["puffcap", 4, 58, 18, 2],
+  ["wisp", 14, 26, 8, 1], ["wisp", 4, 21, 11, 1], ["wisp", 22, 13, 13, 2], ["wisp", 12, 6, 18, 1]
+];
+const PACK = [[0, 0], [38, 24], [-34, 28]];   // where a pack's members stand, round its spawn
+function placeWild(form, lv, tx, ty, ox, oy, name){
+  let x = (tx + .5) * TILE + ox, y = (ty + .5) * TILE + oy;
+  for (let k = 0; k < 30 && blocked(x, y, 20); k++){ x += ((k * 37) % 81) - 40; y += ((k * 53) % 81) - 40; }
+  const e = new Pet(form, lv, "foe", { x, y, wild:true, name });
+  e.wi = G.wild.length; e.tx = x; e.ty = y;
+  G.ents.push(e); G.wild.push(e);
+}
 function spawnWild(){
   G.wild = [];
-  WILD_SPAWNS.forEach(([sp, tx, ty, lv], wi) => {
-    // the game's players haven't met the third forms yet: its wild pets stop at the last level before them
-    if (GAME) lv = Math.min(lv, EVO_LEVELS[2] - 1);
+  // the game's players haven't met the third forms yet: its wild pets, and its mobs, stop at the last level before them
+  const cap = lv => GAME ? Math.min(lv, EVO_LEVELS[2] - 1) : lv;
+  for (let [sp, tx, ty, lv] of WILD_SPAWNS){
+    lv = cap(lv);
     const form = formFor(sp, lv);
-    let x = (tx + .5) * TILE, y = (ty + .5) * TILE;
-    for (let k = 0; k < 30 && blocked(x, y, 20); k++){ x += ((k * 37) % 81) - 40; y += ((k * 53) % 81) - 40; }
-    const e = new Pet(form, lv, "foe", { x, y, wild:true, name:"Wild " + FORMS[form].name });
-    e.wi = wi; e.tx = x; e.ty = y;
-    G.ents.push(e); G.wild.push(e);
-  });
+    placeWild(form, lv, tx, ty, 0, 0, "Wild " + FORMS[form].name);
+  }
+  for (const [kind, tx, ty, lv, n] of MOB_SPAWNS)
+    for (let i = 0; i < n; i++) placeWild(kind, cap(lv), tx, ty, PACK[i][0], PACK[i][1], MOBS[kind].name);
   const R = rng32(99);
   for (let i = 0; i < 22; i++){
     const tx = 2 + Math.floor(R() * (MW - 4)), ty = 2 + Math.floor(R() * (MH - 4));
@@ -2652,7 +2802,7 @@ function takeWildHit(p, h){
     floatText(e.x + rnd(-14, 14), e.y - e.box * .95, String(d), "#ffffff", 15);
   }
   if (Array.isArray(h.rt)){ e.openT = Math.max(e.openT, clamp(+h.rt[1] || 0, 0, 4) * TURN); e.openPct = Math.max(e.openPct, clamp(+h.rt[0] || 0, 0, .5)); }
-  if (Array.isArray(h.bn)) e.burn = { dmg:clamp(Math.round(+h.bn[0]) || 1, 1, e.max), left:clamp(h.bn[1] | 0, 1, 4), t:TURN, src:null };
+  if (Array.isArray(h.bn)) e.burn = { dmg:clamp(Math.round(+h.bn[0]) || 1, 1, e.max), left:clamp(h.bn[1] | 0, 1, 4), t:TURN, src:null, poison:h.bn[2] === 1 };
   if (Array.isArray(h.hg)){ e.weakT = Math.max(e.weakT || 0, clamp(h.hg[1] | 0, 0, 4) * TURN); e.weakPct = Math.max(e.weakPct || 0, clamp(+h.hg[0] || 0, 0, .5)); }
   if (e.cur <= 0){ e.cur = 0; faint(e, null); }
 }
@@ -2685,8 +2835,8 @@ function takeHits(p){
     }
     if (Array.isArray(h.rt)){ me.openT = Math.max(me.openT, clamp(+h.rt[1] || 0, 0, 4) * TURN); me.openPct = Math.max(me.openPct, clamp(+h.rt[0] || 0, 0, .5));
       floatText(me.x, me.y - me.box * 1.2, "guard rattled", "#9fd8ff", 12); }
-    if (Array.isArray(h.bn)){ me.burn = { dmg:clamp(Math.round(+h.bn[0]) || 1, 1, me.max), left:clamp(h.bn[1] | 0, 1, 4), t:TURN, src:null };
-      floatText(me.x + 20, me.y - me.box * 1.1, "burning", "#ff8a3d", 12); }
+    if (Array.isArray(h.bn)){ me.burn = { dmg:clamp(Math.round(+h.bn[0]) || 1, 1, me.max), left:clamp(h.bn[1] | 0, 1, 4), t:TURN, src:null, poison:h.bn[2] === 1 };
+      floatText(me.x + 20, me.y - me.box * 1.1, burnWord(me.burn), burnColour(me.burn), 12); }
     if (Array.isArray(h.hg)){ me.weakT = Math.max(me.weakT || 0, clamp(h.hg[1] | 0, 0, 4) * TURN); me.weakPct = Math.max(me.weakPct || 0, clamp(+h.hg[0] || 0, 0, .5));
       floatText(me.x - 20, me.y - me.box * 1.15, "squeezed", "#ffb3c7", 12); }
     if (+h.ex > 1){ me.exposed = clamp(+h.ex, 1, 2); floatText(me.x, me.y - me.box * 1.2, "wide open", "#9fd8ff", 12); }
@@ -2770,15 +2920,11 @@ function netFx(e, c){
   let tx = t ? t.hitCircle().x : e.x + c.aim.x * 140, ty = t ? (t.boss ? t.y - 6 : t.y) : e.y + c.aim.y * 140;
   if (c.spot && fx.kind === "strike"){ tx = c.spot.x; ty = c.spot.y; }
   const ax = Math.cos(Math.atan2(ty - e.y, tx - e.x)), ay = Math.sin(Math.atan2(ty - e.y, tx - e.x));
-  if (fx.kind === "nova"){
-    const fire = fx.tint === "fire";
-    ring(e.x, e.y, fx.reach, fire ? "#ff8a3d" : "#7ff0ff", .5, fire ? 14 : 8);
-    if (fire) embers(e.x, e.y, 20, 1.1); else sparks(e.x, e.y - e.box * .4, 22, 1.1);
-  }
+  if (fx.kind === "nova") novaLook(e, fx, .7);
   if (fx.kind === "strike"){ G.fx.push({ kind:"bolt", x:tx, y:ty, t:0, dur:.42, seed:Math.random() * 1e4, small:fx.tint === "small" }); sparks(tx, ty, 18, 1); }
   if (fx.kind === "shot"){
     const sx = e.x + e.face * e.box * .6, sy = e.y - 6, a = Math.atan2(ty - sy, tx - sx);
-    G.projs.push({ x:sx, y:sy, z:e.box * .32, vx:Math.cos(a) * SHOT_SPEED, vy:Math.sin(a) * SHOT_SPEED, r:14, life:shotLife(fx), owner:e, sk:c.sk, side:"net",
+    G.projs.push({ x:sx, y:sy, z:e.box * .32 + (e.form.hover || 0), vx:Math.cos(a) * SHOT_SPEED, vy:Math.sin(a) * SHOT_SPEED, r:14, life:shotLife(fx), owner:e, sk:c.sk, side:"net",
       tint:fx.tint, look:true });
   }
   if (fx.kind === "cone") G.fx.push({ kind:"arc", x:e.x, y:e.y - 10, a:Math.atan2(ay, ax), r:fx.reach, arc:fx.arc || .9, t:0, dur:.32, colour:fx.tint });
@@ -2932,7 +3078,7 @@ function updateHud(dt){
   $("me-hp").style.width = hp + "%"; $("me-hpbar").classList.toggle("low", hp < 30);
   const fx = [];
   if (p.stoke) fx.push("stoked"); if (p.charges) fx.push("charged ×" + p.charges); if (p.openT > 0) fx.push("guard open");
-  if (p.burn) fx.push("burning"); if (p.softens) fx.push("guard down"); if (p.weakT > 0) fx.push("squeezed");
+  if (p.burn) fx.push(burnWord(p.burn)); if (p.softens) fx.push("guard down"); if (p.weakT > 0) fx.push("squeezed");
   if ((p.tempo || 1) > 1.005) fx.push(`cooldowns −${Math.round((1 - 1 / p.tempo) * 100)}%`);   // what its Speed buys
   $("me-hptext").textContent = p.alive ? `${Math.ceil(p.cur)} / ${p.max} HP${fx.length ? " · " + fx.join(" · ") : ""}` : "fainted";
   $("swings").textContent = "⚔ " + G.swings;
@@ -3029,7 +3175,7 @@ function drawPet(e){
   if (e.clip){ cfg = e.clip.sk.sprite; frames = cfg.frames; frame = clipFrame(e.clip.sk.clip, e.clip.t); }
   else if (!e.alive) frame = f.doze;
   else if (e.moving > .1) frame = f.walk[Math.floor(e.walkT * 2.2) % 2];
-  else frame = Math.floor(e.idleT * cfg.fps) % frames;
+  else frame = Math.floor(e.idleT * cfg.fps) % (cfg.loop || frames);   // a mob's strip carries its moves after its idle
   let hop = 0, sx = 1, sy = 1, tilt = 0, alpha = 1;
   if (!e.clip && e.alive && e.moving > .1){
     const ph = e.walkT * 2.2 % 1;
@@ -3040,13 +3186,14 @@ function drawPet(e){
   if (e.swipeT > 0){ sx = 1.1; sy = .92; tilt = .1 * e.face; }
   if (!e.alive){ alpha = e.wild ? Math.max(0, 1 - e.faintT / 1.2) : .55; sy = .85; tilt = .45 * e.face; }
   if (alpha <= 0) return;
+  if (f.hover) hop += e.alive ? f.hover + Math.sin(G.time * 3 + e.home.x) * 3 : f.hover * Math.max(0, 1 - e.faintT * 2);
   ctx.fillStyle = "rgba(0,0,0,.28)";
   ctx.beginPath(); ctx.ellipse(e.x, e.y + 2, e.box * .34 * (1 - hop / 30), e.box * .1, 0, 0, 7); ctx.fill();
   if (e.net || e.isPlayer){
     ctx.strokeStyle = e.isPlayer ? "rgba(255,210,63,.6)" : "rgba(95,230,255,.5)"; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.ellipse(e.x, e.y + 2, e.box * .38, e.box * .12, 0, 0, 7); ctx.stroke();
   }
-  if (e.burn && Math.random() < .3) embers(e.x + rnd(-10, 10), e.y - e.box * .4, 1, .2);
+  if (e.burn && Math.random() < .3) (e.burn.poison ? spores : embers)(e.x + rnd(-10, 10), e.y - e.box * .4, 1, .2);
   drawSheet(cfg, frames, frame, e, e.box, {
     hop, sx, sy, tilt, white:e.flash > 0,
     alpha:alpha * (e.inv > 0 && e.isPlayer && !e.clip && Math.floor(G.time * 20) % 2 ? .55 : 1),
@@ -3076,7 +3223,7 @@ function drawLabel(e){
   ctx.font = "800 10px Nunito, system-ui, sans-serif"; ctx.textAlign = "center";
   ctx.fillStyle = "rgba(0,0,0,.65)"; ctx.fillText(`Lv${e.level} ${e.name}`, e.x + 1, y - 3);
   ctx.fillStyle = e.aggro ? "#ffb04a" : "#fff"; ctx.fillText(`Lv${e.level} ${e.name}`, e.x, y - 4);
-  if (e.aggro && e.sp === "ember" && e.cur >= e.max){ ctx.font = "900 16px Nunito, system-ui, sans-serif"; ctx.fillStyle = "#ff6b35"; ctx.fillText("!", e.x, y - 18); }
+  if (e.aggro && temperOf(e) > 0 && e.cur >= e.max){ ctx.font = "900 16px Nunito, system-ui, sans-serif"; ctx.fillStyle = "#ff6b35"; ctx.fillText("!", e.x, y - 18); }
 }
 function drawBoss(b){
   const box = b.box, base = RAID_BOSS.sprite;
@@ -3170,6 +3317,11 @@ function drawFxAir(){
       const g = ctx.createRadialGradient(p.x, y, 1, p.x, y, 24);
       g.addColorStop(0, "rgba(255,255,220,1)"); g.addColorStop(.35, "rgba(255,210,63,.95)"); g.addColorStop(.7, "rgba(255,107,53,.6)"); g.addColorStop(1, "rgba(255,107,53,0)");
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, y, 24, 0, 7); ctx.fill(); ctx.restore();
+    } else if (p.tint === "zap"){
+      ctx.save(); ctx.globalCompositeOperation = "lighter";
+      const g = ctx.createRadialGradient(p.x, y, 1, p.x, y, 18);
+      g.addColorStop(0, "rgba(255,255,255,1)"); g.addColorStop(.3, "rgba(191,248,255,.95)"); g.addColorStop(.65, "rgba(95,230,255,.5)"); g.addColorStop(1, "rgba(95,230,255,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, y, 18, 0, 7); ctx.fill(); ctx.restore();
     } else if (p.tint === "acorn"){
       ctx.save(); ctx.translate(p.x, y); ctx.rotate(p.spin); ctx.imageSmoothingEnabled = false;
       ctx.drawImage(IMG.props, PROP.acorn * 64 + 16, 52, 32, 40, -11, -14, 22, 28); ctx.restore();

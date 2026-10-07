@@ -77,6 +77,55 @@ Each species has a temperament:
 - **Ember** pets come at you.
 - **Nimbus** and **Verdant** pets mind their own business until you hit them.
 
+### Mobs
+
+Beside the wild pets, the world has creatures of its own that were never
+anybody's pet (`MOBS`, `MOB_SPAWNS`). There are 30 in all, spread over 18 spawns:
+
+| Mob | Where | Levels | Comes | Temper | Moves |
+| --- | --- | --- | --- | --- | --- |
+| Bramble Boar | the meadow round the Trailhead | 8–15 | alone | charges if you come within 150 px | **Gore** (a charge); **Stomp** from Lv 9 (a burst that rattles guard) |
+| Cinder Beetle | Ember Crags | 8–20 | in threes | goes for you from 230 px, and its pack comes with it | **Shell Ram** (a charge that leaves you flat-footed); **Cinder Spit** from Lv 12 (a shot that burns) |
+| Puffcap | Verdant Grove | 8–18 | in pairs, or alone | waits to be hit | **Spore Cloud** (a burst that poisons); **Cap Bonk** from Lv 8 (a swipe that rattles guard) |
+| Static Wisp | Nimbus Heights | 8–18 | alone, or two | goes for you from 260 px | **Zap** (a shot); **Discharge** from Lv 10 (a bolt, 25% through guard). It floats, and it fights from range: it backs off to about 190 px and circles there, slower going back than you are going in, so it can always be caught |
+
+To the engine a mob is a wild pet in every way: the same `Pet`, the same
+damage, riders, cooldowns, wind-ups, aim and dodging, the same berry drop and
+respawn, and they're shared between pages the same way (they follow the wild
+pets in `G.wild`, so every page numbers them alike). What differs is in each
+mob's row: how its level's attributes are split (`split`), what share of a
+whole pet's health and Power it gets (`hp`, `dmg`), its temper, and for the
+wisp how far it keeps off (`keep`) and how high it floats (`hover`). When a
+beetle or a Puffcap picks a fight, the rest of its kind within 220 px join in.
+Poison is a burn in green: the same rider, the same ticks, its own word.
+
+**No mob is under Lv 8.** A pet learns its first skill at 8, and with Attack
+at ×0.1 a pet below that can't fell anything. In the game's world they stop
+at Lv 15, like the wild pets.
+
+**How hard they are.** Mobs are meant to be the fights you win; the wild pets
+are the even ones. Simulated as in §3 (two AI pets, 40 fights a matchup, the
+mob at the pet's level), win rate and the HP the pet has left:
+
+| Pet | Boar | 3 Beetles | 2 Puffcaps | Wisp |
+| --- | --- | --- | --- | --- |
+| Cinderling Lv 11 | 100% · 34% | 85% · 36% | 63% · 22% | 85% · 33% |
+| Sparky Lv 11 | 100% · 48% | 100% · 58% | 100% · 42% | 98% · 38% |
+| Bamboo Cub Lv 11 | 100% · 44% | 78% · 44% | 80% · 18% | 83% · 29% |
+| Cinderling Lv 15 | 100% · 51% | 100% · 60% | 100% · 52% | 100% · 51% |
+| Sparky Lv 15 | 100% · 57% | 100% · 49% | 100% · 55% | 100% · 47% |
+| Bamboo Cub Lv 15 | 100% · 54% | 98% · 48% | 55% · 28% | 90% · 46% |
+
+A lone mob costs about half a pet's health; a pack is a real risk, the
+Puffcaps' poison most of all for the slow Bamboo Cub. Before tuning, three
+beetles beat almost every pet and two Puffcaps beat all of them.
+
+**Art.** Each mob is one 16-frame strip (idle 0–3, knocked out 4, its two
+moves 5–9 and 10–15), drawn by `tools/make_assets.py` in the pets' own style
+(a round, fuzzy body lit from the upper left, big glossy eyes, little paws in
+front, a thick dark outline) at 96×80 and upscaled ×3. They're stand-ins
+until real sheets are drawn, as the tiles and props are.
+
 **Controls.** Drag on the left half of the screen to walk. Every pet walks at
 the same pace (165 px/s); Speed shortens its cooldowns instead (§3). The
 select screen shows by how much. Your right thumb
