@@ -17,12 +17,12 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      144,
-      292
+      139,
+      293
      ],
      "scale": [
-      0.1293,
-      0.1097
+      0.1185,
+      0.1013
      ],
      "rotation": 0,
      "flip": false,
@@ -39,7 +39,7 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      265,
+      261,
       295
      ],
      "scale": [
@@ -61,7 +61,7 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      202,
+      198,
       294
      ],
      "scale": [
@@ -92,12 +92,12 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      143,
-      293
+      138,
+      294
      ],
      "scale": [
-      0.1293,
-      0.1097
+      0.1185,
+      0.1013
      ],
      "rotation": 0,
      "flip": false,
@@ -114,7 +114,7 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      262,
+      258,
       297
      ],
      "scale": [
@@ -136,7 +136,7 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      199,
+      195,
       296
      ],
      "scale": [
@@ -167,12 +167,12 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      151,
-      290
+      146,
+      291
      ],
      "scale": [
-      0.1293,
-      0.1097
+      0.1185,
+      0.1013
      ],
      "rotation": 0,
      "flip": false,
@@ -189,7 +189,7 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      266,
+      262,
       294
      ],
      "scale": [
@@ -211,7 +211,7 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      206,
+      202,
       293
      ],
      "scale": [
@@ -242,12 +242,12 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      145,
-      296
+      140,
+      297
      ],
      "scale": [
-      0.1293,
-      0.1097
+      0.1185,
+      0.1013
      ],
      "rotation": 0,
      "flip": false,
@@ -264,7 +264,7 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      267,
+      263,
       300
      ],
      "scale": [
@@ -286,7 +286,7 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      203,
+      199,
       298
      ],
      "scale": [
@@ -317,12 +317,12 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      127,
-      292
+      122,
+      293
      ],
      "scale": [
-      0.1293,
-      0.1097
+      0.1185,
+      0.1013
      ],
      "rotation": 0,
      "flip": false,
@@ -339,7 +339,7 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      245,
+      241,
       297
      ],
      "scale": [
@@ -361,7 +361,7 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      183,
+      179,
       296
      ],
      "scale": [
@@ -392,12 +392,12 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      128,
-      296
+      123,
+      297
      ],
      "scale": [
-      0.1293,
-      0.1097
+      0.1185,
+      0.1013
      ],
      "rotation": 0,
      "flip": false,
@@ -414,7 +414,7 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      246,
+      242,
       301
      ],
      "scale": [
@@ -436,7 +436,7 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      184,
+      180,
       300
      ],
      "scale": [
@@ -467,12 +467,12 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      141,
-      297
+      136,
+      298
      ],
      "scale": [
-      0.1293,
-      0.1097
+      0.1185,
+      0.1013
      ],
      "rotation": 0,
      "flip": false,
@@ -489,7 +489,7 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      256,
+      252,
       301
      ],
      "scale": [
@@ -511,7 +511,7 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      198,
+      194,
       300
      ],
      "scale": [
@@ -542,12 +542,12 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      130,
-      293
+      125,
+      294
      ],
      "scale": [
-      0.1293,
-      0.1097
+      0.1185,
+      0.1013
      ],
      "rotation": 0,
      "flip": false,
@@ -564,7 +564,7 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      246,
+      242,
       298
      ],
      "scale": [
@@ -586,7 +586,7 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      186,
+      182,
       296
      ],
      "scale": [
@@ -617,12 +617,12 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      138,
-      296
+      133,
+      297
      ],
      "scale": [
-      0.1293,
-      0.1097
+      0.1185,
+      0.1013
      ],
      "rotation": 0,
      "flip": false,
@@ -639,7 +639,7 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      254,
+      250,
       305
      ],
      "scale": [
@@ -661,7 +661,7 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      193,
+      189,
       302
      ],
      "scale": [
@@ -692,12 +692,12 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      262,
-      295
+      258,
+      297
      ],
      "scale": [
-      0.1436,
-      0.1224
+      0.1364,
+      0.116
      ],
      "rotation": 0,
      "flip": false,
@@ -714,7 +714,7 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      171,
+      167,
       297
      ],
      "scale": [
@@ -749,12 +749,12 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      270,
-      296
+      266,
+      298
      ],
      "scale": [
-      0.1436,
-      0.1224
+      0.1364,
+      0.116
      ],
      "rotation": 0,
      "flip": false,
@@ -771,7 +771,7 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      175,
+      171,
       299
      ],
      "scale": [
@@ -806,12 +806,12 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      263,
-      290
+      259,
+      292
      ],
      "scale": [
-      0.1436,
-      0.1224
+      0.1364,
+      0.116
      ],
      "rotation": 0,
      "flip": false,
@@ -828,7 +828,7 @@
      "view": 1,
      "view_name": "three_quarter_right",
      "anchor": [
-      170,
+      166,
       291
      ],
      "scale": [

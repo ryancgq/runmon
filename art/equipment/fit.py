@@ -11,8 +11,8 @@ and equip.py then draws the leg back over the collar opening.
 
 Which feet are shod, and how the Cinderling's and Sparky's paws move between
 frames, come from mockup-placements.json (where the hand-made mockups put each
-shoe). The Bamboo Cub's v3 sheet is pinned - its paws do not move - and it
-faces right throughout, so every shoe on it points right.
+shoe). The Bamboo Cub is placed exactly as its mockup (drawn on the v3
+sheet) puts the shoes - see EXACT.
 """
 import sys, json, itertools, os
 import numpy as np
@@ -27,10 +27,10 @@ PAW_GROW = 1.25
 SIDE, TQ, SOLE = 0, 1, 3
 P = json.load(open(os.path.join(HERE, 'mockup-placements.json')))
 # height / width each pet's shoes are drawn at; views not listed keep their own
-ASPECT = {('cinderling', SIDE): .55, ('sparky', TQ): .72, ('bamboo_cub', TQ): .72}
+ASPECT = {('cinderling', SIDE): .55, ('sparky', TQ): .72, ('bamboo_cub', SIDE): .66}
 
 
-def F(name, paw, frames, leg=None, view=SIDE, flip=False, ref=0, moves=True, dx=(-4, 0, 4, 8)):
+def F(name, paw, frames, leg=None, view=SIDE, flip=False, ref=0, moves=True, dx=(-12, -8, -4, 0, 4, 8)):
     """One shod paw: its box (x0, y0, x1, y1) on frame `ref`, the frames and
     foot names that wear it, the x-range of the leg that goes into the collar
     (default: anywhere across the opening, so the heel tab and tongue are what
@@ -40,10 +40,6 @@ def F(name, paw, frames, leg=None, view=SIDE, flip=False, ref=0, moves=True, dx=
 
 
 ALL, R = range(12), range
-# the lying cub's legs come down from its body at the back of each paw, so the
-# collar sits behind the paw's middle
-LYING = (-30, -26, -22, -18, -14, -10)
-SITTING = tuple(range(-24, 25, 4))
 GROUPS = {
  'cinderling': [
    # the near hind shoe sits behind the near front one: anchor it behind the
@@ -59,19 +55,18 @@ GROUPS = {
    F('front_near', (183, 297, 228, 333), [(i, 'front_near') for i in R(9)], view=TQ),
    F('hind_far_eat', (240, 300, 292, 336), [(i, 'hind_far') for i in R(9, 12)], view=TQ, ref=9),
    F('hind_near_eat', (150, 300, 200, 336), [(i, 'hind_near') for i in R(9, 12)], view=TQ, ref=9)],
- 'bamboo_cub': [
-   # frames 1-6 lying down, paws toward the viewer: three-quarter view;
-   # frame 6 lifts the middle one to wave
-   F('hind_near', (24, 258, 98, 297), [(i, 'hind_near') for i in R(6)], view=TQ, moves=False, dx=LYING),
-   F('front_near', (84, 256, 150, 299), [(i, 'front_near') for i in R(5)], view=TQ, moves=False, dx=LYING),
-   F('front_far', (152, 258, 228, 297), [(i, 'front_far') for i in R(6)], view=TQ, moves=False, dx=LYING),
-   # frames 7-12 sitting up: the cub still faces right, so both hind feet
-   # wear the same three-quarter view, toes to the right
-   F('hind_near_sit', (22, 240, 100, 300), [(i, 'hind_near') for i in R(6, 12)], view=TQ,
-     ref=6, moves=False, dx=SITTING),
-   F('hind_far_sit', (158, 240, 234, 300), [(i, 'hind_far') for i in R(6, 12)], view=TQ,
-     ref=6, moves=False, dx=SITTING)],
 }
+
+# The Bamboo Cub is drawn as in its mockup, which was made on the v3 sheet:
+# low side-view shoes, toes right, about the size of the paw, with the paw's
+# fur left showing above and coming down into the collar - not grown to hide
+# the paw. v3 is pinned, so the boxes hold still. (foot, left, width) per
+# frame on the ground line; frame 6 lifts the middle paw to wave, and from
+# frame 7 the cub sits up with its front paws round the bamboo.
+CUB_LYING = [('hind_near', 21, 62), ('front_near', 83, 60), ('front_far', 166, 64)]
+CUB_WAVING = [('hind_near', 21, 62), ('front_far', 166, 64)]
+CUB_SITTING = [('hind_near', 21, 62), ('hind_far', 163, 66)]
+EXACT = {'bamboo_cub': [(CUB_LYING, 289)] * 5 + [(CUB_WAVING, 289)] + [(CUB_SITTING, 290)] * 6}
 ASPECT_OF = lambda pet, view: ASPECT.get((pet, view), equip.VIEWS[view]['img'].height / equip.VIEWS[view]['img'].width)
 
 
@@ -79,7 +74,7 @@ def mock(pet, i, name):
     return next((s for s in P.get(pet, [[]] * 12)[i] if s['foot'] == name), None)
 
 
-result = {pet: [list() for _ in range(12)] for pet in GROUPS}
+result = {pet: [list() for _ in range(12)] for pet in list(GROUPS) + list(EXACT)}
 cache = {}
 for pet, groups in GROUPS.items():
     _, src, ol = equip.PETS[pet]
@@ -152,6 +147,12 @@ for pet, groups in GROUPS.items():
             if v['opening']:
                 s['leg'] = [g['leg'][0] + ddx, g['leg'][1] + ddx]
             result[pet][i].append(s)
+
+for pet, frames in EXACT.items():
+    for i, (feet, bottom) in enumerate(frames):
+        for foot, left, w in feet:
+            result[pet][i].append(dict(foot=foot, view=SIDE, left=left, bottom=bottom, width=w,
+                                       height=round(w * ASPECT_OF(pet, SIDE)), leg=[0, 10000]))
 
 # back to front: the mockup's order where it has one, else left to right
 for pet in result:

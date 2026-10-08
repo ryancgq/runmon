@@ -11,8 +11,11 @@ box the shoe fills, and where the leg goes in. `fit.py` writes it:
 - each shoe is the smallest that hides 95% or more of its paw in every frame
   (and at least 15% bigger than the mockup's), one size per foot for the loop
 - views follow the feet: side view for the dragon's; three-quarter for the
-  squirrel's and the cub's, which point at the viewer - every shoe toe to
-  the right, as each pet faces right, the cub sitting up included
+  squirrel's, which point at the viewer - every shoe toe to the right, as
+  each pet faces right
+- the Bamboo Cub (v3) is placed exactly as its mockup puts the shoes: low
+  side-view shoes about the size of each paw, the paw's fur left showing
+  above and coming down into the collar
 - a side or three-quarter shoe is placed by its ankle anchor under the leg
 - which feet are shod, and how the dragon's and squirrel's paws move, come
   from `mockup-placements.json` (the hand-made mockups); the v3 cub is pinned

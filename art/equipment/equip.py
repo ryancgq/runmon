@@ -36,7 +36,7 @@ DEBUG = "--debug" in sys.argv
 PETS = {
     "cinderling": ("ember:1", "art/ember-cinderling.png", 2),
     "sparky": ("nimbus:1", "art/nimbus-sparky.png", 4),
-    "bamboo_cub": ("verdant:1", "art/verdant-bamboo-cub-v3.png", 2),
+    "bamboo_cub": ("verdant:1", "art/verdant-bamboo-cub-v3.png", 3),
 }
 FEET = ["hind_near", "hind_far", "front_near", "front_far"]
 
@@ -93,9 +93,12 @@ def shoe(view, width, height, outline, flip=False):
     body = Image.fromarray(small)
     canvas = Image.new("RGBA", (width + 2 * outline, height + 2 * outline), (0, 0, 0, 0))
     canvas.paste(body, (outline, outline))
-    rim = canvas.getchannel("A").filter(ImageFilter.MaxFilter(2 * outline + 1))
+    # a round brush: a square one leaves blocky towers round the thin heel tab
+    yy, xx = np.mgrid[-outline:outline + 1, -outline:outline + 1]
+    disk = xx * xx + yy * yy <= outline * outline + outline
+    rim = ndimage.binary_dilation(np.asarray(canvas.getchannel("A")) > 0, structure=disk)
     img = Image.new("RGBA", canvas.size, OUTLINE_RGB + (0,))
-    img.putalpha(rim)
+    img.putalpha(Image.fromarray(rim.astype(np.uint8) * 255))
     img.alpha_composite(canvas)
     ax, ay = outline + v["anchor"][0] * sx, outline + v["anchor"][1] * sy
     opening = None
