@@ -27,7 +27,37 @@
         188,
         278
       ],
-      "use": "Right-facing grounded feet; dragon and squirrel."
+      "use": "Right-facing grounded feet; dragon and squirrel.",
+      "leg_opening": [
+        [
+          128,
+          0
+        ],
+        [
+          128,
+          248
+        ],
+        [
+          160,
+          262
+        ],
+        [
+          200,
+          272
+        ],
+        [
+          240,
+          266
+        ],
+        [
+          258,
+          250
+        ],
+        [
+          258,
+          0
+        ]
+      ]
     },
     {
       "index": 1,
@@ -42,7 +72,45 @@
         186,
         235
       ],
-      "use": "Angled grounded feet."
+      "use": "Angled grounded feet.",
+      "leg_opening": [
+        [
+          140,
+          0
+        ],
+        [
+          140,
+          200
+        ],
+        [
+          160,
+          215
+        ],
+        [
+          165,
+          245
+        ],
+        [
+          180,
+          262
+        ],
+        [
+          205,
+          266
+        ],
+        [
+          220,
+          250
+        ],
+        [
+          228,
+          215
+        ],
+        [
+          228,
+          0
+        ]
+      ]
     },
     {
       "index": 2,
@@ -85,5 +153,6 @@
     }
   },
   "future_shoes": "Retain this view order and cell dimensions. Match these ankle anchors and corresponding view scale, or supply updated per-view anchors. Keep original pets unchanged; equip footwear as separate layers.",
-  "integration_status": "Art atlas and template metadata only; pet attachment tracks and runtime rendering are not implemented."
+  "integration_status": "Art atlas and template metadata only; pet attachment tracks and runtime rendering are not implemented.",
+  "leg_opening": "Optional per view: polygon (cell pixels) over the collar opening and everything above it. Where the pet's leg crosses it, the leg is drawn over the shoe, so the leg goes into the collar instead of the shoe sitting on top of it. Views whose opening faces away from the viewer (seated_sole) leave it out: there the leg is behind the shoe."
 }

@@ -5,19 +5,22 @@ by `shoe-runner.json` (template `pet-footwear-v1`). Future shoes keep the same
 view order and cell size so they drop into the same placements.
 
 `placements.json` says, for every frame of the Cinderling, Sparky and Bamboo
-Cub, which feet are shod and the box each shoe fills (left, bottom, width,
-height, atlas view), back to front. `fit.py` writes it from
-`mockup-placements.json` - where the hand-made mockups of each pet put the
-shoes - by sizing every shoe up until it swallows its paw:
+Cub (v3 sheet), which feet are shod and how: the atlas view, mirroring, the
+box the shoe fills, and where the leg goes in. `fit.py` writes it:
 
-- at least 15% bigger than the mockup's shoe, and big enough to hide 95% or
-  more of the paw in every frame, so no claw, pad or paw fur shows around it
-- the paw sits a third of the way along the shoe, so the leg drops into the
-  collar and the toe runs ahead
-- one size per foot for the whole loop, so a shoe never pulses
-- frame-to-frame motion and which feet are shod are the mockup's: every shoe
-  is the side view in front of the pet; Sparky's front paws go bare while
-  they hold the acorn, the cub's while it eats
+- each shoe is the smallest that hides 95% or more of its paw in every frame
+  (and at least 15% bigger than the mockup's), one size per foot for the loop
+- views follow the feet: side view for the dragon's; three-quarter for the
+  squirrel's and the lying cub's paws, which point at the viewer; the seated
+  cub's soles face the viewer, so `seated_sole`, mirrored for the left foot
+- a side or three-quarter shoe is placed by its ankle anchor under the leg
+- which feet are shod, and how the dragon's and squirrel's paws move, come
+  from `mockup-placements.json` (the hand-made mockups); the v3 cub is pinned
+
+`equip.py` then draws the leg back over each view's `leg_opening` (in
+`shoe-runner.json`), so the leg goes down into the collar with a little
+shadow on the rim, instead of the shoe sitting on top of the paw. A new shoe
+needs its own `leg_opening` per view, or it will look stuck on.
 
 `equip.py` renders those placements and writes, to `preview/`:
 
