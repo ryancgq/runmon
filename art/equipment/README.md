@@ -6,18 +6,18 @@ view order and cell size so they drop into the same placements.
 
 `placements.json` says, for every frame of the Cinderling, Sparky and Bamboo
 Cub, which feet are shod and the box each shoe fills (left, bottom, width,
-height, atlas view), back to front. It was fitted to the hand-made mockups of
-each pet wearing the shoe:
+height, atlas view), back to front. `fit.py` writes it from
+`mockup-placements.json` - where the hand-made mockups of each pet put the
+shoes - by sizing every shoe up until it swallows its paw:
 
-- every shoe is the side view, toe to the right, in front of the pet
-- only the feet you can see are shod - no shoes hidden behind the body
-- Cinderling: near hind, far front, near front, all 12 frames
-- Sparky: hind plus both front feet; frames 10-12 the front paws hold the
-  acorn, so only the two hind feet
-- Bamboo Cub: three ground paws in frames 1-5; frame 6 lifts the middle paw;
-  frames 7-12 only the outer two while it eats
-- each pet keeps its mockup's proportions (Sparky's are chunkier) and gets a
-  dark outline to match its own line weight
+- at least 15% bigger than the mockup's shoe, and big enough to hide 95% or
+  more of the paw in every frame, so no claw, pad or paw fur shows around it
+- the paw sits a third of the way along the shoe, so the leg drops into the
+  collar and the toe runs ahead
+- one size per foot for the whole loop, so a shoe never pulses
+- frame-to-frame motion and which feet are shod are the mockup's: every shoe
+  is the side view in front of the pet; Sparky's front paws go bare while
+  they hold the acorn, the cub's while it eats
 
 `equip.py` renders those placements and writes, to `preview/`:
 
@@ -28,6 +28,7 @@ each pet wearing the shoe:
   same size and framing as the original sheet.
 
 ```
+python3 art/equipment/fit.py            # placements.json from the mockups
 python3 art/equipment/equip.py          # add --debug for a 4x3 contact sheet
 ```
 

@@ -17,12 +17,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      80,
-      268
+      86,
+      260
      ],
      "scale": [
-      0.1086,
-      0.0973
+      0.125,
+      0.1135
      ],
      "rotation": 0,
      "flip": false,
@@ -35,12 +35,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      262,
-      258
+      260,
+      249
      ],
      "scale": [
-      0.1464,
-      0.1324
+      0.1694,
+      0.1541
      ],
      "rotation": 0,
      "flip": false,
@@ -53,12 +53,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      130,
-      269
+      137,
+      249
      ],
      "scale": [
-      0.1579,
-      0.1432
+      0.1809,
+      0.1649
      ],
      "rotation": 0,
      "flip": false,
@@ -80,12 +80,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      94,
-      268
+      100,
+      260
      ],
      "scale": [
-      0.1086,
-      0.0973
+      0.125,
+      0.1135
      ],
      "rotation": 0,
      "flip": false,
@@ -98,12 +98,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      261,
-      259
+      260,
+      249
      ],
      "scale": [
-      0.1431,
-      0.1297
+      0.1694,
+      0.1541
      ],
      "rotation": 0,
      "flip": false,
@@ -116,12 +116,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      136,
-      269
+      143,
+      249
      ],
      "scale": [
-      0.1579,
-      0.1432
+      0.1809,
+      0.1649
      ],
      "rotation": 0,
      "flip": false,
@@ -143,12 +143,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      90,
-      272
+      96,
+      264
      ],
      "scale": [
-      0.1086,
-      0.0973
+      0.125,
+      0.1135
      ],
      "rotation": 0,
      "flip": false,
@@ -161,12 +161,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      264,
-      262
+      262,
+      254
      ],
      "scale": [
-      0.1497,
-      0.1351
+      0.1694,
+      0.1541
      ],
      "rotation": 0,
      "flip": false,
@@ -179,12 +179,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      139,
-      273
+      146,
+      253
      ],
      "scale": [
-      0.1579,
-      0.1432
+      0.1809,
+      0.1649
      ],
      "rotation": 0,
      "flip": false,
@@ -206,12 +206,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      91,
-      267
+      97,
+      259
      ],
      "scale": [
-      0.1086,
-      0.0973
+      0.125,
+      0.1135
      ],
      "rotation": 0,
      "flip": false,
@@ -224,12 +224,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      263,
-      256
+      261,
+      248
      ],
      "scale": [
-      0.1497,
-      0.1351
+      0.1694,
+      0.1541
      ],
      "rotation": 0,
      "flip": false,
@@ -242,12 +242,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      139,
-      268
+      146,
+      248
      ],
      "scale": [
-      0.1579,
-      0.1432
+      0.1809,
+      0.1649
      ],
      "rotation": 0,
      "flip": false,
@@ -269,12 +269,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      91,
-      267
+      97,
+      259
      ],
      "scale": [
-      0.1086,
-      0.0973
+      0.125,
+      0.1135
      ],
      "rotation": 0,
      "flip": false,
@@ -287,12 +287,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      264,
-      258
+      263,
+      248
      ],
      "scale": [
-      0.1431,
-      0.1297
+      0.1694,
+      0.1541
      ],
      "rotation": 0,
      "flip": false,
@@ -305,12 +305,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      135,
-      268
+      142,
+      248
      ],
      "scale": [
-      0.1579,
-      0.1432
+      0.1809,
+      0.1649
      ],
      "rotation": 0,
      "flip": false,
@@ -332,12 +332,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      89,
-      267
+      95,
+      259
      ],
      "scale": [
-      0.1086,
-      0.0973
+      0.125,
+      0.1135
      ],
      "rotation": 0,
      "flip": false,
@@ -350,12 +350,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      260,
-      253
+      258,
+      245
      ],
      "scale": [
-      0.148,
-      0.1351
+      0.1694,
+      0.1541
      ],
      "rotation": 0,
      "flip": false,
@@ -368,12 +368,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      133,
-      268
+      140,
+      248
      ],
      "scale": [
-      0.1579,
-      0.1432
+      0.1809,
+      0.1649
      ],
      "rotation": 0,
      "flip": false,
@@ -395,12 +395,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      87,
-      265
+      93,
+      257
      ],
      "scale": [
-      0.1086,
-      0.0973
+      0.125,
+      0.1135
      ],
      "rotation": 0,
      "flip": false,
@@ -413,12 +413,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      261,
-      256
+      258,
+      248
      ],
      "scale": [
-      0.1513,
-      0.1378
+      0.1694,
+      0.1541
      ],
      "rotation": 0,
      "flip": false,
@@ -431,12 +431,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      131,
-      266
+      138,
+      246
      ],
      "scale": [
-      0.1579,
-      0.1432
+      0.1809,
+      0.1649
      ],
      "rotation": 0,
      "flip": false,
@@ -458,12 +458,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      87,
-      264
+      93,
+      256
      ],
      "scale": [
-      0.1086,
-      0.0973
+      0.125,
+      0.1135
      ],
      "rotation": 0,
      "flip": false,
@@ -476,12 +476,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      262,
-      256
+      260,
+      247
      ],
      "scale": [
-      0.1464,
-      0.1324
+      0.1694,
+      0.1541
      ],
      "rotation": 0,
      "flip": false,
@@ -494,12 +494,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      131,
-      265
+      138,
+      245
      ],
      "scale": [
-      0.1579,
-      0.1432
+      0.1809,
+      0.1649
      ],
      "rotation": 0,
      "flip": false,
@@ -521,12 +521,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      94,
-      264
+      100,
+      256
      ],
      "scale": [
-      0.1086,
-      0.0973
+      0.125,
+      0.1135
      ],
      "rotation": 0,
      "flip": false,
@@ -539,12 +539,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      263,
-      254
+      261,
+      246
      ],
      "scale": [
-      0.148,
-      0.1351
+      0.1694,
+      0.1541
      ],
      "rotation": 0,
      "flip": false,
@@ -557,12 +557,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      132,
-      265
+      139,
+      245
      ],
      "scale": [
-      0.1579,
-      0.1432
+      0.1809,
+      0.1649
      ],
      "rotation": 0,
      "flip": false,
@@ -584,12 +584,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      86,
-      264
+      92,
+      256
      ],
      "scale": [
-      0.1086,
-      0.0973
+      0.125,
+      0.1135
      ],
      "rotation": 0,
      "flip": false,
@@ -602,12 +602,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      270,
-      252
+      268,
+      244
      ],
      "scale": [
-      0.148,
-      0.1351
+      0.1694,
+      0.1541
      ],
      "rotation": 0,
      "flip": false,
@@ -620,12 +620,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      129,
-      265
+      136,
+      245
      ],
      "scale": [
-      0.1579,
-      0.1432
+      0.1809,
+      0.1649
      ],
      "rotation": 0,
      "flip": false,
@@ -647,12 +647,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      85,
-      263
+      91,
+      255
      ],
      "scale": [
-      0.1086,
-      0.0973
+      0.125,
+      0.1135
      ],
      "rotation": 0,
      "flip": false,
@@ -665,12 +665,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      261,
-      251
+      259,
+      243
      ],
      "scale": [
-      0.1497,
-      0.1351
+      0.1694,
+      0.1541
      ],
      "rotation": 0,
      "flip": false,
@@ -683,12 +683,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      130,
-      264
+      137,
+      244
      ],
      "scale": [
-      0.1579,
-      0.1432
+      0.1809,
+      0.1649
      ],
      "rotation": 0,
      "flip": false,
@@ -710,12 +710,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      89,
-      261
+      95,
+      253
      ],
      "scale": [
-      0.1086,
-      0.0973
+      0.125,
+      0.1135
      ],
      "rotation": 0,
      "flip": false,
@@ -728,12 +728,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      269,
-      250
+      267,
+      241
      ],
      "scale": [
-      0.1464,
-      0.1324
+      0.1694,
+      0.1541
      ],
      "rotation": 0,
      "flip": false,
@@ -746,12 +746,12 @@
      "view": 0,
      "view_name": "side_right",
      "anchor": [
-      129,
-      262
+      136,
+      242
      ],
      "scale": [
-      0.1579,
-      0.1432
+      0.1809,
+      0.1649
      ],
      "rotation": 0,
      "flip": false,

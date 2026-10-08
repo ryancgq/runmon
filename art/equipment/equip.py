@@ -105,19 +105,24 @@ def build(pet):
     return strip, track
 
 
-os.makedirs(OUT, exist_ok=True)
-for pet in PETS:
-    img, track = build(pet)
-    img.save(f"{OUT}/{pet}-shoes.png", optimize=True)
-    with open(f"{OUT}/{pet}-shoes.json", "w") as f:
-        json.dump(track, f, indent=1)
-    if DEBUG:
-        fw, fh = img.width // 12, img.height
-        grid = Image.new("RGBA", (4 * fw, 3 * fh), (40, 40, 60, 255))
-        d = ImageDraw.Draw(grid)
-        for i in range(12):
-            x, y = (i % 4) * fw, (i // 4) * fh
-            grid.alpha_composite(img.crop((i * fw, 0, (i + 1) * fw, fh)), (x, y))
-            d.text((x + 4, y + 4), str(i + 1), fill=(255, 255, 0, 255))
-        grid.save(f"{OUT}/{pet}-debug.png")
-    print(pet, "ok")
+def main():
+    os.makedirs(OUT, exist_ok=True)
+    for pet in PETS:
+        img, track = build(pet)
+        img.save(f"{OUT}/{pet}-shoes.png", optimize=True)
+        with open(f"{OUT}/{pet}-shoes.json", "w") as f:
+            json.dump(track, f, indent=1)
+        if DEBUG:
+            fw, fh = img.width // 12, img.height
+            grid = Image.new("RGBA", (4 * fw, 3 * fh), (40, 40, 60, 255))
+            d = ImageDraw.Draw(grid)
+            for i in range(12):
+                x, y = (i % 4) * fw, (i // 4) * fh
+                grid.alpha_composite(img.crop((i * fw, 0, (i + 1) * fw, fh)), (x, y))
+                d.text((x + 4, y + 4), str(i + 1), fill=(255, 255, 0, 255))
+            grid.save(f"{OUT}/{pet}-debug.png")
+        print(pet, "ok")
+
+
+if __name__ == "__main__":
+    main()
