@@ -4953,7 +4953,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-10-08 7e1ac49";
+const BUILD_ID = "2026-10-08 bbab4b7";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -5475,6 +5475,15 @@ async function replayStravaRuns(ids){
   replaying = true; replaySkipped = false;
   heldRuns = held;                                  // the pet as it was, all of them out
   toast("Tap the pet to skip", "", "\u23ED\uFE0F");
+  /* The level whose celebrations have been dealt with - played, or the same
+     clip again and passed over. Skipping used to skip the reward along with
+     the walk: tap the pet while the bar was still filling (the toast above
+     invites it) and a hatch or an evolution simply never played - the pet
+     arrived at its new form in silence. A skip is for the slow bar, not for
+     the moment it was building to, so whatever is still owed when the walk
+     stops is played at the end - see the finally below. */
+  recompute();
+  let owedFrom = derived.level, playedArt = null;
 
   try {
     for (const run of queue){
@@ -5502,7 +5511,8 @@ async function replayStravaRuns(ids){
         const stage = stageForLevel(lv + 1);
         const cel = celebrationFor(save.species, stage, lv + 1);
         // the same clip twice over for one run would be a repeat, not a reward
-        if (cel && cel.art !== lastArt){ lastArt = cel.art; await playCelebration(cel, lv, stage); }
+        if (cel && cel.art !== lastArt){ lastArt = cel.art; playedArt = cel.art; await playCelebration(cel, lv, stage); }
+        owedFrom = lv + 1;
         paintXp(lv + 1, 0, xpToNext(lv + 1));         // and round again from empty
         await wait(300);
       }
@@ -5514,6 +5524,17 @@ async function replayStravaRuns(ids){
   } finally {
     replaying = false; heldRuns = null; previewPet = null;
     recompute(); renderAll();
+    /* Cut short with a level still uncelebrated: the newest form's clip plays
+       now, once - not every one the walk would have shown, which would undo
+       the skip - or, if they walked away to another screen, the moment they
+       are back on the pet (go("home") plays a pending level-up). */
+    // ...unless it is the clip they have just watched: a tap during the bar's
+    // run to a second level inside the same form owes nothing new
+    const owed = replaySkipped && derived.level > owedFrom ? celebrationsBetween(owedFrom, derived.level) : [];
+    if (owed.length && owed[owed.length - 1].art !== playedArt){
+      pendingLevelUp = true; pendingLevelFrom = owedFrom;
+      if (currentScreen === "home") playPendingLevelUp();
+    }
   }
 }
 
