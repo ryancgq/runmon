@@ -408,7 +408,7 @@ because the whole point of it is that there is no sheet.
 
 The shell's two phases sit at levels 3 and 4 rather than 2 and 3, and the
 spacing is worth stating in XP rather than kilometres: the same kilometre is
-worth anywhere from 0.50× to 1.20× depending on mood and streak, so distance
+worth anywhere from 0.70× to 1.20× depending on mood and streak, so distance
 is not a fixed measure of how long a wait feels.
 
 The egg's whole life is 3,033 XP. The changes now fall at 1,000 (33%) and
@@ -1184,14 +1184,19 @@ not climb. Neglect walks it back down, but each rung has its own patience:
 | Mood | XP | Idle days to drop a rung |
 | --- | --- | --- |
 | 🤩 Elated | 100% | 1 |
-| 😄 Happy | 90% | 2 |
-| 🙂 Content | 80% | 3 |
-| 😕 Restless | 70% | 5 |
-| 😢 Sad | 60% | 7 |
-| 😴 Hungry | 50% | floor |
+| 😄 Happy | 94% | 2 |
+| 🙂 Content | 88% | 3 |
+| 😕 Restless | 82% | 5 |
+| 😢 Sad | 76% | 7 |
+| 😴 Hungry | 70% | floor |
+
+The floor was 50%, in steps of 10, until October 2026: running less often
+cost twice over, once in the streak and again in the mood. Elated did not
+change, so a daily runner earns what they did; runs keep what they were paid
+when they were logged.
 
 A run is paid at the rung it starts in and climbs afterwards, so a Hungry pet's
-comeback run earns 50% and the next one earns 60%. Climbing is the reward,
+comeback run earns 70% and the next one earns 76%. Climbing is the reward,
 payable next time; scoring at the new rung would make the ladder free.
 
 **The day a run falls in does not count against it.** Idle days are counted to
@@ -1247,7 +1252,7 @@ lately, the streak is whether you are keeping a cadence right now. A pet can
 be Sad and on a streak (you are three days into a comeback) or Elated with the
 streak just broken (one long run after a fortnight off).
 
-Multiplied out, a run is worth between **×0.50** and **×1.20** of its base.
+Multiplied out, a run is worth between **×0.70** and **×1.20** of its base.
 
 **Levels.** Every level costs more than the last. The growth factor starts at
 ×1.5 and eases off as levels climb — a flat ×1.5 forever would put level 50
@@ -1275,7 +1280,8 @@ scoring path, the egg hatches in **25 km over 5 runs** at that size: the first
 run is paid at Happy with no streak yet, so it costs a little more than the
 table's flat rate. Shorter runs cost more (27 km in 3 km pieces), and so does
 letting the multipliers lapse — a pet left at Restless with the streak broken
-earns 0.70×, so the same forms cost it nearly twice as far.
+earns 0.82×, so the same forms cost it nearly half as far again (0.70× and
+nearly twice as far before the mood floor was raised).
 
 `LEVEL_BASE`, `LEVEL_DECAY`, `EARLY_UNTIL` and `EARLY_MULT` near the top of the
 file control this, and `Runmon.xpTable()` prints the whole curve in the

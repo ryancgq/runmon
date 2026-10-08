@@ -3175,21 +3175,30 @@ const SPECIES_ORDER = ["ember","verdant","nimbus"];
    deliberately sticky - once somebody has lapsed the game stops kicking them,
    and a once-a-week runner settles around Restless instead of on the floor.
 
-   `xpPct` is the whole of the mood's effect on XP - half a run's worth at the
-   floor, all of it at the top - and every run is paid at the current rung
+   `xpPct` is the whole of the mood's effect on XP - 70% of a run's worth at
+   the floor, all of it at the top, in even steps of 6 - and every run is paid
+   at the current rung
    whatever its distance. QUALIFY_KM decides only whether a run raises the rung.
    The streak multiplies separately and has nothing to do with it; see
    STREAK_MULT.
+
+   The floor was 50%, in steps of 10, until October 2026. That made running
+   less often expensive twice over - the streak lapsed and the mood sank -
+   and a once-a-week runner, settling around Restless, was paid 70% of every
+   run on top of losing the streak. Raised so the ladder still rewards
+   regular running without punishing the occasional runner as hard: Elated
+   is unchanged, so a daily runner earns exactly what they did. Runs keep
+   what they were paid when logged; only runs from then on use these.
 
    The keys are the original six and must stay that way: the .mood-* idle
    animations in the stylesheet are keyed by them. */
 const MOODS = {
   elated:{ rank:5, key:"elated", label:"Elated",   emoji:"🤩", xpPct:100, idle:1 },
-  happy: { rank:4, key:"happy",  label:"Happy",    emoji:"😄", xpPct:90, idle:2 },
-  okay:  { rank:3, key:"okay",   label:"Content",  emoji:"🙂", xpPct:80, idle:3 },
-  bored: { rank:2, key:"bored",  label:"Restless", emoji:"😕", xpPct:70, idle:5 },
-  sad:   { rank:1, key:"sad",    label:"Sad",      emoji:"😢", xpPct:60, idle:7 },
-  asleep:{ rank:0, key:"asleep", label:"Hungry",   emoji:"😴", xpPct:50, idle:Infinity }
+  happy: { rank:4, key:"happy",  label:"Happy",    emoji:"😄", xpPct:94, idle:2 },
+  okay:  { rank:3, key:"okay",   label:"Content",  emoji:"🙂", xpPct:88, idle:3 },
+  bored: { rank:2, key:"bored",  label:"Restless", emoji:"😕", xpPct:82, idle:5 },
+  sad:   { rank:1, key:"sad",    label:"Sad",      emoji:"😢", xpPct:76, idle:7 },
+  asleep:{ rank:0, key:"asleep", label:"Hungry",   emoji:"😴", xpPct:70, idle:Infinity }
 };
 const MOOD_BY_RANK = Object.values(MOODS).sort((a, b) => a.rank - b.rank);
 const QUALIFY_KM   = 2;   // the bar a run clears to MOVE things; every run still earns
@@ -4922,7 +4931,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-10-05 8bfb263";
+const BUILD_ID = "2026-10-08 007fa6d";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -6755,7 +6764,7 @@ function compressPath(segments, maxPoints){
    judged at the moment of the run, not the moment of import.
 
    The run is paid at the rung it starts in and climbs afterwards, so a Hungry
-   pet's comeback run earns 50% and the next one earns 60%. Climbing is the
+   pet's comeback run earns 70% and the next one earns 76%. Climbing is the
    reward, payable next time; scoring at the new rung would make the ladder
    free and therefore pointless. */
 function makeRun(at, km, sec, extra){
