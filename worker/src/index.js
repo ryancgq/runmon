@@ -2229,6 +2229,18 @@ export class Athlete {
       map[k] = { t: offered[k] ? offered[k].t : now, at: now };
       delete offered[k];
     }
+    /* And every Strava run the save itself holds. `imported` used to be the
+       only word that a run had arrived, and it rode on one push - the one
+       straight after a sync - so a phone closed before that push landed was
+       offered the same run again and took it twice. The save carries the ids
+       on every push, so one lost request no longer matters. */
+    if (save && Array.isArray(save.runs)) for (const r of save.runs){
+      if (!r || r.strava == null) continue;
+      const k = String(r.strava);
+      if (map[k]) continue;
+      map[k] = { t: offered[k] ? offered[k].t : (Number(r.t) || now), at: now };
+      delete offered[k];
+    }
     /* A run Strava has since said is gone (see activityGone()) does not come
        back in on a push that set off before the app heard. */
     const gone = await s.get("gone") || {};

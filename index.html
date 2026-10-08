@@ -4039,11 +4039,33 @@ function loadSave(){
     save.runs = Array.isArray(parsed.runs) ? parsed.runs : [];
     save.badges = parsed.badges || {};
     save.past = validPast(parsed.past);
+    dupesDropped += dropDuplicateImports();
     return !!save.species;
   } catch(e){
     console.warn("Save file was corrupt, starting fresh.", e);
     return false;
   }
+}
+/* One Strava activity, one run. The app used to take whatever the broker
+   offered without looking, and the broker offers an activity until it hears
+   it was imported - which it heard once, on the push straight after the
+   sync. A phone closed or backgrounded before that push landed, or a dropped
+   connection, lost the word, and the next sync offered the run again and it
+   went in twice: same id, same everything, and its XP paid twice. Both ends
+   are fixed (stravaSync skips an id it holds, and the broker reads the ids
+   off every save), and this takes the second copy back out of a save that
+   already has one - the first copy kept, the extra XP gone with the second.
+   Runs with no Strava id are the app's own and never matched. */
+let dupesDropped = 0;
+function dropDuplicateImports(){
+  const seen = new Set(); let n = 0;
+  save.runs = save.runs.filter(r => {
+    if (!r || r.strava == null) return true;
+    const k = String(r.strava);
+    if (seen.has(k)){ n++; return false; }
+    seen.add(k); return true;
+  });
+  return n;
 }
 function persist(){
   // localStorage stays the offline copy even when the save lives on the server,
@@ -4931,7 +4953,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-10-08 007fa6d";
+const BUILD_ID = "2026-10-08 7e1ac49";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -8997,6 +9019,7 @@ async function stravaSync(opts){
       // treadmill flag just as loadSave() can. Cleared here too, or a save
       // that followed somebody from another device would switch it back on.
       delete save.settings.stravaVirtual;
+      dupesDropped += dropDuplicateImports();
     }
     // Before any new run is added, so "set to level 12" means 12 and this
     // sync's runs then count on top of it.
@@ -9033,8 +9056,14 @@ async function stravaSync(opts){
     const freshMarks = (save.marks || []).filter(m => (m.at || 0) > marksSeen);
 
     const imported = [], newIds = [];
+    const held = new Set(save.runs.filter(r => r && r.strava != null).map(r => String(r.strava)));
     for (const a of (res.activities || [])){
       if (!a.km || a.km <= 0 || !a.sec) continue;
+      // Already here: imported on an earlier sync whose push never reached
+      // the broker. Said again, so it stops being offered - see
+      // dropDuplicateImports().
+      if (held.has(String(a.id))){ imported.push(a.id); continue; }
+      held.add(String(a.id));
       const run = makeRun(a.t, a.km, a.sec, { strava: a.id, manual: !!a.manual, device: a.device || null });
       save.runs.push(run);
       imported.push(a.id);      // for the broker, so it is not fetched again
@@ -9570,11 +9599,15 @@ function boot(){
      or, if Strava cannot be reached, anyway. */
   if (has && !stravaLinked() && foldOldRuns()) persist();
   if (has){
+    if (dupesDropped) persist();     // the cleaned save goes up, and stays
     recompute();
     applyTheme(save.species);
     renderAll();
     go("home");
     $("#screen-home").classList.add("active");
+    if (dupesDropped) toast(dupesDropped === 1
+      ? "A run that came in twice from Strava has been removed"
+      : `${dupesDropped} runs that came in twice from Strava have been removed`, "", "\u{1F9F9}");
   } else if (stravaLinked()){
     // linked but nothing here yet: this is a second device, or a first visit
     // after connecting. The server has the pet; ask before deciding they are new.
