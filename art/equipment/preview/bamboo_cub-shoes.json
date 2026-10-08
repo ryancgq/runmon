@@ -5,7 +5,7 @@
   288,
   306
  ],
- "template": "pet-footwear-v1",
+ "template": "pet-footwear-v2",
  "coordinates": "frame pixels; anchor is where the view's ankle anchor lands",
  "frames": [
   {
@@ -14,15 +14,15 @@
     {
      "foot": "hind_near",
      "visible": true,
-     "view": 0,
-     "view_name": "side_right",
+     "view": 3,
+     "view_name": "runner_round",
      "anchor": [
-      38,
-      259
+      61,
+      252
      ],
      "scale": [
-      0.102,
-      0.1108
+      0.206,
+      0.207
      ],
      "rotation": 0,
      "flip": false,
@@ -36,15 +36,15 @@
     {
      "foot": "front_near",
      "visible": true,
-     "view": 0,
-     "view_name": "side_right",
+     "view": 3,
+     "view_name": "runner_round",
      "anchor": [
-      100,
+      117,
       260
      ],
      "scale": [
-      0.0987,
-      0.1081
+      0.1829,
+      0.1825
      ],
      "rotation": 0,
      "flip": false,
@@ -58,15 +58,15 @@
     {
      "foot": "front_far",
      "visible": true,
-     "view": 0,
-     "view_name": "side_right",
+     "view": 3,
+     "view_name": "runner_round",
      "anchor": [
-      184,
-      258
+      190,
+      252
      ],
      "scale": [
-      0.1053,
-      0.1135
+      0.2106,
+      0.2105
      ],
      "rotation": 0,
      "flip": false,
@@ -89,15 +89,15 @@
     {
      "foot": "hind_near",
      "visible": true,
-     "view": 0,
-     "view_name": "side_right",
+     "view": 3,
+     "view_name": "runner_round",
      "anchor": [
-      38,
-      259
+      61,
+      252
      ],
      "scale": [
-      0.102,
-      0.1108
+      0.206,
+      0.207
      ],
      "rotation": 0,
      "flip": false,
@@ -111,15 +111,15 @@
     {
      "foot": "front_near",
      "visible": true,
-     "view": 0,
-     "view_name": "side_right",
+     "view": 3,
+     "view_name": "runner_round",
      "anchor": [
-      100,
+      117,
       260
      ],
      "scale": [
-      0.0987,
-      0.1081
+      0.1829,
+      0.1825
      ],
      "rotation": 0,
      "flip": false,
@@ -133,15 +133,15 @@
     {
      "foot": "front_far",
      "visible": true,
-     "view": 0,
-     "view_name": "side_right",
+     "view": 3,
+     "view_name": "runner_round",
      "anchor": [
-      184,
-      258
+      190,
+      252
      ],
      "scale": [
-      0.1053,
-      0.1135
+      0.2106,
+      0.2105
      ],
      "rotation": 0,
      "flip": false,
@@ -164,15 +164,15 @@
     {
      "foot": "hind_near",
      "visible": true,
-     "view": 0,
-     "view_name": "side_right",
+     "view": 3,
+     "view_name": "runner_round",
      "anchor": [
-      38,
-      259
+      61,
+      252
      ],
      "scale": [
-      0.102,
-      0.1108
+      0.206,
+      0.207
      ],
      "rotation": 0,
      "flip": false,
@@ -186,15 +186,15 @@
     {
      "foot": "front_near",
      "visible": true,
-     "view": 0,
-     "view_name": "side_right",
+     "view": 3,
+     "view_name": "runner_round",
      "anchor": [
-      100,
+      117,
       260
      ],
      "scale": [
-      0.0987,
-      0.1081
+      0.1829,
+      0.1825
      ],
      "rotation": 0,
      "flip": false,
@@ -208,15 +208,15 @@
     {
      "foot": "front_far",
      "visible": true,
-     "view": 0,
-     "view_name": "side_right",
+     "view": 3,
+     "view_name": "runner_round",
      "anchor": [
-      184,
-      258
+      190,
+      252
      ],
      "scale": [
-      0.1053,
-      0.1135
+      0.2106,
+      0.2105
      ],
      "rotation": 0,
      "flip": false,
@@ -239,15 +239,15 @@
     {
      "foot": "hind_near",
      "visible": true,
-     "view": 0,
-     "view_name": "side_right",
+     "view": 3,
+     "view_name": "runner_round",
      "anchor": [
-      38,
-      259
+      61,
+      252
      ],
      "scale": [
-      0.102,
-      0.1108
+      0.206,
+      0.207
      ],
      "rotation": 0,
      "flip": false,
@@ -261,15 +261,15 @@
     {
      "foot": "front_near",
      "visible": true,
-     "view": 0,
-     "view_name": "side_right",
+     "view": 3,
+     "view_name": "runner_round",
      "anchor": [
-      100,
+      117,
       260
      ],
      "scale": [
-      0.0987,
-      0.1081
+      0.1829,
+      0.1825
      ],
      "rotation": 0,
      "flip": false,
@@ -283,15 +283,15 @@
     {
      "foot": "front_far",
      "visible": true,
-     "view": 0,
-     "view_name": "side_right",
+     "view": 3,
+     "view_name": "runner_round",
      "anchor": [
-      184,
-      258
+      190,
+      252
      ],
      "scale": [
-      0.1053,
-      0.1135
+      0.2106,
+      0.2105
      ],
      "rotation": 0,
      "flip": false,
@@ -314,15 +314,15 @@
     {
      "foot": "hind_near",
      "visible": true,
-     "view": 0,
-     "view_name": "side_right",
+     "view": 3,
+     "view_name": "runner_round",
      "anchor": [
-      38,
-      259
+      61,
+      252
      ],
      "scale": [
-      0.102,
-      0.1108
+      0.206,
+      0.207
      ],
      "rotation": 0,
      "flip": false,
@@ -336,15 +336,15 @@
     {
      "foot": "front_near",
      "visible": true,
-     "view": 0,
-     "view_name": "side_right",
+     "view": 3,
+     "view_name": "runner_round",
      "anchor": [
-      100,
+      117,
       260
      ],
      "scale": [
-      0.0987,
-      0.1081
+      0.1829,
+      0.1825
      ],
      "rotation": 0,
      "flip": false,
@@ -358,15 +358,15 @@
     {
      "foot": "front_far",
      "visible": true,
-     "view": 0,
-     "view_name": "side_right",
+     "view": 3,
+     "view_name": "runner_round",
      "anchor": [
-      184,
-      258
+      190,
+      252
      ],
      "scale": [
-      0.1053,
-      0.1135
+      0.2106,
+      0.2105
      ],
      "rotation": 0,
      "flip": false,
@@ -389,15 +389,15 @@
     {
      "foot": "hind_near",
      "visible": true,
-     "view": 0,
-     "view_name": "side_right",
+     "view": 3,
+     "view_name": "runner_round",
      "anchor": [
-      38,
-      259
+      61,
+      252
      ],
      "scale": [
-      0.102,
-      0.1108
+      0.206,
+      0.207
      ],
      "rotation": 0,
      "flip": false,
@@ -411,15 +411,15 @@
     {
      "foot": "front_far",
      "visible": true,
-     "view": 0,
-     "view_name": "side_right",
+     "view": 3,
+     "view_name": "runner_round",
      "anchor": [
-      184,
-      258
+      190,
+      252
      ],
      "scale": [
-      0.1053,
-      0.1135
+      0.2106,
+      0.2105
      ],
      "rotation": 0,
      "flip": false,
@@ -446,15 +446,15 @@
     {
      "foot": "hind_near",
      "visible": true,
-     "view": 0,
-     "view_name": "side_right",
+     "view": 3,
+     "view_name": "runner_round",
      "anchor": [
-      38,
-      260
+      61,
+      253
      ],
      "scale": [
-      0.102,
-      0.1108
+      0.2176,
+      0.2175
      ],
      "rotation": 0,
      "flip": false,
@@ -468,15 +468,15 @@
     {
      "foot": "hind_far",
      "visible": true,
-     "view": 0,
-     "view_name": "side_right",
+     "view": 3,
+     "view_name": "runner_round",
      "anchor": [
-      181,
-      258
+      196,
+      255
      ],
      "scale": [
-      0.1086,
-      0.1189
+      0.2106,
+      0.2105
      ],
      "rotation": 0,
      "flip": false,
@@ -503,15 +503,15 @@
     {
      "foot": "hind_near",
      "visible": true,
-     "view": 0,
-     "view_name": "side_right",
+     "view": 3,
+     "view_name": "runner_round",
      "anchor": [
-      38,
-      260
+      61,
+      253
      ],
      "scale": [
-      0.102,
-      0.1108
+      0.2176,
+      0.2175
      ],
      "rotation": 0,
      "flip": false,
@@ -525,15 +525,15 @@
     {
      "foot": "hind_far",
      "visible": true,
-     "view": 0,
-     "view_name": "side_right",
+     "view": 3,
+     "view_name": "runner_round",
      "anchor": [
-      181,
-      258
+      196,
+      255
      ],
      "scale": [
-      0.1086,
-      0.1189
+      0.2106,
+      0.2105
      ],
      "rotation": 0,
      "flip": false,
@@ -560,15 +560,15 @@
     {
      "foot": "hind_near",
      "visible": true,
-     "view": 0,
-     "view_name": "side_right",
+     "view": 3,
+     "view_name": "runner_round",
      "anchor": [
-      38,
-      260
+      61,
+      253
      ],
      "scale": [
-      0.102,
-      0.1108
+      0.2176,
+      0.2175
      ],
      "rotation": 0,
      "flip": false,
@@ -582,15 +582,15 @@
     {
      "foot": "hind_far",
      "visible": true,
-     "view": 0,
-     "view_name": "side_right",
+     "view": 3,
+     "view_name": "runner_round",
      "anchor": [
-      181,
-      258
+      196,
+      255
      ],
      "scale": [
-      0.1086,
-      0.1189
+      0.2106,
+      0.2105
      ],
      "rotation": 0,
      "flip": false,
@@ -617,15 +617,15 @@
     {
      "foot": "hind_near",
      "visible": true,
-     "view": 0,
-     "view_name": "side_right",
+     "view": 3,
+     "view_name": "runner_round",
      "anchor": [
-      38,
-      260
+      61,
+      253
      ],
      "scale": [
-      0.102,
-      0.1108
+      0.2176,
+      0.2175
      ],
      "rotation": 0,
      "flip": false,
@@ -639,15 +639,15 @@
     {
      "foot": "hind_far",
      "visible": true,
-     "view": 0,
-     "view_name": "side_right",
+     "view": 3,
+     "view_name": "runner_round",
      "anchor": [
-      181,
-      258
+      196,
+      255
      ],
      "scale": [
-      0.1086,
-      0.1189
+      0.2106,
+      0.2105
      ],
      "rotation": 0,
      "flip": false,
@@ -674,15 +674,15 @@
     {
      "foot": "hind_near",
      "visible": true,
-     "view": 0,
-     "view_name": "side_right",
+     "view": 3,
+     "view_name": "runner_round",
      "anchor": [
-      38,
-      260
+      61,
+      253
      ],
      "scale": [
-      0.102,
-      0.1108
+      0.2176,
+      0.2175
      ],
      "rotation": 0,
      "flip": false,
@@ -696,15 +696,15 @@
     {
      "foot": "hind_far",
      "visible": true,
-     "view": 0,
-     "view_name": "side_right",
+     "view": 3,
+     "view_name": "runner_round",
      "anchor": [
-      181,
-      258
+      196,
+      255
      ],
      "scale": [
-      0.1086,
-      0.1189
+      0.2106,
+      0.2105
      ],
      "rotation": 0,
      "flip": false,
@@ -731,15 +731,15 @@
     {
      "foot": "hind_near",
      "visible": true,
-     "view": 0,
-     "view_name": "side_right",
+     "view": 3,
+     "view_name": "runner_round",
      "anchor": [
-      38,
-      260
+      61,
+      253
      ],
      "scale": [
-      0.102,
-      0.1108
+      0.2176,
+      0.2175
      ],
      "rotation": 0,
      "flip": false,
@@ -753,15 +753,15 @@
     {
      "foot": "hind_far",
      "visible": true,
-     "view": 0,
-     "view_name": "side_right",
+     "view": 3,
+     "view_name": "runner_round",
      "anchor": [
-      181,
-      258
+      196,
+      255
      ],
      "scale": [
-      0.1086,
-      0.1189
+      0.2106,
+      0.2105
      ],
      "rotation": 0,
      "flip": false,

@@ -26,17 +26,17 @@ from PIL import Image, ImageDraw, ImageFilter
 from scipy import ndimage
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ATLAS = os.path.join(HERE, "shoe-runner.png")
-TEMPLATE = os.path.join(HERE, "shoe-runner.json")
+ATLAS = os.path.join(HERE, "shoe-chunky.png")
+TEMPLATE = os.path.join(HERE, "shoe-chunky.json")
 PLACEMENTS = os.path.join(HERE, "placements.json")
 OUT = os.path.join(HERE, "preview")
 DEBUG = "--debug" in sys.argv
 
-# form, sheet, and the outline weight that matches the pet's own line work
+# form, sheet, and extra outline round the shoe (the art has its own)
 PETS = {
-    "cinderling": ("ember:1", "art/ember-cinderling.png", 2),
-    "sparky": ("nimbus:1", "art/nimbus-sparky.png", 4),
-    "bamboo_cub": ("verdant:1", "art/verdant-bamboo-cub-v3.png", 3),
+    "cinderling": ("ember:1", "art/ember-cinderling.png", 1),
+    "sparky": ("nimbus:1", "art/nimbus-sparky.png", 1),
+    "bamboo_cub": ("verdant:1", "art/verdant-bamboo-cub-v3.png", 1),
 }
 FEET = ["hind_near", "hind_far", "front_near", "front_far"]
 

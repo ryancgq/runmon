@@ -5,7 +5,7 @@
   420,
   320
  ],
- "template": "pet-footwear-v1",
+ "template": "pet-footwear-v2",
  "coordinates": "frame pixels; anchor is where the view's ankle anchor lands",
  "frames": [
   {
@@ -15,66 +15,66 @@
      "foot": "hind_near",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
-      96,
-      260
+      106,
+      266
      ],
      "scale": [
       0.125,
-      0.1135
+      0.1242
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 0,
      "leg": [
-      86,
-      128
+      0,
+      10000
      ]
     },
     {
      "foot": "front_far",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
-      269,
-      251
+      268,
+      253
      ],
      "scale": [
-      0.1694,
-      0.1541
+      0.1844,
+      0.1846
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 1,
      "leg": [
-      240,
-      296
+      0,
+      10000
      ]
     },
     {
      "foot": "front_near",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
       146,
-      253
+      257
      ],
      "scale": [
-      0.1809,
-      0.1649
+      0.1803,
+      0.1812
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 2,
      "leg": [
-      112,
-      162
+      0,
+      10000
      ]
     },
     {
@@ -90,66 +90,66 @@
      "foot": "hind_near",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
-      110,
-      260
+      120,
+      266
      ],
      "scale": [
       0.125,
-      0.1135
+      0.1242
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 0,
      "leg": [
-      100,
-      142
+      0,
+      10000
      ]
     },
     {
      "foot": "front_far",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
-      269,
-      251
+      268,
+      253
      ],
      "scale": [
-      0.1694,
-      0.1541
+      0.1844,
+      0.1846
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 1,
      "leg": [
-      240,
-      296
+      0,
+      10000
      ]
     },
     {
      "foot": "front_near",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
       152,
-      253
+      257
      ],
      "scale": [
-      0.1809,
-      0.1649
+      0.1803,
+      0.1812
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 2,
      "leg": [
-      118,
-      168
+      0,
+      10000
      ]
     },
     {
@@ -165,66 +165,66 @@
      "foot": "hind_near",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
-      106,
-      264
+      116,
+      270
      ],
      "scale": [
       0.125,
-      0.1135
+      0.1242
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 0,
      "leg": [
-      96,
-      138
+      0,
+      10000
      ]
     },
     {
      "foot": "front_far",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
-      271,
-      256
+      270,
+      258
      ],
      "scale": [
-      0.1694,
-      0.1541
+      0.1844,
+      0.1846
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 1,
      "leg": [
-      242,
-      298
+      0,
+      10000
      ]
     },
     {
      "foot": "front_near",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
       155,
-      257
+      261
      ],
      "scale": [
-      0.1809,
-      0.1649
+      0.1803,
+      0.1812
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 2,
      "leg": [
-      121,
-      171
+      0,
+      10000
      ]
     },
     {
@@ -240,66 +240,66 @@
      "foot": "hind_near",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
-      107,
-      259
+      117,
+      265
      ],
      "scale": [
       0.125,
-      0.1135
+      0.1242
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 0,
      "leg": [
-      97,
-      139
+      0,
+      10000
      ]
     },
     {
      "foot": "front_far",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
-      270,
-      250
+      269,
+      252
      ],
      "scale": [
-      0.1694,
-      0.1541
+      0.1844,
+      0.1846
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 1,
      "leg": [
-      241,
-      297
+      0,
+      10000
      ]
     },
     {
      "foot": "front_near",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
       155,
-      252
+      256
      ],
      "scale": [
-      0.1809,
-      0.1649
+      0.1803,
+      0.1812
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 2,
      "leg": [
-      121,
-      171
+      0,
+      10000
      ]
     },
     {
@@ -315,66 +315,66 @@
      "foot": "hind_near",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
-      107,
-      259
+      117,
+      265
      ],
      "scale": [
       0.125,
-      0.1135
+      0.1242
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 0,
      "leg": [
-      97,
-      139
+      0,
+      10000
      ]
     },
     {
      "foot": "front_far",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
-      272,
-      250
+      271,
+      252
      ],
      "scale": [
-      0.1694,
-      0.1541
+      0.1844,
+      0.1846
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 1,
      "leg": [
-      243,
-      299
+      0,
+      10000
      ]
     },
     {
      "foot": "front_near",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
       151,
-      252
+      256
      ],
      "scale": [
-      0.1809,
-      0.1649
+      0.1803,
+      0.1812
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 2,
      "leg": [
-      117,
-      167
+      0,
+      10000
      ]
     },
     {
@@ -390,66 +390,66 @@
      "foot": "hind_near",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
-      105,
-      259
+      115,
+      265
      ],
      "scale": [
       0.125,
-      0.1135
+      0.1242
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 0,
      "leg": [
-      95,
-      137
+      0,
+      10000
      ]
     },
     {
      "foot": "front_far",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
-      267,
-      247
+      266,
+      249
      ],
      "scale": [
-      0.1694,
-      0.1541
+      0.1844,
+      0.1846
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 1,
      "leg": [
-      238,
-      294
+      0,
+      10000
      ]
     },
     {
      "foot": "front_near",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
       149,
-      252
+      256
      ],
      "scale": [
-      0.1809,
-      0.1649
+      0.1803,
+      0.1812
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 2,
      "leg": [
-      115,
-      165
+      0,
+      10000
      ]
     },
     {
@@ -465,66 +465,66 @@
      "foot": "hind_near",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
-      103,
-      257
+      113,
+      263
      ],
      "scale": [
       0.125,
-      0.1135
+      0.1242
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 0,
      "leg": [
-      93,
-      135
+      0,
+      10000
      ]
     },
     {
      "foot": "front_far",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
-      267,
-      250
+      266,
+      252
      ],
      "scale": [
-      0.1694,
-      0.1541
+      0.1844,
+      0.1846
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 1,
      "leg": [
-      238,
-      294
+      0,
+      10000
      ]
     },
     {
      "foot": "front_near",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
       147,
-      250
+      254
      ],
      "scale": [
-      0.1809,
-      0.1649
+      0.1803,
+      0.1812
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 2,
      "leg": [
-      113,
-      163
+      0,
+      10000
      ]
     },
     {
@@ -540,66 +540,66 @@
      "foot": "hind_near",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
-      103,
-      256
+      113,
+      262
      ],
      "scale": [
       0.125,
-      0.1135
+      0.1242
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 0,
      "leg": [
-      93,
-      135
+      0,
+      10000
      ]
     },
     {
      "foot": "front_far",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
-      269,
-      249
+      268,
+      251
      ],
      "scale": [
-      0.1694,
-      0.1541
+      0.1844,
+      0.1846
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 1,
      "leg": [
-      240,
-      296
+      0,
+      10000
      ]
     },
     {
      "foot": "front_near",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
       147,
-      249
+      253
      ],
      "scale": [
-      0.1809,
-      0.1649
+      0.1803,
+      0.1812
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 2,
      "leg": [
-      113,
-      163
+      0,
+      10000
      ]
     },
     {
@@ -615,66 +615,66 @@
      "foot": "hind_near",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
-      110,
-      256
+      120,
+      262
      ],
      "scale": [
       0.125,
-      0.1135
+      0.1242
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 0,
      "leg": [
-      100,
-      142
+      0,
+      10000
      ]
     },
     {
      "foot": "front_far",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
-      270,
-      248
+      269,
+      250
      ],
      "scale": [
-      0.1694,
-      0.1541
+      0.1844,
+      0.1846
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 1,
      "leg": [
-      241,
-      297
+      0,
+      10000
      ]
     },
     {
      "foot": "front_near",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
       148,
-      249
+      253
      ],
      "scale": [
-      0.1809,
-      0.1649
+      0.1803,
+      0.1812
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 2,
      "leg": [
-      114,
-      164
+      0,
+      10000
      ]
     },
     {
@@ -690,66 +690,66 @@
      "foot": "hind_near",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
-      102,
-      256
+      112,
+      262
      ],
      "scale": [
       0.125,
-      0.1135
+      0.1242
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 0,
      "leg": [
-      92,
-      134
+      0,
+      10000
      ]
     },
     {
      "foot": "front_far",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
-      277,
-      246
+      276,
+      248
      ],
      "scale": [
-      0.1694,
-      0.1541
+      0.1844,
+      0.1846
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 1,
      "leg": [
-      248,
-      304
+      0,
+      10000
      ]
     },
     {
      "foot": "front_near",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
       145,
-      249
+      253
      ],
      "scale": [
-      0.1809,
-      0.1649
+      0.1803,
+      0.1812
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 2,
      "leg": [
-      111,
-      161
+      0,
+      10000
      ]
     },
     {
@@ -765,66 +765,66 @@
      "foot": "hind_near",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
-      101,
-      255
+      111,
+      261
      ],
      "scale": [
       0.125,
-      0.1135
+      0.1242
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 0,
      "leg": [
-      91,
-      133
+      0,
+      10000
      ]
     },
     {
      "foot": "front_far",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
-      268,
-      245
+      267,
+      247
      ],
      "scale": [
-      0.1694,
-      0.1541
+      0.1844,
+      0.1846
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 1,
      "leg": [
-      239,
-      295
+      0,
+      10000
      ]
     },
     {
      "foot": "front_near",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
       146,
-      248
+      252
      ],
      "scale": [
-      0.1809,
-      0.1649
+      0.1803,
+      0.1812
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 2,
      "leg": [
-      112,
-      162
+      0,
+      10000
      ]
     },
     {
@@ -840,66 +840,66 @@
      "foot": "hind_near",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
-      105,
-      253
+      115,
+      259
      ],
      "scale": [
       0.125,
-      0.1135
+      0.1242
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 0,
      "leg": [
-      95,
-      137
+      0,
+      10000
      ]
     },
     {
      "foot": "front_far",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
-      276,
-      243
+      275,
+      245
      ],
      "scale": [
-      0.1694,
-      0.1541
+      0.1844,
+      0.1846
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 1,
      "leg": [
-      247,
-      303
+      0,
+      10000
      ]
     },
     {
      "foot": "front_near",
      "visible": true,
      "view": 0,
-     "view_name": "side_right",
+     "view_name": "runner_long",
      "anchor": [
       145,
-      246
+      250
      ],
      "scale": [
-      0.1809,
-      0.1649
+      0.1803,
+      0.1812
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 2,
      "leg": [
-      111,
-      161
+      0,
+      10000
      ]
     },
     {
