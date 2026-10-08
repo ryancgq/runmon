@@ -1,0 +1,89 @@
+{
+  "template": "pet-footwear-v1",
+  "image": "shoe-runner.png",
+  "image_size": [
+    1254,
+    1254
+  ],
+  "grid": {
+    "columns": 2,
+    "rows": 2,
+    "cell_width": 627,
+    "cell_height": 627
+  },
+  "coordinates": "Pixels; origin at top-left of each cell; x rightward, y downward.",
+  "anchor_status": "Initial visual estimates; calibrate once against original pet frames before reuse. Generated views do not share an identical ankle position.",
+  "views": [
+    {
+      "index": 0,
+      "name": "side_right",
+      "rect": [
+        0,
+        0,
+        627,
+        627
+      ],
+      "ankle_anchor": [
+        188,
+        278
+      ],
+      "use": "Right-facing grounded feet; dragon and squirrel."
+    },
+    {
+      "index": 1,
+      "name": "three_quarter_right",
+      "rect": [
+        627,
+        0,
+        627,
+        627
+      ],
+      "ankle_anchor": [
+        186,
+        235
+      ],
+      "use": "Angled grounded feet."
+    },
+    {
+      "index": 2,
+      "name": "front",
+      "rect": [
+        0,
+        627,
+        627,
+        627
+      ],
+      "ankle_anchor": [
+        330,
+        126
+      ],
+      "use": "Feet pointing toward viewer."
+    },
+    {
+      "index": 3,
+      "name": "seated_sole",
+      "rect": [
+        627,
+        627,
+        627,
+        627
+      ],
+      "ankle_anchor": [
+        231,
+        155
+      ],
+      "use": "Seated hind feet tilted upward; panda. Mirror when needed for opposite seated foot."
+    }
+  ],
+  "rendering": {
+    "filter": "nearest",
+    "placement": "Place each view's ankle anchor at the pet foot attachment point. Store attachment position, view index, scale, rotation, layer, and visibility per pet animation frame.",
+    "limb_rules": {
+      "dragon": "Four ground-use feet in all 12 reference frames, allowing natural occlusion.",
+      "squirrel": "Frames 1-9: four ground-use feet. Frames 10-12: two hind-foot shoes; two bare front paws hold acorn.",
+      "panda": "Frames 1-5: four ground-use feet. Frame 6: one bare reaching front paw and three ground-use feet. Frames 7-12: two hind-foot shoes; two bare front paws handle bamboo. Preserve seated pose."
+    }
+  },
+  "future_shoes": "Retain this view order and cell dimensions. Match these ankle anchors and corresponding view scale, or supply updated per-view anchors. Keep original pets unchanged; equip footwear as separate layers.",
+  "integration_status": "Art atlas and template metadata only; pet attachment tracks and runtime rendering are not implemented."
+}

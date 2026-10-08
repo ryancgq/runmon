@@ -1,0 +1,613 @@
+{
+ "form": "verdant:1",
+ "sheet": "art/verdant-bamboo-cub.png",
+ "frame_size": [
+  297,
+  330
+ ],
+ "template": "pet-footwear-v1",
+ "frames": [
+  {
+   "frame": 0,
+   "shoes": [
+    {
+     "foot": "hind_far",
+     "visible": true,
+     "view": 3,
+     "view_name": "seated_sole",
+     "anchor": [
+      38,
+      222
+     ],
+     "scale": 0.0956,
+     "rotation": -20,
+     "flip": true,
+     "layer": "behind"
+    },
+    {
+     "foot": "hind_near",
+     "visible": true,
+     "view": 3,
+     "view_name": "seated_sole",
+     "anchor": [
+      82,
+      271
+     ],
+     "scale": 0.1434,
+     "rotation": 0,
+     "flip": true,
+     "layer": "front"
+    },
+    {
+     "foot": "front_far",
+     "visible": true,
+     "view": 2,
+     "view_name": "front",
+     "anchor": [
+      220,
+      270
+     ],
+     "scale": 0.1514,
+     "rotation": 0,
+     "flip": false,
+     "layer": "front"
+    },
+    {
+     "foot": "front_near",
+     "visible": true,
+     "view": 2,
+     "view_name": "front",
+     "anchor": [
+      138,
+      265
+     ],
+     "scale": 0.1671,
+     "rotation": 0,
+     "flip": false,
+     "layer": "front"
+    }
+   ]
+  },
+  {
+   "frame": 1,
+   "shoes": [
+    {
+     "foot": "hind_far",
+     "visible": true,
+     "view": 3,
+     "view_name": "seated_sole",
+     "anchor": [
+      37,
+      223
+     ],
+     "scale": 0.0956,
+     "rotation": -20,
+     "flip": true,
+     "layer": "behind"
+    },
+    {
+     "foot": "hind_near",
+     "visible": true,
+     "view": 3,
+     "view_name": "seated_sole",
+     "anchor": [
+      80,
+      271
+     ],
+     "scale": 0.1434,
+     "rotation": 0,
+     "flip": true,
+     "layer": "front"
+    },
+    {
+     "foot": "front_far",
+     "visible": true,
+     "view": 2,
+     "view_name": "front",
+     "anchor": [
+      217,
+      270
+     ],
+     "scale": 0.1514,
+     "rotation": 0,
+     "flip": false,
+     "layer": "front"
+    },
+    {
+     "foot": "front_near",
+     "visible": true,
+     "view": 2,
+     "view_name": "front",
+     "anchor": [
+      136,
+      265
+     ],
+     "scale": 0.1671,
+     "rotation": 0,
+     "flip": false,
+     "layer": "front"
+    }
+   ]
+  },
+  {
+   "frame": 2,
+   "shoes": [
+    {
+     "foot": "hind_far",
+     "visible": true,
+     "view": 3,
+     "view_name": "seated_sole",
+     "anchor": [
+      30,
+      223
+     ],
+     "scale": 0.0956,
+     "rotation": -20,
+     "flip": true,
+     "layer": "behind"
+    },
+    {
+     "foot": "hind_near",
+     "visible": true,
+     "view": 3,
+     "view_name": "seated_sole",
+     "anchor": [
+      74,
+      271
+     ],
+     "scale": 0.1434,
+     "rotation": 0,
+     "flip": true,
+     "layer": "front"
+    },
+    {
+     "foot": "front_far",
+     "visible": true,
+     "view": 2,
+     "view_name": "front",
+     "anchor": [
+      206,
+      270
+     ],
+     "scale": 0.1514,
+     "rotation": 0,
+     "flip": false,
+     "layer": "front"
+    },
+    {
+     "foot": "front_near",
+     "visible": true,
+     "view": 2,
+     "view_name": "front",
+     "anchor": [
+      128,
+      265
+     ],
+     "scale": 0.1671,
+     "rotation": 0,
+     "flip": false,
+     "layer": "front"
+    }
+   ]
+  },
+  {
+   "frame": 3,
+   "shoes": [
+    {
+     "foot": "hind_far",
+     "visible": true,
+     "view": 3,
+     "view_name": "seated_sole",
+     "anchor": [
+      19,
+      223
+     ],
+     "scale": 0.0956,
+     "rotation": -20,
+     "flip": true,
+     "layer": "behind"
+    },
+    {
+     "foot": "hind_near",
+     "visible": true,
+     "view": 3,
+     "view_name": "seated_sole",
+     "anchor": [
+      63,
+      271
+     ],
+     "scale": 0.1434,
+     "rotation": 0,
+     "flip": true,
+     "layer": "front"
+    },
+    {
+     "foot": "front_far",
+     "visible": true,
+     "view": 2,
+     "view_name": "front",
+     "anchor": [
+      197,
+      269
+     ],
+     "scale": 0.1514,
+     "rotation": 0,
+     "flip": false,
+     "layer": "front"
+    },
+    {
+     "foot": "front_near",
+     "visible": true,
+     "view": 2,
+     "view_name": "front",
+     "anchor": [
+      116,
+      265
+     ],
+     "scale": 0.1671,
+     "rotation": 0,
+     "flip": false,
+     "layer": "front"
+    }
+   ]
+  },
+  {
+   "frame": 4,
+   "shoes": [
+    {
+     "foot": "hind_far",
+     "visible": true,
+     "view": 3,
+     "view_name": "seated_sole",
+     "anchor": [
+      40,
+      228
+     ],
+     "scale": 0.0956,
+     "rotation": -20,
+     "flip": true,
+     "layer": "behind"
+    },
+    {
+     "foot": "hind_near",
+     "visible": true,
+     "view": 3,
+     "view_name": "seated_sole",
+     "anchor": [
+      88,
+      271
+     ],
+     "scale": 0.1434,
+     "rotation": 0,
+     "flip": true,
+     "layer": "front"
+    },
+    {
+     "foot": "front_far",
+     "visible": true,
+     "view": 2,
+     "view_name": "front",
+     "anchor": [
+      218,
+      270
+     ],
+     "scale": 0.1514,
+     "rotation": 0,
+     "flip": false,
+     "layer": "front"
+    },
+    {
+     "foot": "front_near",
+     "visible": true,
+     "view": 2,
+     "view_name": "front",
+     "anchor": [
+      137,
+      265
+     ],
+     "scale": 0.1671,
+     "rotation": 0,
+     "flip": false,
+     "layer": "front"
+    }
+   ]
+  },
+  {
+   "frame": 5,
+   "shoes": [
+    {
+     "foot": "hind_far",
+     "visible": true,
+     "view": 3,
+     "view_name": "seated_sole",
+     "anchor": [
+      40,
+      228
+     ],
+     "scale": 0.0956,
+     "rotation": -20,
+     "flip": true,
+     "layer": "behind"
+    },
+    {
+     "foot": "hind_near",
+     "visible": true,
+     "view": 3,
+     "view_name": "seated_sole",
+     "anchor": [
+      87,
+      271
+     ],
+     "scale": 0.1434,
+     "rotation": 0,
+     "flip": true,
+     "layer": "front"
+    },
+    {
+     "foot": "front_far",
+     "visible": false
+    },
+    {
+     "foot": "front_near",
+     "visible": true,
+     "view": 2,
+     "view_name": "front",
+     "anchor": [
+      138,
+      265
+     ],
+     "scale": 0.1671,
+     "rotation": 0,
+     "flip": false,
+     "layer": "front"
+    }
+   ]
+  },
+  {
+   "frame": 6,
+   "shoes": [
+    {
+     "foot": "hind_far",
+     "visible": true,
+     "view": 3,
+     "view_name": "seated_sole",
+     "anchor": [
+      33,
+      228
+     ],
+     "scale": 0.0956,
+     "rotation": -20,
+     "flip": true,
+     "layer": "behind"
+    },
+    {
+     "foot": "hind_near",
+     "visible": true,
+     "view": 3,
+     "view_name": "seated_sole",
+     "anchor": [
+      81,
+      271
+     ],
+     "scale": 0.1434,
+     "rotation": 0,
+     "flip": true,
+     "layer": "front"
+    },
+    {
+     "foot": "front_far",
+     "visible": false
+    },
+    {
+     "foot": "front_near",
+     "visible": false
+    }
+   ]
+  },
+  {
+   "frame": 7,
+   "shoes": [
+    {
+     "foot": "hind_far",
+     "visible": true,
+     "view": 3,
+     "view_name": "seated_sole",
+     "anchor": [
+      25,
+      228
+     ],
+     "scale": 0.0956,
+     "rotation": -20,
+     "flip": true,
+     "layer": "behind"
+    },
+    {
+     "foot": "hind_near",
+     "visible": true,
+     "view": 3,
+     "view_name": "seated_sole",
+     "anchor": [
+      73,
+      271
+     ],
+     "scale": 0.1434,
+     "rotation": 0,
+     "flip": true,
+     "layer": "front"
+    },
+    {
+     "foot": "front_far",
+     "visible": false
+    },
+    {
+     "foot": "front_near",
+     "visible": false
+    }
+   ]
+  },
+  {
+   "frame": 8,
+   "shoes": [
+    {
+     "foot": "hind_far",
+     "visible": true,
+     "view": 3,
+     "view_name": "seated_sole",
+     "anchor": [
+      36,
+      223
+     ],
+     "scale": 0.0956,
+     "rotation": -20,
+     "flip": true,
+     "layer": "behind"
+    },
+    {
+     "foot": "hind_near",
+     "visible": true,
+     "view": 3,
+     "view_name": "seated_sole",
+     "anchor": [
+      81,
+      270
+     ],
+     "scale": 0.1434,
+     "rotation": 0,
+     "flip": true,
+     "layer": "front"
+    },
+    {
+     "foot": "front_far",
+     "visible": false
+    },
+    {
+     "foot": "front_near",
+     "visible": false
+    }
+   ]
+  },
+  {
+   "frame": 9,
+   "shoes": [
+    {
+     "foot": "hind_far",
+     "visible": true,
+     "view": 3,
+     "view_name": "seated_sole",
+     "anchor": [
+      36,
+      222
+     ],
+     "scale": 0.0956,
+     "rotation": -20,
+     "flip": true,
+     "layer": "behind"
+    },
+    {
+     "foot": "hind_near",
+     "visible": true,
+     "view": 3,
+     "view_name": "seated_sole",
+     "anchor": [
+      80,
+      270
+     ],
+     "scale": 0.1434,
+     "rotation": 0,
+     "flip": true,
+     "layer": "front"
+    },
+    {
+     "foot": "front_far",
+     "visible": false
+    },
+    {
+     "foot": "front_near",
+     "visible": false
+    }
+   ]
+  },
+  {
+   "frame": 10,
+   "shoes": [
+    {
+     "foot": "hind_far",
+     "visible": true,
+     "view": 3,
+     "view_name": "seated_sole",
+     "anchor": [
+      28,
+      223
+     ],
+     "scale": 0.0956,
+     "rotation": -20,
+     "flip": true,
+     "layer": "behind"
+    },
+    {
+     "foot": "hind_near",
+     "visible": true,
+     "view": 3,
+     "view_name": "seated_sole",
+     "anchor": [
+      73,
+      270
+     ],
+     "scale": 0.1434,
+     "rotation": 0,
+     "flip": true,
+     "layer": "front"
+    },
+    {
+     "foot": "front_far",
+     "visible": false
+    },
+    {
+     "foot": "front_near",
+     "visible": false
+    }
+   ]
+  },
+  {
+   "frame": 11,
+   "shoes": [
+    {
+     "foot": "hind_far",
+     "visible": true,
+     "view": 3,
+     "view_name": "seated_sole",
+     "anchor": [
+      21,
+      223
+     ],
+     "scale": 0.0956,
+     "rotation": -20,
+     "flip": true,
+     "layer": "behind"
+    },
+    {
+     "foot": "hind_near",
+     "visible": true,
+     "view": 3,
+     "view_name": "seated_sole",
+     "anchor": [
+      65,
+      271
+     ],
+     "scale": 0.1434,
+     "rotation": 0,
+     "flip": true,
+     "layer": "front"
+    },
+    {
+     "foot": "front_far",
+     "visible": false
+    },
+    {
+     "foot": "front_near",
+     "visible": false
+    }
+   ]
+  }
+ ]
+}
