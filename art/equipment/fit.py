@@ -11,9 +11,8 @@ and equip.py then draws the leg back over the collar opening.
 
 Which feet are shod, and how the Cinderling's and Sparky's paws move between
 frames, come from mockup-placements.json (where the hand-made mockups put each
-shoe). The Bamboo Cub's v3 sheet is pinned - its paws do not move - and its
-seated frames turn the hind soles to the viewer, so those wear the
-seated_sole view, mirrored for the left foot.
+shoe). The Bamboo Cub's v3 sheet is pinned - its paws do not move - and it
+faces right throughout, so every shoe on it points right.
 """
 import sys, json, itertools, os
 import numpy as np
@@ -44,6 +43,7 @@ ALL, R = range(12), range
 # the lying cub's legs come down from its body at the back of each paw, so the
 # collar sits behind the paw's middle
 LYING = (-30, -26, -22, -18, -14, -10)
+SITTING = tuple(range(-24, 25, 4))
 GROUPS = {
  'cinderling': [
    # the near hind shoe sits behind the near front one: anchor it behind the
@@ -65,11 +65,12 @@ GROUPS = {
    F('hind_near', (24, 258, 98, 297), [(i, 'hind_near') for i in R(6)], view=TQ, moves=False, dx=LYING),
    F('front_near', (84, 256, 150, 299), [(i, 'front_near') for i in R(5)], view=TQ, moves=False, dx=LYING),
    F('front_far', (152, 258, 228, 297), [(i, 'front_far') for i in R(6)], view=TQ, moves=False, dx=LYING),
-   # frames 7-12 sitting up: hind soles to the viewer, the leg behind the shoe
-   F('hind_near_sit', (22, 240, 100, 300), [(i, 'hind_near') for i in R(6, 12)], view=SOLE, flip=True,
-     ref=6, moves=False, dx=(-6, -3, 0, 3, 6)),
-   F('hind_far_sit', (158, 240, 234, 300), [(i, 'hind_far') for i in R(6, 12)], view=SOLE,
-     ref=6, moves=False, dx=(-6, -3, 0, 3, 6))],
+   # frames 7-12 sitting up: the cub still faces right, so both hind feet
+   # wear the same three-quarter view, toes to the right
+   F('hind_near_sit', (22, 240, 100, 300), [(i, 'hind_near') for i in R(6, 12)], view=TQ,
+     ref=6, moves=False, dx=SITTING),
+   F('hind_far_sit', (158, 240, 234, 300), [(i, 'hind_far') for i in R(6, 12)], view=TQ,
+     ref=6, moves=False, dx=SITTING)],
 }
 ASPECT_OF = lambda pet, view: ASPECT.get((pet, view), equip.VIEWS[view]['img'].height / equip.VIEWS[view]['img'].width)
 
@@ -99,6 +100,8 @@ for pet, groups in GROUPS.items():
         pw, view = x1 - x0, g['view']
         v = equip.VIEWS[view]
         afrac = v['anchor'][0] / v['img'].width
+        if g['flip']:   # mirrored, the anchor is as far from the right edge
+            afrac = 1 - afrac
         if g['moves']:
             ws = sorted(mock(pet, i, n)['width'] for i, n in g['frames'])
             floor = round(ws[len(ws) // 2] * GROW)

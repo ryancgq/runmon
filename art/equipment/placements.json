@@ -34,11 +34,11 @@
   [{"foot": "hind_near", "view": 1, "left": 21, "bottom": 301, "width": 92, "height": 66, "leg": [0, 10000]}, {"foot": "front_near", "view": 1, "left": 82, "bottom": 301, "width": 86, "height": 62, "leg": [0, 10000]}, {"foot": "front_far", "view": 1, "left": 153, "bottom": 299, "width": 95, "height": 68, "leg": [0, 10000]}],
   [{"foot": "hind_near", "view": 1, "left": 21, "bottom": 301, "width": 92, "height": 66, "leg": [0, 10000]}, {"foot": "front_near", "view": 1, "left": 82, "bottom": 301, "width": 86, "height": 62, "leg": [0, 10000]}, {"foot": "front_far", "view": 1, "left": 153, "bottom": 299, "width": 95, "height": 68, "leg": [0, 10000]}],
   [{"foot": "hind_near", "view": 1, "left": 21, "bottom": 301, "width": 92, "height": 66, "leg": [0, 10000]}, {"foot": "front_far", "view": 1, "left": 153, "bottom": 299, "width": 95, "height": 68, "leg": [0, 10000]}],
-  [{"foot": "hind_near", "view": 3, "left": 12, "bottom": 300, "width": 98, "height": 87, "flip": true}, {"foot": "hind_far", "view": 3, "left": 148, "bottom": 300, "width": 95, "height": 84}],
-  [{"foot": "hind_near", "view": 3, "left": 12, "bottom": 300, "width": 98, "height": 87, "flip": true}, {"foot": "hind_far", "view": 3, "left": 148, "bottom": 300, "width": 95, "height": 84}],
-  [{"foot": "hind_near", "view": 3, "left": 12, "bottom": 300, "width": 98, "height": 87, "flip": true}, {"foot": "hind_far", "view": 3, "left": 148, "bottom": 300, "width": 95, "height": 84}],
-  [{"foot": "hind_near", "view": 3, "left": 12, "bottom": 300, "width": 98, "height": 87, "flip": true}, {"foot": "hind_far", "view": 3, "left": 148, "bottom": 300, "width": 95, "height": 84}],
-  [{"foot": "hind_near", "view": 3, "left": 12, "bottom": 300, "width": 98, "height": 87, "flip": true}, {"foot": "hind_far", "view": 3, "left": 148, "bottom": 300, "width": 95, "height": 84}],
-  [{"foot": "hind_near", "view": 3, "left": 12, "bottom": 300, "width": 98, "height": 87, "flip": true}, {"foot": "hind_far", "view": 3, "left": 148, "bottom": 300, "width": 95, "height": 84}]
+  [{"foot": "hind_near", "view": 1, "left": 14, "bottom": 300, "width": 112, "height": 81, "leg": [0, 10000]}, {"foot": "hind_far", "view": 1, "left": 151, "bottom": 300, "width": 101, "height": 73, "leg": [0, 10000]}],
+  [{"foot": "hind_near", "view": 1, "left": 14, "bottom": 300, "width": 112, "height": 81, "leg": [0, 10000]}, {"foot": "hind_far", "view": 1, "left": 151, "bottom": 300, "width": 101, "height": 73, "leg": [0, 10000]}],
+  [{"foot": "hind_near", "view": 1, "left": 14, "bottom": 300, "width": 112, "height": 81, "leg": [0, 10000]}, {"foot": "hind_far", "view": 1, "left": 151, "bottom": 300, "width": 101, "height": 73, "leg": [0, 10000]}],
+  [{"foot": "hind_near", "view": 1, "left": 14, "bottom": 300, "width": 112, "height": 81, "leg": [0, 10000]}, {"foot": "hind_far", "view": 1, "left": 151, "bottom": 300, "width": 101, "height": 73, "leg": [0, 10000]}],
+  [{"foot": "hind_near", "view": 1, "left": 14, "bottom": 300, "width": 112, "height": 81, "leg": [0, 10000]}, {"foot": "hind_far", "view": 1, "left": 151, "bottom": 300, "width": 101, "height": 73, "leg": [0, 10000]}],
+  [{"foot": "hind_near", "view": 1, "left": 14, "bottom": 300, "width": 112, "height": 81, "leg": [0, 10000]}, {"foot": "hind_far", "view": 1, "left": 151, "bottom": 300, "width": 101, "height": 73, "leg": [0, 10000]}]
 ]
 }

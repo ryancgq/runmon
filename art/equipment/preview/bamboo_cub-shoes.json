@@ -446,40 +446,46 @@
     {
      "foot": "hind_near",
      "visible": true,
-     "view": 3,
-     "view_name": "seated_sole",
+     "view": 1,
+     "view_name": "three_quarter_right",
      "anchor": [
-      79,
-      228
+      41,
+      237
      ],
      "scale": [
-      0.1801,
-      0.1809
+      0.2011,
+      0.1709
      ],
      "rotation": 0,
-     "flip": true,
+     "flip": false,
      "layer": "front",
      "z": 0,
-     "leg": null
+     "leg": [
+      0,
+      10000
+     ]
     },
     {
      "foot": "hind_far",
      "visible": true,
-     "view": 3,
-     "view_name": "seated_sole",
+     "view": 1,
+     "view_name": "three_quarter_right",
      "anchor": [
-      178,
-      230
+      176,
+      243
      ],
      "scale": [
-      0.1746,
-      0.1746
+      0.1813,
+      0.154
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 1,
-     "leg": null
+     "leg": [
+      0,
+      10000
+     ]
     },
     {
      "foot": "front_near",
@@ -497,40 +503,46 @@
     {
      "foot": "hind_near",
      "visible": true,
-     "view": 3,
-     "view_name": "seated_sole",
+     "view": 1,
+     "view_name": "three_quarter_right",
      "anchor": [
-      79,
-      228
+      41,
+      237
      ],
      "scale": [
-      0.1801,
-      0.1809
+      0.2011,
+      0.1709
      ],
      "rotation": 0,
-     "flip": true,
+     "flip": false,
      "layer": "front",
      "z": 0,
-     "leg": null
+     "leg": [
+      0,
+      10000
+     ]
     },
     {
      "foot": "hind_far",
      "visible": true,
-     "view": 3,
-     "view_name": "seated_sole",
+     "view": 1,
+     "view_name": "three_quarter_right",
      "anchor": [
-      178,
-      230
+      176,
+      243
      ],
      "scale": [
-      0.1746,
-      0.1746
+      0.1813,
+      0.154
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 1,
-     "leg": null
+     "leg": [
+      0,
+      10000
+     ]
     },
     {
      "foot": "front_near",
@@ -548,40 +560,46 @@
     {
      "foot": "hind_near",
      "visible": true,
-     "view": 3,
-     "view_name": "seated_sole",
+     "view": 1,
+     "view_name": "three_quarter_right",
      "anchor": [
-      79,
-      228
+      41,
+      237
      ],
      "scale": [
-      0.1801,
-      0.1809
+      0.2011,
+      0.1709
      ],
      "rotation": 0,
-     "flip": true,
+     "flip": false,
      "layer": "front",
      "z": 0,
-     "leg": null
+     "leg": [
+      0,
+      10000
+     ]
     },
     {
      "foot": "hind_far",
      "visible": true,
-     "view": 3,
-     "view_name": "seated_sole",
+     "view": 1,
+     "view_name": "three_quarter_right",
      "anchor": [
-      178,
-      230
+      176,
+      243
      ],
      "scale": [
-      0.1746,
-      0.1746
+      0.1813,
+      0.154
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 1,
-     "leg": null
+     "leg": [
+      0,
+      10000
+     ]
     },
     {
      "foot": "front_near",
@@ -599,40 +617,46 @@
     {
      "foot": "hind_near",
      "visible": true,
-     "view": 3,
-     "view_name": "seated_sole",
+     "view": 1,
+     "view_name": "three_quarter_right",
      "anchor": [
-      79,
-      228
+      41,
+      237
      ],
      "scale": [
-      0.1801,
-      0.1809
+      0.2011,
+      0.1709
      ],
      "rotation": 0,
-     "flip": true,
+     "flip": false,
      "layer": "front",
      "z": 0,
-     "leg": null
+     "leg": [
+      0,
+      10000
+     ]
     },
     {
      "foot": "hind_far",
      "visible": true,
-     "view": 3,
-     "view_name": "seated_sole",
+     "view": 1,
+     "view_name": "three_quarter_right",
      "anchor": [
-      178,
-      230
+      176,
+      243
      ],
      "scale": [
-      0.1746,
-      0.1746
+      0.1813,
+      0.154
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 1,
-     "leg": null
+     "leg": [
+      0,
+      10000
+     ]
     },
     {
      "foot": "front_near",
@@ -650,40 +674,46 @@
     {
      "foot": "hind_near",
      "visible": true,
-     "view": 3,
-     "view_name": "seated_sole",
+     "view": 1,
+     "view_name": "three_quarter_right",
      "anchor": [
-      79,
-      228
+      41,
+      237
      ],
      "scale": [
-      0.1801,
-      0.1809
+      0.2011,
+      0.1709
      ],
      "rotation": 0,
-     "flip": true,
+     "flip": false,
      "layer": "front",
      "z": 0,
-     "leg": null
+     "leg": [
+      0,
+      10000
+     ]
     },
     {
      "foot": "hind_far",
      "visible": true,
-     "view": 3,
-     "view_name": "seated_sole",
+     "view": 1,
+     "view_name": "three_quarter_right",
      "anchor": [
-      178,
-      230
+      176,
+      243
      ],
      "scale": [
-      0.1746,
-      0.1746
+      0.1813,
+      0.154
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 1,
-     "leg": null
+     "leg": [
+      0,
+      10000
+     ]
     },
     {
      "foot": "front_near",
@@ -701,40 +731,46 @@
     {
      "foot": "hind_near",
      "visible": true,
-     "view": 3,
-     "view_name": "seated_sole",
+     "view": 1,
+     "view_name": "three_quarter_right",
      "anchor": [
-      79,
-      228
+      41,
+      237
      ],
      "scale": [
-      0.1801,
-      0.1809
+      0.2011,
+      0.1709
      ],
      "rotation": 0,
-     "flip": true,
+     "flip": false,
      "layer": "front",
      "z": 0,
-     "leg": null
+     "leg": [
+      0,
+      10000
+     ]
     },
     {
      "foot": "hind_far",
      "visible": true,
-     "view": 3,
-     "view_name": "seated_sole",
+     "view": 1,
+     "view_name": "three_quarter_right",
      "anchor": [
-      178,
-      230
+      176,
+      243
      ],
      "scale": [
-      0.1746,
-      0.1746
+      0.1813,
+      0.154
      ],
      "rotation": 0,
      "flip": false,
      "layer": "front",
      "z": 1,
-     "leg": null
+     "leg": [
+      0,
+      10000
+     ]
     },
     {
      "foot": "front_near",

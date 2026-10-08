@@ -23,6 +23,7 @@ where it meets the rim.
 import json, os, sys
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
+from scipy import ndimage
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ATLAS = os.path.join(HERE, "shoe-runner.png")
@@ -44,6 +45,23 @@ FEET = ["hind_near", "hind_far", "front_near", "front_far"]
 OUTLINE_RGB = (24, 20, 28)
 # how far down the rim the leg's shadow falls, and how dark
 SHADOW_PX, SHADOW = 3, 0.62
+
+
+def bamboo(orig):
+    """The cub's bamboo: green, and the near-black line round it. It is held
+    in front of the body, so it stays in front of the shoes too."""
+    rgb = orig[..., :3].astype(int)
+    green = (rgb[..., 1] > rgb[..., 0] + 25) & (rgb[..., 1] > rgb[..., 2] + 25) & (orig[..., 3] > 0)
+    near = np.asarray(Image.fromarray(green.astype(np.uint8) * 255).filter(ImageFilter.MaxFilter(3))) > 0
+    m = green | (near & (rgb.sum(-1) < 120) & (orig[..., 3] > 0))
+    # only the bamboo itself, not stray dark specks of fur beside it
+    lab, n = ndimage.label(m)
+    size = ndimage.sum(m, lab, range(1, n + 1))
+    return np.isin(lab, 1 + np.nonzero(size >= 40)[0])
+
+
+# per pet: what in its sheet is held in front of the feet
+PROPS = {"bamboo_cub": bamboo}
 
 atlas = Image.open(ATLAS).convert("RGBA")
 tpl = json.load(open(TEMPLATE))
@@ -93,10 +111,16 @@ def shoe(view, width, height, outline, flip=False):
     return img, [round(sx, 4), round(sy, 4)], (ax, ay), opening
 
 
-def wear(frame, orig, img, left, top, opening, leg):
+def wear(frame, orig, img, left, top, opening, leg, props=None):
     """Draw the shoe, then the leg back over its opening, with a shadow on the
-    rim below. frame is modified in place; orig is the untouched pet frame."""
+    rim below, then anything the pet holds in front of its feet. frame is
+    modified in place; orig is the untouched pet frame."""
     frame.alpha_composite(img, (left, top))
+    if props is not None:
+        p = props(orig)
+        out = np.asarray(frame).copy()
+        out[p] = orig[p]
+        frame.paste(Image.fromarray(out))
     if opening is None or leg is None:
         return
     fh, fw = orig.shape[:2]
@@ -109,6 +133,8 @@ def wear(frame, orig, img, left, top, opening, leg):
     band = np.zeros(fw, bool)
     band[max(0, leg[0]):min(fw, leg[1])] = True
     m &= band[None, :] & (orig[..., 3] > 0)
+    if props is not None:
+        m &= ~props(orig)
     if not m.any():
         return
     out = np.asarray(frame).copy()
@@ -142,7 +168,7 @@ def build(pet, placements):
             flip = s.get("flip", False)
             img, scale, (ax, ay), opening = shoe(s["view"], s["width"], s["height"], outline, flip)
             left, top = s["left"] - outline, s["bottom"] + outline - img.height
-            wear(frame, orig, img, left, top, opening, s.get("leg"))
+            wear(frame, orig, img, left, top, opening, s.get("leg"), PROPS.get(pet))
             entries.append(dict(foot=s["foot"], visible=True, view=s["view"],
                                 view_name=VIEWS[s["view"]]["name"],
                                 anchor=[round(left + ax), round(top + ay)],
