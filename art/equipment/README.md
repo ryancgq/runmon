@@ -19,9 +19,12 @@ one size per foot for the loop, its ankle anchor under the middle of the leg
 and its sole on the paw's ground line. Which feet are shod, and how the
 dragon's and squirrel's paws move, come from `mockup-placements.json`.
 
-`equip.py` draws the shoes and then the pet's own paw back over each
-`leg_opening`, so the fur goes down into the collar instead of the shoe
-sitting on top of the paw. Anything a pet holds in front of its feet (the
+`equip.py` draws the shoes and then the pet's own paw back into each collar,
+so the fur goes down into the shoe instead of the shoe sitting on top of the
+paw. Only the dark collar lining is opened, plus the strip of outline across
+the top of the opening where the leg comes in (`leg_opening` just bounds the
+search); the outline round the heel tab and tongue is kept, so the collar
+has a clean rounded rim rather than a sharp cut. Anything a pet holds in front of its feet (the
 cub's bamboo) stays in front of the shoes. It writes to `preview/`:
 
 - `<pet>-shoes.json` - per frame and foot: shoe type, where its ankle anchor

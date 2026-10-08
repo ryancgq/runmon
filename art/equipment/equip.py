@@ -66,6 +66,42 @@ PROPS = {"bamboo_cub": bamboo}
 atlas = Image.open(ATLAS).convert("RGBA")
 tpl = json.load(open(TEMPLATE))
 
+def collar_hole(img, poly):
+    """Where the leg may show through the shoe, at atlas resolution: the dark
+    collar lining, plus the strip of outline across the top of the opening
+    where the leg comes in. The outline round the heel tab and the tongue is
+    kept - erasing it is what made the heel look cut off with a sharp edge."""
+    a = np.asarray(img)
+    al = a[..., 3] > 128
+    rgb = a[..., :3].astype(int)
+    mean, sat = rgb.mean(-1), rgb.max(-1) - rgb.min(-1)
+    inside = np.asarray(_poly_mask(img.size, poly))
+    lining = al & inside & (mean > 12) & (mean < 80) & (sat < 30)
+    lining = ndimage.binary_opening(lining, iterations=2)
+    lab, n = ndimage.label(lining)
+    if n:
+        lining = lab == 1 + int(np.argmax(ndimage.sum(lining, lab, range(1, n + 1))))
+    lining = ndimage.binary_fill_holes(lining)
+    # the shoe's own body (anything that is not lining or outline), and a
+    # margin round it: outline that close to the body belongs to the heel tab
+    # or the tongue
+    body = al & ~lining & (mean >= 40)
+    near_body = ndimage.binary_dilation(body, iterations=max(3, img.width // 80))
+    top = np.zeros_like(lining)
+    for x in np.nonzero(lining.any(0))[0]:
+        y = np.nonzero(lining[:, x])[0].min() - 1
+        while y >= 0 and al[y, x] and mean[y, x] < 40 and not near_body[y, x]:
+            top[y, x] = True
+            y -= 1
+    return Image.fromarray(((lining | top) * 255).astype(np.uint8))
+
+
+def _poly_mask(size, poly):
+    m = Image.new("L", size, 0)
+    ImageDraw.Draw(m).polygon(poly, fill=255)
+    return np.asarray(m) > 0
+
+
 # Each view cropped to its silhouette; anchor and leg opening kept relative to it.
 VIEWS = []
 for v in tpl["views"]:
@@ -74,9 +110,11 @@ for v in tpl["views"]:
     a = np.asarray(cell)[..., 3] > 128
     ys, xs = np.nonzero(a)
     bx0, by0 = xs.min(), ys.min()
-    VIEWS.append(dict(name=v["name"], img=cell.crop((bx0, by0, xs.max() + 1, ys.max() + 1)),
+    img = cell.crop((bx0, by0, xs.max() + 1, ys.max() + 1))
+    poly = [(px - bx0, py - by0) for px, py in v.get("leg_opening", [])]
+    VIEWS.append(dict(name=v["name"], img=img,
                       anchor=(v["ankle_anchor"][0] - bx0, v["ankle_anchor"][1] - by0),
-                      opening=[(px - bx0, py - by0) for px, py in v.get("leg_opening", [])]))
+                      opening=poly, hole=collar_hole(img, poly) if poly else None))
 
 
 def shoe(view, width, height, outline, flip=False):
@@ -102,11 +140,16 @@ def shoe(view, width, height, outline, flip=False):
     img.alpha_composite(canvas)
     ax, ay = outline + v["anchor"][0] * sx, outline + v["anchor"][1] * sy
     opening = None
-    if v["opening"]:
-        m = Image.new("L", img.size, 0)
-        ImageDraw.Draw(m).polygon([(outline + px * sx, outline + py * sy)
-                                   for px, py in v["opening"]], fill=255)
-        opening = np.asarray(m) > 0
+    if v["hole"] is not None:
+        hole = np.asarray(v["hole"].resize((width, height), Image.BOX)) >= 128
+        opening = np.zeros(img.size[::-1], bool)
+        opening[outline:outline + height, outline:outline + width] = hole
+        # the extra rim drawn round the shoe is opened too, but only straight
+        # above the hole, so the leg runs into the collar without a seam
+        # and any of that rim within a couple of pixels of the hole, or the
+        # pixel steps of the scaled-down hole leave dark specks above it
+        rim_only = rim & ~(np.asarray(canvas.getchannel("A")) > 0)
+        opening |= rim_only & ndimage.binary_dilation(opening, iterations=outline + 2)
     if flip:
         img = img.transpose(Image.FLIP_LEFT_RIGHT)
         ax = img.width - ax
