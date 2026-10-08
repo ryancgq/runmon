@@ -180,7 +180,7 @@ down through all six moods), or start over and pick a different pet.
 **Test animations** is the one that levels nothing. It opens a panel that does
 not dim the screen, so the pet stays in view above it while you tap through
 every animation the app has: fifteen idles across all three species, the egg's
-three crack phases, six moods, four skills, nine level-up celebrations — each
+three crack phases, six moods, ten skills, ten level-up celebrations — each
 with its full wind-up, burst and caption — and the confetti, the caption and
 the wind-up on their own. The pet is painted straight onto the stage and the
 celebrations run without a level to spend, so you can watch a Blazewyrm's
@@ -225,7 +225,7 @@ import if you want to move a save or keep a backup.
 | **Pet** | The animated pet, its name, level, XP bar, mood, weekly streak strip and recent runs |
 | **Run** | Live map, distance, duration, average pace, calories, pause/resume and hold-to-finish |
 | **Summary** | Route trace, run stats, a full XP breakdown, animated bar fill, and any level up or evolution |
-| **Evolve** | Lifetime stats, the five-stage evolution tree for all three species, and 20 badges. A form you have not been keeps its name back — the silhouette and the description are the tease, and a name beside them answers the question they are asking |
+| **Evolve** | Lifetime stats, the five-stage evolution tree for all three species, 15 badges and the Runmon firsts (see [Badges](#badges)). A form you have not been keeps its name back — the silhouette and the description are the tease, and a name beside them answers the question they are asking |
 | **Friends** | Your friend code, adding someone by theirs, and everyone's pet with their level and totals |
 | **History** | Every run by month, with route thumbnails; reached from **See all runs** under Recent runs |
 | **Settings** | Strava, units, body weight, XP bar animation, new game |
@@ -236,6 +236,27 @@ in it — a full run log is something you go looking for, so it hangs off Recent
 runs on the Pet screen instead and keeps the Pet tab lit while you are in it.
 
 ## Friends
+
+**The tab lists everyone, and the code flow is dormant.** While there are a
+handful of players, asking them to swap six characters to find each other is
+friction for its own sake, so `/friends/all` returns every athlete the broker
+knows who has hatched something, ordered by level. It needs a session, so it is
+players seeing players rather than a URL anybody can fetch, and the handle it
+returns is the roster's own HMAC — it identifies a row without being reversible
+into a Strava profile.
+
+This is the same roster the admin summary reads, which was built to be private;
+pointing the app at it means every player sees every other player's pet name,
+form, level, distances, run count, streaks and last run date without having
+chosen to. No Strava data, no real names, no routes — the card shape is the one
+that was always meant for friends — but being *listed* is new, and nothing in
+the app says so. That is a deliberate call for a game this small and wants
+revisiting before it is not.
+
+None of the friend-code machinery has been deleted. The broker still serves
+`/friends/me`, `/friends/lookup` and `/friends/cards`, and the app still carries
+the functions that call them, so putting the code flow back is a change to the
+tab and nothing else.
 
 A friend code is six characters from an alphabet with no I, O, 0 or 1 in it,
 minted once per athlete and kept. Codes are random rather than derived from
@@ -270,6 +291,20 @@ now; the last two are waiting on theirs.
 - **Ember** (fire) — Cinder Egg → Cinderling → Blazewyrm → Pyrelord → Infernarch
 - **Verdant** (forest) — Leaf Bud → Bamboo Cub → Panda → Thicketmane → Grovewarden
 - **Nimbus** (storm) — Static Egg → Sparky → Zephyrite → Tempestor → Thunderarch
+
+**Evolution stops at the third form for now.** `STAGE_CAP` holds every pet
+there however far it levels, because a form nobody has drawn is not a reward
+for two hundred kilometres. Raising that one constant is the whole of what is
+needed when the art lands — the levels, the names, the tree rows and the
+attribute step are all written already and none of them move. The Evolution
+screen says *"Still being drawn"* on those two rows rather than naming a level
+it will not honour, and the Pet screen's chip reads *"New forms still being
+drawn"* instead of *"Final form reached"*, which would be a lie.
+
+It takes an awkwardness with it. A Pyrelord had no skills of its own and no art
+for any, so it either fought bare-handed or borrowed the Blazewyrm's clips —
+and a Blazewyrm that kept its Cinderling move had a list reading *fireball* and
+*Fireball*, one above the other, distinguishable by a capital letter.
 
 Stages 4 and 5 draw a placeholder rather than the vector forms they used to.
 Those forms were fine beside other vectors and wrong beside the pixel art that
@@ -373,7 +408,7 @@ because the whole point of it is that there is no sheet.
 
 The shell's two phases sit at levels 3 and 4 rather than 2 and 3, and the
 spacing is worth stating in XP rather than kilometres: the same kilometre is
-worth anywhere from 0.50× to 1.20× depending on mood and streak, so distance
+worth anywhere from 0.70× to 1.20× depending on mood and streak, so distance
 is not a fixed measure of how long a wait feels.
 
 The egg's whole life is 3,033 XP. The changes now fall at 1,000 (33%) and
@@ -449,6 +484,38 @@ loses most of it, reporting the pet a dozen pixels higher than it is. Take the
 baseline from the least-lit frame of each row and correct per row, not per
 frame. Per frame would also cancel the crouch the squirrel does before it fires,
 which is animation, not drift.
+
+The Panda's is the only celebration that swells twice. Green motes gather and
+fade over frames 2–7, the pet shuts its eyes through 8–10 with next to nothing
+on screen, and only then does the real bloom build and break — a green and blue
+vortex on 13, at its widest on 14. Counted off the sheet's own effect pixels,
+which run 0 at rest, 7.6k on the first swell, 63 in the lull and 23.8k on 13.
+Frames 13 and 14 are two drawings of the same vortex rather than one drawing
+held, so the aura is carried by alternating them, the way the Bamboo Cub's
+bloom is.
+
+Its `burst` is 12, not the 13 where the vortex actually is. The number counts
+the beats that come *before* the flash, so naming the vortex itself made it the
+last beat of the build — and the build accelerates into the burst, which put
+the clip's whole point on its shortest hold, 41ms. At 12 the two flash beats
+land on the vortex and it holds for 720ms instead. The Bamboo Cub is numbered
+the same way for the same reason.
+
+It arrived as a 4×4 grid, and the grid is not on a grid. The pet is taller than
+its nominal cell and its feet cross into the row below, so cutting at even
+sixteenths put the previous frame's paws at the top of the next one — invisible
+under the effect for most of the clip, and obvious in the settled frames at the
+end. The cut follows the sheet's own empty gutters instead (rows 29–326,
+338–641, 667–930 and 932–1223, no two the same height), and each cell is then
+centred and stood on a common floor. Every cell has the pet's feet on its own
+bottom edge, so bottom-aligning them is what lines the pets up; nothing is
+anchored per frame, which would cancel the lean the pet does at the bloom.
+
+The panda is
+drawn slimmer here than on its idle sheet — a bigger head on a narrower body —
+so no single scale matches both the width and the height of the idle it cuts
+away from. The entry splits the difference, 1.4% wide and 1.4% short, with the
+ground line matched exactly, which is the axis the eye actually catches.
 
 The Zephyrite's celebration works the same way as the Sparky's and needed
 the same care, with one number different: its effect pixels - cyan aura and
@@ -591,21 +658,117 @@ use them.
 ## Skills
 
 A form is not the end of a stage, it is the start of one: a pet keeps learning
-inside the form it grew into. The Cinderling, the Sparky and the Bamboo Cub
-have one move each, all at level 8; the Blazewyrm learns all three of its own
-between level 15, where the form arrives, and level 30, where the next one
-does; and the Zephyrite has the first of its own at 18, the same level the
-Blazewyrm starts.
+inside the form it grew into. The three second forms have four moves each,
+spread over levels 5-15 - the Cinderling at 8, 10, 13 and 15, the Sparky and
+the Bamboo Cub at 8, 11, 13 and 15 - the last and strongest of them (Cinder
+Sweep, Pocket Storm, Forest Slam) at 15, the level before they evolve; the
+Blazewyrm learns all three of its own between level 16, where the form
+arrives, and level 30, where the next one does; and the Zephyrite has the
+first of its own at 18, the same level the Blazewyrm starts.
 
 | Skill | Form | Learns at | What it does |
 | --- | --- | --- | --- |
 | 🔥 fireball | Cinderling | Level 8 | Sold as the strongest fire you will ever see. Three seconds of winding up, then a cough and some smoke. |
+| 💢 Horn Rush | Cinderling | Level 10 | Lowers its horns and charges. It never quite works out how to stop, so it hits hard - and then sees stars. |
+| 💨 Tail Swipe | Cinderling | Level 13 | Spins round and cracks its tail like a whip. The gust knocks their guard wide open. |
+| ⭕ Cinder Sweep | Cinderling | Level 15 | Whips its tail flame round in a full circle. Whatever is close gets burnt - and so, a little, does the Cinderling. |
 | ⚡ Spark | Sparky | Level 8 | Guaranteed to leave something scorched. The something is the squirrel. |
+| 💫 Static Shock | Sparky | Level 11 | Bottles up every spark it has and goes off like a flashbulb. Whatever it hits forgets how to block. |
+| 🌰 Acorn Flick | Sparky | Level 13 | Winds its whole tail round and swats the acorn at them. It will want that acorn back. |
+| ⛈️ Pocket Storm | Sparky | Level 15 | Brews a thundercloud the size of a teacup and points it at them. It is a very angry teacup. |
 | 🍃 Green Gale | Bamboo Cub | Level 8 | The forest's strength, gathered and released. Out of the wrong end. |
+| 🤗 Cuddle | Bamboo Cub | Level 11 | Charges in arms first for the biggest hug it can manage. Whatever it catches comes out squished, and swings softer for a while. |
+| 🎋 Bamboo Tasting | Bamboo Cub | Level 13 | Takes a thoughtful bite, chews it over, and spits out the verdict. At them. Hard. |
+| 🌿 Forest Slam | Bamboo Cub | Level 15 | Leaps as high as a cub can and comes down on the forest floor. The ground erupts - and so, a little, does the cub. |
 | 🔥 Fireball | Blazewyrm | Level 18 | Draws a breath and spits a packed ball of flame |
 | 💥 Flame Stomp | Blazewyrm | Level 22 | Lands hard enough to throw a ring of fire out around it |
 | ☄️ Flying Swoop | Blazewyrm | Level 26 | A low, fast pass trailing fire |
 | 🌩️ Lightning Bolt | Zephyrite | Level 18 | Asks the sky for help. The sky, this time, obliges. |
+| 😴 Nap | Panda | Level 18 | Sits down mid-fight and sleeps it off. Wakes up rested, and a lot harder to hurt. |
+| 🪨 Landslide | Panda | Level 22 | Curls up, picks a direction and commits. Steering was never part of the plan. |
+| 🌀 Arc Lash | Zephyrite | Level 22 | Cracks its tail like a whip. Whatever is downrange gets the storm. |
+
+**A move belongs to the form that learnt it** and retires with that form. The
+Evolution screen still lists an outgrown one, marked as what it was.
+
+**Nap is the longest clip in the game**, at 4.65 seconds, because the joke is
+that it takes its time: three frames of getting drowsy, two of a yawn held open,
+a flop onto its side, and then a full second and a quarter asleep while the z,
+the zz and the zzz arrive. Waking is quicker than going under — 280, 220, 200 —
+and the last frame sits up and holds, so the clip hands the pet back in the pose
+the idle opens with rather than mid-scramble.
+
+Its 4×4 grid overlaps: the sleeping row and the waking row touch, and in two of
+the four columns the lower pet's ears reach up past the upper pet's feet. It is
+cut on a minimum-cost seam that weaves between them rather than on a straight
+line — ten of the twelve boundaries come out crossing nothing at all, and the
+two that touch cross 46 and 15 pixels instead of shearing an ear flat. The same
+lesson as the Panda's celebration, applied before shipping it rather than after.
+
+**The last three frames were drawn smaller than the rest** and are scaled back
+up — ×1.13, ×1.10 and ×1.06 — so the pet does not shrink on its way back to the
+idle. Measured by fitting each frame's silhouette against the first one over a
+range of scales and taking the best overlap, which is the only comparison that
+survives the pose changing: frames 1–6 fit each other within 2%, and 14, 15 and
+16 did not. The lying frames cannot be compared to a sitting one that way, so
+they were checked against each other instead and agree to within 7%, which is
+drawing rather than drift.
+
+**Frames keep the height off the ground they were drawn at**, measured against
+their own row's floor. Standing them all on one line is the obvious way to pack
+a sheet and it is wrong here: frame 14 is the pet startled awake and leaving the
+ground by 41px, and a flat floor silently plants it back down. Everything else
+lands within 5px of its row, which is the drawing's own wobble and is kept
+rather than straightened — once you are flattening, you cannot tell the wobble
+from the jump. The jump is scaled with its frame, 41px to 46px, so the pet does
+not leave the ground by a different amount than it was drawn leaving it. The
+celebration sheet was checked for the same thing and has none: every frame of it
+sits within 3px of its row.
+
+The dimmed-chip machinery it used to need is still there for the next skill
+that arrives without art: a move that is this form's own but has no sheet shows
+a dashed chip that says so when tapped, and the Evolution screen reads
+*"Learnt · animation coming"*.
+
+**Arc Lash is the first move that reaches into somebody else's guard.** Every
+other effect in the game is something a pet does to itself; this drops the
+opponent's Defence 25% for three of their turns, which is worth more to Nimbus
+than to anybody — a pet built to act twice makes the second act land harder.
+Two sources of the same problem take the longer and deeper of the pair rather
+than overwriting each other.
+
+Its first draft hit for *less* than a plain attack, on the theory that the
+debuff was the payment. It made Nimbus measurably worse: a weak move still
+spends the shared cooldown the Bolt is waiting on, so the pet was paying twice
+and buying once. **A second skill has to beat a basic attack on the turn it is
+used, or it is a liability however good its rider is.**
+
+Its grid needed a vertical seam — in the middle row the burst frame and its
+neighbour touch — and one more thing besides. Column 0 has no separator to its
+left, so its origin has to come from the grid's own pitch rather than from the
+sheet's left content edge. Those are not the same kind of reference, and using
+the edge slid every first-column frame 25px sideways: three frames of the same
+resting pose landed 62px apart instead of 16.
+
+**Landslide is the Panda's damage**, and it closed the last real gap in the
+roster: until it existed, Nap was the whole kit and Nap does nothing to
+anybody, which made the third form the only one that could not threaten a
+thing.
+
+It goes through a guard rather than around it — a rolling weight does not care
+how well you are braced — and the cost is a real one: its own Defence is halved
+for three turns afterwards while it unrolls, on a five-turn cooldown. The first
+draft was a bigger hit more often and put Verdant at 65% against Ember and 69%
+against Nimbus from level 22 on. Tuning found the balance sits at a heavier hit
+paid for more dearly rather than a smaller one paid for lightly: 0.95 damage on
+a four-turn cooldown scored identically, but a move called Landslide that hits
+for less than a shove is not worth having.
+
+Its sheet is packed from whole gutter cells rather than content crops. The ball
+wobbles about its cell's centre and that wobble is drawn, so centring each frame
+on its own content would have steadied a ball that is meant to be lurching. The
+pet does not travel across the frame — the roll is carried by the speed lines —
+so there is no horizontal motion to preserve, only the wobble.
 
 All three babies' moves are the same joke told three times, which is
 deliberate: a first skill is named for what the pet thinks it is doing. The
@@ -734,12 +897,282 @@ a game people play against each other, everyone should be looking at the same
 creature. Adding or changing art means editing `DEFAULT_SPRITES` and shipping
 it, which is what `ART-SPEC.md` describes.
 
+## Attributes
+
+Every pet carries four numbers — **HP, Defence, Power and Speed** — shown on the
+Pet screen under the level card. Nothing reads them yet: Battle does not exist.
+They are there so the shape of a species is visible while it grows.
+
+They are **derived, never stored**, from species and level alone, the same rule
+as everything else in the game. There is no save to migrate, nothing to drift,
+and nothing for the cards or the roster to carry.
+
+Every species has the **same total at a given level** and differs only in how
+that total is split, so no form is simply handed more than another. The split
+*is* the identity. None of that is stated in the app: the numbers are
+shown, the rule behind them is not, because working it out is nicer than being
+told it.
+
+| | HP | Defence | Power | Speed | |
+|---|---|---|---|---|---|
+| 🌿 Verdant | 37% | 26% | 27% | 10% | outlasts you |
+| 🔥 Ember | 19% | 19% | 37% | 25% | ends it early |
+| ⚡ Nimbus | 21% | 19% | 30% | 29% | acts twice |
+
+```
+total(level) = 100 + 6 × (level − 1) + evoBonus[stage]
+evoBonus     = [0, 0, 18, 42, 72]        // cumulative, by stage index
+```
+
+Evolving adds a step on top of the per-level growth, but only from the **third**
+form on. The first two arrive at levels 1 and 5, which is before anybody has
+really begun, so a bonus there would be a bigger starting number rather than a
+reward — the same reasoning that put `EARLY_MULT` on the egg.
+
+| Evolution | Total before → after | Worth |
+|---|---|---|
+| Lv 5 → stage 2 | 118 → 124 | nothing extra — an ordinary level |
+| Lv 16 → stage 3 | 184 → 208 | **4 levels** at once |
+| Lv 30 → stage 4 | — | waiting on the art |
+| Lv 50 → stage 5 | — | waiting on the art |
+
+The last two steps are written and unreachable, because `STAGE_CAP` holds the
+pet at its third form. A bonus for evolving is not paid for an evolution that
+does not happen, so past level 16 the pool grows by a flat 6 a level: 208 at
+16, 292 at 30, 706 at 99.
+
+At level 16 a Blazewyrm reads 40 / 40 / 77 / 52 and a Panda 77 / 54 / 56 / 21,
+off the same 208 points.
+
+The bars are drawn against the widest slice anyone has (37%), not against the
+row's own biggest number, so a Panda's Speed reads as short next to a
+Blazewyrm's — which is the point — and no bar jumps as a stat grows.
+
+## Battle
+
+Two pets, taking turns, decided by their attributes and the moves you pick.
+The engine is pure arithmetic — it draws nothing, waits for nothing, touches no
+save — so a fight seeded the same way plays out identically on any device.
+That is what lets a battle be replayed from a seed and a list of choices rather
+than stored blow by blow.
+
+**Mood and streak are deliberately absent.** A battle is about the pet you grew,
+not the week you had, and nobody should lose because they were ill on a Tuesday.
+
+**The screen keeps its own copy of both healths.** `btAct()` settles the whole
+action the instant it is called — that is what makes the engine replayable — so
+the engine's figure is the post-hit one while the attacker is still winding up.
+Painting the bars from it dropped the opponent's health at the *start* of the
+animation and then floated the damage number over it a clip later. The bars now
+advance only when the blow lands: at the end of the attacker's clip, or 400ms
+into a plain attack, which is just past the lunge.
+
+```
+damage   = Power × multiplier × K/(K + Defence) × (1 ± 35%)
+K        = the average of both totals × 0.6
+HP pool  = HP × 5
+```
+
+| | |
+| --- | --- |
+| **Who opens** | a coin weighted by Speed, not a comparison |
+| **Extra turns** | the speed gap as a chance, capped at 35% |
+| **Skills** | one skill, then two ordinary turns, whatever else is off cooldown |
+| **Length** | 8–13 turns, about 30–40 seconds with the clips |
+
+Every number was settled by simulation rather than by taste, and four of the
+rules exist because the simulation contradicted the obvious guess.
+
+**Mitigation is divisive, not subtractive.** Subtracting Defence from damage
+made the Panda unkillable at low levels and paper at high ones.
+
+**K scales with the level of the fight.** Held fixed, Defence quietly grew more
+valuable every level, and a level-99 Panda won 67% of everything.
+
+**A skill costs a shared cooldown, not just its own.** Without it a form's
+three moves are simply three times the damage of everybody else's one.
+
+**Who opens is a weighted coin.** "Faster always goes first" sounds fair and is
+not: Speed rises with level like everything else, so in a fight between two of
+the same species the higher level always opened — and a fight lasting four hits
+each is decided by who lands the first one. **A pet one level up won a hundred
+fights in a hundred.** Making it likely rather than certain put the upset back
+on the table, and cost the fast pet nothing it had earned: at a Zephyrite's
+speed against a Panda's it still opens three times in four.
+
+| Level advantage | +1 | +2 | +3 | +5 | +10 |
+| --- | --- | --- | --- | --- | --- |
+| Higher level wins | 55% | 59% | 64% | 74% | 88% |
+
+Two things the simulation ruled out. **Crits are off**: a crit raises mean
+damage, which shortens fights, which hands them to whoever moved first — it
+made Ember lose to Nimbus 62/38. **Nap is once a battle**: two Pandas with a
+repeatable 30% heal out-heal each other's damage forever, and the fight only
+ended because the engine gave up at eighty turns.
+
+### How balanced it actually is
+
+Every pairing at every level from 8 to 40 lands between 42% and 55%, with
+both pets played the way the game plays a pet on auto: **any move it has ready,
+at random**, and a Nap only once it is hurt. Mirror matches are fair to within
+a fifth of a point over 30,000 fights each, so there is no advantage in being
+the one who sent the challenge.
+
+| Row wins | Verdant v Ember | Verdant v Nimbus | Ember v Nimbus |
+| --- | --- | --- | --- |
+| Level 12 | 48% | 52% | 45% |
+| Level 26 | 45% | 56% | 48% |
+| Level 40 | 46% | 53% | 47% |
+
+A pet on auto used to take the first move it had ready, in the order it
+learnt them. Every number was tuned on that order, and some of it depended
+on it: the Cinderling's Fizzle is a wind-up for the move after it, and with
+the order random the Cinderling fell from 53% to 40% against the Sparky. The
+Sparky's third and fourth moves, meanwhile, were never reached on auto at
+all. Random picking came with a retune of nine moves together, measured on
+the game's own picker.
+
+Capping evolution is what made this reachable. While moves carried forward a
+form's kit kept growing, and the three species drifted into a 40–61% triangle
+that no amount of tuning closed; with each form holding its own moves the worst
+pairing came in from 20 points out to 3.
+
+The weakest spots are Ember against Nimbus at 13, 14 and 22 (42–44%) and
+Nimbus against Verdant from 18 to 26 (43–45%).
+
+### Pile-on marks
+
+Winning a battle is not the prize. **Every fight leaves a mark on the pet that
+was attacked, and a mark takes a share of the XP its owner earns by running**
+while it lasts. It is the only thing one player can do to another, and it is
+deliberately not something anyone can do alone.
+
+```
+chip   = 1 − defenderHP_end / defenderHP_max      // 1 when they were knocked out
+gapMul = gap >= 0 ? min(1, 0.2 + 0.16 × gap)      // gap = their level − yours
+                  : 0.2 × 0.75^−gap
+mark   = 0.10 × chip × gapMul × (win ? 1.4 : 1)
+```
+
+Marks from **distinct** attackers stack, cap at **−30%**, and each fades over
+its own 24 hours so a pile-on drains away through the following day rather than
+ending at a stroke. Two attacks a day, and never the same target twice.
+
+`gapMul` is the whole design in one curve. It pays for punching up and it does
+not pay for punching down, so nothing forbids attacking somebody below you — it
+is simply not worth the attack you spent.
+
+| Gap | `gapMul` | A win leaves | A 60% chip leaves |
+| --- | --- | --- | --- |
+| 5+ up | 1.00 | 14.0% | 6.0% |
+| 3 up | 0.68 | 9.5% | 4.1% |
+| 1 up | 0.36 | 5.0% | 2.2% |
+| Even | 0.20 | 2.8% | 1.2% |
+| 3 down | 0.08 | 1.1% | 0.5% |
+| 5 down | 0.05 | 0.7% | 0.3% |
+
+The consequence is the point, and it needs no rule to enforce it: **the
+highest-level player is the best target for everybody else and the only one who
+cannot answer in kind.** Collusion against the leader is not a loophole, it is
+the intended play.
+
+It is also self-limiting. `gapMul` shrinks as the field closes, so the pressure
+on the leader fades exactly as it does its job — at parity a mark is a fifth of
+full size. It is a feedback loop, not a punishment.
+
+Losing still leaves a mark, which is what makes a hopeless attack on the leader
+worth making; winning is worth 40% more on top.
+
+**Tuned by simulation, not by taste.** Running the real engine across the level
+pairs that actually occur:
+
+| Gap | Attacker wins | Mean chip | Mean mark | Attackers to reach the cap |
+| --- | --- | --- | --- | --- |
+| 0 | 46% | 0.88 | 2.2% | 13.9 |
+| 1 | 37% | 0.85 | 3.7% | 8.1 |
+| 2 | 27% | 0.79 | 4.8% | 6.2 |
+| 3 | 18% | 0.73 | 5.6% | 5.3 |
+| 4 | 15% | 0.69 | 6.4% | 4.7 |
+| 5 | 11% | 0.64 | 7.0% | 4.3 |
+
+A single attacker's best day in twenty is 9.5% at a three-level gap — about a
+third of the cap. Five committed attackers reach it. Note the win rates: a
+five-level gap is **not** a close fight, it is a 1-in-10 upset. What makes the
+attack worth making anyway is that the chip counts even when you lose.
+
+The XP is **gone, not deferred**. A run docked by a pile-on is docked for good,
+and `recompute()` needs no release logic because there is nothing to release.
+The run's distance, streak and badges are untouched — only the pet's XP. The
+summary says so in its own row, naming the number of attackers rather than the
+arithmetic, because what matters to whoever is reading it is that people came
+after them.
+
+The mechanic only bites somebody who is running, so it cannot punish anyone for
+being injured or resting — an idle player pays nothing.
+
+### How a battle is actually had
+
+**Nobody accepts a battle.** The attacker plays their own side on the battle
+screen; `btChoose` plays the defender, who is not present and was never asked.
+This reverses the earlier "the friend must accept" decision, and it had to:
+an XP penalty you can decline is a penalty nobody ever takes, and the leader —
+the only player the mechanic is aimed at — would simply have declined forever.
+It also deleted most of the challenge inbox, the accept flow and the 48-hour
+expiry that were scoped for it.
+
+A battle is **claimed before it is fought and reported after**, which is two
+round trips for what looks like one act. With a single call, an attacker could
+abandon any fight going badly and try again until it went well, and every
+attack would land as a knockout. The attack is spent at `/battle/start`, so
+walking away costs it.
+
+The broker picks the seed and **derives both levels from the roster**, never
+from the request. The client reports only the chip and who won. The mark
+arithmetic is duplicated between `index.html` and the worker, which is a real
+liability — change one copy and replays disagree with the marks they produced —
+so both carry `MARK_VERSION` and every mark records it, putting any drift in
+the data rather than leaving it silent.
+
 ## How XP works
 
 **Distance → XP.** 100 XP per kilometre, and later kilometres inside a single
 run are worth more than earlier ones. The rate climbs continuously from ×1.0 to
-×2.0 at 20 km, so one long run beats the same distance chopped into short ones:
-5 km earns 563 XP, but 10 km earns 1,250 rather than 1,126.
+×1.12 at 12 km, so one long run beats the same distance chopped into short
+ones: 5 km earns 513 XP, but 10 km earns 1,050 rather than 1,025.
+
+| Distance | Flat | Endurance | Total | Effective |
+| --- | --- | --- | --- | --- |
+| 5 km | 500 | 13 | **513** | ×1.03 |
+| 10 km | 1,000 | 50 | **1,050** | ×1.05 |
+| 15 km | 1,500 | 108 | **1,608** | ×1.07 |
+| 20 km | 2,000 | 168 | **2,168** | ×1.08 |
+| 30 km | 3,000 | 288 | **3,288** | ×1.10 |
+| Marathon | 4,220 | 434 | **4,654** | ×1.10 |
+
+The ×1.12 is the *marginal* rate — what the 12th kilometre itself pays, not a
+multiplier on the run. Because the rate ramps up from 100, the effective
+multiplier is always lower, and it approaches ×1.12 from below however far you
+go.
+
+The ceiling used to be ×2.0 at 20 km, which made a marathon worth 7,440 XP and
+every kilometre past the twentieth worth double a beginner's. It is now worth
+4,654 — 37% less — while a 5 km run lost 9%, which is the way round it wanted
+to be.
+
+**This is close to the floor.** The bonus exists to make one long run beat the
+same distance split up, and it can only do that while the rate is still
+climbing. At ×1.12 a 10 km run out-earns two 5 km runs by 2% — about as thin
+as that margin can get and still be the point of the mechanic. Going much
+lower would be a decision to remove endurance rather than to tune it.
+
+**The rate can never fall**, which is what rules out the obvious fix of simply
+capping the bonus in absolute terms. The moment a kilometre is worth less than
+an earlier one, two half-runs beat one whole one and the bonus pays for the
+opposite of endurance. That leaves exactly two dials — how fast the rate climbs
+and where it stops — and between them they set the ceiling, `1 + K × cap`.
+
+None of it is retroactive: every run stores the XP it earned and `recompute()`
+adds those stored numbers up, so nobody's level moved.
 
 **Moods.** The pet sits on a six-rung ladder, and the rung multiplies every run
 it earns — every run, whatever its distance. A run of **2 km or more climbs one
@@ -751,14 +1184,19 @@ not climb. Neglect walks it back down, but each rung has its own patience:
 | Mood | XP | Idle days to drop a rung |
 | --- | --- | --- |
 | 🤩 Elated | 100% | 1 |
-| 😄 Happy | 90% | 2 |
-| 🙂 Content | 80% | 3 |
-| 😕 Restless | 70% | 5 |
-| 😢 Sad | 60% | 7 |
-| 😴 Hungry | 50% | floor |
+| 😄 Happy | 94% | 2 |
+| 🙂 Content | 88% | 3 |
+| 😕 Restless | 82% | 5 |
+| 😢 Sad | 76% | 7 |
+| 😴 Hungry | 70% | floor |
+
+The floor was 50%, in steps of 10, until October 2026: running less often
+cost twice over, once in the streak and again in the mood. Elated did not
+change, so a daily runner earns what they did; runs keep what they were paid
+when they were logged.
 
 A run is paid at the rung it starts in and climbs afterwards, so a Hungry pet's
-comeback run earns 50% and the next one earns 60%. Climbing is the reward,
+comeback run earns 70% and the next one earns 76%. Climbing is the reward,
 payable next time; scoring at the new rung would make the ladder free.
 
 **The day a run falls in does not count against it.** Idle days are counted to
@@ -814,7 +1252,7 @@ lately, the streak is whether you are keeping a cadence right now. A pet can
 be Sad and on a streak (you are three days into a comeback) or Elated with the
 streak just broken (one long run after a fortnight off).
 
-Multiplied out, a run is worth between **×0.50** and **×1.20** of its base.
+Multiplied out, a run is worth between **×0.70** and **×1.20** of its base.
 
 **Levels.** Every level costs more than the last. The growth factor starts at
 ×1.5 and eases off as levels climb — a flat ×1.5 forever would put level 50
@@ -832,7 +1270,7 @@ The curve as tuned:
 | Form | Level | Total XP | Roughly |
 | --- | --- | --- | --- |
 | Baby | 5 | 3,033 | ~22 km |
-| Teen | 15 | 21,533 | ~160 km |
+| Teen | 16 | 24,676 | ~183 km |
 | Adult | 30 | 82,005 | ~607 km |
 | Final | 50 | 176,744 | ~1,309 km |
 
@@ -842,11 +1280,45 @@ scoring path, the egg hatches in **25 km over 5 runs** at that size: the first
 run is paid at Happy with no streak yet, so it costs a little more than the
 table's flat rate. Shorter runs cost more (27 km in 3 km pieces), and so does
 letting the multipliers lapse — a pet left at Restless with the streak broken
-earns 0.70×, so the same forms cost it nearly twice as far.
+earns 0.82×, so the same forms cost it nearly half as far again (0.70× and
+nearly twice as far before the mood floor was raised).
 
 `LEVEL_BASE`, `LEVEL_DECAY`, `EARLY_UNTIL` and `EARLY_MULT` near the top of the
 file control this, and `Runmon.xpTable()` prints the whole curve in the
 console.
+
+## Badges
+
+Badges are about the pet, not the running. Distance clubs, a marathon, a pace,
+early and late runs and run counts were dropped: Strava already awards all of
+those, and a second copy here was the same achievement with a pet drawn next to
+it. Badges a player already won from the old set stay in their save but are no
+longer shown or counted.
+
+| | Badge | For |
+| --- | --- | --- |
+| 🍖 | First Meal | Its first run |
+| 🐣 | Hatched | Out of the egg, at level 5 |
+| 🔟 | Double Digits | Level 10 |
+| 🧬 | Evolved | Its third form, at level 16 |
+| ⭐ 🌟 | Level 20, Level 30 | Those levels |
+| 🎓 | First Move | Its first move learnt |
+| 📚 | Quick Study | Three moves learnt |
+| 🧰 | Full Kit | Every move its current form has |
+| ⚔️ | First Win | Won a fight it started |
+| 🥊 | Brawler | Ten of them |
+| 🗡️ | Giant Slayer | Beat a pet three or more levels above it |
+| 🪓 | Orc Slayer | Hit the raid boss the round he fell |
+| 😄 | Over the Moon | The happiest mood there is |
+| 🔥 | Never Hungry | A seven-day streak |
+
+**Runmon firsts** are races: the first player in the whole game to level 12,
+to evolve twice (level 16), and to levels 20, 25 and 30. The broker decides
+them as saves land — one roster object, one thread, so a tie cannot have two
+winners — and each has one holder for good. Everybody sees who holds each, by
+pet name. Level 5 and the first evolution are not races: every player was past
+both before races existed, and nobody kept who got there first. A player who
+is erased leaves their races won, by "a former player".
 
 ## How tracking works
 
@@ -880,8 +1352,119 @@ nothing but a nag.
 ## Data
 
 Everything derives from the run log, so deleting a run correctly rolls back XP,
-level, evolution stage, streaks and badges. Routes are simplified to 320 points
-before saving to keep `localStorage` small.
+level, evolution stage, streaks and badges — everything from the last week,
+that is. Routes are simplified to 320 points before saving to keep
+`localStorage` small.
+
+### Strava's rules, and what they change
+
+Runmon follows Strava's [API Agreement](https://www.strava.com/legal/api) and
+[API Policy](https://www.strava.com/legal/api_policy) (both effective 1 June
+2026). What that means in the game, with the section each comes from:
+
+- **A run is kept for seven days (6.2), then folded into the pet.** The run's
+  details — time, distance, pace, device — are deleted from the phone and the
+  broker; its XP, one to the run count, and where the mood ladder and streak
+  stood are carried forward in `save.past`. Mood and streak replays start from
+  there rather than the first run, so a pet's level, mood, streak and every
+  later run's pay read exactly as if the run were still in the log (checked
+  against a whole random year in three time zones). A linked phone folds only
+  after it has synced, so a player back from weeks away has the runs from
+  those weeks priced first, streak and all, exactly as a daily player's
+  would be (checked at 3, 10 and 25 days away); if Strava cannot be reached,
+  it folds anyway. The phone folds on every load and sync; the broker folds its own copy nightly from the folds the app
+  worked out ahead (`save.folds`), so a phone left closed does not keep the
+  broker's copy past the week. Strava activity ids are let go after a week
+  too, behind a start-time floor.
+- **Nobody sees another player's Strava data (2.3).** A card — what Rankings,
+  friend codes and the dashboard show — carries the pet, form, level, streak
+  and badge count, and no distance, run count or run time. It also carries XP
+  into the roster for the admin table, but the broker strips it
+  (`playerCard`) before any card reaches another player: XP is the run log
+  summed, the closest thing on a card to Strava's own data. Rankings order by
+  level, then badges, then name.
+- **No lifetime distance**, and no badges for distance or pace (see
+  [Badges](#badges)). Raid swings are banked as swings, not as kilometres.
+- **Disconnecting (2.5, 7.4).** Runs are deleted at once and Strava's grant is
+  revoked through `oauth/revoke`. The pet is kept for **28 days** in case the
+  player comes back — then the broker erases everything about them, including
+  from every nightly backup, and the phone's copy goes the first time the app
+  is opened after that. Strava's limit is 30 days; the erase runs nightly.
+- **A deleted pet** is archived for the same 28 days, restorable from the
+  dashboard, then erased.
+- **Webhooks (6.3).** Strava tells the broker when a player removes Runmon on
+  Strava's own site (treated as a disconnect) or deletes or hides a run
+  (removed within Strava's 48 hours, XP and all). Events are unsigned, so
+  nothing is taken on their word: the broker asks Strava first, only acts on
+  runs it holds, and ignores repeats. Subscribe once from the dashboard.
+- **Consent (2.1, 7.3).** The Connect step, and a one-time sheet for players
+  who connected earlier, say what is read, how, how long, how to stop and how
+  to delete. [`privacy.html`](privacy.html) is the privacy policy and terms.
+  Settings links it, and has Download my data (2.2), contact, and the
+  player's Strava app settings (2.4).
+- **Branding.** Strava's own Connect with Strava button and Powered by Strava
+  logo, unmodified, from its brand guidelines; "View on Strava" on every run;
+  the recording device named, which is how Garmin's attribution rule (4.4) is
+  met.
+- **No AI (5.3)** — nothing Strava sent, or derived from it, goes into any AI
+  system, including chat assistants used to work on this code.
+
+### The admin dashboard
+
+`admin.html`, served beside the app at `/runmon/admin.html`, and useless
+without the admin password. The password is the `ADMIN_TOKEN` repository
+secret, never anything written in the code, so it is not in this public
+repository; change it by changing the secret and re-running the deploy. You
+type it into the page, it is kept only for that tab, and the page will only
+talk to the broker whose address is written into it. Five wrong passwords from
+one address lock that address out for fifteen minutes. From it you can:
+
+- see every player, their pet, form, level, XP and streak, and when they last
+  opened the app — in two groups, **connected to Strava** and
+  **disconnected** (with the day each disconnected one is erased). No
+  distances: the dashboard is somebody other than the player;
+- open a player to see where their XP comes from, whether their Strava link
+  is still live, and their penalty;
+- **set their level, or give or take XP.** The phone's save is the real one
+  and pushes itself up on every sync, so an edit made on the broker would be
+  overwritten. Changes are queued instead and applied by the app the next
+  time the player opens it — the page shows each one as waiting or done. The
+  adjustment sits on top of what their runs earned (`adminXp` in the save);
+  no run is rewritten;
+- **rename their pet** — the only name Runmon has for anybody. Queued for the
+  app like a level change, but since a name shows on everybody else's screen
+  it does not wait for that: the broker puts it on the stored card, the
+  Rankings row and any race the pet holds at once, and a push from the
+  player's app that has not applied it yet is given the new name rather than
+  putting the old one back. The player can still rename the pet themselves
+  afterwards. Up to 16 characters; control and text-direction characters are
+  taken out;
+- **back up** one player or everyone, and **restore** a player from a backup
+  file. A backup keeps each pet's name, species, level and XP — no runs and no
+  distances. A restore puts those back on the player's next sync;
+- restore a player from any of the **automatic backups**: one taken every
+  night at 03:17 UTC by a Cloudflare cron, kept for fourteen days, in the
+  same format; download any of them, or take one now. Every backup is split
+  into connected players, disconnected players and deleted pets;
+- **disconnect** a player (kept 28 days, then erased — see above), or
+  **erase** one now, for a player who asks to be forgotten;
+- see **Deleted pets**, put one back on the account it came from, or erase it
+  now;
+- turn on the **Strava webhook**;
+- see the raid and respawn the boss.
+
+**Deleting a pet is guarded.** "Delete my pet" in Settings takes three steps:
+a sheet saying exactly what is lost, with keeping the pet as the main button;
+typing the pet's name; and a ten-second countdown before the button wakes.
+The broker checks the name and the wait itself, so a tampered app cannot skip
+them.
+
+**One pet per account, and the app asks before replacing one.** If a phone
+with a freshly hatched pet connects to a Strava account whose saved pet has
+real progress — a player whose phone lost its storage and started again
+before reconnecting — the sync stops before uploading anything and asks which
+pet to keep. Until they choose, nothing is uploaded. The same pet on two
+phones (same hatch time) is not asked about.
 
 ### The private roster
 
@@ -897,17 +1480,16 @@ curl -H "Authorization: Bearer $ADMIN_TOKEN" \
 ```
 
 ```
-Runmon · 2026-09-18 04:40 UTC
+Runmon · 2026-09-30 04:40 UTC
 
 Connected to Strava   4
+Disconnected          1
 Hatched               3
-Ran in the last week  3
-Lifetime              457.8 km over 78 runs
 
-HANDLE        PET  SPECIES  FORM         LV  KM     WEEK  RUNS  STREAK  LAST RUN  LINKED
-------------  ---  -------  -----------  --  -----  ----  ----  ------  --------  ------
-QHk6bPEhPaHM  Ash  ember    Blazewyrm    15  180.0  45.0  30    3       1 day     today
-aaaaaaaaaaaa  —    —        not hatched  —   0.0    0.0   0     0       —         today
+HANDLE        PET  SPECIES  FORM         LV  XP     STREAK  SEEN   LINKED
+------------  ---  -------  -----------  --  -----  ------  -----  ------
+QHk6bPEhPaHM  Ash  ember    Blazewyrm    15  41280  3       today  today
+aaaaaaaaaaaa  —    —        not hatched  —   0      0       today  today
 ```
 
 Add `?format=json` for anything that wants to parse it.

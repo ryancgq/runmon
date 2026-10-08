@@ -1,0 +1,33 @@
+# Runmon Explore's own server: the shared world for Explore (explore/).
+# Separate from the Strava broker in worker/ on purpose - its own name, its
+# own Durable Object, its own deploy - so nothing here can touch the game or
+# its players' saves. It asks the broker who a player is and to spend their
+# swings (the BROKER binding below), and nothing else.
+name = "runmon-explore"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+# One Durable Object holds the whole world: who is in it (presence, in
+# memory) and Sir Uwaaarghhhh's account (in its SQLite storage, so his
+# wounds outlast everyone leaving).
+[[durable_objects.bindings]]
+name = "WORLD"
+class_name = "World"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["World"]
+
+# The Strava broker, reached directly between the two workers (a fetch from
+# one workers.dev worker to another on the same account is refused).
+[[services]]
+binding = "BROKER"
+service = "runmon-strava"
+
+[vars]
+# Pages allowed to open the world, comma-separated. The browser sends its
+# page's origin with a websocket and anything else is turned away. Not a
+# lock - a script can claim any origin - just a fence against other sites.
+ALLOWED_ORIGINS = "https://ryancgq.github.io,http://localhost:8765"
+# Set a JOIN_CODE (as a secret, or here) to require ?code= on the link.
+# Unset, anyone with the link can join.

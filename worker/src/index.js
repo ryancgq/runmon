@@ -12,7 +12,24 @@
      GET  /callback     trade the code, mint a session, bounce back to the app
      POST /sync         new activities since last time, plus the stored save
      PUT  /save         store the save and the ids the client actually imported
-     POST /disconnect   tell Strava to forget us, then forget the athlete
+     POST /disconnect   tell Strava to forget us; the pet is erased after GRACE_DAYS
+     POST /pet/delete-intent, /pet/delete   a player deleting their own pet
+     GET|POST /strava/webhook   Strava's events: revokes, runs deleted
+     GET  /firsts       the races - first to each level - and who holds them
+     POST /battle/start  claim an attack on somebody, and spend it
+     POST /battle/report how the fight went; the mark is priced here
+     GET  /battle/marks  what is standing on your own pet, and its fight log
+     GET  /raid          the shared pool, your share of it, and your swings
+     POST /raid/claim    spend a swing; answers with the seed and his health
+     POST /raid/report   what the swing took off him, clamped and applied
+     GET  /explore/me       Explore: who you are, your pet, your swings, the round
+     POST /explore/attempt  Explore: spend a swing on an attempt
+     GET  /explore/legacy   Explore: the raid as it stands, for the one-time handover
+
+   The battle routes are the one place this stops being a pure broker: it
+   prices a mark, because the attacker cannot be trusted to price their own.
+   It still knows nothing about levels beyond the number the roster row
+   already carried.
 --------------------------------------------------------------------------- */
 
 const STRAVA = env => env.STRAVA_BASE || "https://www.strava.com";
@@ -103,14 +120,413 @@ async function lookupCode(env, code){
    the app already computes for Friends: a pet name, a form, a level, totals.
    Nothing from Strava beyond what the game has made its own. */
 const rosterStub = env => env.ATHLETE.get(env.ATHLETE.idFromName("roster:all"));
+/* The pool, as one object. Durable Objects serialise their own reads and
+   writes on a single thread, which is the whole reason the raid is one of
+   these rather than a row somewhere: forty people swinging at once is forty
+   read-modify-writes of the same number, and this is the only way to do that
+   without inventing a lock. */
+const raidStub = env => env.ATHLETE.get(env.ATHLETE.idFromName("raid:" + RAID_ID));
+
+/* A handle is an HMAC, so it cannot be turned back into an athlete id by
+   arithmetic - which is the point, and also a problem the moment one player
+   needs to reach another. The way back is a directory entry, the same trick
+   the friend codes already use and under a prefix that cannot collide with an
+   athlete id either. Written beside the roster row so the two cannot drift. */
+const handleStub = (env, handle) => env.ATHLETE.get(env.ATHLETE.idFromName("h:" + handle));
+/* Everyone who linked Strava before battles existed has a roster row and no
+   way back from their handle, which made them visible in Friends and
+   impossible to attack. The handle is an HMAC, so there is nothing to backfill
+   from - the entry can only be written by the athlete it belongs to, the next
+   time they are seen. Hence this on the sync path: one round trip, and the
+   object writes only when the entry is actually absent. */
+async function ensureHandle(env, athleteId){
+  const handle = (await hmac(env.SESSION_SECRET, "roster:" + athleteId)).slice(0, 12);
+  await handleStub(env, handle).fetch("https://do/dir-ensure", { method:"POST",
+    body: JSON.stringify({ athleteId }) });
+}
+async function lookupHandle(env, handle){
+  const r = await handleStub(env, handle).fetch("https://do/dir-get");
+  const { athleteId } = await r.json();
+  return athleteId || null;
+}
+/* What of a pet the broker may keep once Strava has no part in it, and only
+   for GRACE_DAYS - see purgeAthlete(). A parked or archived pet keeps what
+   the game made: its name, species, hatch time, XP, badges and what it has
+   celebrated. The runs go - their XP is carried over as adminXp, so the
+   level stands - and so does every other player's card the save had cached,
+   and the dates the streak was counted from. */
+function gameOnly(save){
+  const xp = (save.runs || []).reduce((t, r) => t + (Number(r.xp) || 0), 0) + (Number(save.adminXp) || 0);
+  const past = save.past ? { ...save.past,
+    streak: { best: Number(save.past.streak && save.past.streak.best) || 0, count: 0, first: null, last: null } } : null;
+  return { ...save, runs: [], adminXp: Math.max(0, Math.round(xp)), adminKm: 0, past, folds: [],
+    friends: (save.friends || []).map(f => ({ code: f.code, addedAt: f.addedAt })),
+    roster: [], notices: [], noticesGone: [], stravaSyncedAt: null };
+}
+
+/* How long a disconnected player's pet, or a deleted one, is kept before it
+   is erased for good. Strava's API Policy has everything about a player -
+   the app's own data included, since its "Data" means both - deleted within
+   30 days of a disconnect or a request (2.5, 7.4). The erase runs nightly,
+   so 28 days leaves the last night's slack and a day to spare. Inside it a
+   player who reconnects finds their pet, and the admin can put a deleted
+   one back. */
+const GRACE_DAYS = 28, GRACE_MS = GRACE_DAYS * 86400e3;
+/* How long anything read from Strava is kept: its API Policy caps a cache at
+   seven days (6.2). The app folds a run into its pet at six; this is the
+   broker's own backstop for a copy the app has not been back to fold. */
+const RETAIN_MS = 7 * 86400e3;
+
+/* Everything about one player, gone: their Strava grant revoked if it still
+   stands, their object emptied - save, card, tokens, archived pets, friend
+   code - their roster row and handle entry, their rows in the deleted-pets
+   index, and their entries in every nightly backup. The end of the grace
+   period, or the admin acting on a request to be forgotten. `athleteId` may
+   be null for a row whose directory entry never existed; the rest still
+   goes. */
+async function purgeAthlete(env, athleteId, handle){
+  handle = handle || (await hmac(env.SESSION_SECRET, "roster:" + athleteId)).slice(0, 12);
+  let code = null;
+  if (athleteId)
+    ({ code } = await (await (await athleteStub(env, athleteId)).fetch("https://do/purge", { method:"POST" })).json());
+  await rosterStub(env).fetch("https://do/roster-drop", { method:"POST", body: JSON.stringify({ handle }) });
+  await rosterStub(env).fetch("https://do/firsts-forget", { method:"POST", body: JSON.stringify({ handle }) });
+  await handleStub(env, handle).fetch("https://do/dir-clear", { method:"POST" });
+  if (code) await codeStub(env, code).fetch("https://do/dir-clear", { method:"POST" });
+  await deletedStub(env).fetch("https://do/del-drop", { method:"POST", body: JSON.stringify({ handle }) });
+  await backupStub(env).fetch("https://do/bk-scrub", { method:"POST", body: JSON.stringify({ handle, drop: true }) });
+  return { ok:true, handle, erased: true };
+}
+/** One archived pet erased: from its owner's object, the index and the backups. */
+async function eraseDeleted(env, row){
+  if (row.athleteId) await (await athleteStub(env, row.athleteId)).fetch("https://do/pet-drop",
+    { method:"POST", body: JSON.stringify({ id: row.id }) });
+  await deletedStub(env).fetch("https://do/del-drop", { method:"POST", body: JSON.stringify({ id: row.id }) });
+  await backupStub(env).fetch("https://do/bk-scrub", { method:"POST", body: JSON.stringify({ deletedId: row.id }) });
+  if (row.handle && row.pet && row.pet.pet) await rosterStub(env).fetch("https://do/firsts-forget", { method:"POST",
+    body: JSON.stringify({ handle: row.handle, pet: row.pet.pet }) });
+}
+
+/* The nightly pass that keeps the rules, before the night's backup is taken:
+   players disconnected longer than the grace period and pets deleted longer
+   ago than it are erased; every connected pet's copy here has its old runs
+   folded and its week-old Strava ids let go (see Athlete.retention()); roster
+   rows are rewritten to the cut-down card; and the backups lose any distance
+   an older version wrote into them. */
+async function retention(env){
+  const now = Date.now();
+  const out = { erased: 0, deletedErased: 0, folded: 0 };
+  const { rows } = await (await rosterStub(env).fetch("https://do/roster-list")).json();
+  for (const r of rows){
+    const id = await lookupHandle(env, r.handle);
+    if (r.disconnected){
+      if (r.disconnectedAt && now - r.disconnectedAt >= GRACE_MS){ await purgeAthlete(env, id, r.handle); out.erased++; }
+      continue;
+    }
+    if (!id) continue;
+    const stub = await athleteStub(env, id);
+    const f = await (await stub.fetch("https://do/retention", { method:"POST" })).json();
+    if (f.folded) out.folded++;
+    await fillCard(env, stub, r.handle);
+  }
+  await rosterStub(env).fetch("https://do/roster-scrub", { method:"POST" });
+  // a parked pet's card is filled the same way - the dashboard lists it
+  for (const r of rows) if (r.disconnected && !(Number(r.xp) > 0)){
+    const id = await lookupHandle(env, r.handle);
+    if (id) await fillCard(env, await athleteStub(env, id), r.handle);
+  }
+  const { rows: dels } = await (await deletedStub(env).fetch("https://do/del-list")).json();
+  for (const d of dels) if (now - (d.at || now) >= GRACE_MS){ await eraseDeleted(env, d); out.deletedErased++; }
+  await backupStub(env).fetch("https://do/bk-scrub", { method:"POST", body: "{}" });
+  return out;
+}
+
+/* XP and a badge count for a card that has none. Cards gained both when
+   distance came off them, and a card is written by the player's own app -
+   so everyone who had not opened the new version read "0 XP" in Rankings,
+   however long they had played. The save the broker already holds has what
+   the card is missing, and this puts it there, and on the roster row, without
+   touching when the player was last seen. The app's next push replaces it
+   with its own. */
+async function fillCard(env, stub, handle){
+  const { card } = await (await stub.fetch("https://do/card-fill", { method:"POST" })).json();
+  if (card) await rosterStub(env).fetch("https://do/roster-card", { method:"POST",
+    body: JSON.stringify({ handle, card }) });
+}
+
+/* The server's copy of a save, folded the way the app folds its own. The app
+   works out, for every day its runs could be folded from, what the pet
+   carries forward - XP, run count, mood and streak - and sends those with the
+   save as `folds`, because replaying the mood and streak rules here would be
+   the game written twice, and in the wrong time zone. Each fold says from when
+   (`from`, a local midnight) and from when it is due (`at`). A run the app
+   never priced a fold for - a save an older app pushed - is folded the blunt
+   way once it passes RETAIN_MS: its XP kept, its details gone. */
+function foldServer(save, now){
+  const runs0 = Array.isArray(save.runs) ? save.runs : [];
+  const due = (Array.isArray(save.folds) ? save.folds : [])
+    .filter(f => f && f.past && Number(f.at) <= now).sort((a, b) => a.from - b.from);
+  const f = due[due.length - 1] || null;
+  let runs = runs0, past = save.past || null, adminXp = Number(save.adminXp) || 0;
+  if (f){
+    runs = runs.filter(r => !(r.strava && r.t < f.from))
+      .map(r => !r.strava && !r.folded && r.t < f.from ? { ...r, folded: true } : r);
+    past = f.past;
+  }
+  const left = runs.filter(r => r.strava && !r.folded && r.t < now - RETAIN_MS);
+  if (left.length){
+    adminXp += left.reduce((t, r) => t + (Number(r.xp) || 0), 0);
+    runs = runs.filter(r => !left.includes(r));
+  }
+  if (!f && !left.length) return null;
+  return { ...save, runs, past, adminXp: Math.round(adminXp),
+    folds: (save.folds || []).filter(g => g && (!f || g.from > f.from)) };
+}
+
+/* The webhook's own object: the subscription id Strava gave us, and the
+   events already handled, so a retried or doubled event is acted on once. */
+const webhookStub = env => env.ATHLETE.get(env.ATHLETE.idFromName("webhook:strava"));
+const webhookToken = async env => (await hmac(env.SESSION_SECRET, "strava-webhook")).slice(0, 24);
+/* One event from Strava. None of it is signed, and the callback is a public
+   URL, so nothing is taken on the event's word: a revoke is acted on only
+   once Strava refuses the athlete's own token, and a run is removed only
+   once Strava says it is not there - and only if it is one we hold. */
+async function handleWebhook(env, ev){
+  if (!ev || typeof ev !== "object") return { ignored: "body" };
+  const conf = await (await webhookStub(env).fetch("https://do/wh-get")).json();
+  if (conf.id && Number(ev.subscription_id) !== Number(conf.id)) return { ignored: "subscription" };
+  const key = [ev.object_type, ev.aspect_type, ev.object_id, ev.owner_id, ev.event_time,
+               JSON.stringify(ev.updates || {})].join("|");
+  const { dup } = await (await webhookStub(env).fetch("https://do/wh-seen",
+    { method:"POST", body: JSON.stringify({ key }) })).json();
+  if (dup) return { ignored: "duplicate" };
+  const owner = String(ev.owner_id || "");
+  if (!/^\d+$/.test(owner)) return { ignored: "owner" };
+  const stub = await athleteStub(env, owner);
+  const upd = ev.updates || {};
+  if (ev.object_type === "athlete" && String(upd.authorized) === "false"){
+    const v = await (await stub.fetch("https://do/verify-revoked", { method:"POST" })).json();
+    if (!v.known || !v.revoked) return { ignored: "not revoked" };
+    await parkAthlete(env, owner);
+    return { parked: true };
+  }
+  /* With the activity:read scope a run made "Only You" arrives as a delete,
+     so the one case covers both; `private` is checked as well in case the
+     scope is ever widened. */
+  if (ev.object_type === "activity" &&
+      (ev.aspect_type === "delete" || (ev.aspect_type === "update" && String(upd.private) === "true")))
+    return await (await stub.fetch("https://do/activity-gone", { method:"POST",
+      body: JSON.stringify({ id: String(ev.object_id) }) })).json();
+  return { ignored: "kind" };
+}
+/* The races: the first player in the whole game to each of these levels.
+   Decided here, in the roster object, the moment a save carrying the level
+   lands - one object, one thread, so two players crossing the line together
+   cannot both win - and never again. Level 5 and the first evolution are
+   not among them: every player had passed both before races existed, and
+   nobody kept who did it first. Game data only - a level and a pet's name,
+   which every player sees in Rankings already. */
+const FIRSTS = [
+  { id:"1st-lv12",  level:12, name:"First to Level 12" },
+  // 16 since the third form moved there from 15. A race already won at 15
+  // stays won - it is decided once and kept - so this only moves the line
+  // for a race still open.
+  { id:"1st-form3", level:16, name:"First to Evolve Twice" },
+  { id:"1st-lv20",  level:20, name:"First to Level 20" },
+  { id:"1st-lv25",  level:25, name:"First to Level 25" },
+  { id:"1st-lv30",  level:30, name:"First to Level 30" }
+];
+
+/** A card as it may be stored or shown to anybody else - see rosterCard().
+    Also what an older app's card is cut down to on the way in, and what one
+    already stored is cut down to on the way out, so no player sees another's
+    distance whatever version either of them is running. */
+const gameCard = c => c ? { v: 2, ...rosterCard(c), at: Number(c.at) || null } : null;
+
+/* A disconnect - from Settings, from the dashboard, or from Strava's side,
+   which arrives as a webhook. The pet is parked for GRACE_DAYS and then
+   erased. Strava's grant is revoked, its tokens and everything read from it
+   are deleted, and the save becomes gameOnly(). The pet stays where it is,
+   under the Strava id it belongs to, so connecting again inside the grace
+   period finds it at the same level - on the same phone, or on a new one that
+   has no pet of its own. The Rankings row stays for the admin list, stripped
+   and marked disconnected with the time the clock started, and is hidden
+   from players; the friend code's directory entry goes so nobody finds a pet
+   that is not playing. */
+async function parkAthlete(env, athleteId){
+  const stub = await athleteStub(env, athleteId);
+  const { code } = await (await stub.fetch("https://do/park", { method:"POST" })).json();
+  const handle = (await hmac(env.SESSION_SECRET, "roster:" + athleteId)).slice(0, 12);
+  await rosterStub(env).fetch("https://do/roster-park", { method:"POST", body: JSON.stringify({ handle }) });
+  if (code) await codeStub(env, code).fetch("https://do/dir-clear", { method:"POST" });
+  await backupStub(env).fetch("https://do/bk-scrub", { method:"POST", body: JSON.stringify({ handle }) });
+  return { ok:true, handle };
+}
+
+/* Pets a player deleted, kept for the admin to put back. One object indexes
+   them all, beside the copy in the athlete's own object - that copy is the
+   one tied to the Strava id; this one is what the dashboard lists. */
+const deletedStub = env => env.ATHLETE.get(env.ATHLETE.idFromName("deleted:all"));
+
+/* Every pet's backup entry, or one: what adminSnapshot() keeps - name,
+   species, level and XP - and nothing from Strava. Shared by the
+   dashboard's download and the nightly copy, so the two can never disagree
+   about what a backup is. */
+async function snapshotUsers(env, handle){
+  const { rows } = await (await rosterStub(env).fetch("https://do/roster-list")).json();
+  const pick = handle ? rows.filter(r => r.handle === handle) : rows;
+  const connected = [], disconnected = [];
+  for (const r of pick){
+    const id = await lookupHandle(env, r.handle);
+    const snap = id ? (await (await (await athleteStub(env, id)).fetch("https://do/admin-snapshot")).json()).snap : null;
+    const entry = { handle: r.handle, ...(snap || { pet: r.pet || "", species: r.species || null,
+      level: r.level || null, xp: null }), reachable: !!id,
+      ...(r.disconnected && r.disconnectedAt ? { eraseAt: r.disconnectedAt + GRACE_MS } : {}) };
+    (r.disconnected ? disconnected : connected).push(entry);
+  }
+  return { connected, disconnected };
+}
+/** A backup file's contents: players by whether they are connected, and the
+    pets deleted so far. The same shape for the download and the nightly one. */
+async function backupOf(env, handle){
+  const { connected, disconnected } = await snapshotUsers(env, handle);
+  let { rows: deleted } = await (await deletedStub(env).fetch("https://do/del-list")).json();
+  if (handle) deleted = deleted.filter(d => d.handle === handle);
+  deleted = deleted.map(({ athleteId, ...rest }) => rest);   // the id stays on the server
+  return { runmon: "backup", v: 3, at: Date.now(), connected, disconnected, deleted };
+}
+/* The nightly copy, kept on the broker so there is always a recent one
+   without anybody remembering to press a button. Fourteen days of them: long
+   enough to notice a lost pet and put it back. A player erased is taken out
+   of all of them at once (purgeAthlete), so fourteen days of copies cannot
+   stretch anybody's grace period. One object holds them all, a key a day. */
+const AUTO_KEEP_DAYS = 14;
+const backupStub = env => env.ATHLETE.get(env.ATHLETE.idFromName("backups:auto"));
+async function autoBackup(env){
+  const backup = { ...(await backupOf(env)), auto: true };
+  const day = new Date().toISOString().slice(0, 10);
+  await backupStub(env).fetch("https://do/bk-put", { method:"POST",
+    body: JSON.stringify({ day, backup, keep: AUTO_KEEP_DAYS }) });
+  return { day, users: backup.connected.length + backup.disconnected.length,
+           connected: backup.connected.length, disconnected: backup.disconnected.length,
+           deleted: backup.deleted.length };
+}
 async function rosterPut(env, athleteId, card){
   const handle = (await hmac(env.SESSION_SECRET, "roster:" + athleteId)).slice(0, 12);
   await rosterStub(env).fetch("https://do/roster-put", { method:"POST",
     body: JSON.stringify({ handle, card: card || null }) });
+  await handleStub(env, handle).fetch("https://do/dir-set", { method:"POST",
+    body: JSON.stringify({ athleteId }) });
 }
-/* The admin token is compared as a digest, not as a string. An early-exit
-   string compare hands the token over a character at a time to anybody willing
-   to time the responses. */
+
+/* --- what a battle costs the pet that was attacked ------------------------
+   This is the same arithmetic as markGapMul()/markFor() in index.html, and it
+   is here rather than trusted from the client because the client is the
+   attacker: it reports how the fight went, and the worker prices it. Levels
+   come from the roster, so neither side's claim about them is read.
+
+   The duplication is deliberate but it is a liability - change one copy and
+   replays disagree with the marks they produced. Both carry MARK_VERSION and
+   every mark records it, so a drift shows up in the data rather than silently.
+   ------------------------------------------------------------------------- */
+const MARK_VERSION = 1;
+const MARK_UNIT    = 0.10;
+const MARK_CAP     = 0.30;
+const MARK_HOURS   = 24;
+const markGapMul = gap => gap >= 0 ? Math.min(1, 0.2 + 0.16 * gap)
+                                   : 0.2 * Math.pow(0.75, -gap);
+function markFor(chip, gap, win){
+  const c = Math.max(0, Math.min(1, chip || 0));
+  return MARK_UNIT * c * markGapMul(gap) * (win ? 1.4 : 1);
+}
+/* What the marks on a pet add up to right now. The same arithmetic as
+   markPenalty() in index.html, and here for the same reason the rest of this
+   block is: the roster hands every player's standing penalty to every other
+   player, and that number cannot come from the device it is about. Each mark
+   counts in full for its own 24 hours and then not at all - they used to fade,
+   and no longer do - so this is still computed on read rather than stored:
+   the moment one runs out is the moment the row has to change. */
+function markPenalty(marks, now){
+  const t = now || Date.now();
+  let sum = 0;
+  for (const m of marks || [])
+    if (t - (m.at || 0) < MARK_HOURS * 3600e3) sum += (m.amt || 0);
+  return Math.min(MARK_CAP, Math.max(0, sum));
+}
+/** How many of them are still standing - the count the app says it out loud in. */
+function markCount(marks, now){
+  return (marks || []).filter(m =>
+    ((now || Date.now()) - (m.at || 0)) < MARK_HOURS * 3600e3).length;
+}
+/* --- the raid ------------------------------------------------------------
+   One boss, one pool, everybody against it. The pool cannot live on a device:
+   a raid whose health each phone keeps its own copy of is a boss everyone
+   kills separately, which is a single-player fight with a shared name.
+
+   Like the mark arithmetic above, his health is written down twice - here and
+   in RAID_BOSS.battle.hp - and for the same reason: the app draws him and
+   fights him, and this decides what a swing is worth. RAID_VERSION rides on
+   every report so a drift between the two shows up in the data rather than as
+   a raid that quietly stops adding up.
+   ------------------------------------------------------------------------- */
+const RAID_VERSION = 1;
+const RAID_ID      = "uwaaargh";
+const RAID_HP      = 25000;
+const RAID_KM_PER_SWING = 5;
+/* He does not come back on his own. When his health reaches zero the epoch
+   closes and stays closed - no timer, no respawn - and everything about it is
+   kept: the shares are stored per epoch, so felling him twice leaves two
+   records rather than overwriting the first. Bringing him back is a deliberate
+   act through /admin/raid, which is the switch and the only one. */
+const RAID_RESPAWNS = false;
+
+/* The most one attempt can take off him, by level. Measured on the real engine
+   at 3,600 seeds a level - three species, 1,200 each, every fight played to
+   the end against an effectively bottomless pool, because a swing is worth
+   what the pet can do before it dies and not what is left of him - and then
+   doubled. The observed worst case at level 26 was 811 and this allows 1,630.
+
+   Doubling rather than shaving the tail, because the cost of the two errors is
+   not symmetric: a clamp below an honest fight silently robs a real player of
+   a good attempt and they would never know why, while a clamp at twice the
+   luckiest possible fight still refuses the report that matters, which is the
+   one claiming the whole pool in a single swing.
+
+   It is worth being plain about what this does and does not do. It stops an
+   absurd report. It does not stop a determined cheat, because a determined
+   cheat does not need an absurd number - what actually bounds them is that a
+   swing costs five kilometres that Strava has to have seen. If one player ever
+   needs to be stopped from felling him alone, the rule for that is a cap on
+   one player's share of one epoch, and it belongs here too. */
+const RAID_SWING_CAP = [
+  [1, 200], [5, 320], [10, 500], [14, 610], [18, 990], [22, 1300], [26, 1630],
+  [30, 2110], [35, 2780], [40, 3430], [50, 4540], [60, 7130], [80, 10760], [99, 14650]
+];
+function raidSwingCap(level){
+  const lv = Math.max(1, Math.min(99, Number(level) || 1));
+  const t  = RAID_SWING_CAP;
+  if (lv <= t[0][0]) return t[0][1];
+  for (let i = 1; i < t.length; i++){
+    if (lv > t[i][0]) continue;
+    const [l0, c0] = t[i - 1], [l1, c1] = t[i];
+    return c0 + (c1 - c0) * (lv - l0) / (l1 - l0);
+  }
+  return t[t.length - 1][1];
+}
+/* The marks his health falls past, which are the app's RAID_MILESTONES. Held
+   here as well because the alert belongs to the raid and not to whoever
+   happened to land the blow: the app used to raise them on the attacker's own
+   device, so a boss dropping below half was news to one person. */
+const RAID_MARKS = [0.75, 0.5, 0.25, 0];
+
+/* Two a day, and never the same target twice inside a day. The second rule is
+   the one that matters: it is what makes a pile-on need other people. The
+   first decides how much of a day's damage any one player can be responsible
+   for, and two makes choosing a target a real decision rather than a sweep. */
+const ATTACKS_PER_DAY = 2;
+/* The admin password is the ADMIN_TOKEN secret, and it is compared as a
+   digest, not as a string: an early-exit string compare hands it over a
+   character at a time to anybody willing to time the responses. */
 async function adminOk(env, given){
   if (!env.ADMIN_TOKEN || !given) return false;
   const [a, b] = await Promise.all([
@@ -118,6 +534,30 @@ async function adminOk(env, given){
     hmac(env.SESSION_SECRET, "admin:" + env.ADMIN_TOKEN)
   ]);
   return a === b;
+}
+/* The password is short enough to guess, so guessing is made slow. Five wrong
+   tries from one address inside fifteen minutes lock that address out for
+   fifteen - and a locked address is refused even the right password, or the
+   sixth guess would simply be allowed to land. Counted per address, in an
+   object of its own, so somebody hammering the page from elsewhere cannot
+   lock the owner out of it. A wrong password answers the same 404 as a path
+   that does not exist; only a lockout says what it is, so the owner knows to
+   wait rather than to doubt the password. */
+const GATE_TRIES = 5, GATE_MS = 15 * 60e3;
+/* How long a player has to wait between asking to delete their pet and
+   confirming it. The app shows the same countdown; this is what makes it
+   real. */
+const DELETE_WAIT_MS = 10e3;
+async function adminGate(request, env){
+  const given = (request.headers.get("Authorization") || "").replace(/^Bearer /, "");
+  const ip = request.headers.get("CF-Connecting-IP") || "local";
+  const gate = env.ATHLETE.get(env.ATHLETE.idFromName("admin-gate:" + ip));
+  const { lockedUntil } = await (await gate.fetch("https://do/gate-check")).json();
+  if (lockedUntil > Date.now())
+    return json(env, { error:`Too many wrong passwords. Try again in ${Math.ceil((lockedUntil - Date.now()) / 60e3)} minutes.` }, 429);
+  if (await adminOk(env, given)){ await gate.fetch("https://do/gate-ok", { method:"POST" }); return null; }
+  await gate.fetch("https://do/gate-fail", { method:"POST" });
+  return json(env, { error:"no such endpoint" }, 404);
 }
 
 /** Every authenticated route is the same three lines, so they live here. */
@@ -128,12 +568,38 @@ async function withAthlete(request, env, fn){
 }
 
 export default {
-  async fetch(request, env){
+  /* Cloudflare's cron (wrangler.toml [triggers]) - once a night: the rules
+     first, so the backup it then takes holds nothing they have let go. */
+  async scheduled(event, env, ctx){
+    ctx.waitUntil((async () => { await retention(env); await autoBackup(env); })());
+  },
+
+  async fetch(request, env, ctx){
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/+$/, "") || "/";
     if (request.method === "OPTIONS") return new Response(null, { headers: cors(env) });
 
     try {
+      /* Strava's webhook. The GET is Strava checking the address when the
+         subscription is made (see /admin/webhook); the POSTs are events,
+         answered at once - Strava wants a 200 inside two seconds - and
+         handled after. */
+      if (path === "/strava/webhook"){
+        if (request.method === "GET"){
+          if (url.searchParams.get("hub.mode") === "subscribe" &&
+              url.searchParams.get("hub.verify_token") === await webhookToken(env))
+            return new Response(JSON.stringify({ "hub.challenge": url.searchParams.get("hub.challenge") || "" }),
+              { headers:{ "Content-Type":"application/json" } });
+          return json(env, { error:"no such endpoint" }, 404);
+        }
+        if (request.method === "POST"){
+          const ev = await request.json().catch(() => null);
+          const job = handleWebhook(env, ev).catch(() => null);
+          if (ctx && ctx.waitUntil) ctx.waitUntil(job); else await job;
+          return new Response("ok");
+        }
+      }
+
       if (path === "/connect"){
         // `state` is signed so a stranger cannot walk an athlete through a
         // callback we did not start
@@ -172,8 +638,8 @@ export default {
         const stub = await athleteStub(env, athleteId);
         await stub.fetch("https://do/open", { method:"POST", body: JSON.stringify({
           athleteId, refresh: tok.refresh_token, access: tok.access_token,
-          expires: tok.expires_at * 1000,
-          firstName: (tok.athlete && tok.athlete.firstname) || "" }) });
+          // nothing else from the athlete's profile: Runmon has no use for it
+          expires: tok.expires_at * 1000 }) });
 
         // On the roster the moment they link, so somebody who connects and never
         // runs still shows up as a connection rather than as nothing at all.
@@ -189,22 +655,56 @@ export default {
       }
 
       if (path === "/sync" && request.method === "POST")
-        return await withAthlete(request, env, stub => stub.fetch("https://do/sync", { method:"POST" }));
+        return await withAthlete(request, env, async (stub, id) => {
+          // Sync is what every player does on opening the app, which makes it
+          // the place an old account becomes reachable again. Guarded: a
+          // directory write is bookkeeping and must never cost somebody
+          // their runs.
+          try { await ensureHandle(env, id); } catch (e){ /* not worth a failed sync */ }
+          return stub.fetch("https://do/sync", { method:"POST" });
+        });
 
       if (path === "/save" && request.method === "PUT")
         return await withAthlete(request, env, async (stub, id) => {
           const body = await request.text();
           const res = await stub.fetch("https://do/save", { method:"POST", body });
+          const out = await res.json();
+          // a parked athlete's old session is refused here, not just at /sync:
+          // a push already on its way would otherwise put runs back and
+          // un-park the Rankings row
+          if (!out.saved) return json(env, out, 409);
           // the roster row is a copy of the card, refreshed as the save lands
           try {
             const parsed = JSON.parse(body);
-            if (parsed && parsed.card) await rosterPut(env, id, parsed.card);
+            if (parsed && parsed.card) await rosterPut(env, id, out.pet ? { ...parsed.card, pet: out.pet } : parsed.card);
           } catch (e){ /* a save that will not parse is the DO's problem, not the roster's */ }
-          return res;
+          return json(env, out);
         });
 
       if (path === "/disconnect" && request.method === "POST")
-        return await withAthlete(request, env, stub => stub.fetch("https://do/wipe", { method:"POST" }));
+        return await withAthlete(request, env, async (stub, id) =>
+          json(env, { disconnected: true, ...(await parkAthlete(env, id)), eraseAt: Date.now() + GRACE_MS }));
+
+      /* A player deleting their own pet. Two calls, on purpose, and both
+         checked here rather than trusted to the app: the first opens an
+         intent, the second has to arrive at least DELETE_WAIT_MS later and
+         within ten minutes, carrying the pet's name as the player typed it.
+         The pet is archived, not destroyed - see petDelete(). */
+      if (path === "/pet/delete-intent" && request.method === "POST")
+        return await withAthlete(request, env, async stub =>
+          json(env, await (await stub.fetch("https://do/pet-intent", { method:"POST" })).json()));
+      if (path === "/pet/delete" && request.method === "POST")
+        return await withAthlete(request, env, async (stub, id) => {
+          const body = await request.json().catch(() => ({}));
+          const r = await (await stub.fetch("https://do/pet-delete", { method:"POST",
+            body: JSON.stringify({ intent: body.intent, name: body.name }) })).json();
+          if (!r.ok) return json(env, r, 400);
+          const handle = (await hmac(env.SESSION_SECRET, "roster:" + id)).slice(0, 12);
+          await deletedStub(env).fetch("https://do/del-add", { method:"POST",
+            body: JSON.stringify({ ...r.entry, handle, athleteId: String(id) }) });
+          await rosterStub(env).fetch("https://do/roster-reset", { method:"POST", body: JSON.stringify({ handle }) });
+          return json(env, { ok:true, deleted: r.entry.pet, eraseAt: r.entry.at + GRACE_MS });
+        });
 
       /* --- friends ---------------------------------------------------------
          A friend code is a random six characters, not anything derived from the
@@ -222,6 +722,42 @@ export default {
           return json(env, { code, card });
         });
 
+      /* Everybody who has linked and hatched something, which while the game
+         is this small is what the Friends tab shows instead of a list you have
+         to build by hand. It reads the same roster the admin summary does -
+         the rows are written on every save - and hands back the same card a
+         friend code would have got you: a pet, a form and totals, never runs
+         or routes or anything about the athlete.
+
+         It needs a session, so this is players seeing players rather than a
+         URL anybody can curl. The handle is the roster's own HMAC, not an
+         athlete id, so it identifies a row without being reversible into a
+         Strava profile. */
+      if (path === "/friends/all")
+        return await withAthlete(request, env, async (_stub, me) => {
+          const mine = (await hmac(env.SESSION_SECRET, "roster:" + me)).slice(0, 12);
+          const r = await rosterStub(env).fetch("https://do/roster-list");
+          const { rows } = await r.json();
+          const players = (rows || [])
+            .filter(x => x.handle !== mine && x.pet && !x.disconnected)
+            .map(x => ({ id: x.handle, card: playerCard(rosterCard(x)), lastSeen: x.lastSeen || 0,
+                         pen: markPenalty(x.marks), hits: markCount(x.marks) }))
+            .sort((a, b) => byRank(a.card, b.card))
+            .slice(0, 200);
+          return json(env, { players });
+        });
+
+      /* The races, and who holds each - see FIRSTS. `mine` is worked out here,
+         since the app does not know its own handle. */
+      if (path === "/firsts")
+        return await withAthlete(request, env, async (_stub, me) => {
+          const mine = (await hmac(env.SESSION_SECRET, "roster:" + me)).slice(0, 12);
+          const { firsts } = await (await rosterStub(env).fetch("https://do/firsts-list")).json();
+          return json(env, { firsts: FIRSTS.map(f => { const h = firsts[f.id];
+            return { id: f.id, name: f.name, level: f.level, mine: !!(h && h.handle === mine),
+                     holder: h ? (h.gone ? { gone: true, at: h.at } : { pet: h.pet, species: h.species, at: h.at }) : null }; }) });
+        });
+
       if (path === "/friends/lookup")
         return await withAthlete(request, env, async (stub, me) => {
           // 200 with an `error` for anything about the code itself. An HTTP
@@ -236,7 +772,7 @@ export default {
           const r = await theirs.fetch("https://do/card");
           const { card } = await r.json();
           if (!card) return json(env, { error:"They have not hatched a pet yet." });
-          return json(env, { code, card });
+          return json(env, { code, card: playerCard(card) });
         });
 
       // One round trip for a whole friends list. Codes only - a card carries a
@@ -251,7 +787,7 @@ export default {
             if (!owner) return;
             const r = await (await athleteStub(env, owner)).fetch("https://do/card");
             const { card } = await r.json();
-            if (card) cards[code] = card;
+            if (card) cards[code] = playerCard(card);
           }));
           return json(env, { cards });
         });
@@ -264,21 +800,515 @@ export default {
 
          Plain text by default because it is read in a terminal; ?format=json
          for anything that wants to parse it. */
+      /* A battle is claimed before it is fought and reported after, which is
+         two round trips for what looks like one act. It is deliberate: with a
+         single call the attacker could abandon any fight going badly and try
+         again until it went well, and every attack would land as a knockout.
+         The attack is spent at /battle/start, so walking away costs it.
+
+         The defender is not consulted at either end. btChoose plays their pet
+         on the attacker's device; they were never asked and cannot decline,
+         which is the only reason an XP penalty works at all - one you can
+         refuse is one nobody ever takes. */
+      if (path === "/battle/start" && request.method === "POST")
+        return await withAthlete(request, env, async (stub, me) => {
+          const body   = await request.json().catch(() => ({}));
+          const target = String(body.target || "").slice(0, 24);
+          if (!target) return json(env, { error:"no target" }, 400);
+
+          const myHandle = (await hmac(env.SESSION_SECRET, "roster:" + me)).slice(0, 12);
+          if (target === myHandle) return json(env, { error:"that is you" }, 400);
+
+          // Levels are read off the roster, never off the request. It is the
+          // one number the whole mark hangs on, and it is fixed here so it
+          // cannot move between the fight starting and its result arriving.
+          const r = await rosterStub(env).fetch("https://do/roster-list");
+          const { rows } = await r.json();
+          const mine   = (rows || []).find(x => x.handle === myHandle);
+          const theirs = (rows || []).find(x => x.handle === target && !x.disconnected);
+          if (!theirs || !theirs.pet) return json(env, { error:"no such player" }, 404);
+          // Listed in Friends but not reachable: their roster row predates the
+          // directory. "No such player" was actively misleading - they are
+          // plainly there on the screen - so say what is true and what fixes
+          // it. It heals itself the moment they next open the app.
+          if (!await lookupHandle(env, target))
+            return json(env, { error:"They have not opened Runmon since battles arrived. Ask them to open the app once." }, 409);
+
+          const gap  = (Number(theirs.level) || 0) - (Number(mine && mine.level) || 0);
+          const seed = crypto.getRandomValues(new Uint32Array(1))[0];
+          const gate = await stub.fetch("https://do/attack-claim", { method:"POST",
+            body: JSON.stringify({ target, seed, gap, at: Date.now() }) });
+          const g = await gate.json();
+          if (!g.ok) return json(env, { error: g.why, until: g.until || 0 }, 429);
+          return json(env, { ok:true, seed, gap, left: g.left });
+        });
+
+      /* How it went. The seed has to match the claim, so a result cannot be
+         reported for a fight that was never started. */
+      if (path === "/battle/report" && request.method === "POST")
+        return await withAthlete(request, env, async (stub, me) => {
+          const body = await request.json().catch(() => ({}));
+          const chip = Math.max(0, Math.min(1, Number(body.chip) || 0));
+          const win  = !!body.win;
+          const seed = (Number(body.seed) || 0) >>> 0;
+
+          const c = await (await stub.fetch("https://do/attack-close", { method:"POST",
+            body: JSON.stringify({ seed }) })).json();
+          if (!c.ok) return json(env, { error: c.why }, 409);
+
+          const owner = await lookupHandle(env, c.target);
+          if (!owner) return json(env, { error:"no such player" }, 404);
+
+          const myHandle = (await hmac(env.SESSION_SECRET, "roster:" + me)).slice(0, 12);
+
+          /* Both pets' names travel with the row. A handle is an HMAC and means
+             nothing to a person, and the app cannot always translate one: it
+             knows the roster only after somebody has opened Friends, and the
+             one place this has to read well - the notice on opening the app -
+             is exactly where it may not have. The names are already public to
+             every player in the roster, so nothing new is being told. */
+          const r = await rosterStub(env).fetch("https://do/roster-list");
+          const { rows } = await r.json();
+          const nameOf = h => {
+            const row = (rows || []).find(x => x.handle === h);
+            return row && row.pet ? String(row.pet).slice(0, 24) : "";
+          };
+
+          const at  = Date.now();
+          const amt = markFor(chip, c.gap, win);
+          const row = { at, amt, by: myHandle, byName: nameOf(myHandle),
+                        toName: nameOf(c.target), chip, win, seed,
+                        gap: c.gap, v: MARK_VERSION };
+          await (await athleteStub(env, owner)).fetch("https://do/mark-add", {
+            method:"POST", body: JSON.stringify(row) });
+          /* A second copy, on the roster row. The marks that matter to the pet
+             live with the pet, but the Rankings table shows everyone's standing
+             penalty at once, and fanning out to two hundred athlete objects to
+             draw one screen is not a read worth making. Only `at` and `amt` go
+             across - enough to know what it is worth and when it ends, nothing
+             about who did it. */
+          await rosterStub(env).fetch("https://do/roster-mark", { method:"POST",
+            body: JSON.stringify({ handle: c.target, at, amt }) });
+          await stub.fetch("https://do/log-add", { method:"POST",
+            body: JSON.stringify({ ...row, dir:"out", who: c.target }) });
+          return json(env, { ok:true, amt, gap: c.gap });
+        });
+
+      /* What is standing on your own pet, and the fights it has been in. The
+         app prices its runs from this. */
+      if (path === "/battle/marks")
+        return await withAthlete(request, env, async (stub, me) => {
+          const data = await (await stub.fetch("https://do/marks")).json();
+          /* And, while the list is in hand, the roster's copy of it is brought
+             up to date. Rankings shows every player's standing penalty, and
+             that copy is written by whoever lands the attack - so marks that
+             predate it, or any drift since, would never appear there and there
+             is nothing to migrate from: the roster cannot read into an athlete
+             object, and fanning out to two hundred of them to draw one screen
+             is the read the copy exists to avoid. Every player does this on
+             opening the tab, so the table fills itself in.
+
+             Skipped when there is nothing on the pet. An expired mark is
+             ignored by both the penalty and the count, so a row whose marks
+             have all run out needs no write to stop showing them - and a quiet
+             day is most of them. */
+          const live = t => Date.now() - (Number(t) || 0) < MARK_HOURS * 3600e3;
+          const sync = (handle, marks) => rosterStub(env).fetch("https://do/roster-sync",
+            { method:"POST", body: JSON.stringify({ handle, marks }) });
+
+          if ((data.marks || []).length){
+            const handle = (await hmac(env.SESSION_SECRET, "roster:" + me)).slice(0, 12);
+            await sync(handle, data.marks.map(m => ({ at: m.at, amt: m.amt })));
+          }
+
+          /* And the rows of everyone this player has attacked. Waiting for each
+             of them to open the app would be right if they were the only ones
+             who knew, but they are not: an outgoing row in this pet's own log
+             is the same at and amt that went onto the target, written in the
+             same breath. So the attacker repairs what the attacker did, and a
+             player who spent their two attacks this morning sees the result of
+             them the next time they look - rather than whenever the person
+             they hit happens to open Runmon.
+
+             Merged by the roster, so the copy the attack already wrote is not
+             counted twice, and only ever adds. A day's live rows is two. */
+          const out = (data.battles || []).filter(bt =>
+            bt && bt.dir === "out" && bt.who && live(bt.at) && bt.amt > 0);
+          const byTarget = new Map();
+          for (const bt of out){
+            if (!byTarget.has(bt.who)) byTarget.set(bt.who, []);
+            byTarget.get(bt.who).push({ at: bt.at, amt: bt.amt });
+          }
+          for (const [handle, marks] of byTarget) await sync(handle, marks);
+
+          return json(env, data);
+        });
+
+      /* --- the raid ------------------------------------------------------
+         Three routes and one switch. Everything here needs a session: the pool
+         is what the players are doing to him together, not a public scoreboard
+         for anybody with the URL.
+
+         What he is on, what you have taken off him, and what your running has
+         bought. One call, because it is one screen. */
+      if (path === "/raid")
+        return await withAthlete(request, env, async (stub, me) => {
+          const handle = (await hmac(env.SESSION_SECRET, "roster:" + me)).slice(0, 12);
+          const [rs, sh, sw] = await Promise.all([
+            raidStub(env).fetch("https://do/raid-state", { method:"POST", body:"{}" }),
+            raidStub(env).fetch("https://do/raid-share", { method:"POST",
+              body: JSON.stringify({ handle }) }),
+            stub.fetch("https://do/raid-swings")
+          ]);
+          const { raid } = await rs.json();
+          const { share } = await sh.json();
+          const swings = await sw.json();
+          return json(env, { raid: { id: raid.id, epoch: raid.epoch, hp: raid.hp,
+                                     max: raid.max, crossed: raid.crossed || [],
+                                     felledAt: raid.felledAt || null,
+                                     startedAt: raid.startedAt || 0,
+                                     respawns: RAID_RESPAWNS, v: RAID_VERSION },
+                             you: { dealt: share.dealt || 0, swings: share.swings || 0,
+                                    // the badge's question, answered where it can be
+                                    slayer: !!raid.felledAt && (share.dealt || 0) > 0 },
+                             attempts: swings });
+        });
+
+      /* Spend a swing. Refused when he is down, so a raid cannot be fought
+         past its own end, and refused when the kilometres have not been run -
+         which is the only thing that limits a raid at all. */
+      if (path === "/raid/claim" && request.method === "POST")
+        return await withAthlete(request, env, async (stub) => {
+          const r = await raidStub(env).fetch("https://do/raid-state", { method:"POST", body:"{}" });
+          const { raid } = await r.json();
+          if (raid.hp <= 0) return json(env, { error:"he is already down", raid }, 409);
+
+          const seed = crypto.getRandomValues(new Uint32Array(1))[0];
+          const gate = await stub.fetch("https://do/raid-claim", { method:"POST",
+            body: JSON.stringify({ epoch: raid.epoch, seed, at: Date.now() }) });
+          const g = await gate.json();
+          if (!g.ok) return json(env, { error: g.why, attempts: g }, 429);
+          return json(env, { ok:true, seed, epoch: raid.epoch, hp: raid.hp, max: raid.max,
+                             attempts: { earned: g.earned, spent: g.spent, left: g.left } });
+        });
+
+      /* How the swing went. `dealt` is the client's account of its own fight,
+         so it is clamped here against what a pet of that level could possibly
+         do - and the level is read off the roster, never off the request, the
+         same rule an attack follows. */
+      if (path === "/raid/report" && request.method === "POST")
+        return await withAthlete(request, env, async (stub, me) => {
+          const body = await request.json().catch(() => ({}));
+          const seed = (Number(body.seed) || 0) >>> 0;
+
+          const c = await (await stub.fetch("https://do/raid-close", { method:"POST",
+            body: JSON.stringify({ seed }) })).json();
+          if (!c.ok) return json(env, { error: c.why }, 409);
+
+          const handle = (await hmac(env.SESSION_SECRET, "roster:" + me)).slice(0, 12);
+          const rr = await rosterStub(env).fetch("https://do/roster-list");
+          const { rows } = await rr.json();
+          const mine = (rows || []).find(x => x.handle === handle);
+          const cap  = raidSwingCap(mine && mine.level);
+          const dealt = Math.max(0, Math.min(cap, Math.round(Number(body.dealt) || 0)));
+
+          const ap = await raidStub(env).fetch("https://do/raid-apply", { method:"POST",
+            body: JSON.stringify({ handle, epoch: c.epoch, dealt }) });
+          const a = await ap.json();
+          if (!a.ok) return json(env, { error: a.why, raid: a.raid }, 409);
+          return json(env, { ok:true, took: a.took, crossed: a.crossed,
+                             capped: dealt < Math.round(Number(body.dealt) || 0),
+                             raid: { epoch: a.raid.epoch, hp: a.raid.hp, max: a.raid.max,
+                                     felledAt: a.raid.felledAt || null } });
+        });
+
+      /* --- Explore ----------------------------------------------------
+         Explore is its own component: its own page (explore/) and its own
+         world server (explore-worker/), which keeps Sir Uwaaarghhhh's health
+         and who has taken what off him. It asks this worker three things and
+         nothing else, always with the player's own session: who they are,
+         to spend one of their swings, and - once, at the handover - what the
+         old raid here had come to. It never sees a run; a swing is still
+         earned from kilometres, but only this worker knows them.
+
+         Who you are: your roster handle, your pet as the roster has it (the
+         level read off the roster, never off a request, as an attack's is),
+         your swings, and the raid's round, which the admin switch moves. */
+      if (path === "/explore/me")
+        return await withAthlete(request, env, async (stub, me) => {
+          const handle = (await hmac(env.SESSION_SECRET, "roster:" + me)).slice(0, 12);
+          const [rr, rs, sw] = await Promise.all([
+            rosterStub(env).fetch("https://do/roster-list"),
+            raidStub(env).fetch("https://do/raid-state", { method:"POST", body:"{}" }),
+            stub.fetch("https://do/raid-swings")
+          ]);
+          const row = ((await rr.json()).rows || []).find(x => x.handle === handle);
+          if (!row || !row.pet || !row.species) return json(env, { error:"no pet yet" }, 404);
+          const { raid } = await rs.json();
+          return json(env, { handle, pet: row.pet, species: row.species, level: Number(row.level) || 1,
+                             swings: await sw.json(), epoch: raid.epoch });
+        });
+
+      /* Spend one swing on an Explore attempt. Refused, with how far the
+         next one is, when the kilometres have not been run. */
+      if (path === "/explore/attempt" && request.method === "POST")
+        return await withAthlete(request, env, async (stub, me) => {
+          const handle = (await hmac(env.SESSION_SECRET, "roster:" + me)).slice(0, 12);
+          const [g, rs, rr] = await Promise.all([
+            stub.fetch("https://do/explore-spend", { method:"POST", body:"{}" }),
+            raidStub(env).fetch("https://do/raid-state", { method:"POST", body:"{}" }),
+            rosterStub(env).fetch("https://do/roster-list")
+          ]);
+          const spend = await g.json(), { raid } = await rs.json();
+          const row = ((await rr.json()).rows || []).find(x => x.handle === handle);
+          return json(env, { ...spend, handle, level: Number(row && row.level) || 1, epoch: raid.epoch },
+                      spend.ok ? 200 : 429);
+        });
+
+      /* The old raid as it stands - his health and everyone's share of the
+         current round, with their pets' names - for Explore to carry over
+         once when it takes the raid's place. */
+      if (path === "/explore/legacy")
+        return await withAthlete(request, env, async () => {
+          const r = await raidStub(env).fetch("https://do/raid-roll", { method:"POST",
+            body: JSON.stringify({ epoch: null }) });
+          const { epoch, roll, raid } = await r.json();
+          const rows = new Map(((await (await rosterStub(env).fetch("https://do/roster-list")).json()).rows || [])
+            .map(x => [x.handle, x]));
+          return json(env, { epoch, max: raid.max, hp: raid.hp, felledAt: raid.felledAt || null,
+            roll: roll.map(x => ({ handle: x.handle, dealt: x.dealt,
+                                   pet: (rows.get(x.handle) || {}).pet || "", species: (rows.get(x.handle) || {}).species || "" })) });
+        });
+
+      /* The switch. He does not come back on his own; this is what brings him
+         back, and it is behind the admin token like the summary - a wrong
+         token gets the same 404 a missing route would, so it does not
+         advertise itself.
+
+           curl -H "Authorization: Bearer $ADMIN_TOKEN" .../admin/raid
+           curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
+                -H 'Content-Type: application/json' -d '{"hp":35100}' .../admin/raid
+
+         GET reads an epoch and who is owed a badge for it - ?epoch=N for one
+         that is already over, which is the question an Orc Slayer raises
+         months later - and POST starts the next one. Nothing is deleted
+         either way. */
+      if (path === "/admin/raid"){
+        { const refused = await adminGate(request, env); if (refused) return refused; }
+        if (request.method === "POST"){
+          const body = await request.json().catch(() => ({}));
+          const r = await raidStub(env).fetch("https://do/raid-respawn", { method:"POST",
+            body: JSON.stringify({ hp: body.hp }) });
+          return json(env, await r.json());
+        }
+        const want = url.searchParams.get("epoch");
+        const r = await raidStub(env).fetch("https://do/raid-roll", { method:"POST",
+          body: JSON.stringify({ epoch: want == null ? null : Number(want) }) });
+        const { epoch, roll, raid } = await r.json();
+        const names = new Map(((await (await rosterStub(env)
+          .fetch("https://do/roster-list")).json()).rows || [])
+          .map(x => [x.handle, x.pet]));
+        return json(env, { raid, epoch,
+          roll: roll.map(x => ({ ...x, pet: names.get(x.handle) || "" })) });
+      }
+
       if (path === "/admin/summary"){
-        const given = (request.headers.get("Authorization") || "").replace(/^Bearer /, "");
-        if (!await adminOk(env, given)) return json(env, { error:"no such endpoint" }, 404);
+        { const refused = await adminGate(request, env); if (refused) return refused; }
         const r = await rosterStub(env).fetch("https://do/roster-list");
         const { rows } = await r.json();
         rows.sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0));
         if (url.searchParams.get("format") === "json")
-          return new Response(JSON.stringify({ count: rows.length, rows }, null, 2),
+          return new Response(JSON.stringify({ count: rows.length, rows: rows.map(rowOut) }, null, 2),
             { headers:{ "Content-Type":"application/json", "Cache-Control":"no-store" } });
         return new Response(summaryTable(rows),
           { headers:{ "Content-Type":"text/plain; charset=utf-8", "Cache-Control":"no-store" } });
       }
 
+      /* --- the admin dashboard ---------------------------------------------
+         admin.html, served beside the app, calls these with ADMIN_TOKEN. The
+         same answer as any unknown path when the token is wrong, so the routes
+         do not advertise themselves. Players are addressed by roster handle -
+         an HMAC, not their Strava id - and the handle directory turns it back
+         into the athlete id when something has to be done to them. */
+      if (path.startsWith("/admin/") && path !== "/admin/raid" && path !== "/admin/summary"){
+        { const refused = await adminGate(request, env); if (refused) return refused; }
+        const body = request.method === "POST" ? await request.json().catch(() => ({})) : {};
+        const handle = String(body.handle || url.searchParams.get("handle") || "").slice(0, 24);
+        const who = async () => {
+          const id = handle ? await lookupHandle(env, handle) : null;
+          if (!id) throw Object.assign(new Error("That player cannot be reached - they have not opened the app since the directory was added."), { status: 404 });
+          return id;
+        };
+
+        if (path === "/admin/users"){
+          const { rows } = await (await rosterStub(env).fetch("https://do/roster-list")).json();
+          const reach = await Promise.all(rows.map(r => lookupHandle(env, r.handle).then(Boolean)));
+          const out = rows.map((r, i) => ({ ...rowOut(r), reachable: reach[i],
+            eraseAt: r.disconnected && r.disconnectedAt ? r.disconnectedAt + GRACE_MS : null,
+            pen: markPenalty(r.marks || []), hits: markCount(r.marks || []), marks: undefined }));
+          const { raid } = await (await raidStub(env).fetch("https://do/raid-state", { method:"POST", body:"{}" })).json();
+          return json(env, { at: Date.now(), rows: out, raid });
+        }
+
+        if (path === "/admin/user"){
+          const id = await who();
+          const { rows } = await (await rosterStub(env).fetch("https://do/roster-list")).json();
+          const found = rows.find(r => r.handle === handle);
+          const row = found ? { ...rowOut(found), marks: undefined,
+            eraseAt: found.disconnected && found.disconnectedAt ? found.disconnectedAt + GRACE_MS : null } : null;
+          const peek = await (await (await athleteStub(env, id)).fetch("https://do/admin-peek")).json();
+          return json(env, { handle, row, ...peek });
+        }
+
+        if (path === "/admin/adjust" && request.method === "POST"){
+          const kind = body.kind === "level" ? "level" : body.kind === "xp" ? "xp" : null;
+          const value = Math.round(Number(body.value));
+          if (!kind || !Number.isFinite(value)) return json(env, { error:"Say a level or an XP amount." }, 400);
+          if (kind === "level" && (value < 1 || value > 99)) return json(env, { error:"A level is 1 to 99." }, 400);
+          if (kind === "xp" && Math.abs(value) > 10000000) return json(env, { error:"That is too much XP." }, 400);
+          const r = await (await athleteStub(env, await who())).fetch("https://do/admin-adjust",
+            { method:"POST", body: JSON.stringify({ kind, value, note: body.note }) });
+          return json(env, await r.json());
+        }
+
+        /* A new name for a player's pet - one somebody should not have to
+           see in Rankings, or a typo they asked to have fixed. The pet's name
+           is the only name Runmon has for anybody: it collects none from
+           Strava. Unlike a level it shows on everybody else's screen, so it
+           cannot wait for the player to open the app: the stored card, the
+           Rankings row and any race the pet holds take it now, and the app
+           picks it up on its next sync like any other adjustment. Until it
+           has, a push from it carrying the old name is given the new one -
+           see commit(). */
+        if (path === "/admin/rename" && request.method === "POST"){
+          const name = petNameOf(body.name);
+          if (!name) return json(env, { error:"A name is 1 to 16 characters." }, 400);
+          const r = await (await (await athleteStub(env, await who())).fetch("https://do/admin-rename",
+            { method:"POST", body: JSON.stringify({ name, note: body.note }) })).json();
+          if (r.error) return json(env, r);
+          if (r.card) await rosterStub(env).fetch("https://do/roster-card", { method:"POST",
+            body: JSON.stringify({ handle, card: r.card }) });
+          return json(env, r);
+        }
+
+        if (path === "/admin/disconnect" && request.method === "POST")
+          return json(env, { ...(await parkAthlete(env, await who())), eraseAt: Date.now() + GRACE_MS });
+
+        /* Erase a player now rather than at the end of the grace period - a
+           player who asked to be forgotten, by email. Works on a row whose
+           directory entry never existed, since the row and backups still go. */
+        if (path === "/admin/erase" && request.method === "POST"){
+          if (!handle) return json(env, { error:"Which player?" }, 400);
+          return json(env, await purgeAthlete(env, await lookupHandle(env, handle), handle));
+        }
+
+        /* The webhook subscription: what Strava has, and making one. Strava
+           checks the callback while the POST is in flight, which is why the
+           callback is this same worker. If one already exists for this
+           callback it is adopted rather than failed on. */
+        if (path === "/admin/webhook"){
+          const callback = url.origin + "/strava/webhook";
+          const list = async () => {
+            const q = new URL(API(env) + "/push_subscriptions");
+            q.searchParams.set("client_id", env.STRAVA_CLIENT_ID);
+            q.searchParams.set("client_secret", env.STRAVA_CLIENT_SECRET);
+            const r = await fetch(q);
+            const subs = r.ok ? await r.json().catch(() => null) : null;
+            return Array.isArray(subs) ? subs.map(x => ({ id: x.id, callback_url: x.callback_url })) : null;
+          };
+          const remember = id => webhookStub(env).fetch("https://do/wh-set", { method:"POST",
+            body: JSON.stringify({ id, callback, at: Date.now() }) });
+          if (request.method === "POST"){
+            const r = await fetch(API(env) + "/push_subscriptions", { method:"POST",
+              body: new URLSearchParams({ client_id: env.STRAVA_CLIENT_ID, client_secret: env.STRAVA_CLIENT_SECRET,
+                                          callback_url: callback, verify_token: await webhookToken(env) }) });
+            const out = await r.json().catch(() => ({}));
+            if (r.ok && out.id){ await remember(out.id); return json(env, { ok:true, id: out.id, callback }); }
+            const have = (await list() || []).find(x => x.callback_url === callback);
+            if (have){ await remember(have.id); return json(env, { ok:true, id: have.id, callback, adopted: true }); }
+            return json(env, { error: "Strava refused the subscription: " + JSON.stringify(out).slice(0, 300) }, 502);
+          }
+          const stored = await (await webhookStub(env).fetch("https://do/wh-get")).json();
+          return json(env, { stored, strava: await list(), callback });
+        }
+
+        /* Pets players deleted: the list, and putting one back on the Strava
+           account it came from, as a restore queued like any other. The
+           account needs a pet of its own to write over - a player who
+           deleted theirs is asked to hatch an egg first. */
+        if (path === "/admin/deleted"){
+          const { rows } = await (await deletedStub(env).fetch("https://do/del-list")).json();
+          return json(env, { rows: rows.map(({ athleteId, ...rest }) => ({ ...rest, eraseAt: rest.at + GRACE_MS })) });
+        }
+        if (path === "/admin/deleted/erase" && request.method === "POST"){
+          const { row } = await (await deletedStub(env).fetch("https://do/del-get", { method:"POST",
+            body: JSON.stringify({ id: body.id }) })).json();
+          if (!row) return json(env, { error:"No deleted pet with that id." }, 404);
+          await eraseDeleted(env, row);
+          return json(env, { ok:true });
+        }
+        if (path === "/admin/deleted/restore" && request.method === "POST"){
+          const { row } = await (await deletedStub(env).fetch("https://do/del-get", { method:"POST",
+            body: JSON.stringify({ id: body.id }) })).json();
+          if (!row) return json(env, { error:"No deleted pet with that id." }, 404);
+          const p = row.pet || {};
+          const r = await (await athleteStub(env, row.athleteId)).fetch("https://do/admin-adjust", { method:"POST",
+            body: JSON.stringify({ kind:"restore", value: p.level || 1,
+              snap: { species: p.species, pet: p.pet, level: p.level || 1, xp: p.xp, km: null },
+              note: "brought back from Deleted pets" }) });
+          const out = await r.json();
+          if (!out.ok) return json(env, { error: "They have no pet on their account right now. Once they hatch an egg, restore it again - it replaces that egg." }, 409);
+          await deletedStub(env).fetch("https://do/del-mark", { method:"POST",
+            body: JSON.stringify({ id: row.id, restoredAt: Date.now() }) });
+          return json(env, { ok:true, rev: out.rev });
+        }
+
+        /* A backup of every pet, or one: name, species, level and XP, and
+           nothing Strava measured - see adminSnapshot(). */
+        const fileOf = (backup, name) => new Response(JSON.stringify(backup, null, 1), {
+          headers: { "Content-Type":"application/json", "Cache-Control":"no-store", ...cors(env),
+            "Content-Disposition": `attachment; filename="${name}.json"` } });
+        if (path === "/admin/backup")
+          return fileOf(await backupOf(env, handle),
+            `runmon-backup-${new Date().toISOString().slice(0,10)}${handle ? "-" + handle : ""}`);
+
+        /* The nightly copies: the list, or one day's as a file (just one
+           player's entry, with ?handle=, for a restore). POST takes one now. */
+        if (path === "/admin/backups"){
+          if (request.method === "POST") return json(env, { ok:true, ...(await autoBackup(env)) });
+          const day = url.searchParams.get("day");
+          if (!day) return json(env, await (await backupStub(env).fetch("https://do/bk-list")).json());
+          const { backup } = await (await backupStub(env).fetch("https://do/bk-get", { method:"POST",
+            body: JSON.stringify({ day }) })).json();
+          if (!backup) return json(env, { error:"There is no automatic backup for that day." }, 404);
+          if (handle) for (const k of ["users", "connected", "disconnected", "deleted"])
+            if (backup[k]) backup[k] = backup[k].filter(u => u.handle === handle);
+          return fileOf(backup, `runmon-auto-${day}${handle ? "-" + handle : ""}`);
+        }
+
+        /* Put a backed-up pet back. Queued like any other change, so the app
+           applies it on its next sync: species, name, and level, XP and
+           distance made up on top of whatever its runs now come to. */
+        if (path === "/admin/restore" && request.method === "POST"){
+          const b = body.snap || {};
+          const species = ["ember","nimbus","verdant"].includes(b.species) ? b.species : null;
+          const level = Math.round(Number(b.level));
+          if (!species || !(level >= 1 && level <= 99)) return json(env, { error:"That is not a Runmon backup of this player." }, 400);
+          const num = (v, max) => v == null || !Number.isFinite(Number(v)) ? null : Math.max(0, Math.min(max, Number(v)));
+          // a backup from before distance was dropped still carries it; it is
+          // not put back
+          const snap = { species, pet: String(b.pet || "").slice(0, 24), level,
+                         xp: num(b.xp, 1e9), km: null };
+          const r = await (await athleteStub(env, await who())).fetch("https://do/admin-adjust",
+            { method:"POST", body: JSON.stringify({ kind:"restore", value: level, snap, note: body.note || "restored from backup" }) });
+          return json(env, await r.json());
+        }
+        return json(env, { error:"no such endpoint" }, 404);
+      }
+
       return json(env, { error:"no such endpoint" }, 404);
     } catch (err){
+      if (err && err.status) return json(env, { error: err.message }, err.status);
       // every route above is `return await`, not `return`: a returned promise
       // rejects after the try block has already exited, so without the await
       // this catch never sees it and a malformed body escapes as a raw runtime
@@ -288,9 +1318,16 @@ export default {
   }
 };
 
-/* What a roster row keeps of a card. Named rather than spread wholesale so
-   that a field added to the card for the game does not silently land in the
-   private table as well. */
+/* What a roster row keeps of a card, which is also everything any other
+   player is ever shown. Named rather than spread wholesale so that a field
+   added to the card for the game does not silently land in the private table
+   as well.
+
+   The game's own numbers and nothing Strava measured. Strava's API Policy
+   lets an athlete's data be shown to that athlete and nobody else (2.3), so
+   the distance, the week's distance, the run count and the time of the last
+   run that cards used to carry are gone - older apps still send them and
+   they are dropped here. Level, XP, streak and badges are the game's. */
 function rosterCard(c){
   return {
     pet: String(c.pet || "").slice(0, 24),
@@ -298,41 +1335,74 @@ function rosterCard(c){
     form: String(c.form || "").slice(0, 24),
     stage: Number(c.stage) || 0,
     level: Number(c.level) || 0,
-    km: Number(c.km) || 0,
-    weekKm: Number(c.weekKm) || 0,
-    runs: Number(c.runs) || 0,
+    xp: Math.max(0, Math.round(Number(c.xp) || 0)),
     streak: Number(c.streak) || 0,
     best: Number(c.best) || 0,
-    lastRun: Number(c.lastRun) || null
+    badges: Math.max(0, Math.round(Number(c.badges) || 0))
   };
 }
+/* A pet's name as the dashboard may set it: the app's own limit of 16, with
+   control and direction-override characters taken out - a name is drawn on
+   other people's screens, and an override would let one run backwards over
+   whatever sits next to it. Cut on a whole character, so an emoji is not
+   cut in half, and short enough for rosterCard()'s 24 code units, which would
+   otherwise cut it for us. Empty when nothing is left. */
+function petNameOf(v){
+  const s = String(v || "").replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, "")
+    .replace(/\s+/g, " ").trim();
+  let out = "", n = 0;
+  for (const ch of s){ if (n === 16 || out.length + ch.length > 24) break; out += ch; n++; }
+  return out.trim();
+}
+/** A roster row as it leaves the object: the card cut down as above, and
+    the bookkeeping around it. Rows written before the cut still hold the old
+    fields until the pet next saves or the nightly pass rewrites them. */
+const rowOut = r => ({ handle: r.handle, ...(r.pet ? rosterCard(r) : {}),
+  marks: r.marks || [], firstSeen: r.firstSeen || null, lastSeen: r.lastSeen || null,
+  disconnected: !!r.disconnected, disconnectedAt: r.disconnectedAt || null });
+/* Levels first, then XP inside a level - distance used to break the tie.
+   The admin table's order only; players are ranked by byRank. */
+const byStanding = (a, b) => (b.level - a.level) || ((b.xp || 0) - (a.xp || 0));
+/* What one player is shown of another: the card without its XP. XP is the
+   run log summed, so of everything on a card it is the closest to Strava's
+   own data, and putting it side by side down a table of athletes is the
+   comparison Strava's API Policy is most wary of. The card still carries XP
+   into the roster - the admin table and the nightly backfill read it there -
+   it just stops at this door. Level, form, streak and badges are the
+   pet's. */
+const playerCard = c => { const { xp, ...rest } = c; return rest; };
+/* The order players see: level, then badges, then name - XP no longer has a
+   say, for the reason above. */
+const byRank = (a, b) => (b.level - a.level) || ((b.badges || 0) - (a.badges || 0))
+  || String(a.pet).localeCompare(String(b.pet));
 /* A plain-text table, because this is read over curl in a terminal. Columns are
    padded to their widest value rather than to a guess, so a long pet name does
-   not push everything out of line. */
+   not push everything out of line.
+
+   The game's numbers only. It used to total everybody's kilometres and runs,
+   which is exactly the aggregate Strava's API Policy (5.4) rules out, and
+   the per-row distances went with it. */
 function summaryTable(rows){
   const DAY = 86400000, now = Date.now();
   const ago = t => !t ? "\u2014" : (d => d === 0 ? "today" : d === 1 ? "1 day" : d + " days")
     (Math.round((now - t) / DAY));
-  const head = ["HANDLE","PET","SPECIES","FORM","LV","KM","WEEK","RUNS","STREAK","LAST RUN","LINKED"];
+  const head = ["HANDLE","PET","SPECIES","FORM","LV","XP","STREAK","SEEN","LINKED",""];
   const body = rows.map(r => [
     r.handle || "", r.pet || "\u2014", r.species || "\u2014", r.form || "not hatched",
-    String(r.level || "\u2014"), (r.km || 0).toFixed(1), (r.weekKm || 0).toFixed(1),
-    String(r.runs || 0), String(r.streak || 0), ago(r.lastRun), ago(r.firstSeen)
+    String(r.level || "\u2014"), String(Math.round(r.xp || 0)), String(r.streak || 0),
+    ago(r.lastSeen), ago(r.firstSeen), r.disconnected ? "disconnected" : ""
   ]);
   const w = head.map((h, i) => Math.max(h.length, ...body.map(b => b[i].length)));
   const line = cells => cells.map((c, i) => c.padEnd(w[i])).join("  ").trimEnd();
 
   const hatched = rows.filter(r => (r.stage || 0) > 0).length;
-  const active7 = rows.filter(r => r.lastRun && now - r.lastRun < 7 * DAY).length;
-  const km = rows.reduce((a, r) => a + (r.km || 0), 0);
-  const runs = rows.reduce((a, r) => a + (r.runs || 0), 0);
+  const linked = rows.filter(r => !r.disconnected).length;
   const out = [
     `Runmon \u00b7 ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC`,
     "",
-    `Connected to Strava   ${rows.length}`,
+    `Connected to Strava   ${linked}`,
+    `Disconnected          ${rows.length - linked}`,
     `Hatched               ${hatched}`,
-    `Ran in the last week  ${active7}`,
-    `Lifetime              ${km.toFixed(1)} km over ${runs} runs`,
     "",
     line(head),
     w.map(n => "-".repeat(n)).join("  "),
@@ -352,9 +1422,45 @@ export class Athlete {
     if (path === "/open")  return this.open(await request.json());
     if (path === "/sync")  return this.sync();
     if (path === "/save")  return this.commit(await request.json());
-    if (path === "/wipe")  return this.wipe();
+    if (path === "/park")  return this.park();
+    if (path === "/pet-intent") return this.petIntent();
+    if (path === "/pet-delete") return this.petDelete(await request.json());
+    if (path === "/purge")      return this.purge();
+    if (path === "/card-fill")  return this.cardFill();
+    if (path === "/retention")  return this.retention();
+    if (path === "/verify-revoked") return this.verifyRevoked();
+    if (path === "/activity-gone")  return this.activityGone(await request.json());
+    /* One archived pet let go, at the end of its grace period. */
+    if (path === "/pet-drop"){
+      const { id } = await request.json();
+      const list = (await this.state.storage.get("deletedPets") || []).filter(e => e.id !== id);
+      await this.state.storage.put("deletedPets", list);
+      return this.ok({ ok:true });
+    }
+    /* The webhook's object - see handleWebhook(). Events are remembered for
+       three days, which is far longer than Strava retries for. */
+    if (path === "/wh-get") return this.ok(await this.state.storage.get("conf") || {});
+    if (path === "/wh-set"){ await this.state.storage.put("conf", await request.json()); return this.ok({ ok:true }); }
+    if (path === "/wh-seen"){
+      const { key } = await request.json();
+      const now = Date.now();
+      const seen = await this.state.storage.get("seen") || {};
+      for (const k of Object.keys(seen)) if (now - seen[k] > 3 * 86400e3) delete seen[k];
+      const dup = !!seen[key];
+      seen[key] = now;
+      await this.state.storage.put("seen", seen);
+      return this.ok({ dup });
+    }
     if (path === "/code")  return this.code(await request.json());
-    if (path === "/card")  return this.ok({ card: await this.state.storage.get("card") || null });
+    if (path === "/card")  return this.ok({ card: gameCard(await this.state.storage.get("card")) });
+    // the friend code without minting one, which /code would do
+    if (path === "/code-peek") return this.ok({ code: await this.state.storage.get("friendCode") || null });
+    if (path === "/admin-peek")    return this.adminPeek();
+    if (path === "/admin-adjust")  return this.adminAdjust(await request.json());
+    if (path === "/admin-rename")  return this.adminRename(await request.json());
+    if (path === "/admin-snapshot") return this.adminSnapshot();
+    // a directory entry, or anything else, emptied - for a disconnect
+    if (path === "/dir-clear"){ await this.state.storage.deleteAll(); return this.ok({ ok:true }); }
     // the same class standing in as a directory entry, keyed by a friend code
     if (path === "/dir-set"){
       const { athleteId } = await request.json();
@@ -363,6 +1469,234 @@ export class Athlete {
     }
     if (path === "/dir-get")
       return this.ok({ athleteId: await this.state.storage.get("owner") || null });
+    /* The nightly backups' object: one key a day, oldest dropped past `keep`. */
+    if (path === "/bk-put"){
+      const { day, backup, keep } = await request.json();
+      await this.state.storage.put("day:" + day, backup);
+      const days = [...(await this.state.storage.list({ prefix:"day:" })).keys()].sort();
+      if (days.length > keep) await this.state.storage.delete(days.slice(0, days.length - keep));
+      return this.ok({ ok:true });
+    }
+    if (path === "/bk-list"){
+      const map = await this.state.storage.list({ prefix:"day:" });
+      return this.ok({ days: [...map.entries()].map(([k, v]) => ({ day: k.slice(4), at: v.at,
+        connected: (v.connected || v.users || []).length, disconnected: (v.disconnected || []).length,
+        deleted: (v.deleted || []).length,
+        players: (v.users || []).length + (v.connected || []).length + (v.disconnected || []).length }))
+        .sort((a, b) => b.day.localeCompare(a.day)) });
+    }
+    if (path === "/bk-get"){
+      const { day } = await request.json();
+      return this.ok({ backup: await this.state.storage.get("day:" + day) || null });
+    }
+    /* The deleted-pets index - see deletedStub(). */
+    if (path === "/del-add"){
+      const row = await request.json();
+      await this.state.storage.put("del:" + row.id, row);
+      return this.ok({ ok:true });
+    }
+    if (path === "/del-list"){
+      const map = await this.state.storage.list({ prefix:"del:" });
+      return this.ok({ rows: [...map.values()].sort((a, b) => b.at - a.at) });
+    }
+    if (path === "/del-get"){
+      const { id } = await request.json();
+      return this.ok({ row: await this.state.storage.get("del:" + id) || null });
+    }
+    /* An archived pet erased, by its id - or all of one player's, by handle. */
+    if (path === "/del-drop"){
+      const { id, handle } = await request.json();
+      if (id) await this.state.storage.delete("del:" + id);
+      if (handle){
+        const map = await this.state.storage.list({ prefix:"del:" });
+        const keys = [...map].filter(([, v]) => v.handle === handle).map(([k]) => k);
+        if (keys.length) await this.state.storage.delete(keys);
+      }
+      return this.ok({ ok:true });
+    }
+    if (path === "/del-mark"){
+      const { id, restoredAt } = await request.json();
+      const row = await this.state.storage.get("del:" + id);
+      if (row) await this.state.storage.put("del:" + id, { ...row, restoredAt });
+      return this.ok({ ok:true });
+    }
+    /* The nightly backups, cleaned. A player erased leaves every one of
+       them (`drop` with their handle), an archived pet erased leaves by its
+       id, and any distance a backup from before it was dropped still holds
+       goes on every call - which the nightly pass makes with nothing else. */
+    if (path === "/bk-scrub"){
+      const { handle, drop, deletedId } = await request.json().catch(() => ({}));
+      const map = await this.state.storage.list({ prefix:"day:" });
+      for (const [k, b] of map){
+        const before = JSON.stringify(b);
+        for (const key of ["users", "connected", "disconnected"]){
+          if (!Array.isArray(b[key])) continue;
+          if (drop && handle) b[key] = b[key].filter(u => u.handle !== handle);
+          for (const u of b[key]) delete u.km;
+        }
+        if (Array.isArray(b.deleted))
+          b.deleted = b.deleted.filter(d => !(drop && handle && d.handle === handle) && !(deletedId && d.id === deletedId));
+        if (JSON.stringify(b) !== before) await this.state.storage.put(k, b);
+      }
+      return this.ok({ ok:true });
+    }
+    /* An admin-gate object: failed passwords from one address, and when it is
+       locked until. */
+    if (path === "/gate-check")
+      return this.ok({ lockedUntil: await this.state.storage.get("lockedUntil") || 0 });
+    if (path === "/gate-ok"){ await this.state.storage.deleteAll(); return this.ok({ ok:true }); }
+    if (path === "/gate-fail"){
+      const now = Date.now();
+      const fails = (await this.state.storage.get("fails") || []).filter(t => now - t < GATE_MS);
+      fails.push(now);
+      await this.state.storage.put(fails.length >= GATE_TRIES
+        ? { fails: [], lockedUntil: now + GATE_MS } : { fails });
+      return this.ok({ ok:true });
+    }
+    /* Write only when there is nothing there. Decided inside the object so the
+       check and the write are one round trip rather than two. */
+    if (path === "/dir-ensure"){
+      const { athleteId } = await request.json();
+      const had = await this.state.storage.get("owner");
+      if (!had) await this.state.storage.put("owner", String(athleteId));
+      return this.ok({ ok:true, wrote: !had });
+    }
+
+    /* --- pile-on marks ---------------------------------------------------
+       Marks live with the pet they are on rather than in one table, because
+       that is who reads them: the app asks for its own and prices its runs.
+       Expired ones are dropped on every touch, so the list stays the size of
+       a day's attention rather than growing forever. */
+    if (path === "/mark-add"){
+      const row   = await request.json();
+      const fresh = (await this.state.storage.get("marks") || [])
+        .filter(m => Date.now() - (m.at || 0) < MARK_HOURS * 3600e3);
+      fresh.push(row);
+      await this.state.storage.put("marks", fresh.slice(-40));
+      await this.logAdd({ ...row, dir:"in", who: row.by });
+      return this.ok({ ok:true });
+    }
+    if (path === "/marks"){
+      const marks = (await this.state.storage.get("marks") || [])
+        .filter(m => Date.now() - (m.at || 0) < MARK_HOURS * 3600e3);
+      // How many attacks are left today, worked out the same way the claim
+      // does it. The app has no other way to know without spending one.
+      const day  = Math.floor(Date.now() / 86400e3);
+      const used = (await this.state.storage.get("atkDay")) === day
+        ? (await this.state.storage.get("atkCount") || 0) : 0;
+      const hits = await this.state.storage.get("atkHits") || {};
+      const spent = Object.keys(hits)
+        .filter(k => Date.now() - hits[k] < MARK_HOURS * 3600e3);
+      /* And when each of those was, because "you have attacked them" is only
+         half an answer - the other half is when you can again. The lock runs
+         24 hours from the claim, and so does the mark it left - but a mark under
+         half a percent, which is what a swing at somebody below you leaves,
+         never shows on their row at all, so the row alone cannot tell you.
+         Without the time the app could only say no when somebody tapped
+         Attack. `hitToday` stays for any app that predates this. */
+      const hitAt = {};
+      for (const k of spent) hitAt[k] = hits[k];
+      return this.ok({ marks, battles: await this.state.storage.get("battles") || [],
+                       attacksLeft: Math.max(0, ATTACKS_PER_DAY - used),
+                       attacksPerDay: ATTACKS_PER_DAY, hitToday: spent, hitAt });
+    }
+    if (path === "/log-add"){
+      await this.logAdd(await request.json());
+      return this.ok({ ok:true });
+    }
+
+    /* Claim an attack: spend it, and remember what was claimed so the result
+       can be checked against it later. Both limits are decided here, together,
+       because they are one decision - an attack that is not allowed must not
+       be recorded as spent. The claim is what makes abandoning a fight cost
+       something, so it is written whether or not a result ever arrives. */
+    if (path === "/attack-claim"){
+      const { target, seed, gap, at } = await request.json();
+      const day  = Math.floor(at / 86400e3);
+      const seen = await this.state.storage.get("atkDay");
+      const used = seen === day ? (await this.state.storage.get("atkCount") || 0) : 0;
+
+      const hits = await this.state.storage.get("atkHits") || {};
+      for (const k of Object.keys(hits))
+        if (at - hits[k] >= MARK_HOURS * 3600e3) delete hits[k];
+
+      if (hits[target])
+        return this.ok({ ok:false, why:"already attacked them today",
+                         until: hits[target] + MARK_HOURS * 3600e3 });
+      if (used >= ATTACKS_PER_DAY)
+        return this.ok({ ok:false, why:"out of attacks today",
+                         until: (day + 1) * 86400e3 });
+
+      hits[target] = at;
+      await this.state.storage.put({ atkDay: day, atkCount: used + 1, atkHits: hits,
+                                     pending: { target, seed, gap, at } });
+      return this.ok({ ok:true, left: ATTACKS_PER_DAY - used - 1 });
+    }
+
+    /* --- swings at the raid ----------------------------------------------
+       Earned from kilometres this broker has seen, spent by swinging. Spent is
+       one lifetime counter rather than one per epoch: a raid that gave
+       everybody their whole running history back as swings the moment a new
+       boss arrived would be felled the same afternoon by kilometres run
+       against the last one.
+
+       Claimed before the fight and closed after, the same two round trips an
+       attack takes and for the same reason - with one call a bad attempt could
+       be abandoned and retried until it went well, and every swing would land
+       its best case. */
+    if (path === "/raid-claim"){
+      const { epoch, seed, at } = await request.json();
+      const bank   = await this.raidBank();
+      const earned = bank.earned;
+      const spent  = await this.state.storage.get("raidSpent") || 0;
+      if (spent >= earned)
+        return this.ok({ ok:false, why:"no swings left", earned, spent,
+                         toNext: RAID_KM_PER_SWING - bank.part });
+      await this.state.storage.put({ raidSpent: spent + 1,
+                                     raidPending: { epoch, seed, at } });
+      return this.ok({ ok:true, left: earned - spent - 1, earned, spent: spent + 1 });
+    }
+    if (path === "/raid-close"){
+      const { seed } = await request.json();
+      const p = await this.state.storage.get("raidPending");
+      if (!p) return this.ok({ ok:false, why:"no swing was started" });
+      if ((p.seed >>> 0) !== (seed >>> 0)) return this.ok({ ok:false, why:"that is not the swing that was started" });
+      if (Date.now() - p.at > 3600e3) return this.ok({ ok:false, why:"that swing took too long" });
+      await this.state.storage.delete("raidPending");
+      return this.ok({ ok:true, epoch: p.epoch });
+    }
+    /* A swing spent on an Explore attempt. Explore keeps the fight and what
+       it took off him; all this side keeps is that the swing is gone. */
+    if (path === "/explore-spend"){
+      const bank  = await this.raidBank();
+      const spent = await this.state.storage.get("raidSpent") || 0;
+      if (spent >= bank.earned)
+        return this.ok({ ok:false, why:"no swings left", earned: bank.earned, spent, left: 0,
+                         toNext: RAID_KM_PER_SWING - bank.part });
+      await this.state.storage.put("raidSpent", spent + 1);
+      return this.ok({ ok:true, left: bank.earned - spent - 1, earned: bank.earned, spent: spent + 1,
+                       toNext: RAID_KM_PER_SWING - bank.part });
+    }
+    /* What this pet has banked, for the screen rather than for a decision. */
+    if (path === "/raid-swings"){
+      const bank   = await this.raidBank();
+      const spent  = await this.state.storage.get("raidSpent") || 0;
+      return this.ok({ earned: bank.earned, spent, left: Math.max(0, bank.earned - spent),
+                       toNext: RAID_KM_PER_SWING - bank.part });
+    }
+
+    /* Close it against the claim. An hour is long enough for the longest fight
+       anybody will sit through and short enough that a claim cannot be banked
+       and spent against a level that has since moved. */
+    if (path === "/attack-close"){
+      const { seed } = await request.json();
+      const p = await this.state.storage.get("pending");
+      if (!p) return this.ok({ ok:false, why:"no fight was started" });
+      if ((p.seed >>> 0) !== (seed >>> 0)) return this.ok({ ok:false, why:"that is not the fight that was started" });
+      if (Date.now() - p.at > 3600e3) return this.ok({ ok:false, why:"that fight took too long" });
+      await this.state.storage.delete("pending");
+      return this.ok({ ok:true, target: p.target, gap: p.gap });
+    }
     /* the same class standing in as the roster, one key per athlete. `firstSeen`
        is kept from whatever was there, so a row records when somebody linked
        rather than when they last saved. */
@@ -374,10 +1708,203 @@ export class Athlete {
         handle,
         ...(card ? rosterCard(card) : {}),
         ...(prev.pet && !card ? rosterCard(prev) : {}),   // a re-link keeps the pet
+        // rosterCard() names its fields, so anything not in it is dropped by
+        // this write. Marks are not part of a card and would go every time the
+        // pet saved - which is every run - taking the penalty with them.
+        marks: prev.marks || [],
         firstSeen: prev.firstSeen || Date.now(),
-        lastSeen: Date.now()
+        lastSeen: Date.now(),
+        // only a connected athlete writes a row, so this is always a return
+        disconnected: false
       });
+      if (card && prev.pet) await this.renameFirsts(handle, prev.pet, rosterCard(card).pet);
+      if (card){
+        const c = rosterCard(card);
+        for (const f of FIRSTS){
+          if (c.level < f.level || await this.state.storage.get("first:" + f.id)) continue;
+          await this.state.storage.put("first:" + f.id, { handle, pet: c.pet, species: c.species, at: Date.now() });
+        }
+      }
       return this.ok({ ok: true });
+    }
+    /* The pet's own marks, as the roster sees them. Merged rather than
+       replaced: an attack landing between the read that produced this list and
+       this write would otherwise be erased, and a mark is identified well
+       enough by the moment it was made and what it was worth. */
+    if (path === "/roster-sync"){
+      const { handle, marks } = await request.json();
+      const key  = "row:" + handle;
+      const prev = await this.state.storage.get(key);
+      if (!prev) return this.ok({ ok:false });
+      const seen = new Set();
+      const merged = [...(marks || []), ...(prev.marks || [])]
+        .filter(m => m && Date.now() - (m.at || 0) < MARK_HOURS * 3600e3)
+        .filter(m => { const k = m.at + ":" + m.amt;
+                       if (seen.has(k)) return false; seen.add(k); return true; })
+        .sort((a, b) => a.at - b.at);
+      await this.state.storage.put(key, { ...prev, marks: merged.slice(-40) });
+      return this.ok({ ok:true, marks: merged.length });
+    }
+    /* A mark landing on somebody, as the roster sees it. Written here rather
+       than read from the athlete object when the table is drawn, and dropped
+       once it has run out so a row does not grow a day's history it will never
+       show. A handle with no row is somebody who linked and never hatched:
+       nothing to mark, and nothing to create. */
+    if (path === "/roster-mark"){
+      const { handle, at, amt } = await request.json();
+      const key  = "row:" + handle;
+      const prev = await this.state.storage.get(key);
+      if (!prev) return this.ok({ ok:false });
+      const marks = (prev.marks || [])
+        .filter(m => Date.now() - (m.at || 0) < MARK_HOURS * 3600e3);
+      marks.push({ at: Number(at) || Date.now(), amt: Number(amt) || 0 });
+      await this.state.storage.put(key, { ...prev, marks: marks.slice(-40) });
+      return this.ok({ ok:true });
+    }
+    /* --- the raid pool ---------------------------------------------------
+       One object for the whole raid. `raid` is the live epoch; a share is a
+       row of its own, keyed by epoch and handle, so felling him and starting
+       again leaves the old epoch's contributors intact rather than clearing
+       them. That is what makes an Orc Slayer badge answerable months later. */
+    if (path === "/raid-state"){
+      return this.ok({ raid: await this.raidState(await request.json().catch(() => ({}))) });
+    }
+    /* What one attempt took off him. The damage arrives already clamped - the
+       cap is a game rule and belongs with the other ones, not in here - and
+       this decides only what it does to the pool, which is the one question
+       that has to be answered by a single thread.
+
+       Reported against an epoch. An attempt claimed before he fell and
+       reported after is refused rather than reopening him: the fight happened,
+       but what it was a fight for is over. */
+    if (path === "/raid-apply"){
+      const { handle, epoch, dealt } = await request.json();
+      const raid = await this.raidState({});
+      if (epoch !== raid.epoch) return this.ok({ ok:false, why:"that raid is over", raid });
+      if (raid.hp <= 0)         return this.ok({ ok:false, why:"he is already down", raid });
+
+      const before = raid.hp;
+      const took   = Math.max(0, Math.min(before, Math.round(Number(dealt) || 0)));
+      raid.hp = before - took;
+
+      // the marks his health has just fallen past, so the alert is the raid's
+      // to tell rather than the attacker's to have witnessed
+      const f0 = before / raid.max, f1 = raid.hp / raid.max;
+      const crossed = RAID_MARKS.filter(m => f0 > m && f1 <= m);
+      if (crossed.length) raid.crossed = [...new Set([...(raid.crossed || []), ...crossed])];
+      if (raid.hp <= 0 && !raid.felledAt) raid.felledAt = Date.now();
+
+      const key  = `share:${raid.epoch}:${handle}`;
+      const prev = await this.state.storage.get(key) || { dealt: 0, swings: 0 };
+      await this.state.storage.put({
+        raid,
+        [key]: { dealt: prev.dealt + took, swings: prev.swings + 1, at: Date.now() }
+      });
+      return this.ok({ ok:true, took, crossed, raid });
+    }
+    /* One player's part in an epoch. Absent means they never landed a blow,
+       which is the question the badge asks. */
+    if (path === "/raid-share"){
+      const { handle, epoch } = await request.json();
+      const raid = await this.raidState({});
+      const row  = await this.state.storage.get(`share:${epoch == null ? raid.epoch : epoch}:${handle}`);
+      return this.ok({ share: row || { dealt: 0, swings: 0 } });
+    }
+    /* Everyone who landed a blow on an epoch, deepest first. Who the badge is
+       owed to, and the only list that says so. */
+    if (path === "/raid-roll"){
+      const { epoch } = await request.json();
+      const raid = await this.raidState({});
+      const ep   = epoch == null ? raid.epoch : epoch;
+      const map  = await this.state.storage.list({ prefix: `share:${ep}:`, limit: 1000 });
+      const roll = [...map.entries()]
+        .map(([k, v]) => ({ handle: k.slice(`share:${ep}:`.length), ...v }))
+        .filter(x => x.dealt > 0)
+        .sort((a, b) => b.dealt - a.dealt);
+      return this.ok({ epoch: ep, roll, raid });
+    }
+    /* The switch. He does not come back on his own and nothing here is on a
+       timer; this is the only way a new epoch begins, and it is behind the
+       admin token at the edge. The epoch number only ever goes up, so the
+       shares of every raid before it keep their own keys. */
+    if (path === "/raid-respawn"){
+      const { hp } = await request.json().catch(() => ({}));
+      const old  = await this.raidState({});
+      const chosen = Number(hp) > 0;
+      const raid = {
+        id: RAID_ID, epoch: old.epoch + 1,
+        max: chosen ? Math.round(hp) : RAID_HP,
+        hp:  chosen ? Math.round(hp) : RAID_HP,
+        // a health named at the switch is never revised by a later deploy
+        sized: chosen,
+        startedAt: Date.now(), felledAt: null, crossed: [], v: RAID_VERSION
+      };
+      await this.state.storage.put("raid", raid);
+      return this.ok({ ok:true, raid, was: old });
+    }
+
+    /* A disconnect: the row stays, for the admin's list, with nothing from
+       Strava left on it - see parkAthlete(). */
+    if (path === "/roster-park"){
+      const { handle } = await request.json();
+      const prev = await this.state.storage.get("row:" + handle);
+      if (prev) await this.state.storage.put("row:" + handle, {
+        handle, ...(prev.pet ? rosterCard(prev) : {}),
+        marks: [], firstSeen: prev.firstSeen, lastSeen: prev.lastSeen,
+        disconnected: true, disconnectedAt: prev.disconnected && prev.disconnectedAt ? prev.disconnectedAt : Date.now() });
+      return this.ok({ ok:true });
+    }
+    /* A pet deleted: the player is still here, with no pet until they hatch one. */
+    if (path === "/roster-reset"){
+      const { handle } = await request.json();
+      const prev = await this.state.storage.get("row:" + handle) || {};
+      await this.state.storage.put("row:" + handle, { handle, marks: [],
+        firstSeen: prev.firstSeen || Date.now(), lastSeen: Date.now() });
+      return this.ok({ ok:true });
+    }
+    /* A card's fields refreshed on a row and nothing else - see fillCard(). */
+    if (path === "/roster-card"){
+      const { handle, card } = await request.json();
+      const prev = await this.state.storage.get("row:" + handle);
+      if (prev && prev.pet){
+        await this.state.storage.put("row:" + handle, { ...prev, ...rosterCard(card) });
+        await this.renameFirsts(handle, prev.pet, rosterCard(card).pet);
+      }
+      return this.ok({ ok:true });
+    }
+    if (path === "/firsts-list"){
+      const map = await this.state.storage.list({ prefix: "first:" });
+      const out = {}; for (const [k, v] of map) out[k.slice(6)] = v;
+      return this.ok({ firsts: out });
+    }
+    /* A race won by somebody being erased stays won - it happened - but by
+       nobody named: "a former player". With `pet`, only the races that pet
+       won, for an archived pet erased while its owner plays on. */
+    if (path === "/firsts-forget"){
+      const { handle, pet } = await request.json();
+      const map = await this.state.storage.list({ prefix: "first:" });
+      for (const [k, v] of map) if (v.handle === handle && (!pet || v.pet === pet))
+        await this.state.storage.put(k, { at: v.at, species: v.species, gone: true });
+      return this.ok({ ok:true });
+    }
+    if (path === "/roster-drop"){
+      const { handle } = await request.json();
+      await this.state.storage.delete("row:" + handle);
+      return this.ok({ ok:true });
+    }
+    /* Every row rewritten to what a row now keeps - the fields Strava
+       measured, from before the card was cut down, go - and a disconnected
+       row with no time on it gets one, so its grace period can run. */
+    if (path === "/roster-scrub"){
+      const map = await this.state.storage.list({ prefix: "row:", limit: 1000 });
+      for (const [k, r] of map){
+        const clean = { handle: r.handle, ...(r.pet ? rosterCard(r) : {}), marks: r.marks || [],
+          firstSeen: r.firstSeen || null, lastSeen: r.lastSeen || null,
+          ...(r.disconnected ? { disconnected: true, disconnectedAt: r.disconnectedAt || Date.now() }
+                             : { disconnected: false }) };
+        if (JSON.stringify(clean) !== JSON.stringify(r)) await this.state.storage.put(k, clean);
+      }
+      return this.ok({ ok:true });
     }
     if (path === "/roster-list"){
       const map = await this.state.storage.list({ prefix: "row:", limit: 1000 });
@@ -386,8 +1913,51 @@ export class Athlete {
     return new Response("no", { status: 404 });
   }
 
+  /* The live epoch, minted on the first touch rather than by a migration -
+     there is no moment before this object exists when something could have
+     written it. `max` is stored on the epoch rather than read from RAID_HP
+     each time, so changing his health in the code does not silently resize a
+     raid that is already half fought.
+
+     With one exception, and it is here because it was needed: an epoch that
+     nobody has swung at yet is not yet a raid, so if it still carries the
+     default health it takes the current one. GET /raid mints on first touch,
+     and the app was calling it on every sync before the feature shipped, so
+     the live raid got started at the health the broker happened to be carrying
+     by people who could not see it existed. Without this, shipping a different
+     number would have needed a respawn by hand to take effect.
+
+     `sized` marks an epoch whose health was chosen at the switch. Those are
+     left alone at any cost: somebody who starts a raid at 8,000 for a small
+     field means it, and a later deploy must not quietly undo them. */
+  async raidState(){
+    const have = await this.state.storage.get("raid");
+    if (!have){
+      const raid = { id: RAID_ID, epoch: 1, max: RAID_HP, hp: RAID_HP, sized: false,
+                     startedAt: Date.now(), felledAt: null, crossed: [], v: RAID_VERSION };
+      await this.state.storage.put("raid", raid);
+      return raid;
+    }
+    const untouched = have.hp === have.max && !have.felledAt && !(have.crossed || []).length;
+    if (!have.sized && untouched && have.max !== RAID_HP){
+      const raid = { ...have, max: RAID_HP, hp: RAID_HP, startedAt: Date.now() };
+      await this.state.storage.put("raid", raid);
+      return raid;
+    }
+    return have;
+  }
+
+  /* Both sides of a fight keep a copy: yours says what you did, theirs says
+     what was done to them. Fifty is a couple of weeks of a busy game. */
+  async logAdd(row){
+    const log = await this.state.storage.get("battles") || [];
+    log.push(row);
+    await this.state.storage.put("battles", log.slice(-50));
+  }
+
   async open(tok){
     const s = this.state.storage;
+    await s.delete("parkedAt");
     await s.put({
       athleteId: tok.athleteId, refresh: tok.refresh, access: tok.access, expires: tok.expires,
       // Runs before this moment are somebody's training history, not this pet's
@@ -428,12 +1998,15 @@ export class Athlete {
     if (!token) return this.ok({ save, activities: [], error:"reauth" });
 
     const connectedAt = await s.get("connectedAt") || Date.now();
-    const imported = new Set(await s.get("imported") || []);
+    const { map: imported, floor } = await this.pruneImported(Date.now());
     const virtual = !!(save && save.settings && save.settings.stravaVirtual);
     const want = new Set([...ALWAYS, ...(virtual ? OPT_IN : [])]);
 
     const url = new URL(API(this.env) + "/athlete/activities");
-    url.searchParams.set("after", Math.floor(connectedAt / 1000));
+    // From the later of connecting and the floor: anything that started
+    // before the floor was imported more than a week ago and its id let go -
+    // see pruneImported().
+    url.searchParams.set("after", Math.floor(Math.max(connectedAt, floor) / 1000));
     // Strava returns newest first, so a new run is always inside this window;
     // the cap only bites if someone logs more than this between two app opens.
     // 200 is the endpoint's maximum, and costs the same one request as 100.
@@ -445,7 +2018,7 @@ export class Athlete {
     // empty - nothing recorded since connecting, nothing of a type that counts,
     // or everything already taken - without anyone having to read a log.
     const raw = await r.json();
-    const fresh = raw.filter(a => !imported.has(String(a.id)));
+    const fresh = raw.filter(a => !imported[String(a.id)] && !(Date.parse(a.start_date) <= floor));
     const kinds = {};
     for (const a of fresh) kinds[a.type] = (kinds[a.type] || 0) + 1;
 
@@ -458,9 +2031,22 @@ export class Athlete {
         sec: a.moving_time,
         elev: a.total_elevation_gain || 0,
         type: a.type,
-        manual: !!a.manual                 // typed in by hand on Strava, not recorded
+        manual: !!a.manual,                // typed in by hand on Strava, not recorded
+        // what recorded it - shown on the run so a Garmin-recorded one carries
+        // Garmin's attribution (Strava's API Policy 4.4)
+        device: a.device_name ? String(a.device_name).slice(0, 60) : null
       }))
       .sort((x, y) => x.t - y.t);
+    /* When each one we hand over started, so that once the app says it
+       imported it the id can be let go on time - see pruneImported(). Kept
+       only until then; a week-old offer the app never took is dropped. */
+    if (activities.length){
+      const offered = await s.get("offered") || {};
+      const cut = Date.now() - RETAIN_MS;
+      for (const k of Object.keys(offered)) if (offered[k].at < cut) delete offered[k];
+      for (const a of activities) offered[a.id] = { t: a.t, at: Date.now() };
+      await s.put("offered", offered);
+    }
 
     await s.put("lastSync", Date.now());
     // connectedAt matters more than it looks: the window is on an activity's
@@ -483,7 +2069,137 @@ export class Athlete {
         if (recent.length) seen.latestStart = Date.parse(recent[0].start_date) || null;
       }
     }
-    return this.ok({ save, activities, seen });
+    /* Kilometres this broker has seen for itself, which is what a swing at the
+       raid is bought with - banked as swings, see raidBank(). The card carries a `km` and it is written by the
+       device, so pricing the raid off it would make the swing budget a number
+       the player types. This counter only ever grows by distances read out of
+       Strava's own answer.
+
+       Counted against a high-water mark of start time rather than against
+       `imported`. `imported` is the obvious candidate and it is the wrong one:
+       it is written by commit() on the round trip that follows, so syncing
+       twice without ever committing hands the same activities over twice, and
+       an earlier version of this counted them twice - which is unlimited
+       swings for anybody willing to call /sync in a loop, the exact hole this
+       counter exists to close. The mark makes it idempotent on its own, and
+       costs one number rather than a list that grows forever.
+
+       Ties fail closed: two activities starting in the same second would count
+       once. Under-counting somebody's kilometres is a swing they have to run
+       again for, which is the cheaper of the two mistakes.
+
+       It starts at zero for everybody, including players who have been running
+       for months. Seeding it from the stored save would undo the point of
+       having it, so the alternative was picked: the raid starts when this
+       does. */
+    const kmAfter = await s.get("kmAfter") || 0;
+    const counting = activities.filter(a => a.t > kmAfter);
+    if (counting.length){
+      const km = counting.reduce((t, a) => t + (Number(a.km) || 0), 0);
+      const bank = await this.raidBank();
+      bank.part += km;
+      const whole = Math.floor(bank.part / RAID_KM_PER_SWING);
+      bank.earned += whole;
+      bank.part = Math.round((bank.part - whole * RAID_KM_PER_SWING) * 1000) / 1000;
+      await s.put({ raidBank: bank, kmAfter: Math.max(kmAfter, ...counting.map(a => a.t)) });
+    }
+    /* What the admin has queued for this pet. The phone's save is the one
+       that counts - the copy here is only adopted by a device that has none -
+       so an admin cannot edit the save in place: the next push from the phone
+       would put it straight back. Instead the change is queued and handed
+       back on every sync, numbered, and the app applies what it has not seen
+       yet and pushes the result. Sent every time rather than once, because a
+       sync whose reply is lost would otherwise lose the adjustment with it. */
+    const adjust = await s.get("adjust") || [];
+    return this.ok({ save, activities, seen, adjust });
+  }
+
+  /* A race is held by a pet's name, so a renamed pet keeps its races under
+     its new one. Only races that name - the same player's deleted pets keep
+     theirs under the names they had. */
+  async renameFirsts(handle, from, to){
+    if (!from || !to || from === to) return;
+    const map = await this.state.storage.list({ prefix: "first:" });
+    for (const [k, v] of map) if (v.handle === handle && v.pet === from)
+      await this.state.storage.put(k, { ...v, pet: to });
+  }
+
+  /** What the admin dashboard shows for one pet. The save is summarised
+      rather than handed over whole; the whole thing is what /admin/backup is
+      for. */
+  async adminPeek(){
+    const s = this.state.storage;
+    const [save, card, connectedAt, lastSync, refresh, friendCode, adjust, imported, battles, parkedAt, deletedPets] =
+      await Promise.all(["save","card","connectedAt","lastSync","refresh","friendCode",
+                         "adjust","importedAt","battles","parkedAt","deletedPets"].map(k => s.get(k)));
+    const runs = (save && save.runs) || [];
+    return this.ok({
+      linked: !!refresh, connectedAt: connectedAt || null, lastSync: lastSync || null,
+      friendCode: friendCode || null, card: gameCard(card),
+      // XP, never distance: the dashboard is somebody other than the player
+      save: save ? {
+        petName: save.petName || "", species: save.species || null,
+        runs: runs.filter(r => !r.folded).length,
+        runXp: runs.filter(r => !r.folded).reduce((t, r) => t + (Number(r.xp) || 0), 0),
+        pastXp: Number(save.past && save.past.xp) || 0,
+        adminXp: Number(save.adminXp) || 0,
+        adminRev: Number(save.adminRev) || 0,
+        badges: Object.keys(save.badges || {}).length,
+        createdAt: save.createdAt || null, syncedAt: save.stravaSyncedAt || null
+      } : null,
+      adjust: adjust || [], parkedAt: parkedAt || null, deletedPets: (deletedPets || []).length,
+      eraseAt: parkedAt ? parkedAt + GRACE_MS : null,
+      imported: Object.keys(imported || {}).length, battles: (battles || []).length
+    });
+  }
+
+  /** Queue a change to this pet's level or XP. Kept to the last fifty: the app
+      applies every one it has not seen, in order, so the queue is history as
+      much as instructions, and fifty is more than a pet will ever need. */
+  async adminAdjust({ kind, value, note, snap, id, name, from }){
+    const s = this.state.storage;
+    if (!(await s.get("save"))) return this.ok({ error:"This player has no pet saved yet - they need to open the app (and hatch an egg, on a new phone) first." });
+    const list = await s.get("adjust") || [];
+    const rev = (list.length ? list[list.length - 1].rev : 0) + 1;
+    list.push({ rev, kind, value, ...(snap ? { snap } : {}), ...(id ? { id: String(id) } : {}),
+                ...(name ? { name, from: String(from || "") } : {}),
+                note: String(note || "").slice(0, 120), at: Date.now() });
+    await s.put("adjust", list.slice(-50));
+    return this.ok({ ok:true, rev });
+  }
+
+  /** Rename the pet: queued for the app like any adjustment, and put on the
+      stored save and card at once, since those are what everybody else is
+      shown. The card comes back so the roster row can follow. */
+  async adminRename({ name, note }){
+    const s = this.state.storage;
+    const [save, card] = await Promise.all([s.get("save"), s.get("card")]);
+    if (!save) return this.ok({ error:"This player has no pet saved yet - they need to open the app (and hatch an egg, on a new phone) first." });
+    const from = save.petName || "";
+    const r = await (await this.adminAdjust({ kind:"name", value: 0, name, from, note })).json();
+    if (r.error) return this.ok(r);
+    const put = { save: { ...save, petName: name } };
+    if (card) put.card = { ...card, pet: name };
+    await s.put(put);
+    return this.ok({ ok:true, rev: r.rev, from, card: put.card ? gameCard(put.card) : null });
+  }
+
+  /** What a backup keeps of this pet: the game's own state, and nothing
+      Strava measured. It used to keep the lifetime distance as well; a
+      backup is kept for longer than Strava's seven days (API Policy 6.2), so
+      that went, with the runs, which were never in it. */
+  async adminSnapshot(){
+    const s = this.state.storage;
+    const [save, card] = await Promise.all([s.get("save"), s.get("card")]);
+    if (!save) return this.ok({ snap: null });
+    const runs = (save.runs || []).filter(r => !r.folded);
+    const xp = runs.reduce((t, r) => t + (Number(r.xp) || 0), 0) + (Number(save.adminXp) || 0)
+             + (Number(save.past && save.past.xp) || 0);
+    return this.ok({ snap: {
+      pet: String(save.petName || "").slice(0, 24), species: save.species || null,
+      level: (card && Number(card.level)) || null,
+      xp: Math.max(0, Math.round(xp))
+    } });
   }
 
   /** This athlete's friend code, minted once and kept. */
@@ -495,7 +2211,7 @@ export class Athlete {
       code = [...bytes].map(b => CODE_ALPHABET[b % CODE_ALPHABET.length]).join("");
       await s.put("friendCode", code);
     }
-    return this.ok({ code, card: await s.get("card") || null });
+    return this.ok({ code, card: gameCard(await s.get("card")) });
   }
 
   /** The client says what it stored and what it managed to import, together, so
@@ -504,20 +2220,256 @@ export class Athlete {
       working them out again here would be the same rules written twice. */
   async commit({ save, imported, card }){
     const s = this.state.storage;
-    const seen = new Set(await s.get("imported") || []);
-    for (const id of imported || []) seen.add(String(id));
-    const write = { save, imported: [...seen] };
-    if (card) write.card = card;
+    if (await s.get("parkedAt")) return this.ok({ saved: false, error: "disconnected" });
+    const now = Date.now();
+    const { map } = await this.pruneImported(now);
+    const offered = await s.get("offered") || {};
+    for (const id of imported || []){
+      const k = String(id);
+      map[k] = { t: offered[k] ? offered[k].t : now, at: now };
+      delete offered[k];
+    }
+    /* And every Strava run the save itself holds. `imported` used to be the
+       only word that a run had arrived, and it rode on one push - the one
+       straight after a sync - so a phone closed before that push landed was
+       offered the same run again and took it twice. The save carries the ids
+       on every push, so one lost request no longer matters. */
+    if (save && Array.isArray(save.runs)) for (const r of save.runs){
+      if (!r || r.strava == null) continue;
+      const k = String(r.strava);
+      if (map[k]) continue;
+      map[k] = { t: offered[k] ? offered[k].t : (Number(r.t) || now), at: now };
+      delete offered[k];
+    }
+    /* A run Strava has since said is gone (see activityGone()) does not come
+       back in on a push that set off before the app heard. */
+    const gone = await s.get("gone") || {};
+    if (save && Array.isArray(save.runs) && Object.keys(gone).length)
+      save.runs = save.runs.filter(r => !(r && r.strava && gone[String(r.strava)]));
+    /* A rename from the dashboard the app has not applied yet. The app takes
+       adjustments before it pushes on a sync, but a push of its own - after a
+       fight, say - can land first, and would put the old name back on the
+       card and the Rankings row until the next sync. */
+    const named = (await s.get("adjust") || [])
+      .filter(a => a.kind === "name" && a.name && a.rev > (Number(save && save.adminRev) || 0)).pop();
+    if (named && save){ save.petName = named.name; if (card) card = { ...card, pet: named.name }; }
+    const write = { save, importedAt: map, offered };
+    if (card) write.card = gameCard(card);
     await s.put(write);
-    return this.ok({ saved: true });
+    return this.ok({ saved: true, ...(named && save ? { pet: named.name } : {}) });
   }
 
-  async wipe(){
+  /** A disconnect - see parkAthlete(). */
+  async park(){
+    const s = this.state.storage;
+    await this.revoke();
+    const [save, card] = await Promise.all([s.get("save"), s.get("card")]);
+    await s.delete(["refresh", "access", "expires", "connectedAt", "lastSync", "imported",
+                    "importedAt", "floor", "offered", "gone",
+                    "kmSeen", "kmAfter", "raidBank", "raidSpent", "raidPending", "deleteIntent"]);
+    const put = { parkedAt: Date.now() };
+    if (save) put.save = gameOnly(save);
+    if (card) put.card = gameCard(card);
+    await s.put(put);
+    return this.ok({ parked: true, code: await s.get("friendCode") || null });
+  }
+
+  /* Tell Strava to forget us. oauth/revoke is the endpoint Strava now asks
+     for - oauth/deauthorize is retired on 1 June 2027 - and takes the
+     refresh token with the app's own credentials, so it works even when the
+     access token has lapsed. The old endpoint stays as a fallback until then,
+     for a Strava that answers the new one badly. */
+  async revoke(){
+    const s = this.state.storage;
+    const refresh = await s.get("refresh");
+    if (!refresh) return false;
+    const basic = btoa(`${this.env.STRAVA_CLIENT_ID}:${this.env.STRAVA_CLIENT_SECRET}`);
+    const r = await fetch(STRAVA(this.env) + "/oauth/revoke", { method:"POST",
+      headers:{ Authorization:`Basic ${basic}`, "Content-Type":"application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ token: refresh, token_type_hint: "refresh_token" }) }).catch(() => null);
+    if (r && r.ok) return true;
     const token = await this.accessToken();
     if (token) await fetch(STRAVA(this.env) + "/oauth/deauthorize", {
-      method:"POST", headers:{ Authorization:`Bearer ${token}` } }).catch(()=>{});
-    await this.state.storage.deleteAll();
-    return this.ok({ disconnected: true });
+      method:"POST", headers:{ Authorization:`Bearer ${token}` } }).catch(() => {});
+    return false;
+  }
+
+  /** A card with no XP given it from the save - see fillCard(). */
+  async cardFill(){
+    const s = this.state.storage;
+    const [card, save] = await Promise.all([s.get("card"), s.get("save")]);
+    if (!card || !save || Number(card.xp) > 0) return this.ok({ card: null });
+    const runs = (save.runs || []).filter(r => r && !r.folded);
+    const xp = Math.max(0, Math.round(runs.reduce((t, r) => t + (Number(r.xp) || 0), 0)
+      + (Number(save.adminXp) || 0) + (Number(save.past && save.past.xp) || 0)));
+    const badges = Object.keys(save.badges || {}).length;
+    if (!xp && !badges) return this.ok({ card: null });
+    const filled = gameCard({ ...card, xp, badges: Math.max(badges, Number(card.badges) || 0) });
+    await s.put("card", filled);
+    return this.ok({ card: filled });
+  }
+
+  /** Everything this object holds, gone - see purgeAthlete(). */
+  async purge(){
+    const s = this.state.storage;
+    await this.revoke();
+    const code = await s.get("friendCode");
+    await s.deleteAll();
+    return this.ok({ ok:true, code: code || null });
+  }
+
+  /* The Strava ids of what the app has imported, each kept a week and then
+     let go, which is Strava's cache limit (API Policy 6.2). Letting one go
+     would let it be fetched and paid for again, so the floor moves up to where
+     it started, and nothing starting at or before the floor is fetched again.
+     A run uploaded to Strava more than a week after it began, and after a
+     later run was already imported, is the one thing that misses out.
+
+     The first touch turns the old id list - which had no dates, and kept
+     every id forever - into a floor above everything it could have held. */
+  async pruneImported(now){
+    const s = this.state.storage;
+    let [map, floor] = await Promise.all([s.get("importedAt"), s.get("floor")]);
+    floor = Number(floor) || 0;
+    let dirty = false;
+    if (!map){
+      map = {};
+      if (await s.get("imported")){
+        const save = await s.get("save");
+        const starts = ((save && save.runs) || []).filter(r => r && r.strava).map(r => Number(r.t) || 0);
+        floor = Math.max(floor, Number(await s.get("kmAfter")) || 0, ...starts);
+        await s.delete("imported");
+      }
+      dirty = true;
+    }
+    for (const k of Object.keys(map)){
+      if (now - map[k].at >= RETAIN_MS){ floor = Math.max(floor, Number(map[k].t) || 0); delete map[k]; dirty = true; }
+    }
+    if (dirty) await s.put({ importedAt: map, floor });
+    return { map, floor };
+  }
+
+  /* Swings at the raid, banked. The broker used to keep the lifetime
+     kilometres it had seen and work swings out from them; a lifetime
+     distance is Strava's, and kept past a week it is exactly what the API
+     Policy rules out, so what is kept now is the swings it bought and the
+     part of one still being run for - under five kilometres. */
+  async raidBank(){
+    const s = this.state.storage;
+    let bank = await s.get("raidBank");
+    if (!bank){
+      const km = Number(await s.get("kmSeen")) || 0;
+      const earned = Math.floor(km / RAID_KM_PER_SWING);
+      bank = { earned, part: Math.round((km - earned * RAID_KM_PER_SWING) * 1000) / 1000 };
+      await s.put("raidBank", bank);
+      await s.delete("kmSeen");
+    }
+    return bank;
+  }
+
+  /* The nightly pass for one connected pet: its copy of the save folded
+     (foldServer), its imported ids let go, and the removed-run list trimmed. */
+  async retention(){
+    const s = this.state.storage;
+    const now = Date.now();
+    let folded = false;
+    const save = await s.get("save");
+    if (save){
+      const out = foldServer(save, now);
+      if (out){ await s.put("save", out); folded = true; }
+    }
+    await this.pruneImported(now);
+    await this.raidBank();
+    const gone = await s.get("gone");
+    if (gone){
+      for (const k of Object.keys(gone)) if (now - gone[k] >= RETAIN_MS) delete gone[k];
+      await s.put("gone", gone);
+    }
+    return this.ok({ folded });
+  }
+
+  /* Has this athlete really revoked us? The webhook says so without proof,
+     so Strava is asked: a refresh it refuses, or a 401 on the athlete's own
+     profile, is a yes. An object with no token at all is nobody we know. */
+  async verifyRevoked(){
+    const s = this.state.storage;
+    if (!(await s.get("refresh"))) return this.ok({ known: false });
+    const token = await this.accessToken();
+    if (!token) return this.ok({ known: true, revoked: true });
+    const r = await fetch(API(this.env) + "/athlete", { headers:{ Authorization:`Bearer ${token}` } });
+    return this.ok({ known: true, revoked: r.status === 401 });
+  }
+
+  /* A run deleted on Strava, or made "Only You". Strava wants that reflected
+     within 48 hours (API Policy 6.3). Only a run this object holds is looked
+     at, so a stranger's event costs nothing; Strava is asked whether it is
+     really gone; and then it leaves this copy of the save and is queued for
+     the app, which takes it out of the phone's copy and the pet's XP on its
+     next sync - the same as deleting it in the app. A run already folded into
+     the pet has nothing left to remove. */
+  async activityGone({ id }){
+    const s = this.state.storage;
+    id = String(id || "");
+    const [save, map] = await Promise.all([s.get("save"), s.get("importedAt")]);
+    const inSave = !!(save && Array.isArray(save.runs) && save.runs.some(r => r && String(r.strava) === id));
+    if (!inSave && !(map && map[id])) return this.ok({ ok:false, why:"not ours" });
+    const token = await this.accessToken();
+    if (!token) return this.ok({ ok:false, why:"no token" });
+    const r = await fetch(API(this.env) + "/activities/" + encodeURIComponent(id),
+      { headers:{ Authorization:`Bearer ${token}` } });
+    if (r.ok) return this.ok({ ok:false, why:"still there" });
+    if (r.status !== 404 && r.status !== 403) return this.ok({ ok:false, why:"strava " + r.status });
+    const gone = await s.get("gone") || {};
+    gone[id] = Date.now();
+    const put = { gone };
+    if (map){ delete map[id]; put.importedAt = map; }
+    if (inSave){ save.runs = save.runs.filter(x => !(x && String(x.strava) === id)); put.save = save; }
+    await s.put(put);
+    if (save) await this.adminAdjust({ kind:"unrun", value: 0, id, note:"deleted or made private on Strava" });
+    return this.ok({ ok:true, removed: inSave });
+  }
+
+  /* Deleting a pet, step one: an intent, which the second step has to wait
+     for. Remembered here, so a second call from a tampered app that never
+     opened one - or opened it a moment ago - is refused. */
+  async petIntent(){
+    const s = this.state.storage;
+    const save = await s.get("save");
+    if (!save || !save.species) return this.ok({ ok:false, error:"There is no pet on your account to delete." });
+    const intent = { id: crypto.randomUUID(), at: Date.now() };
+    await s.put("deleteIntent", intent);
+    return this.ok({ ok:true, intent: intent.id, pet: save.petName || "", waitMs: DELETE_WAIT_MS });
+  }
+
+  /* Step two. The pet goes into this athlete's own list of deleted pets -
+     keyed, like everything in here, by their Strava id - as gameOnly() keeps
+     it, with the admin queue it had, and the live save, card and queue are
+     cleared so the next pet starts clean. Nothing is destroyed: the admin
+     can put it back from the dashboard. */
+  async petDelete({ intent, name }){
+    const s = this.state.storage;
+    const [save, card, had, queue] = await Promise.all(
+      [s.get("save"), s.get("card"), s.get("deleteIntent"), s.get("adjust")]);
+    if (!save || !save.species) return this.ok({ ok:false, error:"There is no pet on your account to delete." });
+    if (!had || had.id !== intent) return this.ok({ ok:false, error:"Start again from Settings - that confirmation has expired." });
+    const age = Date.now() - had.at;
+    if (age < DELETE_WAIT_MS) return this.ok({ ok:false, error:"Too quick - wait for the countdown." });
+    if (age > 10 * 60e3){ await s.delete("deleteIntent"); return this.ok({ ok:false, error:"That took too long - start again from Settings." }); }
+    const norm = t => String(t || "").trim().toLowerCase();
+    if (!norm(name) || norm(name) !== norm(save.petName)) return this.ok({ ok:false, error:"The name did not match your pet's." });
+
+    const kept = gameOnly(save);
+    const entry = { id: crypto.randomUUID(), at: Date.now(), by: "player",
+      pet: { pet: save.petName || "", species: save.species, createdAt: save.createdAt || null,
+             level: (card && Number(card.level)) || null, form: (card && card.form) || null,
+             xp: kept.adminXp, badges: Object.keys(save.badges || {}) },
+      save: kept, adjust: queue || [] };
+    const list = await s.get("deletedPets") || [];
+    list.push(entry);
+    await s.put("deletedPets", list);
+    await s.delete(["save", "card", "adjust", "deleteIntent", "marks"]);
+    const { save: _full, ...summary } = entry;
+    return this.ok({ ok:true, entry: summary });
   }
 
   ok(obj){
