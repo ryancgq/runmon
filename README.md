@@ -196,21 +196,36 @@ save, so a leaked Shortcut costs somebody spam, not their pet. **Turn off**
 retires it, and so does disconnecting Strava; setting up again issues a new
 one.
 
-### Switched on per phone, for now
+### Who sees it, and Strava being full
 
-It ships switched off. Nobody sees an Apple Health section, and a Strava
-player's app behaves exactly as it did before it — same imports, same words,
-same calls to the broker; that was checked by running one Strava scenario
-against the build before and after and comparing everything stored and shown.
-Opening the app once with **`?health=1`** turns it on for that browser
-(`?health=0` turns it off), and anybody already using it keeps it. Turn it on
-in Safari, since that is what the Shortcut opens. Going public is changing
-`healthOn()` to `() => STRAVA_ON`.
+Strava caps how many athletes an app may connect until it has been reviewed,
+and Runmon is at the cap. So **Apple Health is now the main way in** for
+anybody not already on Strava, and Strava is shown but closed to new players
+(`STRAVA_FULL` near the top of the Strava section of `index.html`):
 
-Two things wait for that change on purpose, because each would reach Strava
-players: an activity uploaded to Strava twice — watch and phone — is still
-imported twice, since overlap is only checked against Health's runs; and
-Strava runs only keep a full `span` on a phone with Health on.
+- Settings puts **Apple Health above Strava**. Strava's Connect button is
+  greyed out as **Full**, with a line saying new connections are paused.
+- A **brand-new player** sees "Already playing with Strava?" where the Connect
+  Strava step was, chooses an egg, and is offered Apple Health the moment it
+  hatches ("Feed Pip").
+- Anyone who has **played with Strava before** — connected now, disconnected
+  inside the four weeks, consented once, or holding a Strava run — is never
+  stopped (`stravaReturning()`): their Connect button works as it always did,
+  and a new player's greyed row carries a **Sign in with Strava** link for a
+  returning player on a new phone. Signing back in uses the slot the athlete
+  already has.
+- A player **connected to Strava sees nothing of Apple Health** unless they
+  set it up themselves (`healthOn()`), so their app is exactly what it was.
+  That was checked by running one Strava scenario against the build before
+  Apple Health and this one, comparing everything stored and shown: identical
+  but for the clock. Two things are kept back from them on purpose: an
+  activity uploaded to Strava twice is still imported twice, since overlap is
+  only checked against Health's runs; and Strava runs only keep a full `span`
+  on a save that has a Health link.
+
+Setting `STRAVA_FULL` back to `false` reopens Strava to everyone. Apple Health
+began behind a `?health=1` switch while it was tried out; the switch no longer
+matters, and `takeHealthFlag()` only tidies it out of the address.
 
 ### Getting back in without Strava
 
@@ -235,8 +250,8 @@ and holds no codes. A restore is checked against the player's own copy as
 well, so a stale directory entry can never open anything. **Make a new code**
 retires the old one at once; erasing the player, or connecting Strava (which
 moves them onto their athlete), retires it too. Strava athletes are never
-given one. Like the rest of Health, the welcome screen's button only shows
-with the switch on.
+given one. The welcome screen's button shows to everybody not already on
+Strava.
 
 ### Never counting a run twice
 

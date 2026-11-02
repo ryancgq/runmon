@@ -1146,6 +1146,8 @@ body::before{
 /* .mono sets 11px further down; a code someone copies by eye needs room */
 #rc-in.mono{font-size:17px}
 .recovery-code.mono{font-size:19px}
+.strava-full .btn[disabled]{opacity:.4;cursor:not-allowed}
+.linkbtn{background:none;border:0;padding:0;color:var(--accent);font:inherit;font-weight:800;text-decoration:underline;cursor:pointer}
 .recovery-code{margin:6px 0 4px;padding:14px 10px;border-radius:12px;background:var(--bg-2);border:1px solid var(--line);
   text-align:center;font-size:19px;letter-spacing:1.5px;color:var(--text);user-select:all;-webkit-user-select:all}
 .hg-status{margin:4px 0 10px;padding:10px 12px;border-radius:12px;font-size:12.5px;font-weight:800;line-height:1.45}
@@ -1674,11 +1676,11 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
         <div><h2>Settings</h2></div>
       </div>
 
-      <div class="section-title" id="strava-title" hidden>Strava</div>
-      <div id="strava-panel" hidden></div>
-
       <div class="section-title" id="health-title" hidden>Apple Health</div>
       <div id="health-panel" hidden></div>
+
+      <div class="section-title" id="strava-title" hidden>Strava</div>
+      <div id="strava-panel" hidden></div>
 
       <div class="section-title">Your pet</div>
       <div class="row">
@@ -1788,8 +1790,8 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
          before the egg because connecting leaves the page, and losing a chosen
          egg and a typed name to a redirect is worse than asking first. -->
     <div class="ob-step" id="ob-strava">
-      <h2 style="font-size:26px;margin-top:14px">Connect Strava</h2>
-      <p class="muted" style="font-size:13px;font-weight:600;line-height:1.55;margin:8px 0 0">
+      <h2 style="font-size:26px;margin-top:14px" id="ob-strava-h">Connect Strava</h2>
+      <p class="muted" id="ob-strava-p" style="font-size:13px;font-weight:600;line-height:1.55;margin:8px 0 0">
         Record your runs in Strava exactly as you do now. Runmon reads them and
         feeds your pet on its own — there is nothing to remember to open.
       </p>
@@ -4994,7 +4996,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-11-02 3b4a7e0";
+const BUILD_ID = "2026-11-02 3c21c2c";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -5697,7 +5699,8 @@ function renderHome(){
   const noRunsYet = NATIVE_RUN ? "Let's log your first run"
     : stravaAthlete() ? "Your runs arrive from Strava"
     : save.healthLink ? "Your runs arrive from Apple Health"
-    : healthOn() ? "Connect Strava or Apple Health in Settings to feed your pet"
+    : healthOn() ? (stravaNewOpen() ? "Connect Strava or Apple Health in Settings to feed your pet"
+                                     : "Set up Apple Health in Settings to feed your pet")
     : "Connect Strava in Settings to feed your pet";
   // walks alone are runs in the log but not runs: there is no last run to count from
   $("#greeting-sub").textContent = d.runs.length && d.gapDays !== Infinity
@@ -6515,7 +6518,8 @@ function renderTrackNote(){
        buildings and under trees, and a browser tab gets throttled the moment
        the screen locks \u2014 both cost you distance and the XP with it. Record
        in Strava and your runs arrive here on their own.
-       ${(!linked && STRAVA_ON) ? '<button type="button" data-nav="settings">Connect Strava</button>' : ""}</div>`;
+       ${(!linked && STRAVA_ON) ? (stravaNewOpen() ? '<button type="button" data-nav="settings">Connect Strava</button>'
+                                                   : '<button type="button" data-nav="settings">Set up Apple Health</button>') : ""}</div>`;
     el.hidden = false;
     return;
   }
@@ -7820,6 +7824,13 @@ function renderStravaPanel(){
            <div class="h">Start again from an egg. Your pet is removed from your account and this phone.</div></div>
          <button class="btn danger" style="width:auto;padding:9px 15px;font-size:13px" id="pet-delete">Delete</button>
        </div>` : ""}`
+    : !stravaNewOpen()
+    ? `<div class="row strava-full">
+         <div class="t"><div class="n">Connect Strava</div>
+           <div class="h">Runmon has reached the number of Strava players it is allowed for now, so new connections are paused. Use Apple Health above — Strava will open again.
+             <br><b>Already play with Strava?</b> <button type="button" class="linkbtn" id="strava-on">Sign in with Strava</button></div></div>
+         <button class="btn ghost" style="width:auto;padding:9px 15px;font-size:13px" disabled aria-disabled="true">Full</button>
+       </div>${err}`
     : `<div class="row">
          <div class="t"><div class="n">Connect Strava</div>
            <div class="h">Run with Strava as normal and your pet grows on its own. Runs from before you connect do not count — the pet starts from your next one.${
@@ -7877,7 +7888,7 @@ function renderHealthPanel(){
   if (!healthLinked()){
     panel.innerHTML = where + `<div class="row">
         <div class="t"><div class="n">Apple Health <span style="color:var(--muted);font-weight:700">· iPhone</span></div>
-          <div class="h">No Strava? Runs your iPhone or Apple Watch saves to Health can feed your pet instead. Set it up once, then open Runmon from its Shortcut and new runs come in on the way. Runs started before you set it up do not count.</div></div>
+          <div class="h">${stravaNewOpen() ? "No Strava? Runs" : "The way to feed your pet on an iPhone: runs and walks"} your iPhone or Apple Watch saves to Health ${stravaNewOpen() ? "can feed your pet instead" : "come in on their own"}. Set it up once, then open Runmon from its Shortcut and new runs come in on the way. Runs started before you set it up do not count.</div></div>
         <button class="btn primary" ${small} id="health-on"${healthBusy ? " disabled" : ""}>${healthBusy ? "Setting up…" : "Set up"}</button>
       </div>` + del;
     return;
@@ -7974,6 +7985,17 @@ function healthGuide(step){
       e => toast(e.message || String(e), "bad", "\u26A0\uFE0F"));
   const s = screens[healthGuideStep];
   openSheet({ title: s.title, body: dots + s.body, actions: s.actions });
+}
+
+/** Straight after hatching, for a player with no way yet to feed the pet. */
+function offerHealth(name){
+  if (document.querySelector("#sheet-wrap.show") || save.healthLink) return;
+  openSheet({
+    title: `Feed ${esc(name || save.petName || "your pet")}`,
+    desc: "Your pet grows from your runs and walks. On an iPhone, Apple Health brings them in — set it up now, it takes about two minutes.",
+    actions: [{ label: "Later", cls: "ghost", fn: () => { closeSheet(); toast("Set up Apple Health any time in Settings", "", "\u2699\uFE0F"); } },
+              { label: "Set up Apple Health", cls: "primary", fn: () => { closeSheet(); healthSetUp(); } }]
+  });
 }
 
 /* --- recovery code -------------------------------------------------------
@@ -8231,6 +8253,18 @@ function obStep(id){
   $$(".ob-step").forEach(s => s.classList.toggle("on", s.id === id));
   $("#onboard").scrollTop = 0;
 }
+/* With Strava full, the step is for players coming back: it says new
+   connections are paused, offers the sign-in to anyone who already plays
+   with Strava, and sends everyone else on to an egg - Apple Health is
+   offered once it has hatched (offerHealth). */
+function obStravaWording(){
+  const full = !stravaNewOpen();
+  $("#ob-strava-h").textContent = full ? "Already playing with Strava?" : "Connect Strava";
+  $("#ob-strava-p").innerHTML = full
+    ? "New Strava connections are paused for now. If you already play Runmon with Strava, sign in to bring your pet to this phone. New here? Choose an egg — you can feed it with Apple Health on your iPhone."
+    : "Record your runs in Strava exactly as you do now. Runmon reads them and feeds your pet on its own — there is nothing to remember to open.";
+  $("#ob-strava-skip").textContent = full ? "I'm new — choose an egg" : "Not now";
+}
 /* The Strava step is worth showing only to someone who could act on it. */
 function obAfterWelcome(){
   return (STRAVA_ON && !stravaAthlete()) ? "ob-strava" : "ob-2";
@@ -8269,7 +8303,10 @@ function hatch(){
   go("home");
   setTimeout(() => {
     toast(NATIVE_RUN ? `${name} hatched! Go for a run to feed it.`
-                     : `${name} hatched! Record a run in Strava to feed it.`, "good", "🥚");
+          : stravaAthlete() || stravaNewOpen() ? `${name} hatched! Record a run in Strava to feed it.`
+          : `${name} hatched!`, "good", "🥚");
+    // with Strava full, Apple Health is how a new pet gets fed: ask now
+    if (!NATIVE_RUN && healthOn() && !stravaAthlete() && !save.healthLink) setTimeout(() => offerHealth(name), 900);
     confetti(50);
   }, 420);
 }
@@ -9179,11 +9216,27 @@ const stravaAthlete = () => stravaLinked() && !healthOnlySession();
    Health-only player - keeps it on. When it goes to everyone this becomes
    `() => STRAVA_ON` and the flag can go. */
 const HEALTH_FLAG_KEY = "runmon.health.on";
+/* Apple Health is the way in for everyone who is not already on Strava. A
+   player connected to Strava sees nothing of it unless they set it up
+   themselves, so their app is exactly what it was: same Settings, same
+   words, same runs. (It started behind a ?health=1 switch while it was
+   tried out; takeHealthFlag() still tidies that out of the address.) */
 function healthOn(){
   if (!STRAVA_ON) return false;
-  if ((save && save.healthLink) || healthOnlySession()) return true;
-  try { return localStorage.getItem(HEALTH_FLAG_KEY) === "1"; } catch(e){ return false; }
+  return !stravaAthlete() || !!(save && save.healthLink) || healthOnlySession();
 }
+/* Strava caps how many athletes an app may connect until it has been
+   reviewed, and Runmon is at the cap. New players cannot connect, so the
+   button is shown greyed out rather than taken away - it is coming back.
+   Anyone who has played with Strava before is never stopped: signing back
+   in on a new phone, after a disconnect, or when Strava asks for it uses
+   the slot they already have. */
+const STRAVA_FULL = true;
+function stravaReturning(){
+  return stravaAthlete() || !!save.parkedAt || !!save.stravaConsentAt ||
+    (save.runs || []).some(r => r && r.strava != null);
+}
+const stravaNewOpen = () => !STRAVA_FULL || stravaReturning();
 function takeHealthFlag(){
   const m = /[?&]health=([01])\b/.exec(location.search || "");
   if (!m) return;
@@ -9594,7 +9647,7 @@ async function stravaSync(opts){
         { strava: a.id, manual: !!a.manual, device: a.device || null },
         // the full span is only kept for a phone that might need it; without
         // it a Strava run is read as [start, start + moving time]
-        healthOn() ? { span } : {}));
+        save.healthLink ? { span } : {}));
       save.runs.push(run);
       newIds.push(run.id);      // for the replay, which walks our own runs
       fromStrava++;
@@ -10099,7 +10152,7 @@ function wire(){
   });
 
   // onboarding
-  $("#ob-go").addEventListener("click", () => obStep(obAfterWelcome()));
+  $("#ob-go").addEventListener("click", () => { obStravaWording(); obStep(obAfterWelcome()); });
   $("#ob-restore").addEventListener("click", restoreWithCode);
   $("#ob-strava-go").addEventListener("click", () => {
     // leaves the page for Strava and comes back through /callback; nothing has
@@ -10109,8 +10162,11 @@ function wire(){
   $("#ob-strava-skip").addEventListener("click", () => {
     obStep("ob-2");
     // no Strava: on an iPhone, Apple Health is the other way in
-    toast(healthOn() ? "Connect Strava or Apple Health any time in Settings"
-                     : "You can connect Strava any time in Settings", "", "\u2699\uFE0F");
+    // with Strava full there is nothing to promise: Apple Health is offered
+    // the moment the egg hatches
+    if (stravaNewOpen())
+      toast(healthOn() ? "Connect Strava or Apple Health any time in Settings"
+                       : "You can connect Strava any time in Settings", "", "\u2699\uFE0F");
   });
   $("#ob-next").addEventListener("click", () => {
     if (!obSpecies) return;
@@ -10232,7 +10288,7 @@ function boot(){
   // the newer one on its next persist - dropping runs the broker is sure were
   // counted - so a save written by another tab is taken up here.
   window.addEventListener("storage", e => {
-    if (!healthOn()) return;
+    if (!(save.healthLink || healthOnlySession())) return;
     if (e.key !== SAVE_KEY || !e.newValue || replaying || tracker.active || stravaBusy) return;
     if (loadSave()){ recompute(); renderAll(); }
   });
