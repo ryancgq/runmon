@@ -4966,7 +4966,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-10-08 bbab4b7";
+const BUILD_ID = "2026-11-02 1b4c52d";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -5669,7 +5669,8 @@ function renderHome(){
   const noRunsYet = NATIVE_RUN ? "Let's log your first run"
     : stravaAthlete() ? "Your runs arrive from Strava"
     : save.healthLink ? "Your runs arrive from Apple Health"
-    : "Connect Strava or Apple Health in Settings to feed your pet";
+    : healthOn() ? "Connect Strava or Apple Health in Settings to feed your pet"
+    : "Connect Strava in Settings to feed your pet";
   $("#greeting-sub").textContent = d.runs.length
     ? (d.gapDays === 0 ? "You already ran today — nice." : d.gapDays === 1 ? "You ran yesterday. Keep it rolling." : `${d.gapDays} days since your last run`)
     : d.pastRuns ? "A week or more since your last run" : noRunsYet;
@@ -5824,9 +5825,10 @@ function renderHistory(){
       <h3>No runs yet</h3><p>Every run you log lands here — and feeds your pet.</p>
       <button class="btn primary" data-nav="track" style="max-width:240px;margin:0 auto">Start your first run</button></div>`
       : `<div class="empty-state"><div class="ico">🏃</div>
-      <h3>No runs yet</h3><p>Runs come from Strava or Apple Health — record one there and
-         it lands here, and feeds your pet, the next time you open Runmon.</p>
-      ${stravaAthlete() || save.healthLink ? "" : `<button class="btn primary" data-nav="settings" style="max-width:240px;margin:0 auto">Connect in Settings</button>`}</div>`;
+      <h3>No runs yet</h3><p>${healthOn()
+        ? "Runs come from Strava or Apple Health — record one there and it lands here, and feeds your pet, the next time you open Runmon."
+        : "Runs come from Strava — record one there and it lands here, and feeds your pet, the next time you open Runmon."}</p>
+      ${stravaAthlete() || save.healthLink ? "" : `<button class="btn primary" data-nav="settings" style="max-width:240px;margin:0 auto">${healthOn() ? "Connect in Settings" : "Connect Strava"}</button>`}</div>`;
     el.innerHTML += foldNote;
     return;
   }
@@ -6881,9 +6883,10 @@ function runSpan(r){
   const ms = (Number(r.sec) || 0) * 1000;
   return (r.strava || r.health) ? [r.t, r.t + ms] : [r.t - ms, r.t];
 }
-function runOverlapping(span){
+function runOverlapping(span, only){
   const [a, b] = span;
-  return save.runs.find(r => { if (!r) return false; const [c, d] = runSpan(r); return a < d && c < b; }) || null;
+  return save.runs.find(r => { if (!r || (only && !only(r))) return false;
+    const [c, d] = runSpan(r); return a < d && c < b; }) || null;
 }
 /* How old a Health workout may be and still be counted. A Strava run's times
    are deleted when it folds at RETAIN_DAYS, so a Health copy of it is only
@@ -7804,8 +7807,8 @@ function healthLinked(){
 function renderHealthPanel(){
   const title = $("#health-title"), panel = $("#health-panel");
   if (!title || !panel) return;
-  title.hidden = panel.hidden = !STRAVA_ON;
-  if (!STRAVA_ON) return;
+  title.hidden = panel.hidden = !healthOn();
+  if (!healthOn()) return;
   const small = 'style="width:auto;padding:9px 15px;font-size:13px"';
   // A Home Screen web app keeps its storage apart from Safari's, and the
   // Shortcut always opens Safari: set up from an icon, the pet would be in
@@ -8922,6 +8925,29 @@ let healthAdopting = null;
 const stravaLinked = () => STRAVA_ON && !!stravaSession;
 const healthOnlySession = () => /^p/.test(String(stravaSession || ""));
 const stravaAthlete = () => stravaLinked() && !healthOnlySession();
+/* Apple Health is switched on per phone while it is being tried out, so a
+   release carrying it changes nothing for anybody on Strava: no panel, no
+   new wording, and Strava's runs imported exactly as before. Visiting the
+   app once with ?health=1 turns it on for that browser (?health=0 turns it
+   off), and anybody already using it - a save holding a sync link, or a
+   Health-only player - keeps it on. When it goes to everyone this becomes
+   `() => STRAVA_ON` and the flag can go. */
+const HEALTH_FLAG_KEY = "runmon.health.on";
+function healthOn(){
+  if (!STRAVA_ON) return false;
+  if ((save && save.healthLink) || healthOnlySession()) return true;
+  try { return localStorage.getItem(HEALTH_FLAG_KEY) === "1"; } catch(e){ return false; }
+}
+function takeHealthFlag(){
+  const m = /[?&]health=([01])\b/.exec(location.search || "");
+  if (!m) return;
+  try {
+    if (m[1] === "1") localStorage.setItem(HEALTH_FLAG_KEY, "1");
+    else localStorage.removeItem(HEALTH_FLAG_KEY);
+  } catch(e){}
+  const q = location.search.replace(/([?&])health=[01]\b&?/, "$1").replace(/[?&]$/, "");
+  history.replaceState(null, "", location.pathname + q + location.hash);
+}
 
 async function stravaCall(path, init){
   const r = await fetch(RUNMON_API + path, Object.assign({
@@ -9312,10 +9338,16 @@ async function stravaSync(opts){
       if (held.has(String(a.id))){ imported.push(a.id); continue; }
       imported.push(a.id);      // for the broker, so it is not fetched again
       const span = [a.t, a.t + (a.elapsed || a.sec) * 1000];
-      // the same run, already in from Apple Health
-      if (runOverlapping(span)){ alreadyHad++; continue; }
+      // The same run, already in from Apple Health. Checked against Health's
+      // runs only: two Strava activities overlapping each other are Strava's
+      // business, and are imported exactly as they always were.
+      if (runOverlapping(span, r => r.health)){ alreadyHad++; continue; }
       held.add(String(a.id));
-      const run = makeRun(a.t, a.km, a.sec, { strava: a.id, manual: !!a.manual, device: a.device || null, span });
+      const run = makeRun(a.t, a.km, a.sec, Object.assign(
+        { strava: a.id, manual: !!a.manual, device: a.device || null },
+        // the full span is only kept for a phone that might need it; without
+        // it a Strava run is read as [start, start + moving time]
+        healthOn() ? { span } : {}));
       save.runs.push(run);
       newIds.push(run.id);      // for the replay, which walks our own runs
       fromStrava++;
@@ -9432,7 +9464,10 @@ async function stravaSync(opts){
     if (fromStrava) got.push(`${fromStrava} run${fromStrava === 1 ? "" : "s"} from Strava`);
     if (fromHealth) got.push(`${fromHealth} from Apple Health`);
     const twice = alreadyHad ? ` \u00b7 ${alreadyHad} already counted` : "";
-    if (fromHealth && !(opts && opts.loud)){
+    if (!fromHealth && !alreadyHad && opts && opts.loud && imported.length){
+      // a Strava-only sync says exactly what it always said
+      toast(`${imported.length} run${imported.length === 1 ? "" : "s"} from Strava`, "good", "\u{1F3C3}");
+    } else if (fromHealth && !(opts && opts.loud)){
       // Arriving through the Shortcut is the one quiet sync worth a word: it
       // is the player's only sign the Health side is working.
       toast(got.join(" \u00b7 ") + twice, "good", "\u2764\uFE0F");
@@ -9507,7 +9542,8 @@ async function stravaPush(imported, healthSettled){
   const healthDone = [...new Set(save.runs.filter(r => r && r.health).map(r => r.health)
     .concat(healthSettled || []))];
   await stravaCall("/save", { method:"PUT",
-    body: JSON.stringify({ save, imported: imported || [], healthDone, card: publicCard() }) });
+    body: JSON.stringify(Object.assign({ save, imported: imported || [], card: publicCard() },
+      healthDone.length ? { healthDone } : {})) });
 }
 /** Called on every persist(); coalesced, because persist() is called a lot. */
 function stravaSchedulePush(){
@@ -9815,7 +9851,8 @@ function wire(){
   $("#ob-strava-skip").addEventListener("click", () => {
     obStep("ob-2");
     // no Strava: on an iPhone, Apple Health is the other way in
-    toast("Connect Strava or Apple Health any time in Settings", "", "\u2699\uFE0F");
+    toast(healthOn() ? "Connect Strava or Apple Health any time in Settings"
+                     : "You can connect Strava any time in Settings", "", "\u2699\uFE0F");
   });
   $("#ob-next").addEventListener("click", () => {
     if (!obSpecies) return;
@@ -9862,6 +9899,7 @@ window.RunPet = window.Runmon;
 function boot(){
   wire();
   stravaLoadSession();
+  takeHealthFlag();
   takeHealthHash();
   const has = loadSave();
   // the sandbox exists so mechanics can be tried without going outside, and a
@@ -9936,6 +9974,7 @@ function boot(){
   // the newer one on its next persist - dropping runs the broker is sure were
   // counted - so a save written by another tab is taken up here.
   window.addEventListener("storage", e => {
+    if (!healthOn()) return;
     if (e.key !== SAVE_KEY || !e.newValue || replaying || tracker.active || stravaBusy) return;
     if (loadSave()){ recompute(); renderAll(); }
   });

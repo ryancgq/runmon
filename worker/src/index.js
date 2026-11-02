@@ -797,10 +797,11 @@ export default {
         // their runs.
         try { await ensureHandle(env, id); } catch (e){ /* not worth a failed sync */ }
         const out = await (await stub.fetch("https://do/sync", { method:"POST" })).json();
-        // A session with fewer than 100 days left is quietly renewed. For a
-        // Strava athlete an expired one costs a reconnect; a Health-only player
-        // has nothing to reconnect to, and losing it would orphan their pet.
-        if (sess.exp - Date.now() < 100 * 86400e3) out.session = await mintSession(env, id);
+        // A Health-only player's session is quietly renewed once it has fewer
+        // than 100 days left: they have no Strava to reconnect through, and
+        // losing it would orphan their pet. A Strava athlete's is left alone,
+        // exactly as before - an expired one is a reconnect away.
+        if (isPlayerId(id) && sess.exp - Date.now() < 100 * 86400e3) out.session = await mintSession(env, id);
         return json(env, out);
       }
 

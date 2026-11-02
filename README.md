@@ -196,6 +196,22 @@ save, so a leaked Shortcut costs somebody spam, not their pet. **Turn off**
 retires it, and so does disconnecting Strava; setting up again issues a new
 one.
 
+### Switched on per phone, for now
+
+It ships switched off. Nobody sees an Apple Health section, and a Strava
+player's app behaves exactly as it did before it — same imports, same words,
+same calls to the broker; that was checked by running one Strava scenario
+against the build before and after and comparing everything stored and shown.
+Opening the app once with **`?health=1`** turns it on for that browser
+(`?health=0` turns it off), and anybody already using it keeps it. Turn it on
+in Safari, since that is what the Shortcut opens. Going public is changing
+`healthOn()` to `() => STRAVA_ON`.
+
+Two things wait for that change on purpose, because each would reach Strava
+players: an activity uploaded to Strava twice — watch and phone — is still
+imported twice, since overlap is only checked against Health's runs; and
+Strava runs only keep a full `span` on a phone with Health on.
+
 ### Never counting a run twice
 
 A run can reach Runmon more than one way at once, and in practice often does:
@@ -234,9 +250,6 @@ there would have stopped real Strava runs being fetched. They travel as
 `healthDone` on the save instead — every Health run the save holds, on every
 push, so a push that never lands cannot leave a workout queued to be counted
 again.
-
-This also closed a hole on the Strava side: an activity uploaded twice to
-Strava — a watch and a phone both recording — is now counted once.
 
 Steps are not imported, deliberately. XP, the mood ladder and streaks are all
 built on discrete runs and the 2 km bar; a daily step total would make an
