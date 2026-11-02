@@ -1911,7 +1911,7 @@ const SESSION_KEY = "runmon.strava.session";
 /* The iCloud link to the Runmon Shortcut, once it has been built and shared -
    see "Apple Health" in the README for how. Empty, Settings explains how to
    build it instead of offering a link that goes nowhere. */
-const HEALTH_SHORTCUT_URL = "";
+const HEALTH_SHORTCUT_URL = "https://www.icloud.com/shortcuts/a15d139a37b24bcfa2bb298cdac6944f";
 /* Saves written before the app was renamed. Read once, copied to SAVE_KEY, and
    deliberately left in place as a backup — but cleared on reset, or a "new game"
    would come back from the dead on the next load. Never migrated into the demo. */
@@ -4996,7 +4996,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-11-02 3c21c2c";
+const BUILD_ID = "2026-11-02 b22acf8";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -7954,9 +7954,9 @@ function healthGuide(step){
     { title: "Step 2 · Add the Runmon Shortcut",
       body: HEALTH_SHORTCUT_URL
         ? `<ol class="health-steps">
-             <li>Tap <b>Get the Shortcut</b> below. The Shortcuts app opens.</li>
-             <li>Tap <b>Add Shortcut</b>.</li>
+             <li>Tap <b>Get the Shortcut</b> below, then <b>Set Up Shortcut</b>.</li>
              <li>When it asks for your sync link, <b>paste</b> the one you just copied.</li>
+             <li>Tap <b>Add Shortcut</b>.</li>
            </ol>
            <a class="btn primary hg-big" href="${esc(HEALTH_SHORTCUT_URL)}" target="_blank" rel="noopener">Get the Shortcut</a>
            <p class="hg-p hg-small">Then come back to Safari for the last step.</p>`
@@ -7970,6 +7970,8 @@ function healthGuide(step){
           <li>The first time, iPhone asks to let it read Health and to send data to Runmon — tap <b>Allow</b> for both.</li>
           <li>It opens Runmon again, and this will turn green.</li>
         </ol>
+        <p class="hg-p hg-small">If it stops with <b>“You can allow this in Settings”</b>: open the iPhone's
+          <b>Settings → Apps → Shortcuts → Advanced</b>, turn on <b>Allow Sharing Large Amounts of Data</b>, and run it again.</p>
         ${healthGuideStatus()}
         <p class="hg-p"><b>From now on, open Runmon by tapping the Shortcut</b> — that tap is what syncs your runs.
           To put it on your Home Screen: in Shortcuts, press and hold <b>Runmon</b> → <b>Share</b> → <b>Add to Home Screen</b>.</p>`,
