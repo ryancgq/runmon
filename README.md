@@ -286,9 +286,26 @@ lights for more than two minutes splits one outing into two. An outing sent
 while it was still going on, then sent again longer, replaces itself as long
 as the app has not collected it yet.
 
-Steps are not imported. A daily step total has no start and end to match a
-Strava run against, and the sessions above already carry the distance steps
-would.
+**Vehicles.** A phone counts distance from steps, so a smooth drive adds next
+to nothing — but a bumpy bus or train can shake out "steps", and a bus in
+traffic at 25 km/h is faster than the run threshold, so unchecked it would be
+paid as a very good run. So the Shortcut sends **Step Count** too, and:
+
+- no slice faster than **7 m/s** (about 2:20 per km) is kept; nobody holds that
+  on foot.
+- each slice's **stride** — its distance over the steps taken in the same
+  window — must be human. People cover about 0.6–0.9 m a step walking and
+  1–1.6 m running; a slice over **2.5 m** a step was not walked and is dropped,
+  only that slice, so the walk to the bus stop still counts and the ride does
+  not.
+- an outing as a whole must come in under **2.2 m** a step, and an outing with
+  **no steps** recorded against it is not counted at all.
+
+Steps are read per device and the most any one device counted is used, so a
+watch's distance can be checked against the phone's steps, and a phone and a
+watch counting the same steps are not added together. Steps earn nothing;
+they are only the check. The broker's reply says when distance looked like a
+vehicle, and when no steps came with it.
 
 ### Swings
 
@@ -329,15 +346,20 @@ offers it to every player. Until then the setup guide points here.
    - **Text**: `Start | End | Value | Source`, each the variable from the
      steps above.
 4. After **End Repeat**: **Combine Text** — *Repeat Results*, with *New Lines*.
-5. **Get Contents of URL** — URL: the sync link from the setup guide (leave it
+5. The same again for steps: a second **Find Health Samples** — Type **Step
+   Count**, *Start Date is in the last 3 days* — then a second **Repeat with
+   Each** building the same `Start | End | Value | Source` line, and a second
+   **Combine Text** with *New Lines*.
+6. **Get Contents of URL** — URL: the sync link from the setup guide (leave it
    for the import question when sharing). Method **POST**, Request Body
-   **JSON**, one *Text* field named `samples` holding the combined text.
-6. **Open URLs** — `https://ryancgq.github.io/runmon/#health`.
-7. Before sharing, under the Shortcut's details → *Set Up Import Questions*,
-   add one on step 5's URL: "Paste the sync link from Runmon's Settings". Then
+   **JSON**, two *Text* fields: `samples` holding the distance text, `steps`
+   holding the steps text.
+7. **Open URLs** — `https://ryancgq.github.io/runmon/#health`.
+8. Before sharing, under the Shortcut's details → *Set Up Import Questions*,
+   add one on step 6's URL: "Paste the sync link from Runmon's Settings". Then
    Share → **Copy iCloud Link**.
 
-Three days rather than seven: tapped daily, three is plenty, and the loop is
+Three days rather than seven: tapped daily, three is plenty, and the loops are
 the slow part. The broker only takes outings from the last five days anyway.
 
 The broker is forgiving on purpose, because a Shortcut is easy to build and

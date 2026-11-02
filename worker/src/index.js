@@ -649,17 +649,64 @@ const clearHealthOwner = (env, key) => key
    into a walk; otherwise it is a walk, which the app pays at half. */
 const SESSION_GAP_MS = 2 * 60e3, SESSION_MIN_MS = 10 * 60e3, SESSION_MIN_KM = 1;
 const RUN_MPS = 1000 / 480;
-function sessionsFromSamples(lines){
+/* Vehicles. A phone counts distance from steps, so a smooth drive adds next to
+   nothing - but a bumpy bus or train can shake out "steps", and a bus in
+   traffic at 25 km/h is faster than the run threshold, so unchecked it would
+   be paid as a very good run. Two checks keep it out:
+
+   - SLICE_MAX_MPS: no slice faster than 7 m/s (about 2:20 per km), which no
+     player sustains on foot. Faster slices are dropped and break the outing
+     there, as a gap would.
+   - Stride: distance divided by the steps taken over the same window. People
+     cover roughly 0.6-0.9 m a step walking and 1-1.6 m running. A slice whose
+     stride is over STRIDE_SLICE_MAX was not walked and is dropped - only that
+     slice, so the walk to the bus stop still counts and the ride does not. An
+     outing as a whole must come in under STRIDE_MAX, and an outing with no
+     steps recorded against it at all is not counted: there is nothing to say
+     it was on foot.
+
+   Steps are read per device and the most any one device counted is used, so
+   a watch's distance is checked against the phone's steps if that is what
+   recorded them, and a phone and a watch counting the same steps are not
+   added together. Steps are only used for this check; they earn nothing. */
+const SLICE_MAX_MPS = 7, STRIDE_SLICE_MAX = 2.5, STRIDE_MAX = 2.2;
+function readSlices(lines, value){
+  const out = [];
+  for (const line of (lines || []).slice(0, 6000)){
+    const f = typeof line === "string" ? line.split(/\s*[|;\t]\s*/)
+      : [line.start, line.end, line.value ?? line.distance ?? line.count, line.source];
+    const start = healthTime(f[0]), end = healthTime(f[1]), v = value(f[2]);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start || !(v > 0)) continue;
+    out.push({ start, end, v, src: String(f[3] || "").slice(0, 60) });
+  }
+  return out;
+}
+const stepCount = v => Number(String(v == null ? "" : v).replace(/[^0-9.]/g, ""));
+/** Steps taken between a and b, by the device that counted the most. */
+function stepsIn(steps, a, b){
+  const per = new Map();
+  for (const x of steps){
+    if (x.end < a || x.start > b) continue;
+    const share = x.end > x.start ? (Math.min(b, x.end) - Math.max(a, x.start)) / (x.end - x.start) : 1;
+    if (share > 0) per.set(x.src, (per.get(x.src) || 0) + x.v * share);
+  }
+  return Math.max(0, ...per.values());
+}
+function sessionsFromSamples(lines, stepLines){
+  const notes = {};
+  const note = (k, n = 1) => { notes[k] = (notes[k] || 0) + n; };
+  const steps = readSlices(stepLines, stepCount);
   const bySource = new Map();
-  for (const line of lines.slice(0, 5000)){
-    const f = typeof line === "string" ? line.split(/\s*[|;\t]\s*/) : [line.start, line.end, line.value ?? line.distance, line.source];
-    const start = healthTime(f[0]), end = healthTime(f[1]), km = healthKm(f[2]);
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start || !(km > 0)) continue;
-    // a slice faster than a sprinter is a glitch, not a run
-    if (end > start && km * 1000 / ((end - start) / 1000) > 12) continue;
-    const src = String(f[3] || "").slice(0, 60);
-    if (!bySource.has(src)) bySource.set(src, []);
-    bySource.get(src).push({ start, end, km });
+  for (const x of readSlices(lines, healthKm)){
+    const sec = (x.end - x.start) / 1000;
+    if (sec > 0 && x.v * 1000 / sec > SLICE_MAX_MPS){ note("vehicleSlices"); continue; }
+    // too small to judge a stride from: a few metres either way is noise
+    if (x.v >= 0.05){
+      const n = stepsIn(steps, x.start, x.end);
+      if (n > 0 && x.v * 1000 / n > STRIDE_SLICE_MAX){ note("vehicleSlices"); continue; }
+    }
+    if (!bySource.has(x.src)) bySource.set(x.src, []);
+    bySource.get(x.src).push({ start: x.start, end: x.end, km: x.v });
   }
   const out = [];
   for (const slices of bySource.values()){
@@ -667,12 +714,15 @@ function sessionsFromSamples(lines){
     let cur = null;
     const close = () => {
       if (!cur) return;
-      const runKm = cur.slices.reduce((t, x) =>
+      const c = cur; cur = null;
+      if (c.end - c.start < SESSION_MIN_MS || c.km < SESSION_MIN_KM) return;
+      const n = stepsIn(steps, c.start, c.end);
+      if (!(n > 0)){ note("noSteps"); return; }
+      if (c.km * 1000 / n > STRIDE_MAX){ note("vehicle"); return; }
+      const runKm = c.slices.reduce((t, x) =>
         t + (x.end > x.start && x.km * 1000 / ((x.end - x.start) / 1000) >= RUN_MPS ? x.km : 0), 0);
-      if (cur.end - cur.start >= SESSION_MIN_MS && cur.km >= SESSION_MIN_KM)
-        out.push({ start: cur.start, end: cur.end, distance: cur.km,
-                   type: runKm >= cur.km / 2 ? "Running" : "Walking" });
-      cur = null;
+      out.push({ start: c.start, end: c.end, distance: c.km,
+                 type: runKm >= c.km / 2 ? "Running" : "Walking" });
     };
     for (const x of slices){
       if (cur && x.start - cur.end <= SESSION_GAP_MS){
@@ -681,7 +731,7 @@ function sessionsFromSamples(lines){
     }
     close();
   }
-  return out;
+  return { sessions: out, notes };
 }
 
 function parseHealthBody(raw){
@@ -689,9 +739,9 @@ function parseHealthBody(raw){
   try { body = JSON.parse(raw); } catch (e){ /* plain text, one per line */ }
   let items = [];
   if (body && body.samples != null){
-    const lines = Array.isArray(body.samples) ? body.samples
-      : String(body.samples).split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-    return sessionsFromSamples(lines).slice(0, 100);
+    const asLines = v => Array.isArray(v) ? v : String(v == null ? "" : v).split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const { sessions, notes } = sessionsFromSamples(asLines(body.samples), asLines(body.steps));
+    return { items: sessions.slice(0, 100), notes };
   }
   if (Array.isArray(body)) items = body;
   else if (body && Array.isArray(body.workouts)) items = body.workouts;
@@ -702,7 +752,7 @@ function parseHealthBody(raw){
       return { start, end, distance, type, duration };
     });
   }
-  return items.slice(0, 100);
+  return { items: items.slice(0, 100), notes: {} };
 }
 function healthTime(v){
   if (v == null || v === "") return NaN;
@@ -894,7 +944,7 @@ export default {
         if (!owner) return json(env, { error:"unknown link",
           message:"Runmon does not recognise this sync link. Set Apple Health up again in Runmon's Settings and paste the new link into the Shortcut." }, 404);
         const r = await (await athleteStub(env, owner)).fetch("https://do/health-put",
-          { method:"POST", body: JSON.stringify({ items: parseHealthBody(await request.text()) }) });
+          { method:"POST", body: JSON.stringify(parseHealthBody(await request.text())) });
         return json(env, await r.json());
       }
 
@@ -2595,7 +2645,7 @@ export class Athlete {
   /** What the Shortcut sent, queued for the app. A workout overlapping one
       already taken is that run again - sent twice, or a second app's copy of
       it in Health - and is not taken. */
-  async healthPut({ items }){
+  async healthPut({ items, notes }){
     const s = this.state.storage;
     const [since, pending0, spans0, refresh] = await Promise.all(
       ["healthSince", "healthPending", "healthSpans", "refresh"].map(k => s.get(k)));
@@ -2608,6 +2658,9 @@ export class Athlete {
     // oldest first, so of two copies of one run the earlier-starting is kept
     const clean = (items || []).map(cleanWorkout);
     for (const c of clean) if (!c.ok) counts.skipped[c.why] = (counts.skipped[c.why] || 0) + 1;
+    // what the session builder threw out on the way: vehicles, and outings
+    // with no steps to show they were on foot
+    for (const [k, n] of Object.entries(notes || {})) counts.skipped[k] = (counts.skipped[k] || 0) + n;
     const swingKm = w => w.km * (w.walk ? 0.5 : 1);
     let bankAdd = 0;
     for (const w of clean.filter(c => c.ok).map(c => c.ok).sort((a, b) => a.start - b.start)){
@@ -2660,8 +2713,11 @@ export class Athlete {
     }
     await s.put(put);
     const n = counts.queued;
-    counts.message = n ? `${n} new run${n === 1 ? "" : "s"} or walk${n === 1 ? "" : "s"} sent to Runmon.`
-      : counts.sent ? "Nothing new for Runmon." : "No runs found in Health.";
+    const rode = notes && (notes.vehicle || notes.vehicleSlices);
+    counts.message = (n ? `${n} new run${n === 1 ? "" : "s"} or walk${n === 1 ? "" : "s"} sent to Runmon.`
+      : counts.sent ? "Nothing new for Runmon." : "No runs found in Health.")
+      + (rode ? " Some distance looked like a car, bus or train and did not count." : "")
+      + (notes && notes.noSteps && !n ? " Make sure the Shortcut sends Step Count as well." : "");
     return this.ok(counts);
   }
 
