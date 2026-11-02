@@ -1146,6 +1146,7 @@ body::before{
 /* .mono sets 11px further down; a code someone copies by eye needs room */
 #rc-in.mono{font-size:17px}
 .recovery-code.mono{font-size:19px}
+.health-go{max-width:300px;margin:0 auto;display:block}
 .strava-full .btn[disabled]{opacity:.4;cursor:not-allowed}
 .linkbtn{background:none;border:0;padding:0;color:var(--accent);font:inherit;font-weight:800;text-decoration:underline;cursor:pointer}
 .recovery-code{margin:6px 0 4px;padding:14px 10px;border-radius:12px;background:var(--bg-2);border:1px solid var(--line);
@@ -1803,6 +1804,8 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
       <div class="ob-foot">
         <button class="strava-btn" id="ob-strava-go"><img src="art/strava/btn_strava_connect_with_orange.svg"
           alt="Connect with Strava" width="237" height="48"></button>
+        <button class="btn primary health-go" id="ob-health-go" hidden>&#x2764;&#xFE0F;&nbsp; Connect with Apple Health</button>
+        <button class="btn ghost" id="ob-strava-signin" hidden style="margin-top:9px">Already play with Strava? Sign in</button>
         <button class="btn ghost" id="ob-strava-skip" style="margin-top:9px">Not now</button>
       </div>
     </div>
@@ -4996,7 +4999,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-11-02 b22acf8";
+const BUILD_ID = "2026-11-02 d06ab78";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -8245,7 +8248,8 @@ function showOnboarding(){
   // It used to end "Nothing ever leaves your device", which stopped being
   // true when a pet could live on the broker and friends could see it.
   if (priv && !NATIVE_RUN)
-    priv.innerHTML = 'Runs come from Strava. <a href="privacy.html" target="_blank" rel="noopener">Privacy policy</a>';
+    priv.innerHTML = (stravaNewOpen() ? 'Runs come from Strava.' : 'Runs come from Apple Health or Strava.') +
+      ' <a href="privacy.html" target="_blank" rel="noopener">Privacy policy</a>';
   const oc = $("#ob-consent");
   if (oc) oc.innerHTML = stravaDisclosureHTML();
   paintPet($("#ob-hero"), hero, 0, "okay");
@@ -8263,12 +8267,23 @@ function obStep(id){
    offered once it has hatched (offerHealth). */
 function obStravaWording(){
   const full = !stravaNewOpen();
-  $("#ob-strava-h").textContent = full ? "Already playing with Strava?" : "Connect Strava";
+  $("#ob-strava-h").textContent = full ? "Connect Apple Health" : "Connect Strava";
   $("#ob-strava-p").innerHTML = full
-    ? "New Strava connections are paused for now. If you already play Runmon with Strava, sign in to bring your pet to this phone. New here? Choose an egg — you can feed it with Apple Health on your iPhone."
+    ? "Runs and walks your iPhone or Apple Watch saves to Health feed your pet. Choose an egg first — setting up Apple Health comes straight after, and takes about two minutes."
     : "Record your runs in Strava exactly as you do now. Runmon reads them and feeds your pet on its own — there is nothing to remember to open.";
-  $("#ob-strava-skip").textContent = full ? "I'm new — choose an egg" : "Not now";
+  // With Strava full, Apple Health is the main way in: its button leads, and
+  // Strava drops to a sign-in for players who already have it. That opens
+  // Strava's own sheet - the disclosure and the official button - so nothing
+  // about connecting Strava changes for them.
+  $("#ob-consent").hidden = full;
+  $("#ob-strava-go").hidden = full;
+  $("#ob-health-go").hidden = !full;
+  $("#ob-strava-signin").hidden = !full;
+  $("#ob-strava-skip").textContent = full ? "Not on an iPhone? Choose an egg" : "Not now";
 }
+/* Chosen "Connect with Apple Health" before there is a pet to connect:
+   setup starts by itself the moment the egg hatches. */
+let obWantsHealth = false;
 /* The Strava step is worth showing only to someone who could act on it. */
 function obAfterWelcome(){
   return (STRAVA_ON && !stravaAthlete()) ? "ob-strava" : "ob-2";
@@ -8310,7 +8325,9 @@ function hatch(){
           : stravaAthlete() || stravaNewOpen() ? `${name} hatched! Record a run in Strava to feed it.`
           : `${name} hatched!`, "good", "🥚");
     // with Strava full, Apple Health is how a new pet gets fed: ask now
-    if (!NATIVE_RUN && healthOn() && !stravaAthlete() && !save.healthLink) setTimeout(() => offerHealth(name), 900);
+    // chose it on the way in: go straight into setup rather than asking again
+    if (!NATIVE_RUN && healthOn() && !stravaAthlete() && !save.healthLink)
+      setTimeout(() => { if (obWantsHealth){ obWantsHealth = false; healthSetUp(); } else offerHealth(name); }, 900);
     confetti(50);
   }, 420);
 }
@@ -10163,7 +10180,10 @@ function wire(){
     // been chosen yet, so there is nothing to lose on the way
     location.href = RUNMON_API + "/connect";
   });
+  $("#ob-health-go").addEventListener("click", () => { obWantsHealth = true; obStep("ob-2"); });
+  $("#ob-strava-signin").addEventListener("click", openConnectSheet);
   $("#ob-strava-skip").addEventListener("click", () => {
+    obWantsHealth = false;
     obStep("ob-2");
     // no Strava: on an iPhone, Apple Health is the other way in
     // with Strava full there is nothing to promise: Apple Health is offered

@@ -205,9 +205,13 @@ anybody not already on Strava, and Strava is shown but closed to new players
 
 - Settings puts **Apple Health above Strava**. Strava's Connect button is
   greyed out as **Full**, with a line saying new connections are paused.
-- A **brand-new player** sees "Already playing with Strava?" where the Connect
-  Strava step was, chooses an egg, and is offered Apple Health the moment it
-  hatches ("Feed Pip").
+- A **brand-new player** sees **Connect Apple Health** where the Connect Strava
+  step was, as the main button; Strava drops to "Already play with Strava?
+  Sign in", which opens Strava's own sheet — the disclosure and the official
+  button — so nothing about connecting Strava changes for a returning player.
+  Apple Health needs a pet to attach to, so the button leads to the egg and
+  setup opens by itself the moment it hatches. "Not on an iPhone? Choose an
+  egg" skips, and hatching then offers Apple Health instead ("Feed Pip").
 - Anyone who has **played with Strava before** — connected now, disconnected
   inside the four weeks, consented once, or holding a Strava run — is never
   stopped (`stravaReturning()`): their Connect button works as it always did,
