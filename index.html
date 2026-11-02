@@ -1286,6 +1286,30 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
   max-height:88%;overflow-y:auto;
 }
 .sheet-wrap.show .sheet{transform:none}
+/* Full screen: the setup guide's steps are pages, not a panel over the pet -
+   nothing else to look at, buttons at the foot, and the title big enough to
+   say this is the step that matters. */
+.sheet-wrap.full{align-items:stretch;background:var(--bg);backdrop-filter:none}
+.sheet-wrap.full .sheet{
+  height:100%;max-height:none;border:0;border-radius:0;
+  padding:calc(26px + var(--safe-t)) 22px calc(22px + var(--safe-b));
+  display:flex;flex-direction:column;transform:translateY(18px);opacity:0;
+  transition:transform .34s var(--ease),opacity .24s var(--ease);
+}
+.sheet-wrap.full.show .sheet{transform:none;opacity:1}
+.sheet-wrap.full .sheet h3{font-size:27px;line-height:1.2;margin:4px 0 14px}
+.sheet-wrap.full .hg-p{font-size:15px}
+.sheet-wrap.full .hg-small{font-size:13px}
+.sheet-wrap.full .health-steps{font-size:14.5px}
+.sheet-wrap.full .health-steps li{margin-bottom:12px}
+.sheet-wrap.full .sheet-btns{margin-top:auto;padding-top:20px}
+.sheet-wrap.full .sheet-btns .btn{padding:16px 6px;font-size:15px}
+.hg-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+.hg-top .hg-dots{margin:0}
+.hg-kicker{font-size:11px;font-weight:900;letter-spacing:1.4px;text-transform:uppercase;color:var(--accent)}
+.hg-note{margin:4px 0 12px;padding:12px 13px;border-radius:12px;font-size:13px;font-weight:700;line-height:1.5;
+  background:rgba(255,210,63,.08);border:1px solid rgba(255,210,63,.3);color:var(--text)}
+.hg-note b{color:var(--accent-2)}
 .sheet h3{font-size:19px;margin-bottom:6px}
 .sheet .desc{font-size:13px;color:var(--muted);font-weight:600;line-height:1.55;margin:0 0 16px}
 .sheet-btns{display:flex;gap:8px;margin-top:16px}
@@ -1800,11 +1824,12 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
         <div class="pet-halo"></div>
         <div class="pet-holder egg-crack" id="ob-strava-art"></div>
       </div>
+      <div class="hg-note" id="ob-safari" hidden></div>
       <div class="consent" id="ob-consent"></div>
       <div class="ob-foot">
         <button class="strava-btn" id="ob-strava-go"><img src="art/strava/btn_strava_connect_with_orange.svg"
           alt="Connect with Strava" width="237" height="48"></button>
-        <button class="btn primary health-go" id="ob-health-go" hidden>&#x2764;&#xFE0F;&nbsp; Connect with Apple Health</button>
+        <button class="btn primary health-go" id="ob-health-go" hidden>Connect with Apple Health</button>
         <button class="btn ghost" id="ob-strava-signin" hidden style="margin-top:9px">Already play with Strava? Sign in</button>
         <button class="btn ghost" id="ob-strava-skip" style="margin-top:9px">Not now</button>
       </div>
@@ -4999,7 +5024,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-11-02 d06ab78";
+const BUILD_ID = "2026-11-02 966a198";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -7161,12 +7186,17 @@ function openSheet(cfg){
   sheetActions = cfg.actions || [];
   sheetOnClose = cfg.onClose || null;
   $("#sheet").innerHTML = `
+    ${cfg.top || ""}
     <h3>${cfg.title}</h3>
     ${cfg.desc ? `<p class="desc">${cfg.desc}</p>` : ""}
     ${cfg.body || ""}
     <div class="sheet-btns">${sheetActions.map((a, i) =>
       `<button class="btn ${a.cls || "ghost"}" data-sheet-act="${i}">${a.label}</button>`).join("")}</div>`;
   $("#sheet-wrap").classList.toggle("bare", !!cfg.bare);
+  // a page of its own rather than a panel over the app: for steps that have
+  // to be done before anything else makes sense (the Apple Health setup)
+  $("#sheet-wrap").classList.toggle("full", !!cfg.full);
+  if (cfg.full) $("#sheet").scrollTop = 0;
   $("#sheet-wrap").classList.add("show");
   if (cfg.onOpen) cfg.onOpen($("#sheet"));
 }
@@ -7924,6 +7954,12 @@ function renderHealthPanel(){
    panel, the home screen and this guide all say "not syncing yet" until the
    broker has actually heard from the Shortcut (save.healthLink.heardAt). */
 let healthGuideStep = 0;
+/* Said before anything is set up, because it cannot be fixed afterwards
+   without starting over: a private window forgets the pet when it closes,
+   and a Home Screen icon keeps a store of its own that the Shortcut - which
+   always opens Safari - never sees. */
+const SAFARI_NOTE = `<div class="hg-note">Use Runmon in <b>Safari</b> — not in a <b>Private</b> window, and not from a Home Screen icon.
+  Your pet is kept in the browser you set this up in, and the Shortcut always opens normal Safari.</div>`;
 function healthHeard(){ return !!(save.healthLink && save.healthLink.heardAt); }
 function healthGuideStatus(){
   return healthHeard()
@@ -7937,6 +7973,7 @@ function healthGuide(step){
   const last = healthOnlySession() ? 4 : 3;
   healthGuideStep = Math.max(0, Math.min(last, step || 0));
   const dots = `<div class="hg-dots">${[0,1,2,3,4].slice(0, last + 1).map(i => `<i class="${i === healthGuideStep ? "on" : i < healthGuideStep ? "done" : ""}"></i>`).join("")}</div>`;
+  const top = `<div class="hg-top"><span class="hg-kicker">Set up Apple Health \u00b7 ${healthGuideStep + 1} of ${last + 1}</span>${dots}</div>`;
   const back = { label:"Back", cls:"ghost", fn: () => healthGuide(healthGuideStep - 1) };
   const next = { label:"Next", cls:"primary", fn: () => healthGuide(healthGuideStep + 1) };
   const later = { label:"Not now", cls:"ghost", fn: () => { closeSheet(); healthNudge(); } };
@@ -7946,15 +7983,16 @@ function healthGuide(step){
       body: `<p class="hg-p">Runmon can't read Apple Health by itself — iPhones don't let websites do that. A small
           <b>Shortcut</b> on your phone does it: it sends your latest runs and walks to Runmon, then opens the app. Walks count at half XP.</p>
         <p class="hg-p"><b>Nothing syncs until you've added the Shortcut and run it once.</b> It takes about two minutes.</p>
+        ${SAFARI_NOTE}
         ${healthGuideStatus()}`,
       actions: [later, next] },
-    { title: "Step 1 · Copy your sync link",
+    { title: "Copy your sync link",
       body: `<p class="hg-p">This tells the Shortcut where to send your runs. It can only send runs in — it can't read your pet.</p>
         <span class="health-link mono">${url}</span>
         <button class="btn primary hg-big" data-health="copy">Copy link</button>
         <p class="hg-p hg-small">You'll paste it in the next step.</p>`,
       actions: [back, next] },
-    { title: "Step 2 · Add the Runmon Shortcut",
+    { title: "Add the Runmon Shortcut",
       body: HEALTH_SHORTCUT_URL
         ? `<ol class="health-steps">
              <li>Tap <b>Get the Shortcut</b> below, then <b>Set Up Shortcut</b>.</li>
@@ -7962,12 +8000,12 @@ function healthGuide(step){
              <li>Tap <b>Add Shortcut</b>.</li>
            </ol>
            <a class="btn primary hg-big" href="${esc(HEALTH_SHORTCUT_URL)}" target="_blank" rel="noopener">Get the Shortcut</a>
-           <p class="hg-p hg-small">Then come back to Safari for the last step.</p>`
+           <p class="hg-p hg-small">Then come back to Safari for the next step.</p>`
         : `<p class="hg-p"><b>The Runmon Shortcut hasn't been published yet</b>, so for now it has to be built by hand
              in the Shortcuts app. The full steps are under “Apple Health → Building the Shortcut” in Runmon's README.
              Paste your sync link into its <b>Get Contents of URL</b> step.</p>`,
       actions: [back, next] },
-    { title: "Step 3 · Run it once now",
+    { title: "Run it once now",
       body: `<ol class="health-steps">
           <li>Open the <b>Shortcuts</b> app and tap <b>Runmon</b>.</li>
           <li>The first time, iPhone asks to let it read Health and to send data to Runmon — tap <b>Allow</b> for both.</li>
@@ -7976,14 +8014,14 @@ function healthGuide(step){
         <p class="hg-p hg-small">If it stops with <b>“You can allow this in Settings”</b>: open the iPhone's
           <b>Settings → Apps → Shortcuts → Advanced</b>, turn on <b>Allow Sharing Large Amounts of Data</b>, and run it again.</p>
         <p class="hg-p hg-small">Still not green? If you skipped the question or pasted something else, delete the
-          <b>Runmon</b> shortcut in the Shortcuts app and add it again from step 2, pasting your sync link this time.</p>
+          <b>Runmon</b> shortcut in the Shortcuts app and add it again (go Back to “Add the Runmon Shortcut”), pasting your sync link this time.</p>
         ${healthGuideStatus()}
         <p class="hg-p"><b>From now on, open Runmon by tapping the Shortcut</b> — that tap is what syncs your runs.
           To put it on your Home Screen: in Shortcuts, press and hold <b>Runmon</b> → <b>Share</b> → <b>Add to Home Screen</b>.</p>`,
       actions: last > 3 ? [back, next]
         : [back, { label: healthHeard() ? "Done" : "I'll do it later", cls: healthHeard() ? "primary" : "ghost",
                    fn: () => { closeSheet(); healthNudge(); } }] },
-    { title: "Last step · Save your recovery code",
+    { title: "Save your recovery code",
       body: recoveryBodyHTML(),
       actions: [back, { label: "Done", cls: "primary", fn: () => { closeSheet(); healthNudge(); } }] }
   ];
@@ -7991,7 +8029,7 @@ function healthGuide(step){
     loadRecoveryCode(false).then(() => { if (healthGuideStep === 4 && $("#sheet-wrap").classList.contains("show")) healthGuide(4); },
       e => toast(e.message || String(e), "bad", "\u26A0\uFE0F"));
   const s = screens[healthGuideStep];
-  openSheet({ title: s.title, body: dots + s.body, actions: s.actions });
+  openSheet({ full: true, top, title: s.title, body: s.body, actions: s.actions });
 }
 
 /** Straight after hatching, for a player with no way yet to feed the pet. */
@@ -8276,6 +8314,8 @@ function obStravaWording(){
   // Strava's own sheet - the disclosure and the official button - so nothing
   // about connecting Strava changes for them.
   $("#ob-consent").hidden = full;
+  $("#ob-safari").hidden = !full;
+  if (full) $("#ob-safari").innerHTML = SAFARI_NOTE.replace(/^<div class="hg-note">|<\/div>$/g, "");
   $("#ob-strava-go").hidden = full;
   $("#ob-health-go").hidden = !full;
   $("#ob-strava-signin").hidden = !full;
