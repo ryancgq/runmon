@@ -1143,6 +1143,11 @@ body::before{
 .hg-p b{color:var(--text)}
 .hg-small{font-size:12px;margin-top:8px}
 .hg-big{display:block;width:100%;margin-top:10px;text-align:center;text-decoration:none}
+/* .mono sets 11px further down; a code someone copies by eye needs room */
+#rc-in.mono{font-size:17px}
+.recovery-code.mono{font-size:19px}
+.recovery-code{margin:6px 0 4px;padding:14px 10px;border-radius:12px;background:var(--bg-2);border:1px solid var(--line);
+  text-align:center;font-size:19px;letter-spacing:1.5px;color:var(--text);user-select:all;-webkit-user-select:all}
 .hg-status{margin:4px 0 10px;padding:10px 12px;border-radius:12px;font-size:12.5px;font-weight:800;line-height:1.45}
 .hg-status.wait{background:rgba(255,92,122,.1);color:var(--danger);border:1px solid rgba(255,92,122,.3)}
 .hg-status.ok{background:rgba(74,222,128,.1);color:var(--good);border:1px solid rgba(74,222,128,.3)}
@@ -1771,6 +1776,7 @@ label.fl{display:block;font-size:11px;font-weight:800;color:var(--muted);letter-
       </div>
       <div class="ob-foot">
         <button class="btn primary" id="ob-go">Choose an egg</button>
+        <button class="btn ghost" id="ob-restore" hidden style="margin-top:9px">I have a recovery code</button>
         <p class="muted center" id="ob-privacy" style="font-size:11px;font-weight:700;margin-top:14px;line-height:1.6">
           Needs location permission while a run is in progress.<br>Your pet is saved on this device.
         </p>
@@ -4988,7 +4994,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-11-02 3052d89";
+const BUILD_ID = "2026-11-02 3b4a7e0";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -7854,12 +7860,20 @@ function renderHealthPanel(){
     : "";
   // the one place a Health-only player can delete their pet: the Strava panel
   // that carries the button for everyone else is not theirs
-  const del = healthOnlySession() && save.species
+  const rec = healthOnlySession() && save.species
+    ? `<div class="row">
+         <div class="t"><div class="n">Recovery code</div>
+           <div class="h">${save.recoverySavedAt
+             ? "Brings your pet back on a new phone or another browser. You have no Strava to sign in with, so keep it safe."
+             : `<b style="color:var(--danger)">Not saved yet.</b> Without it, a new phone or cleared Safari data means losing ${esc(save.petName || "your pet")}.`}</div></div>
+         <button class="btn ${save.recoverySavedAt ? "ghost" : "primary"}" ${small} data-health="rc-show">Show</button>
+       </div>` : "";
+  const del = rec + (healthOnlySession() && save.species
     ? `<div class="row">
          <div class="t"><div class="n">Delete my pet</div>
            <div class="h">Start again from an egg. Your pet is removed from your account and this phone.</div></div>
          <button class="btn danger" ${small} id="pet-delete">Delete</button>
-       </div>` : "";
+       </div>` : "");
   if (!healthLinked()){
     panel.innerHTML = where + `<div class="row">
         <div class="t"><div class="n">Apple Health <span style="color:var(--muted);font-weight:700">· iPhone</span></div>
@@ -7904,8 +7918,11 @@ function healthGuideStatus(){
 }
 function healthGuide(step){
   if (!save.healthLink) return;
-  healthGuideStep = Math.max(0, Math.min(3, step || 0));
-  const dots = `<div class="hg-dots">${[0,1,2,3].map(i => `<i class="${i === healthGuideStep ? "on" : i < healthGuideStep ? "done" : ""}"></i>`).join("")}</div>`;
+  // a Health-only player has no Strava to sign back in with: their guide
+  // ends on the recovery code
+  const last = healthOnlySession() ? 4 : 3;
+  healthGuideStep = Math.max(0, Math.min(last, step || 0));
+  const dots = `<div class="hg-dots">${[0,1,2,3,4].slice(0, last + 1).map(i => `<i class="${i === healthGuideStep ? "on" : i < healthGuideStep ? "done" : ""}"></i>`).join("")}</div>`;
   const back = { label:"Back", cls:"ghost", fn: () => healthGuide(healthGuideStep - 1) };
   const next = { label:"Next", cls:"primary", fn: () => healthGuide(healthGuideStep + 1) };
   const later = { label:"Not now", cls:"ghost", fn: () => { closeSheet(); healthNudge(); } };
@@ -7945,12 +7962,117 @@ function healthGuide(step){
         ${healthGuideStatus()}
         <p class="hg-p"><b>From now on, open Runmon by tapping the Shortcut</b> — that tap is what syncs your runs.
           To put it on your Home Screen: in Shortcuts, press and hold <b>Runmon</b> → <b>Share</b> → <b>Add to Home Screen</b>.</p>`,
-      actions: [back, { label: healthHeard() ? "Done" : "I'll do it later", cls: healthHeard() ? "primary" : "ghost",
-                        fn: () => { closeSheet(); healthNudge(); } }] }
+      actions: last > 3 ? [back, next]
+        : [back, { label: healthHeard() ? "Done" : "I'll do it later", cls: healthHeard() ? "primary" : "ghost",
+                   fn: () => { closeSheet(); healthNudge(); } }] },
+    { title: "Last step · Save your recovery code",
+      body: recoveryBodyHTML(),
+      actions: [back, { label: "Done", cls: "primary", fn: () => { closeSheet(); healthNudge(); } }] }
   ];
+  if (healthGuideStep === 4 && !recoveryCode)
+    loadRecoveryCode(false).then(() => { if (healthGuideStep === 4 && $("#sheet-wrap").classList.contains("show")) healthGuide(4); },
+      e => toast(e.message || String(e), "bad", "\u26A0\uFE0F"));
   const s = screens[healthGuideStep];
   openSheet({ title: s.title, body: dots + s.body, actions: s.actions });
 }
+
+/* --- recovery code -------------------------------------------------------
+   A Health-only player's pet is reachable only through the session in this
+   browser: a new phone, cleared website data or another browser would strand
+   it. The recovery code is the second key - shown at the end of setup and in
+   Settings, and typed in on the welcome screen to bring the pet back. Until
+   the player has copied or shared it once (save.recoverySavedAt), Settings
+   says it has not been saved. */
+let recoveryCode = null;
+const prettyRecovery = c => String(c || "").replace(/(.{4})(?=.)/g, "$1-");
+async function loadRecoveryCode(rotate){
+  const r = await stravaCall("/recovery/code", { method:"POST", body: JSON.stringify(rotate ? { rotate: true } : {}) });
+  recoveryCode = r.code || null;
+  return recoveryCode;
+}
+function recoveryBodyHTML(){
+  return `<p class="hg-p">If you change phone, clear Safari's history or use another browser, this code brings
+      <b>${esc(save.petName || "your pet")}</b> back. You don't have Strava to sign in with, so <b>it is the only way back in</b>.</p>
+    <div class="recovery-code mono">${recoveryCode ? esc(prettyRecovery(recoveryCode)) : "Getting your code…"}</div>
+    <div class="sheet-btns" style="margin-top:10px">
+      <button class="btn primary" data-health="rc-copy">Copy</button>
+      <button class="btn ghost" data-health="rc-share">Share / Save</button>
+    </div>
+    <p class="hg-p hg-small">Keep it somewhere private, like Notes or a password manager. Anyone with it can open your pet.</p>`;
+}
+function recoveryMarkSaved(){
+  if (!save.recoverySavedAt){ save.recoverySavedAt = Date.now(); persist(); }
+  renderHealthPanel();
+}
+async function recoveryCopy(btn){
+  if (!recoveryCode) return;
+  try {
+    await navigator.clipboard.writeText(prettyRecovery(recoveryCode));
+    if (btn) btn.textContent = "Copied ✓";
+    recoveryMarkSaved();
+  } catch (e){ toast("Press and hold the code to copy it", "", "\u{1F511}"); }
+}
+async function recoveryShare(){
+  if (!recoveryCode) return;
+  const text = `My Runmon recovery code for ${save.petName || "my pet"}: ${prettyRecovery(recoveryCode)}\n` +
+    `To restore: open https://ryancgq.github.io/runmon/?health=1 in Safari and tap "I have a recovery code".`;
+  try {
+    if (navigator.share){ await navigator.share({ text }); recoveryMarkSaved(); }
+    else { await navigator.clipboard.writeText(text); toast("Copied", "good", "\u{1F511}"); recoveryMarkSaved(); }
+  } catch (e){ /* share sheet dismissed */ }
+}
+/** The code on its own sheet, from Settings. */
+async function showRecovery(){
+  const draw = () => openSheet({ title: "Your recovery code", body: recoveryBodyHTML(),
+    actions: [{ label: "Make a new code", cls: "ghost", fn: recoveryRotate }, { label: "Done", cls: "primary", fn: closeSheet }] });
+  draw();
+  try { await loadRecoveryCode(false); draw(); }
+  catch (e){ closeSheet(); toast(e.message || String(e), "bad", "⚠️"); }
+}
+function recoveryRotate(){
+  openSheet({ title: "Make a new recovery code?",
+    desc: "The old code stops working straight away. Use this if someone else may have seen it.",
+    actions: [{ label: "Keep it", cls: "ghost", fn: showRecovery },
+      { label: "New code", cls: "danger", fn: async () => {
+          try { await loadRecoveryCode(true); }
+          catch (e){ toast(e.message || String(e), "bad", "⚠️"); return; }
+          delete save.recoverySavedAt; persist();
+          showRecovery();
+        } }] });
+}
+/** The welcome screen's way back in. */
+function restoreWithCode(){
+  openSheet({ title: "Restore your pet",
+    body: `<p class="hg-p">Type the recovery code you saved when you set up Apple Health.</p>
+      <input class="inp mono" id="rc-in" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX" style="text-align:center;letter-spacing:1px">`,
+    onOpen: el => { const i = el.querySelector("#rc-in"); if (i) setTimeout(() => i.focus(), 50); },
+    actions: [{ label: "Cancel", cls: "ghost", fn: closeSheet },
+      { label: "Restore", cls: "primary", fn: async () => {
+          const code = ($("#rc-in") && $("#rc-in").value) || "";
+          let j;
+          try {
+            const r = await fetch(RUNMON_API + "/recovery/restore", { method:"POST",
+              headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ code }) });
+            j = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(j.error || "Runmon's server is not answering (" + r.status + ").");
+          } catch (e){ toast(e.message || String(e), "bad", "⚠️"); return; }
+          stravaSession = j.session;
+          try { localStorage.setItem(SESSION_KEY, j.session); } catch(e){}
+          closeSheet();
+          // the server's save wins on first contact - see stravaSync()
+          await stravaSync();
+          if (save.species){
+            save.recoverySavedAt = save.recoverySavedAt || Date.now();
+            persist();
+            $("#onboard").classList.remove("show");
+            $("#tabbar").classList.remove("hidden");
+            $("#fab").classList.remove("hidden");
+            applyTheme(save.species); renderAll(); go("home");
+            toast(`Welcome back, ${esc(save.petName || "your pet")}`, "good", "\u{1F511}");
+          } else toast("That account has no pet yet — choose an egg.", "", "\u{1F95A}");
+        } }] });
+}
+
 /* A player who left the guide before the Shortcut ever ran is told so where
    they will look - the pet screen - rather than only in Settings. It goes as
    soon as the broker hears from the Shortcut. */
@@ -8080,6 +8202,8 @@ let obSpecies = null;
 
 function showOnboarding(){
   $("#onboard").classList.add("show");
+  // only where Apple Health is on: nobody else was ever given a code
+  $("#ob-restore").hidden = !healthOn();
   $("#tabbar").classList.add("hidden");
   $("#fab").classList.add("hidden");
   const hero = DEMO ? "ember" : SPECIES_ORDER[(Math.random() * 3) | 0];
@@ -9904,6 +10028,9 @@ function wire(){
     const hb = e.target.closest("[data-health]");
     if (hb && hb.dataset.health === "copy"){ healthCopy(hb); return; }
     if (hb && hb.dataset.health === "guide"){ healthGuide(healthHeard() ? 3 : 0); return; }
+    if (hb && hb.dataset.health === "rc-show"){ showRecovery(); return; }
+    if (hb && hb.dataset.health === "rc-copy"){ recoveryCopy(hb); return; }
+    if (hb && hb.dataset.health === "rc-share"){ recoveryShare(); return; }
     if (e.target.closest("#health-off")){ healthTurnOff(); return; }
     if (e.target.closest("#strava-off")){
       /* A disconnect costs the pet only if it lasts. The broker revokes its
@@ -9973,6 +10100,7 @@ function wire(){
 
   // onboarding
   $("#ob-go").addEventListener("click", () => obStep(obAfterWelcome()));
+  $("#ob-restore").addEventListener("click", restoreWithCode);
   $("#ob-strava-go").addEventListener("click", () => {
     // leaves the page for Strava and comes back through /callback; nothing has
     // been chosen yet, so there is nothing to lose on the way

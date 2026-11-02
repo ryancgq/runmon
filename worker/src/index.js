@@ -206,10 +206,11 @@ const RETAIN_MS = 7 * 86400e3;
    goes. */
 async function purgeAthlete(env, athleteId, handle){
   handle = handle || (await hmac(env.SESSION_SECRET, "roster:" + athleteId)).slice(0, 12);
-  let code = null, healthKey = null;
+  let code = null, healthKey = null, recoveryCode = null;
   if (athleteId)
-    ({ code, healthKey } = await (await (await athleteStub(env, athleteId)).fetch("https://do/purge", { method:"POST" })).json());
+    ({ code, healthKey, recoveryCode } = await (await (await athleteStub(env, athleteId)).fetch("https://do/purge", { method:"POST" })).json());
   await clearHealthOwner(env, healthKey);
+  if (recoveryCode) await (await recoveryDir(env, recoveryCode)).fetch("https://do/dir-clear", { method:"POST" });
   await rosterStub(env).fetch("https://do/roster-drop", { method:"POST", body: JSON.stringify({ handle }) });
   await rosterStub(env).fetch("https://do/firsts-forget", { method:"POST", body: JSON.stringify({ handle }) });
   await handleStub(env, handle).fetch("https://do/dir-clear", { method:"POST" });
@@ -626,6 +627,27 @@ const setHealthOwner = (env, key, athleteId) => healthDir(env, key).fetch("https
 const clearHealthOwner = (env, key) => key
   ? healthDir(env, key).fetch("https://do/dir-clear", { method:"POST" }) : null;
 
+/* Recovery codes. A Health-only player has no Strava to sign in through, so
+   the session in their browser is the only key to their pet: a new phone,
+   cleared website data or a different browser would strand it. The recovery
+   code is a second key they keep themselves - sixteen characters from the
+   friend-code alphabet, about 80 bits, so it cannot be guessed - and
+   entering it anywhere mints a fresh session for the same player.
+
+   The code itself is kept in the player's own object, so Settings can show
+   it again. The directory that finds the player from a code is filed under
+   an HMAC of it, so the directory holds no codes. Making a new code retires
+   the old one; erasing the player retires it too. Strava athletes do not get
+   one: connecting Strava is already their way back in. */
+const recoveryDir = async (env, code) =>
+  env.ATHLETE.get(env.ATHLETE.idFromName("rc:" + (await hmac(env.SESSION_SECRET, "recovery:" + code)).slice(0, 32)));
+const normaliseRecovery = raw => {
+  const up = String(raw || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return up.length === 16 && [...up].every(c => CODE_ALPHABET.includes(c)) ? up : null;
+};
+const newRecoveryCode = () => [...crypto.getRandomValues(new Uint8Array(16))]
+  .map(b => CODE_ALPHABET[b % CODE_ALPHABET.length]).join("");
+
 /* Shortcuts is a forgiving place to build a request and an unforgiving place
    to debug one, so this takes what it is likely to be given: a JSON list of
    workouts, or one line per workout as text, with dates as ISO strings or
@@ -946,6 +968,38 @@ export default {
         const r = await (await athleteStub(env, owner)).fetch("https://do/health-put",
           { method:"POST", body: JSON.stringify(parseHealthBody(await request.text())) });
         return json(env, await r.json());
+      }
+
+      /* The player's recovery code: the one they have, or a new one with
+         { rotate: true }, which retires the old. Health-only players only. */
+      if (path === "/recovery/code" && request.method === "POST")
+        return await withAthlete(request, env, async (stub, id) => {
+          if (!isPlayerId(id)) return json(env, { error:"Strava accounts are recovered by connecting Strava." }, 400);
+          const body = await request.json().catch(() => ({}));
+          const s = await (await stub.fetch("https://do/recovery-get")).json();
+          let code = s.code;
+          if (!code || body.rotate){
+            if (code) await (await recoveryDir(env, code)).fetch("https://do/dir-clear", { method:"POST" });
+            code = newRecoveryCode();
+            await (await recoveryDir(env, code)).fetch("https://do/dir-set", { method:"POST", body: JSON.stringify({ athleteId: id }) });
+            await stub.fetch("https://do/recovery-set", { method:"POST", body: JSON.stringify({ code }) });
+          }
+          return json(env, { code });
+        });
+
+      /* A code in, a session out. No session needed - this is how a player
+         with none gets back in. A wrong code gets the same answer however it
+         is wrong, and 80 bits is far beyond guessing. */
+      if (path === "/recovery/restore" && request.method === "POST"){
+        const body = await request.json().catch(() => ({}));
+        const code = normaliseRecovery(body.code);
+        const owner = code && (await (await (await recoveryDir(env, code)).fetch("https://do/dir-get")).json()).athleteId;
+        if (!owner || !isPlayerId(owner)) return json(env, { error:"That recovery code was not recognised." }, 404);
+        // the code is checked against the player's own copy too, so a
+        // directory entry left behind by a rotation can never open anything
+        const s = await (await (await athleteStub(env, owner)).fetch("https://do/recovery-get")).json();
+        if (s.code !== code) return json(env, { error:"That recovery code was not recognised." }, 404);
+        return json(env, { session: await mintSession(env, owner) });
       }
 
       if (path === "/health/unlink" && request.method === "POST")
@@ -1739,6 +1793,12 @@ export class Athlete {
     if (path === "/open")  return this.open(await request.json());
     if (path === "/sync")  return this.sync();
     if (path === "/health-link")   return this.healthLink();
+    if (path === "/recovery-get")  return this.ok({ code: await this.state.storage.get("recoveryCode") || null });
+    if (path === "/recovery-set"){
+      const { code } = await request.json();
+      await this.state.storage.put("recoveryCode", code);
+      return this.ok({ ok: true });
+    }
     if (path === "/health-put")    return this.healthPut(await request.json());
     if (path === "/health-unlink") return this.healthUnlink();
     if (path === "/health-export") return this.healthExport();
@@ -2829,9 +2889,9 @@ export class Athlete {
   async purge(){
     const s = this.state.storage;
     await this.revoke();
-    const [code, healthKey] = await Promise.all([s.get("friendCode"), s.get("healthKey")]);
+    const [code, healthKey, recoveryCode] = await Promise.all([s.get("friendCode"), s.get("healthKey"), s.get("recoveryCode")]);
     await s.deleteAll();
-    return this.ok({ ok:true, code: code || null, healthKey: healthKey || null });
+    return this.ok({ ok:true, code: code || null, healthKey: healthKey || null, recoveryCode: recoveryCode || null });
   }
 
   /* The Strava ids of what the app has imported, each kept a week and then

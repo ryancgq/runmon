@@ -131,6 +131,8 @@ save. No locking code, no eventual-consistency window.
 | `POST /health/import/<key>` | the iPhone Shortcut drops running workouts here |
 | `POST /health/unlink` | retire the sync link and drop the queue |
 | `POST /health/adopt` | move a Health-only player's link, queue, swings and friend code onto a Strava athlete |
+| `POST /recovery/code` | a Health-only player's recovery code; `{ "rotate": true }` makes a new one and retires the old |
+| `POST /recovery/restore` | a recovery code in, a session for that player out; no session needed |
 
 `/sync` also returns `health`, the queued workouts, and `healthInfo`; `/save`
 takes `healthDone`, the workouts settled. A session with fewer than 100 days

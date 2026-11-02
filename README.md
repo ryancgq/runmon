@@ -212,6 +212,32 @@ players: an activity uploaded to Strava twice — watch and phone — is still
 imported twice, since overlap is only checked against Health's runs; and
 Strava runs only keep a full `span` on a phone with Health on.
 
+### Getting back in without Strava
+
+A Strava player who changes phone connects Strava again and their pet comes
+with them. A Health-only player has no Strava to sign in through: the session
+in their browser is the only key to their pet, and a new phone, cleared
+website data, private browsing or a different browser would lose it. The pet
+would still be on the broker, out of reach.
+
+So a Health-only player gets a **recovery code** — sixteen characters from
+the friend-code alphabet, about 80 bits, shown as `XXXX-XXXX-XXXX-XXXX`. It is
+the last step of their setup guide, with Copy and Share/Save, and stays in
+**Settings → Apple Health → Recovery code**, which reads *Not saved yet* in
+red until they have copied or shared it once. On a new browser, **I have a
+recovery code** on the welcome screen takes it and brings the pet back: the
+broker mints a fresh session for the same player, and the app takes the
+server's save as it does on any first sync.
+
+The code is kept in the player's own object, so Settings can show it again;
+the directory that finds a player from a code is filed under an HMAC of it,
+and holds no codes. A restore is checked against the player's own copy as
+well, so a stale directory entry can never open anything. **Make a new code**
+retires the old one at once; erasing the player, or connecting Strava (which
+moves them onto their athlete), retires it too. Strava athletes are never
+given one. Like the rest of Health, the welcome screen's button only shows
+with the switch on.
+
 ### Never counting a run twice
 
 A run can reach Runmon more than one way at once, and in practice often does:
