@@ -1135,6 +1135,17 @@ body::before{
 .health-link{display:block;margin-top:6px;padding:9px 10px;border-radius:10px;background:var(--bg-2);
   border:1px solid var(--line);word-break:break-all;color:var(--text);user-select:all;-webkit-user-select:all}
 .health-steps .btn{width:auto;padding:8px 14px;font-size:12.5px;margin-top:7px}
+.hg-dots{display:flex;gap:6px;justify-content:center;margin:-2px 0 12px}
+.hg-dots i{width:7px;height:7px;border-radius:50%;background:var(--line)}
+.hg-dots i.done{background:var(--muted)}
+.hg-dots i.on{background:var(--accent);width:18px;border-radius:4px}
+.hg-p{font-size:13px;color:var(--muted);font-weight:600;line-height:1.55;margin:0 0 10px}
+.hg-p b{color:var(--text)}
+.hg-small{font-size:12px;margin-top:8px}
+.hg-big{display:block;width:100%;margin-top:10px;text-align:center;text-decoration:none}
+.hg-status{margin:4px 0 10px;padding:10px 12px;border-radius:12px;font-size:12.5px;font-weight:800;line-height:1.45}
+.hg-status.wait{background:rgba(255,92,122,.1);color:var(--danger);border:1px solid rgba(255,92,122,.3)}
+.hg-status.ok{background:rgba(74,222,128,.1);color:var(--good);border:1px solid rgba(74,222,128,.3)}
 .row.stack .seg{margin-top:11px}
 .row.stack .seg button{flex:1;padding:8px 0}
 .row.tap{transition:.16s var(--ease)}
@@ -4966,7 +4977,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-11-02 1b4c52d";
+const BUILD_ID = "2026-11-02 e555f57";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -7816,7 +7827,7 @@ function renderHealthPanel(){
   const standalone = navigator.standalone === true ||
     (window.matchMedia && matchMedia("(display-mode: standalone)").matches);
   const where = standalone
-    ? `<div class="row"><div class="t"><div class="h" style="color:var(--bad)">You opened Runmon from a Home Screen icon. The Shortcut opens Runmon in Safari, which iOS keeps apart from this icon — set Apple Health up from Runmon in Safari instead. On Strava, connect it there too and your pet follows.</div></div></div>`
+    ? `<div class="row"><div class="t"><div class="h" style="color:var(--danger)">You opened Runmon from a Home Screen icon. The Shortcut opens Runmon in Safari, which iOS keeps apart from this icon — set Apple Health up from Runmon in Safari instead. On Strava, connect it there too and your pet follows.</div></div></div>`
     : "";
   // the one place a Health-only player can delete their pet: the Strava panel
   // that carries the button for everyone else is not theirs
@@ -7836,30 +7847,114 @@ function renderHealthPanel(){
   }
   const since = (healthInfo && healthInfo.since) || save.healthLink.since;
   const last = healthInfo && healthInfo.last;
-  const getIt = HEALTH_SHORTCUT_URL
-    ? `<br><a class="btn primary" href="${esc(HEALTH_SHORTCUT_URL)}" target="_blank" rel="noopener">Get the Shortcut</a>`
-    : `<br><span>The Runmon Shortcut has not been published yet. It is built once by hand and shared — the steps are under “Apple Health” in the README.</span>`;
-  panel.innerHTML = where + `<div class="row">
-      <div class="t"><div class="n">Linked</div>
-        <div class="h">Open Runmon from the Runmon Shortcut and your new runs come in. Only runs started after ${since ? fmtWhen(since) : "you set this up"}, and in the last five days, count. Last heard from the Shortcut: ${last ? fmtWhen(last) : "not yet"}.</div></div>
-    </div>
-    <div class="row stack">
-      <div class="t"><div class="n">Setting up the Shortcut</div>
-        <ol class="health-steps">
-          <li><b>Copy your sync link.</b> It only lets your Shortcut send runs in — it cannot read your pet.
-            <span class="health-link mono">${esc(save.healthLink.url)}</span>
-            <button class="btn ghost" id="health-copy">Copy link</button></li>
-          <li><b>Add the Runmon Shortcut</b> and paste the link when it asks.${getIt}</li>
-          <li><b>Put it on your Home Screen</b> and open Runmon from it from now on. If you have a Runmon icon there already, remove it: iOS keeps that icon's save apart from Safari's.</li>
-        </ol>
-        <div class="h">A run that also reaches Runmon through Strava is counted once — whichever copy arrives first.</div></div>
-    </div>
-    <div class="row">
+  // Until the broker has heard from the Shortcut, the one thing this panel
+  // says is that it is not working yet, and the one button finishes it.
+  const status = healthHeard()
+    ? `<div class="row">
+        <div class="t"><div class="n" style="color:var(--good)">\u2713 Syncing</div>
+          <div class="h">Open Runmon by tapping the Runmon Shortcut and your new runs come in. Last heard from it: ${last ? fmtWhen(last) : fmtWhen(save.healthLink.heardAt)}. Runs from the last five days count, from ${since ? fmtWhen(since) : "when you set this up"} on. A run that also comes through Strava counts once.</div></div>
+        <button class="btn ghost" ${small} data-health="guide">Setup steps</button>
+      </div>`
+    : `<div class="row">
+        <div class="t"><div class="n" style="color:var(--danger)">Not syncing yet</div>
+          <div class="h">Runmon hasn't heard from your Shortcut. Add the Runmon Shortcut and run it once — about two minutes.</div></div>
+        <button class="btn primary" ${small} data-health="guide">Finish setup</button>
+      </div>`;
+  panel.innerHTML = where + status + `<div class="row">
       <div class="t"><div class="n">Turn off</div>
         <div class="h">Stops accepting runs from the Shortcut and retires its link. Runs already counted stay.</div></div>
       <button class="btn danger" ${small} id="health-off">Turn off</button>
     </div>` + del;
 }
+/* The setup guide. Tapping Set up only makes a link; nothing syncs until the
+   Shortcut exists on the phone and has run once, and a player who stopped at
+   Set up would reasonably believe it was done. So Set up opens this straight
+   away - one step to a screen, each saying what to do and why - and the
+   panel, the home screen and this guide all say "not syncing yet" until the
+   broker has actually heard from the Shortcut (save.healthLink.heardAt). */
+let healthGuideStep = 0;
+function healthHeard(){ return !!(save.healthLink && save.healthLink.heardAt); }
+function healthGuideStatus(){
+  return healthHeard()
+    ? `<div class="hg-status ok">✓ Working — Runmon heard from your Shortcut ${fmtWhen(save.healthLink.heardAt)}.</div>`
+    : `<div class="hg-status wait">Not syncing yet — waiting for your Shortcut to run once.</div>`;
+}
+function healthGuide(step){
+  if (!save.healthLink) return;
+  healthGuideStep = Math.max(0, Math.min(3, step || 0));
+  const dots = `<div class="hg-dots">${[0,1,2,3].map(i => `<i class="${i === healthGuideStep ? "on" : i < healthGuideStep ? "done" : ""}"></i>`).join("")}</div>`;
+  const back = { label:"Back", cls:"ghost", fn: () => healthGuide(healthGuideStep - 1) };
+  const next = { label:"Next", cls:"primary", fn: () => healthGuide(healthGuideStep + 1) };
+  const later = { label:"Not now", cls:"ghost", fn: () => { closeSheet(); healthNudge(); } };
+  const url = esc(save.healthLink.url);
+  const screens = [
+    { title: "One more thing: the Shortcut",
+      body: `<p class="hg-p">Runmon can't read Apple Health by itself — iPhones don't let websites do that. A small
+          <b>Shortcut</b> on your phone does it: it sends your latest runs to Runmon, then opens the app.</p>
+        <p class="hg-p"><b>Nothing syncs until you've added the Shortcut and run it once.</b> It takes about two minutes.</p>
+        ${healthGuideStatus()}`,
+      actions: [later, next] },
+    { title: "Step 1 · Copy your sync link",
+      body: `<p class="hg-p">This tells the Shortcut where to send your runs. It can only send runs in — it can't read your pet.</p>
+        <span class="health-link mono">${url}</span>
+        <button class="btn primary hg-big" data-health="copy">Copy link</button>
+        <p class="hg-p hg-small">You'll paste it in the next step.</p>`,
+      actions: [back, next] },
+    { title: "Step 2 · Add the Runmon Shortcut",
+      body: HEALTH_SHORTCUT_URL
+        ? `<ol class="health-steps">
+             <li>Tap <b>Get the Shortcut</b> below. The Shortcuts app opens.</li>
+             <li>Tap <b>Add Shortcut</b>.</li>
+             <li>When it asks for your sync link, <b>paste</b> the one you just copied.</li>
+           </ol>
+           <a class="btn primary hg-big" href="${esc(HEALTH_SHORTCUT_URL)}" target="_blank" rel="noopener">Get the Shortcut</a>
+           <p class="hg-p hg-small">Then come back to Safari for the last step.</p>`
+        : `<p class="hg-p"><b>The Runmon Shortcut hasn't been published yet</b>, so for now it has to be built by hand
+             in the Shortcuts app. The full steps are under “Apple Health → Building the Shortcut” in Runmon's README.
+             Paste your sync link into its <b>Get Contents of URL</b> step.</p>`,
+      actions: [back, next] },
+    { title: "Step 3 · Run it once now",
+      body: `<ol class="health-steps">
+          <li>Open the <b>Shortcuts</b> app and tap <b>Runmon</b>.</li>
+          <li>The first time, iPhone asks to let it read Health and to send data to Runmon — tap <b>Allow</b> for both.</li>
+          <li>It opens Runmon again, and this will turn green.</li>
+        </ol>
+        ${healthGuideStatus()}
+        <p class="hg-p"><b>From now on, open Runmon by tapping the Shortcut</b> — that tap is what syncs your runs.
+          To put it on your Home Screen: in Shortcuts, press and hold <b>Runmon</b> → <b>Share</b> → <b>Add to Home Screen</b>.</p>`,
+      actions: [back, { label: healthHeard() ? "Done" : "I'll do it later", cls: healthHeard() ? "primary" : "ghost",
+                        fn: () => { closeSheet(); healthNudge(); } }] }
+  ];
+  const s = screens[healthGuideStep];
+  openSheet({ title: s.title, body: dots + s.body, actions: s.actions });
+}
+/* A player who left the guide before the Shortcut ever ran is told so where
+   they will look - the pet screen - rather than only in Settings. It goes as
+   soon as the broker hears from the Shortcut. */
+function healthNudge(){
+  if (!save.healthLink || healthHeard()) return;
+  if (noticeAdd({ id: "health-setup:" + save.healthLink.url.slice(-8), kind: "info",
+      title: "Apple Health isn't syncing yet",
+      body: "Finish setting up the Runmon Shortcut: Settings → Apple Health → Finish setup." })){
+    persist(); renderNotices();
+  }
+  renderHealthPanel();
+}
+/* Called after every sync: the first time the broker says it has heard from
+   the Shortcut, the setup is done - say so, and clear the reminder. */
+function healthCheckHeard(){
+  if (!save.healthLink || healthHeard() || !healthInfo || !healthInfo.last) return;
+  save.healthLink.heardAt = healthInfo.last;
+  save.notices = (save.notices || []).filter(n => !String(n.id).startsWith("health-setup:"));
+  persist(); renderNotices(); renderHealthPanel();
+  const open = $("#sheet-wrap").classList.contains("show");
+  if (open && healthGuideStep === 3) healthGuide(3);           // turns the status green in place
+  else if (!open) openSheet({ title: "Apple Health is syncing ✓",
+    desc: "Runmon just heard from your Shortcut. From now on, open Runmon by tapping the Shortcut and your new runs come in on the way.",
+    actions: [{ label: "Got it", cls: "primary", fn: closeSheet }] });
+  else toast("Apple Health is syncing ✓", "good", "❤️");
+}
+
 async function healthSetUp(){
   if (healthBusy) return;
   healthBusy = true; renderHealthPanel();
@@ -7879,7 +7974,7 @@ async function healthSetUp(){
     save.healthLink = { url: j.url, since: j.since };
     healthInfo = { since: j.since, last: null };
     persist();
-    toast("Apple Health is set up — now the Shortcut", "good", "❤️");
+    setTimeout(() => healthGuide(0), 0);       // after the panel redraws below
   } catch (err){
     toast(err.message || String(err), "bad", "⚠️");
   } finally {
@@ -7887,10 +7982,14 @@ async function healthSetUp(){
     renderSettings();
   }
 }
-async function healthCopy(){
+async function healthCopy(btn){
   const url = save.healthLink && save.healthLink.url;
   if (!url) return;
-  try { await navigator.clipboard.writeText(url); toast("Sync link copied", "good", "\u{1F4CB}"); }
+  try {
+    await navigator.clipboard.writeText(url);
+    if (btn) btn.textContent = "Copied \u2713";
+    else toast("Sync link copied", "good", "\u{1F4CB}");
+  }
   catch (err){ toast("Press and hold the link to copy it", "", "\u{1F4CB}"); }
 }
 function healthTurnOff(){
@@ -9323,6 +9422,7 @@ async function stravaSync(opts){
     if ("healthInfo" in res){
       healthInfo = res.healthInfo;
       if (!healthInfo && save.healthLink) delete save.healthLink;
+      healthCheckHeard();
     }
     const imported = [], newIds = [], healthSettled = [];
     let fromStrava = 0, fromHealth = 0, alreadyHad = 0;
@@ -9774,6 +9874,9 @@ function wire(){
     if (e.target.closest("#strava-sync")){ stravaSync({ loud:true }); return; }
     if (e.target.closest("#health-on")){ healthSetUp(); return; }
     if (e.target.closest("#health-copy")){ healthCopy(); return; }
+    const hb = e.target.closest("[data-health]");
+    if (hb && hb.dataset.health === "copy"){ healthCopy(hb); return; }
+    if (hb && hb.dataset.health === "guide"){ healthGuide(healthHeard() ? 3 : 0); return; }
     if (e.target.closest("#health-off")){ healthTurnOff(); return; }
     if (e.target.closest("#strava-off")){
       /* A disconnect costs the pet only if it lasts. The broker revokes its
