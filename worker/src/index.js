@@ -611,7 +611,7 @@ async function adminGate(request, env){
    to be compared with. */
 const HEALTH_HORIZON_MS = 5 * 86400e3;
 /* Everything an object keeps for Health, so a disconnect can drop it in one go. */
-const HEALTH_KEYS = ["healthKey", "healthSince", "healthPending", "healthSpans", "healthLast", "healthKmAfter"];
+const HEALTH_KEYS = ["healthKey", "healthSince", "healthPending", "healthSpans", "healthLast"];
 /* How long the times of taken workouts are remembered, for the overlap check
    above. Past the horizon nothing can arrive to be checked against them. */
 const HEALTH_SPANS_MS = 6 * 86400e3;
@@ -630,10 +630,69 @@ const clearHealthOwner = (env, key) => key
    to debug one, so this takes what it is likely to be given: a JSON list of
    workouts, or one line per workout as text, with dates as ISO strings or
    epoch numbers and the distance as a number or as "5.02 km" / "3.1 mi". */
+/* Sessions, from Health's raw distance.
+
+   Shortcuts cannot read workouts from Health on current iOS - "Workouts" is
+   not a type Find Health Samples offers - so the Shortcut sends what it can
+   read: Walking + Running Distance, the slices of distance a phone or watch
+   writes all day, each with a start, an end and a source. The runs and walks
+   are rebuilt from those here.
+
+   Slices from one device that follow each other with no gap longer than
+   SESSION_GAP_MS are one outing. Each device's are kept apart, because a
+   phone in the pocket and a watch on the wrist both write the same walk, and
+   two copies overlapping in time are then caught as one by the overlap check
+   in healthPut(). An outing counts if it lasted SESSION_MIN_MS and covered
+   SESSION_MIN_KM - which is what keeps a day of pottering around the house
+   from paying anything. It is a run if most of its distance was covered at
+   running pace (RUN_MPS, 8:00 min/km), so a warm-up walk does not turn a run
+   into a walk; otherwise it is a walk, which the app pays at half. */
+const SESSION_GAP_MS = 2 * 60e3, SESSION_MIN_MS = 10 * 60e3, SESSION_MIN_KM = 1;
+const RUN_MPS = 1000 / 480;
+function sessionsFromSamples(lines){
+  const bySource = new Map();
+  for (const line of lines.slice(0, 5000)){
+    const f = typeof line === "string" ? line.split(/\s*[|;\t]\s*/) : [line.start, line.end, line.value ?? line.distance, line.source];
+    const start = healthTime(f[0]), end = healthTime(f[1]), km = healthKm(f[2]);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start || !(km > 0)) continue;
+    // a slice faster than a sprinter is a glitch, not a run
+    if (end > start && km * 1000 / ((end - start) / 1000) > 12) continue;
+    const src = String(f[3] || "").slice(0, 60);
+    if (!bySource.has(src)) bySource.set(src, []);
+    bySource.get(src).push({ start, end, km });
+  }
+  const out = [];
+  for (const slices of bySource.values()){
+    slices.sort((a, b) => a.start - b.start);
+    let cur = null;
+    const close = () => {
+      if (!cur) return;
+      const runKm = cur.slices.reduce((t, x) =>
+        t + (x.end > x.start && x.km * 1000 / ((x.end - x.start) / 1000) >= RUN_MPS ? x.km : 0), 0);
+      if (cur.end - cur.start >= SESSION_MIN_MS && cur.km >= SESSION_MIN_KM)
+        out.push({ start: cur.start, end: cur.end, distance: cur.km,
+                   type: runKm >= cur.km / 2 ? "Running" : "Walking" });
+      cur = null;
+    };
+    for (const x of slices){
+      if (cur && x.start - cur.end <= SESSION_GAP_MS){
+        cur.end = Math.max(cur.end, x.end); cur.km += x.km; cur.slices.push(x);
+      } else { close(); cur = { start: x.start, end: x.end, km: x.km, slices: [x] }; }
+    }
+    close();
+  }
+  return out;
+}
+
 function parseHealthBody(raw){
   let body = raw;
   try { body = JSON.parse(raw); } catch (e){ /* plain text, one per line */ }
   let items = [];
+  if (body && body.samples != null){
+    const lines = Array.isArray(body.samples) ? body.samples
+      : String(body.samples).split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    return sessionsFromSamples(lines).slice(0, 100);
+  }
   if (Array.isArray(body)) items = body;
   else if (body && Array.isArray(body.workouts)) items = body.workouts;
   else {
@@ -676,7 +735,8 @@ function cleanWorkout(w){
   const type = String(w.type || w.workoutType || w.activity || "");
   // Running only. A type that is missing altogether is let through, because
   // the Shortcut is meant to filter to running before it sends anything.
-  if (type && !/run/i.test(type)) return { why:"notRun" };
+  const walk = /walk/i.test(type);
+  if (type && !walk && !/run/i.test(type)) return { why:"notRun" };
   const start = healthTime(w.start || w.startDate);
   let end = healthTime(w.end || w.endDate);
   const km = healthKm(w.distance != null ? w.distance : w.km, w.unit);
@@ -690,8 +750,11 @@ function cleanWorkout(w){
   if (sec < 20 || km < 0.05) return { why:"tooShort" };
   // the tracker's own ceiling on a believable speed
   if (km * 1000 / sec > 12) return { why:"tooFast" };
+  // a "walk" at running pace is a run that was labelled oddly; a walk is
+  // never paid less than its pace earned
+  if (walk && km * 1000 / sec >= RUN_MPS) return cleanWorkout({ ...w, type: "Running" });
   // keyed on the start to the second: the same workout sent again has it
-  return { ok: { key: "h:" + Math.round(start / 1000), start, end, km, sec } };
+  return { ok: { key: "h:" + Math.round(start / 1000), start, end, km, sec, ...(walk ? { walk: true } : {}) } };
 }
 
 async function withAthlete(request, env, fn){
@@ -2534,8 +2597,8 @@ export class Athlete {
       it in Health - and is not taken. */
   async healthPut({ items }){
     const s = this.state.storage;
-    const [since, pending0, spans0, refresh, kmAfter0] = await Promise.all(
-      ["healthSince", "healthPending", "healthSpans", "refresh", "healthKmAfter"].map(k => s.get(k)));
+    const [since, pending0, spans0, refresh] = await Promise.all(
+      ["healthSince", "healthPending", "healthSpans", "refresh"].map(k => s.get(k)));
     if (!since) return this.ok({ error:"unlinked", message:"Apple Health is switched off in Runmon. Set it up again in Settings." });
     const now = Date.now();
     const pending = pending0 || {};
@@ -2545,13 +2608,30 @@ export class Athlete {
     // oldest first, so of two copies of one run the earlier-starting is kept
     const clean = (items || []).map(cleanWorkout);
     for (const c of clean) if (!c.ok) counts.skipped[c.why] = (counts.skipped[c.why] || 0) + 1;
+    const swingKm = w => w.km * (w.walk ? 0.5 : 1);
+    let bankAdd = 0;
     for (const w of clean.filter(c => c.ok).map(c => c.ok).sort((a, b) => a.start - b.start)){
       if (w.start < since){ counts.beforeLink++; continue; }
       if (w.start < now - HEALTH_HORIZON_MS){ counts.tooOld++; continue; }
       if (w.start > now + 10 * 60e3){ counts.skipped.badDate = (counts.skipped.badDate || 0) + 1; continue; }
-      if (pending[w.key] || spans.some(x => w.start < x.end && x.start < w.end)){ counts.already++; continue; }
+      const hit = spans.find(x => w.start < x.end && x.start < w.end);
+      /* An outing sent while it was still going on, and sent again longer.
+         Rebuilt from slices, a walk tapped in half way is the same walk with
+         a later end next time - so while the app has not collected it yet,
+         the longer one replaces it rather than being turned away. */
+      const old = hit && hit.key && pending[hit.key];
+      if (old && w.end > old.end && w.km > old.km && Math.abs(w.start - old.start) <= SESSION_GAP_MS){
+        delete pending[old.key];
+        spans.splice(spans.indexOf(hit), 1);
+        pending[w.key] = w;
+        spans.push({ start: w.start, end: w.end, key: w.key });
+        if (!refresh) bankAdd += swingKm(w) - swingKm(old);
+        counts.queued++;
+        continue;
+      }
+      if (pending[w.key] || hit){ counts.already++; continue; }
       pending[w.key] = w;
-      spans.push({ start: w.start, end: w.end });
+      spans.push({ start: w.start, end: w.end, key: w.key });
       taken.push(w);
       counts.queued++;
     }
@@ -2559,22 +2639,28 @@ export class Athlete {
     /* Swings, for a player whose runs only come from Health. One with Strava
        is paid by Strava's runs alone (see stravaSync()): the same run arriving
        both ways would otherwise buy its swings twice, and this side cannot see
-       Strava's copy to tell. A high-water mark on start time, as Strava's
-       counter has, so a workout can only ever be counted once. */
-    const kmAfter = Number(kmAfter0) || 0;
-    const counting = refresh ? [] : taken.filter(w => w.start > kmAfter);
-    if (counting.length){
+       Strava's copy to tell.
+
+       Paid for every outing taken, once - not against a high-water mark on
+       start time the way Strava's counter is. A mark pays nothing for an
+       outing that arrives after a later one, and with Health that is
+       ordinary: a watch syncing to the phone late, or a walk tapped in
+       before an older run had reached Health. Taking is already once only -
+       the spans above outlive the five-day horizon, and a link set up again
+       takes nothing from before it - so the payment can ride on it. */
+    // walks buy swings at half, as they earn XP at half
+    if (!refresh) bankAdd += taken.reduce((t, w) => t + swingKm(w), 0);
+    if (bankAdd > 0){
       const bank = await this.raidBank();
-      bank.part += counting.reduce((t, w) => t + w.km, 0);
+      bank.part += bankAdd;
       const whole = Math.floor(bank.part / RAID_KM_PER_SWING);
       bank.earned += whole;
       bank.part = Math.round((bank.part - whole * RAID_KM_PER_SWING) * 1000) / 1000;
       put.raidBank = bank;
-      put.healthKmAfter = Math.max(kmAfter, ...counting.map(w => w.start));
     }
     await s.put(put);
     const n = counts.queued;
-    counts.message = n ? `${n} new run${n === 1 ? "" : "s"} sent to Runmon.`
+    counts.message = n ? `${n} new run${n === 1 ? "" : "s"} or walk${n === 1 ? "" : "s"} sent to Runmon.`
       : counts.sent ? "Nothing new for Runmon." : "No runs found in Health.";
     return this.ok(counts);
   }
@@ -2582,8 +2668,9 @@ export class Athlete {
   async healthUnlink(){
     const s = this.state.storage;
     const key = await s.get("healthKey");
-    // healthKmAfter stays: a link set up again must not pay for old runs twice
-    await s.delete(HEALTH_KEYS.filter(k => k !== "healthKmAfter"));
+    // Nothing can be paid twice by setting up again: a new link only takes
+    // outings that start after it, and these all started before.
+    await s.delete(HEALTH_KEYS);
     return this.ok({ key: key || null });
   }
 

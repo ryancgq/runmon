@@ -4138,7 +4138,9 @@ function recompute(){
 
   const lv = levelFromXp(totalXp);
   const stage = stageForLevel(lv.level);
-  const lastRunTs = runs.length ? runs[runs.length-1].t : null;
+  // "You ran yesterday" means running: a walk is not the last run
+  const ranOnly = noWalks(runs);
+  const lastRunTs = ranOnly.length ? ranOnly[ranOnly.length-1].t : null;
   const gapDays = lastRunTs == null ? Infinity : daysBetweenKeys(dayKey(lastRunTs), dayKey(Date.now()));
   const runCount = runs.length + (past ? past.runs : 0);
 
@@ -4203,7 +4205,14 @@ function nextDayKey(k){
   d.setDate(d.getDate() + 1);
   return dayKey(d.getTime());
 }
+/* A walk from Apple Health earns XP but is not running: it neither climbs
+   the mood ladder, nor counts as showing up, nor carries a streak. Taken out
+   here, at the root of each, so every caller agrees - the pet screen, the
+   price of the next run, and the weekly fold alike. Nothing else in the log
+   is ever a walk, so for a Strava player this filters nothing. */
+const noWalks = runs => runs.some(r => r && r.walk) ? runs.filter(r => !(r && r.walk)) : runs;
 function moodStateAt(runs, nowTs, past){
+  runs = noWalks(runs);
   const seeded = !!(past && past.through);
   if (!runs.length && !seeded) return { rank: MOOD_START, idle: 0 };
   const best = new Map();
@@ -4247,6 +4256,7 @@ function moodRankAt(runs, nowTs){ return moodStateAt(runs, nowTs, save.past).ran
    A day that already has a qualifying run is replayed in full, so a second run
    of the day still collects the climb the first one earned. */
 function moodAt(runs, ts){
+  runs = noWalks(runs);
   const key = dayKey(ts);
   const ran = runs.some(r => dayKey(r.t) === key && r.km >= QUALIFY_KM);
   // one millisecond before today began, i.e. the end of yesterday
@@ -4302,6 +4312,7 @@ function chainEndingAt(days, key, seed){
    `past` defaults to the save's own; foldPast() passes the one it is
    folding from. */
 function streakAt(runs, nowTs, past){
+  runs = noWalks(runs);
   if (past === undefined) past = save.past;
   const seed = past && past.streak && past.streak.last ? past.streak : null;
   const days = qualifyingDays(runs);
@@ -4977,7 +4988,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-11-02 e555f57";
+const BUILD_ID = "2026-11-02 f86ef51";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -5682,7 +5693,8 @@ function renderHome(){
     : save.healthLink ? "Your runs arrive from Apple Health"
     : healthOn() ? "Connect Strava or Apple Health in Settings to feed your pet"
     : "Connect Strava in Settings to feed your pet";
-  $("#greeting-sub").textContent = d.runs.length
+  // walks alone are runs in the log but not runs: there is no last run to count from
+  $("#greeting-sub").textContent = d.runs.length && d.gapDays !== Infinity
     ? (d.gapDays === 0 ? "You already ran today — nice." : d.gapDays === 1 ? "You ran yesterday. Keep it rolling." : `${d.gapDays} days since your last run`)
     : d.pastRuns ? "A week or more since your last run" : noRunsYet;
 
@@ -5773,7 +5785,7 @@ function runItemHTML(r){
     <div class="thumb"><canvas width="104" height="104" data-thumb="${r.id}"></canvas></div>
     <div class="main">
       <div class="d1"><span class="km">${U.distStr(r.km, 2)}<small>${U.label}</small></span>
-        <span class="dt">${relDate(r.t)}${r.sim ? " · sim" : ""}</span></div>
+        <span class="dt">${relDate(r.t)}${r.sim ? " · sim" : ""}${r.walk ? " · walk, half XP" : ""}</span></div>
       <div class="d2"><span>⏱ ${fmtDur(r.sec)}</span><span>⚡ ${fmtPace(paceSec)} /${U.label}</span><span>🔥 ${r.kcal}</span></div>
       ${r.device ? `<div class="d3">${esc(r.device)}</div>` : ""}
     </div>
@@ -6847,7 +6859,8 @@ function makeRun(at, km, sec, extra){
   // The run is folded in before asking, because a qualifying run can be the
   // second day that starts the streak it then collects on. It cannot be the
   // first: one run is a run, and a streak wants two days.
-  const withThis = activeRuns().concat([{ t: at, km }]);
+  const walk = !!(extra && extra.walk);
+  const withThis = activeRuns().concat([{ t: at, km, walk }]);
   const streakOn = streakAt(withThis, at).live;
   const mood = moodIfRunNow(at);
   // What other players have taken off this run. It is read once, here, and
@@ -6857,6 +6870,12 @@ function makeRun(at, km, sec, extra){
   const by  = (save.marks || []).filter(m =>
     at - (m.at || 0) < MARK_HOURS * 3600e3).length;
   const p = xpParts(km, mood, streakOn, pen);
+  // A walk is paid half of what the same distance run would be, every part
+  // of the breakdown alike so it still adds up.
+  if (walk){
+    for (const k of ["flat", "end", "mood", "streak", "marked"]) p[k] = Math.round(p[k] * WALK_XP);
+    p.total = p.flat + p.end + p.mood + p.streak + p.marked;
+  }
   return Object.assign({
     id: "r" + at.toString(36) + Math.random().toString(36).slice(2, 6),
     t: at, km, sec,
@@ -6875,6 +6894,10 @@ function makeRun(at, km, sec, extra){
     sim: false, path: []
   }, extra || {});
 }
+
+/* What a walk from Apple Health is paid, as a share of a run of the same
+   distance - see makeRun(). */
+const WALK_XP = 0.5;
 
 /* One person cannot be on two runs at once. That is the whole rule that stops
    a run being counted twice, and it holds whatever the run came in through -
@@ -7890,7 +7913,7 @@ function healthGuide(step){
   const screens = [
     { title: "One more thing: the Shortcut",
       body: `<p class="hg-p">Runmon can't read Apple Health by itself — iPhones don't let websites do that. A small
-          <b>Shortcut</b> on your phone does it: it sends your latest runs to Runmon, then opens the app.</p>
+          <b>Shortcut</b> on your phone does it: it sends your latest runs and walks to Runmon, then opens the app. Walks count at half XP.</p>
         <p class="hg-p"><b>Nothing syncs until you've added the Shortcut and run it once.</b> It takes about two minutes.</p>
         ${healthGuideStatus()}`,
       actions: [later, next] },
@@ -9425,7 +9448,7 @@ async function stravaSync(opts){
       healthCheckHeard();
     }
     const imported = [], newIds = [], healthSettled = [];
-    let fromStrava = 0, fromHealth = 0, alreadyHad = 0;
+    let fromStrava = 0, fromHealth = 0, walksFromHealth = 0, alreadyHad = 0;
     const held = new Set(save.runs.filter(r => r && r.strava != null).map(r => String(r.strava)));
     // Strava first, so when one batch carries the same run both ways, the
     // GPS-traced Strava copy is the one kept. After that, first come, first
@@ -9460,10 +9483,10 @@ async function stravaSync(opts){
       // broker turns these away; this is for one queued before it did.
       if (h.start < Date.now() - HEALTH_HORIZON_MS){ alreadyHad++; continue; }
       if (!(h.km > 0) || !(h.sec > 0) || runOverlapping(span)){ alreadyHad++; continue; }
-      const run = makeRun(h.start, h.km, h.sec, { health: h.key, span });
+      const run = makeRun(h.start, h.km, h.sec, Object.assign({ health: h.key, span }, h.walk ? { walk: true } : {}));
       save.runs.push(run);
       newIds.push(run.id);
-      fromHealth++;
+      if (h.walk) walksFromHealth++; else fromHealth++;
     }
     if (res.error === "reauth"){
       // no token left for this athlete: disconnected from Strava's side, or
@@ -9562,12 +9585,16 @@ async function stravaSync(opts){
     }
     const got = [];
     if (fromStrava) got.push(`${fromStrava} run${fromStrava === 1 ? "" : "s"} from Strava`);
-    if (fromHealth) got.push(`${fromHealth} from Apple Health`);
+    if (fromHealth || walksFromHealth) got.push([
+      fromHealth ? `${fromHealth} run${fromHealth === 1 ? "" : "s"}` : "",
+      walksFromHealth ? `${walksFromHealth} walk${walksFromHealth === 1 ? "" : "s"}` : ""
+    ].filter(Boolean).join(" + ") + " from Apple Health");
     const twice = alreadyHad ? ` \u00b7 ${alreadyHad} already counted` : "";
-    if (!fromHealth && !alreadyHad && opts && opts.loud && imported.length){
+    const anyHealth = fromHealth + walksFromHealth;
+    if (!anyHealth && !alreadyHad && opts && opts.loud && imported.length){
       // a Strava-only sync says exactly what it always said
       toast(`${imported.length} run${imported.length === 1 ? "" : "s"} from Strava`, "good", "\u{1F3C3}");
-    } else if (fromHealth && !(opts && opts.loud)){
+    } else if (anyHealth && !(opts && opts.loud)){
       // Arriving through the Shortcut is the one quiet sync worth a word: it
       // is the player's only sign the Health side is working.
       toast(got.join(" \u00b7 ") + twice, "good", "\u2764\uFE0F");

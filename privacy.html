@@ -66,11 +66,14 @@
           time, elevation gain, activity type, whether it was entered by hand, the device that recorded it,
           and Strava's ID for it</td><td>Strava's API, read-only (<code>activity:read</code>), each time you open Runmon</td>
           <td>To turn your runs into XP for your pet, show you the run, and not count it twice</td></tr>
-      <tr><td>If you set up <b>Apple Health</b> instead: for each running workout from the last week, when it
-          started and ended and how far it went. If you are not on Strava, a random player ID made for you
+      <tr><td>If you set up <b>Apple Health</b> instead: your walking and running distance from the last three days,
+          as Health records it &mdash; small slices, each with a start, an end, a distance and the name of the
+          device that recorded it. Runmon turns them into outings straight away and keeps, for each run or
+          walk of 10 minutes and 1 km or more, only when it started and ended and how far it went; the
+          slices and device names are not kept. If you are not on Strava, a random player ID made for you
           when you set it up</td><td>Your iPhone, sent by the Runmon Shortcut only when you tap it</td>
-          <td>To turn your runs into XP for your pet, and not count a run twice when it also reaches Runmon
-          through Strava</td></tr>
+          <td>To turn your runs and walks into XP for your pet, and not count a run twice when it also reaches
+          Runmon through Strava</td></tr>
       <tr><td>Your pet: its name, species, level, XP, badges, mood, streak, battles and raid swings, your
           friend code, and your settings (units, body weight for the calorie estimate)</td><td>You, and the game</td>
           <td>To run the game</td></tr>
@@ -78,8 +81,8 @@
     </tbody>
   </table>
   <p>Runmon does not collect your name, email, photo, location or GPS routes from Strava, and cannot see
-    activities you keep to "Only You". From Apple Health it receives only what the Shortcut sends: running
-    workouts' times and distances &mdash; no routes, heart rate, steps or anything else in Health. Runmon
+    activities you keep to "Only You". From Apple Health it receives only what the Shortcut sends: walking
+    and running distance &mdash; no routes, heart rate, steps or anything else in Health. Runmon
     cannot read Health itself; the Shortcut runs on your phone, and you can see and edit what it sends. It uses no cookies, analytics, trackers or advertising. When you
     email me, I have your email address and what you wrote, and use it only to answer you.</p>
 

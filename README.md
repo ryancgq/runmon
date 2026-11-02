@@ -174,8 +174,8 @@ replaying exactly as a Strava catch-up does.
 
 HealthKit has no web API. A page cannot read it, and nothing on the internet
 can pull from it, so the phone does the pushing. The Shortcut reads the last
-week of running workouts, posts them to the broker under the player's own sync
-link, and only then opens `…/runmon/#health`. The app was going to sync on
+three days of walking and running distance, posts it to the broker under the
+player's own sync link, and only then opens `…/runmon/#health`. The app was going to sync on
 opening anyway; `#health` makes an already-open tab sync too, without waiting
 out the once-a-minute throttle. The phone is guaranteed to be unlocked at that
 moment — the player just tapped it — which is the one time HealthKit lets a
@@ -251,68 +251,103 @@ there would have stopped real Strava runs being fetched. They travel as
 push, so a push that never lands cannot leave a workout queued to be counted
 again.
 
-Steps are not imported, deliberately. XP, the mood ladder and streaks are all
-built on discrete runs and the 2 km bar; a daily step total would make an
-ordinary day of walking out-earn a 5 km run and keep the pet Elated without a
-run in sight. Only workouts typed as running count.
+### Runs and walks, rebuilt from distance
+
+The first design read *workouts* from Health. On a real iPhone that turned
+out not to exist: *Find Health Samples* does not offer Workouts as a type.
+What it does offer is **Walking + Running Distance** — the slices of distance
+a phone or watch writes through the day, each with a start, an end and the
+device that wrote it. A week of them came to 281 on the owner's phone, few
+enough for a Shortcut to loop over in a moment. So the Shortcut sends those,
+and the broker rebuilds outings from them (`sessionsFromSamples()`):
+
+- slices from one device with no gap longer than **2 minutes** between them
+  are one outing. Devices are kept apart, because a phone in a pocket and a
+  watch on a wrist both write the same walk; their two copies then overlap in
+  time and the overlap check keeps one.
+- an outing counts if it lasted **10 minutes** and covered **1 km**. That is
+  what keeps a day of pottering about the house from paying anything.
+- it is a **run** if most of its distance was covered at running pace — under
+  8:00 min/km — so a warm-up walk does not turn a run into a walk. Otherwise
+  it is a **walk**.
+
+**A walk pays half** what the same distance run would (`WALK_XP`), buys
+swings at half, and does nothing for the mood ladder or the streak — it is
+neither the 2 km run that climbs a rung nor a day of showing up, and "you ran
+yesterday" ignores it. That is filtered at the root of the mood and streak
+functions (`noWalks()`), so the pet screen, the price of the next run and the
+weekly fold all agree. Walking counting at full value was decided against:
+most people walk 2 km a day, so it would have kept every pet Elated and paid
+a Health player for what Strava players' walks do not pay at all.
+
+This is a reconstruction, and it can be wrong at the edges: a brisk walk
+slower than 8:00 min/km is a walk even if it felt like a jog, and stopping at
+lights for more than two minutes splits one outing into two. An outing sent
+while it was still going on, then sent again longer, replaces itself as long
+as the app has not collected it yet.
+
+Steps are not imported. A daily step total has no start and end to match a
+Strava run against, and the sessions above already carry the distance steps
+would.
 
 ### Swings
 
 Swings are bought with kilometres the broker has counted itself, so a player
 cannot type their own swing budget. Health keeps that: the broker counts a
-taken workout's distance against a high-water mark on its start time, exactly
-as it does Strava's, so a workout can only ever be counted once.
+taken outing's distance against a high-water mark on its start time, exactly
+as it does Strava's, so an outing can only ever be counted once — at half for
+a walk.
 
 **Only for players whose runs come from Health alone.** A player with Strava
 linked is paid by Strava's runs, and Health adds nothing to their swings: the
-broker cannot see Strava's copy of a Health workout to tell they are one run,
+broker cannot see Strava's copy of a Health outing to tell they are one run,
 and paying both would let every watch run buy its swings twice. A Health run
 still earns that player XP — the app can see both copies, and counts it once.
 
-A Health workout is self-reported in the way a run keyed in by hand on Strava
+Health distance is self-reported in the way a run keyed in by hand on Strava
 is, and the broker already pays those. It applies the same checks the tracker
-did: running only, 50 m and 20 seconds at least, nothing faster than 12 m/s.
+did: 50 m and 20 seconds at least, nothing faster than 12 m/s, and no single
+slice faster than that either.
 
 ### Building the Shortcut
 
 The Shortcut is built once, by hand, and shared as an iCloud link; that link
 then goes in `HEALTH_SHORTCUT_URL` near the top of `index.html`, and Settings
-offers it to every player. Until then Settings points here.
-
-> **Untested on a device.** These steps were written without an iPhone to hand.
-> Reports differ on what *Find Health Samples* offers for workouts across iOS
-> versions, so build it, run it once from inside the Shortcuts app to read the
-> broker's reply, and check **Settings → Apple Health → Last heard from the
-> Shortcut**.
+offers it to every player. Until then the setup guide points here.
 
 1. New shortcut, named **Runmon**, with Runmon's icon and colour.
-2. **Find Health Samples** — Type **Workouts**; filter *Start Date is in the
-   last 7 days* and, if offered, *Workout Type is Running*; sort by Start Date,
-   latest first; limit 20.
-3. **Repeat with Each** over the samples. Inside it:
+2. **Find Health Samples** — Type **Walking + Running Distance**; filter
+   *Start Date is in the last 3 days*; **Unit km**. Leave Group by and Sort by
+   as they are, Limit off.
+3. **Repeat with Each** over the Health Samples. Inside it, each starting
+   from *Repeat Item*:
    - **Get Details of Health Sample** → *Start Date*, then **Format Date** →
-     *ISO 8601*, include time.
+     Date Format *ISO 8601*.
    - the same for *End Date*.
-   - **Get Details of Health Sample** → *Distance* (sometimes *Total
-     Distance*).
-   - **Text**: `Start | End | Distance | Type`, each a variable from the steps
-     above, with *Workout Type* for Type if it is offered (leave it out if not).
+   - **Get Details of Health Sample** → *Value*.
+   - **Get Details of Health Sample** → *Source*.
+   - **Text**: `Start | End | Value | Source`, each the variable from the
+     steps above.
 4. After **End Repeat**: **Combine Text** — *Repeat Results*, with *New Lines*.
-5. **Get Contents of URL** — URL: leave it for the import question below.
-   Method **POST**, Request Body **JSON**, one *Text* field named `text` holding
-   the combined text.
+5. **Get Contents of URL** — URL: the sync link from the setup guide (leave it
+   for the import question when sharing). Method **POST**, Request Body
+   **JSON**, one *Text* field named `samples` holding the combined text.
 6. **Open URLs** — `https://ryancgq.github.io/runmon/#health`.
 7. Before sharing, under the Shortcut's details → *Set Up Import Questions*,
    add one on step 5's URL: "Paste the sync link from Runmon's Settings". Then
    Share → **Copy iCloud Link**.
 
+Three days rather than seven: tapped daily, three is plenty, and the loop is
+the slow part. The broker only takes outings from the last five days anyway.
+
 The broker is forgiving on purpose, because a Shortcut is easy to build and
-hard to debug. It takes the lines above, or JSON `{"workouts":[{start, end,
-distance, type}]}`; dates as ISO strings or epoch numbers; distances as
-`5.02 km`, `3.1 mi`, `5020 m`, `5,02 km`, or a bare number in kilometres. It
-keeps only when, how far and how long — not which app recorded the run, not a
-route, not a heart rate — and its reply counts every workout it turned away and
-why.
+hard to debug. Slices come as `samples` — lines of `start | end | value |
+source`, or a JSON list — with dates as ISO strings or epoch numbers and the
+value as a number in kilometres or with a unit (`420 m`, `0.26 mi`). Whole
+workouts, should a later iOS offer them, are still taken as `workouts` or
+`text`. It keeps only when, how far and how long for each outing — not which
+device, not a route, not a heart rate — and its reply counts what it turned
+away and why.
 
 Two limits worth knowing. With no signal the POST fails and the Shortcut stops
 before opening the app; tapping it again later sends the same week, and
