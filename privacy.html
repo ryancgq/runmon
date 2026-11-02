@@ -66,6 +66,11 @@
           time, elevation gain, activity type, whether it was entered by hand, the device that recorded it,
           and Strava's ID for it</td><td>Strava's API, read-only (<code>activity:read</code>), each time you open Runmon</td>
           <td>To turn your runs into XP for your pet, show you the run, and not count it twice</td></tr>
+      <tr><td>If you set up <b>Apple Health</b> instead: for each running workout from the last week, when it
+          started and ended and how far it went. If you are not on Strava, a random player ID made for you
+          when you set it up</td><td>Your iPhone, sent by the Runmon Shortcut only when you tap it</td>
+          <td>To turn your runs into XP for your pet, and not count a run twice when it also reaches Runmon
+          through Strava</td></tr>
       <tr><td>Your pet: its name, species, level, XP, badges, mood, streak, battles and raid swings, your
           friend code, and your settings (units, body weight for the calorie estimate)</td><td>You, and the game</td>
           <td>To run the game</td></tr>
@@ -73,7 +78,9 @@
     </tbody>
   </table>
   <p>Runmon does not collect your name, email, photo, location or GPS routes from Strava, and cannot see
-    activities you keep to "Only You". It uses no cookies, analytics, trackers or advertising. When you
+    activities you keep to "Only You". From Apple Health it receives only what the Shortcut sends: running
+    workouts' times and distances &mdash; no routes, heart rate, steps or anything else in Health. Runmon
+    cannot read Health itself; the Shortcut runs on your phone, and you can see and edit what it sends. It uses no cookies, analytics, trackers or advertising. When you
     email me, I have your email address and what you wrote, and use it only to answer you.</p>
 
   <h3>How long it is kept</h3>
@@ -83,6 +90,10 @@
       <tr><td>Each run's details (time, distance, pace, device) and its Strava ID</td>
           <td><b>Seven days</b>, on Runmon's server and on your phone. Then the run is folded into your pet: the
           XP it earned, the run count and your streak and mood carry on; the details are deleted.</td></tr>
+      <tr><td>A run from Apple Health</td>
+          <td>Its time and distance stay with your pet, like any run that is not Strava's, until you delete the
+          pet or disconnect. On Runmon's server, a workout waiting to be collected and the times used to spot a
+          repeat are kept at most <b>seven days</b>.</td></tr>
       <tr><td>A run you delete on Strava, or make "Only You"</td><td>Removed from Runmon within 48 hours of Strava telling Runmon.</td></tr>
       <tr><td>Your tokens</td><td>Until you disconnect, when they are revoked with Strava and deleted.</td></tr>
       <tr><td>Your pet and game data</td><td>While you are connected. After you disconnect, <b>four weeks</b>

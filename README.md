@@ -162,6 +162,155 @@ is absent from the app entirely: no panel, no network calls. **The sandbox is
 always in that state**, so it keeps working offline and needs no worker to test
 new artwork against.
 
+## Apple Health
+
+For iPhone runners who are not on Strava. With the tracker switched off, Strava
+was the only way a run could reach a pet; Apple Health is the second. Runs come
+from whatever saved them to Health — an Apple Watch, the Fitness app, any
+running app that writes there — and the player's day does not change: they tap
+a **Runmon** Shortcut on their Home Screen where they used to tap Runmon, a
+Shortcuts banner shows for a second, and the app opens with the new runs
+replaying exactly as a Strava catch-up does.
+
+HealthKit has no web API. A page cannot read it, and nothing on the internet
+can pull from it, so the phone does the pushing. The Shortcut reads the last
+week of running workouts, posts them to the broker under the player's own sync
+link, and only then opens `…/runmon/#health`. The app was going to sync on
+opening anyway; `#health` makes an already-open tab sync too, without waiting
+out the once-a-minute throttle. The phone is guaranteed to be unlocked at that
+moment — the player just tapped it — which is the one time HealthKit lets a
+Shortcut read anything.
+
+**Settings → Apple Health → Set up** asks the broker for a sync link. A Strava
+athlete gets one attached to their athlete. Anybody else gets a player of their
+own on the broker — a random id beginning with `p` — and a session for it, so
+their save, Friends, Rankings and Explore work the way a Strava athlete's do.
+If that player connects Strava later, the app hands the broker both sessions
+and the Health side moves onto the athlete: the link, anything still queued,
+the times already taken, unspent swings and the friend code. The player object
+is then erased the way any player is. The Shortcut on their phone keeps working
+untouched.
+
+The link can only drop workouts into one player's queue. It cannot read a
+save, so a leaked Shortcut costs somebody spam, not their pet. **Turn off**
+retires it, and so does disconnecting Strava; setting up again issues a new
+one.
+
+### Never counting a run twice
+
+A run can reach Runmon more than one way at once, and in practice often does:
+an Apple Watch run goes to Health *and* to Strava; Strava writes its runs back
+into Health; two apps recording the same run both save it to Health. Each copy
+has its own id, so ids cannot see that these are one run.
+
+Time can. **One person cannot be on two runs at once**, so a run whose time
+span crosses a run already held is that run again, and is not counted. Where
+that is checked depends on who can see what:
+
+- **The app** holds every source together, so it checks every incoming run —
+  Strava's and Health's alike — against the whole run log. Runs now store
+  their wall-clock span, stops included (`span`, in ms); older ones are rebuilt
+  from what `t` always meant. A sync takes Strava's activities first, so when
+  one batch has the same run both ways the GPS-traced Strava copy is kept;
+  otherwise it is first come, first counted. A run recognised as a copy is
+  still reported back as settled, so it is never offered again.
+- **The broker** only ever sees Health, and keeps Health from repeating itself:
+  a workout overlapping one it has already taken in the last six days is not
+  taken. That matters on the broker and not only in the app, because swings
+  are counted there (below).
+
+Folding is what sets the limits. Strava's API Policy has a run's details
+deleted after a week, so a folded Strava run no longer has the times a Health
+copy of it would be recognised by. Health workouts are therefore only taken
+while they are **under five days old** — a day inside the app's six-day fold —
+so any Strava copy is still there to be compared with. Health runs themselves
+are not Strava's data and keep their times when they fold, the way the
+tracker's runs always have, so a Strava copy arriving after its Health twin is
+recognised however late it comes.
+
+Health keys never go into Strava's `importedAt` map. Letting a Strava id go
+moves Strava's fetch floor up to that activity's start, so a Health time in
+there would have stopped real Strava runs being fetched. They travel as
+`healthDone` on the save instead — every Health run the save holds, on every
+push, so a push that never lands cannot leave a workout queued to be counted
+again.
+
+This also closed a hole on the Strava side: an activity uploaded twice to
+Strava — a watch and a phone both recording — is now counted once.
+
+Steps are not imported, deliberately. XP, the mood ladder and streaks are all
+built on discrete runs and the 2 km bar; a daily step total would make an
+ordinary day of walking out-earn a 5 km run and keep the pet Elated without a
+run in sight. Only workouts typed as running count.
+
+### Swings
+
+Swings are bought with kilometres the broker has counted itself, so a player
+cannot type their own swing budget. Health keeps that: the broker counts a
+taken workout's distance against a high-water mark on its start time, exactly
+as it does Strava's, so a workout can only ever be counted once.
+
+**Only for players whose runs come from Health alone.** A player with Strava
+linked is paid by Strava's runs, and Health adds nothing to their swings: the
+broker cannot see Strava's copy of a Health workout to tell they are one run,
+and paying both would let every watch run buy its swings twice. A Health run
+still earns that player XP — the app can see both copies, and counts it once.
+
+A Health workout is self-reported in the way a run keyed in by hand on Strava
+is, and the broker already pays those. It applies the same checks the tracker
+did: running only, 50 m and 20 seconds at least, nothing faster than 12 m/s.
+
+### Building the Shortcut
+
+The Shortcut is built once, by hand, and shared as an iCloud link; that link
+then goes in `HEALTH_SHORTCUT_URL` near the top of `index.html`, and Settings
+offers it to every player. Until then Settings points here.
+
+> **Untested on a device.** These steps were written without an iPhone to hand.
+> Reports differ on what *Find Health Samples* offers for workouts across iOS
+> versions, so build it, run it once from inside the Shortcuts app to read the
+> broker's reply, and check **Settings → Apple Health → Last heard from the
+> Shortcut**.
+
+1. New shortcut, named **Runmon**, with Runmon's icon and colour.
+2. **Find Health Samples** — Type **Workouts**; filter *Start Date is in the
+   last 7 days* and, if offered, *Workout Type is Running*; sort by Start Date,
+   latest first; limit 20.
+3. **Repeat with Each** over the samples. Inside it:
+   - **Get Details of Health Sample** → *Start Date*, then **Format Date** →
+     *ISO 8601*, include time.
+   - the same for *End Date*.
+   - **Get Details of Health Sample** → *Distance* (sometimes *Total
+     Distance*).
+   - **Text**: `Start | End | Distance | Type`, each a variable from the steps
+     above, with *Workout Type* for Type if it is offered (leave it out if not).
+4. After **End Repeat**: **Combine Text** — *Repeat Results*, with *New Lines*.
+5. **Get Contents of URL** — URL: leave it for the import question below.
+   Method **POST**, Request Body **JSON**, one *Text* field named `text` holding
+   the combined text.
+6. **Open URLs** — `https://ryancgq.github.io/runmon/#health`.
+7. Before sharing, under the Shortcut's details → *Set Up Import Questions*,
+   add one on step 5's URL: "Paste the sync link from Runmon's Settings". Then
+   Share → **Copy iCloud Link**.
+
+The broker is forgiving on purpose, because a Shortcut is easy to build and
+hard to debug. It takes the lines above, or JSON `{"workouts":[{start, end,
+distance, type}]}`; dates as ISO strings or epoch numbers; distances as
+`5.02 km`, `3.1 mi`, `5020 m`, `5,02 km`, or a bare number in kilometres. It
+keeps only when, how far and how long — not which app recorded the run, not a
+route, not a heart rate — and its reply counts every workout it turned away and
+why.
+
+Two limits worth knowing. With no signal the POST fails and the Shortcut stops
+before opening the app; tapping it again later sends the same week, and
+nothing is counted twice. And on iOS a Home Screen web app keeps its storage
+apart from Safari's, while the Shortcut always opens Safari — so Apple Health
+has to be set up from Runmon *in Safari*, and the Home Screen icon removed
+afterwards. Settings says so when it is opened from an icon. A Strava player
+moving across connects Strava again and their pet follows; a pet that only
+ever lived in an icon's storage cannot be moved across yet — there is no save
+export in the app, whatever older notes below say.
+
 ---
 
 ## Demo build

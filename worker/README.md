@@ -100,6 +100,16 @@ Per athlete, in one Durable Object keyed by Strava athlete id: the rotating
 refresh token, the game save, and the ids of activities already imported.
 `POST /disconnect` deauthorises with Strava and deletes all of it.
 
+A player who set up Apple Health without Strava gets an object of their own,
+keyed by a random id beginning with `p`, holding the same kind of save. Either
+kind can also hold a Health sync key, when it was set up, the workouts the
+Shortcut sent that the app has not collected yet, and the times of workouts
+taken in the last six days, to recognise a repeat. The key finds its object
+through a directory object named `hk:<key>`, the way a friend code does.
+
+Nothing to configure for any of this: no new secret, no new binding and no
+migration, because it is all the existing `Athlete` class.
+
 ## Why a Durable Object rather than KV
 
 A Durable Object runs one request at a time for a given athlete. That makes the
@@ -117,6 +127,14 @@ save. No locking code, no eventual-consistency window.
 | `POST /sync` | activities since last time, plus the stored save |
 | `PUT /save` | store the save and the ids the client actually imported |
 | `POST /disconnect` | deauthorise at Strava, then forget the athlete |
+| `POST /health/link` | issue the Apple Health sync link; with no session, make a player and a session too |
+| `POST /health/import/<key>` | the iPhone Shortcut drops running workouts here |
+| `POST /health/unlink` | retire the sync link and drop the queue |
+| `POST /health/adopt` | move a Health-only player's link, queue, swings and friend code onto a Strava athlete |
+
+`/sync` also returns `health`, the queued workouts, and `healthInfo`; `/save`
+takes `healthDone`, the workouts settled. A session with fewer than 100 days
+left comes back renewed as `session`.
 
 Sessions are signed, not stored: athlete id plus expiry with an HMAC over both.
 There is no session table to leak, and rotating `SESSION_SECRET` signs everyone

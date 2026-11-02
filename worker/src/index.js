@@ -25,6 +25,12 @@
      GET  /explore/me       Explore: who you are, your pet, your swings, the round
      POST /explore/attempt  Explore: spend a swing on an attempt
      GET  /explore/legacy   Explore: the raid as it stands, for the one-time handover
+     POST /health/link        Apple Health: issue the player's sync link, and a
+                              session too for somebody with no Strava
+     POST /health/import/KEY  Apple Health: the iPhone Shortcut drops runs here
+     POST /health/unlink      Apple Health: stop accepting them
+     POST /health/adopt       a Health-only player has just linked Strava: move
+                              their Health link and swings onto the athlete
 
    The battle routes are the one place this stops being a pure broker: it
    prices a mark, because the attacker cannot be trusted to price their own.
@@ -58,7 +64,7 @@ async function mintSession(env, athleteId){
   const body = `${athleteId}.${exp}`;
   return `${body}.${await hmac(env.SESSION_SECRET, body)}`;
 }
-async function readSession(env, token){
+async function readSessionFull(env, token){
   if (!token) return null;
   const i = token.lastIndexOf(".");
   if (i < 0) return null;
@@ -66,8 +72,22 @@ async function readSession(env, token){
   if (await hmac(env.SESSION_SECRET, body) !== sig) return null;
   const [athleteId, exp] = body.split(".");
   if (!athleteId || Number(exp) < Date.now()) return null;
-  return athleteId;
+  return { id: athleteId, exp: Number(exp) };
 }
+async function readSession(env, token){
+  const s = await readSessionFull(env, token);
+  return s ? s.id : null;
+}
+const bearer = request => (request.headers.get("Authorization") || "").replace(/^Bearer /, "");
+
+/* A player with no Strava still needs somewhere for a save and a Health link
+   to live. Their id is "p" and random letters: Strava athlete ids are all
+   digits and every directory name carries a "word:" prefix, so it collides
+   with neither, and the app can tell a Health-only session from a Strava one
+   by its first character. */
+const isPlayerId = id => /^p[a-z0-9]+$/.test(String(id || ""));
+const randomId = n => [...crypto.getRandomValues(new Uint8Array(n))]
+  .map(b => "abcdefghijklmnopqrstuvwxyz0123456789"[b % 36]).join("");
 
 /* --- plumbing ------------------------------------------------------------ */
 const cors = env => ({
@@ -186,9 +206,10 @@ const RETAIN_MS = 7 * 86400e3;
    goes. */
 async function purgeAthlete(env, athleteId, handle){
   handle = handle || (await hmac(env.SESSION_SECRET, "roster:" + athleteId)).slice(0, 12);
-  let code = null;
+  let code = null, healthKey = null;
   if (athleteId)
-    ({ code } = await (await (await athleteStub(env, athleteId)).fetch("https://do/purge", { method:"POST" })).json());
+    ({ code, healthKey } = await (await (await athleteStub(env, athleteId)).fetch("https://do/purge", { method:"POST" })).json());
+  await clearHealthOwner(env, healthKey);
   await rosterStub(env).fetch("https://do/roster-drop", { method:"POST", body: JSON.stringify({ handle }) });
   await rosterStub(env).fetch("https://do/firsts-forget", { method:"POST", body: JSON.stringify({ handle }) });
   await handleStub(env, handle).fetch("https://do/dir-clear", { method:"POST" });
@@ -355,7 +376,9 @@ const gameCard = c => c ? { v: 2, ...rosterCard(c), at: Number(c.at) || null } :
    that is not playing. */
 async function parkAthlete(env, athleteId){
   const stub = await athleteStub(env, athleteId);
-  const { code } = await (await stub.fetch("https://do/park", { method:"POST" })).json();
+  const { code, healthKey } = await (await stub.fetch("https://do/park", { method:"POST" })).json();
+  // the Shortcut's link stops with the connection, not four weeks later
+  await clearHealthOwner(env, healthKey);
   const handle = (await hmac(env.SESSION_SECRET, "roster:" + athleteId)).slice(0, 12);
   await rosterStub(env).fetch("https://do/roster-park", { method:"POST", body: JSON.stringify({ handle }) });
   if (code) await codeStub(env, code).fetch("https://do/dir-clear", { method:"POST" });
@@ -561,8 +584,118 @@ async function adminGate(request, env){
 }
 
 /** Every authenticated route is the same three lines, so they live here. */
+/* --- Apple Health ---------------------------------------------------------
+   HealthKit has no web API: the data never leaves the phone unless something
+   on the phone sends it. An iPhone Shortcut does that - reads recent running
+   workouts, posts them here, then opens the app - so the app finds them
+   waiting on its next /sync exactly as it finds Strava activities.
+
+   The sync link is a random key in the URL, looked up in a directory object
+   the way a friend code is. It can only drop workouts into one player's queue;
+   it cannot read a save, so a Shortcut that leaks costs somebody some spam,
+   not their pet. Unlinking deletes the directory entry, and the link is dead.
+
+   Never counting a run twice is split between here and the app, by what each
+   can see. The app has the whole run log - Strava's runs, Health's, the
+   sandbox tracker's - and drops anything whose time overlaps a run it holds.
+   This side only ever sees Health, and keeps Health from repeating itself:
+   a workout overlapping one it has already taken is the same run, whether
+   it is the same workout sent twice or a second app's copy of it in Health.
+   That matters here and not only in the app, because swings are counted
+   here, off what was taken.
+
+   Only workouts from the last HEALTH_HORIZON_MS are taken. The app deletes
+   a Strava run's details at six days (Strava's API Policy 6.2), and with
+   them the times a Health copy of that run would be recognised by - so a
+   Health workout is only let in while any Strava copy of it is still there
+   to be compared with. */
+const HEALTH_HORIZON_MS = 5 * 86400e3;
+/* Everything an object keeps for Health, so a disconnect can drop it in one go. */
+const HEALTH_KEYS = ["healthKey", "healthSince", "healthPending", "healthSpans", "healthLast", "healthKmAfter"];
+/* How long the times of taken workouts are remembered, for the overlap check
+   above. Past the horizon nothing can arrive to be checked against them. */
+const HEALTH_SPANS_MS = 6 * 86400e3;
+const healthDir = (env, key) => env.ATHLETE.get(env.ATHLETE.idFromName("hk:" + key));
+async function healthOwner(env, key){
+  if (!/^[a-z0-9]{24}$/.test(key || "")) return null;
+  const r = await healthDir(env, key).fetch("https://do/dir-get");
+  return (await r.json()).athleteId || null;
+}
+const setHealthOwner = (env, key, athleteId) => healthDir(env, key).fetch("https://do/dir-set",
+  { method:"POST", body: JSON.stringify({ athleteId }) });
+const clearHealthOwner = (env, key) => key
+  ? healthDir(env, key).fetch("https://do/dir-clear", { method:"POST" }) : null;
+
+/* Shortcuts is a forgiving place to build a request and an unforgiving place
+   to debug one, so this takes what it is likely to be given: a JSON list of
+   workouts, or one line per workout as text, with dates as ISO strings or
+   epoch numbers and the distance as a number or as "5.02 km" / "3.1 mi". */
+function parseHealthBody(raw){
+  let body = raw;
+  try { body = JSON.parse(raw); } catch (e){ /* plain text, one per line */ }
+  let items = [];
+  if (Array.isArray(body)) items = body;
+  else if (body && Array.isArray(body.workouts)) items = body.workouts;
+  else {
+    const text = typeof body === "string" ? body : (body && (body.text || body.lines)) || "";
+    items = String(text).split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(line => {
+      const [start, end, distance, type, duration] = line.split(/\s*[|;\t]\s*/);
+      return { start, end, distance, type, duration };
+    });
+  }
+  return items.slice(0, 100);
+}
+function healthTime(v){
+  if (v == null || v === "") return NaN;
+  if (typeof v === "number" || /^\d+(\.\d+)?$/.test(String(v))){
+    const n = Number(v);
+    return n < 1e12 ? n * 1000 : n;              // seconds or milliseconds
+  }
+  return Date.parse(String(v));
+}
+function healthKm(v, unit){
+  if (v == null || v === "") return NaN;
+  let s = String(v).trim().toLowerCase();
+  // "5,02 km" from a comma-decimal locale; but "1,204 m" is a thousands mark
+  if (/^\d+,\d{1,2}(\D|$)/.test(s)) s = s.replace(",", ".");
+  s = s.replace(/,/g, "");
+  const m = /^(-?\d+(?:\.\d+)?)\s*([a-z]*)/.exec(s);
+  if (!m) return NaN;
+  const n = Number(m[1]), u = m[2] || String(unit || "km").toLowerCase();
+  if (/^(mi|mile|miles)$/.test(u)) return n * 1.609344;
+  if (/^(m|metre|metres|meter|meters)$/.test(u)) return n / 1000;
+  if (/^(km|kms|kilometre|kilometres|kilometer|kilometers)$/.test(u)) return n;
+  return NaN;                                    // a unit we do not recognise is not a guess
+}
+/* One workout, checked. Anything that fails says why, so the Shortcut's reply
+   can explain an empty sync instead of looking like a quiet week. Only what
+   the game needs is kept: when, how far, how long. Not which app recorded it,
+   not the route, not the heart rate. */
+function cleanWorkout(w){
+  if (!w || typeof w !== "object") return { why:"unreadable" };
+  const type = String(w.type || w.workoutType || w.activity || "");
+  // Running only. A type that is missing altogether is let through, because
+  // the Shortcut is meant to filter to running before it sends anything.
+  if (type && !/run/i.test(type)) return { why:"notRun" };
+  const start = healthTime(w.start || w.startDate);
+  let end = healthTime(w.end || w.endDate);
+  const km = healthKm(w.distance != null ? w.distance : w.km, w.unit);
+  const dur = Number(w.duration) > 0 ? Number(w.duration) : NaN;   // seconds
+  if (!Number.isFinite(start)) return { why:"badDate" };
+  if (!Number.isFinite(end) && Number.isFinite(dur)) end = start + dur * 1000;
+  if (!Number.isFinite(end) || end <= start) return { why:"badDate" };
+  if (end - start > 24 * 3600e3) return { why:"badDate" };
+  if (!Number.isFinite(km) || km <= 0) return { why:"noDistance" };
+  const sec = Math.round(Number.isFinite(dur) && dur * 1000 <= end - start + 1000 ? dur : (end - start) / 1000);
+  if (sec < 20 || km < 0.05) return { why:"tooShort" };
+  // the tracker's own ceiling on a believable speed
+  if (km * 1000 / sec > 12) return { why:"tooFast" };
+  // keyed on the start to the second: the same workout sent again has it
+  return { ok: { key: "h:" + Math.round(start / 1000), start, end, km, sec } };
+}
+
 async function withAthlete(request, env, fn){
-  const id = await readSession(env, (request.headers.get("Authorization") || "").replace(/^Bearer /, ""));
+  const id = await readSession(env, bearer(request));
   if (!id) return json(env, { error:"not linked" }, 401);
   return fn(await athleteStub(env, id), id);
 }
@@ -654,14 +787,84 @@ export default {
         return Response.redirect(appURL(env) + "#strava=" + await mintSession(env, athleteId), 302);
       }
 
-      if (path === "/sync" && request.method === "POST")
+      if (path === "/sync" && request.method === "POST"){
+        const sess = await readSessionFull(env, bearer(request));
+        if (!sess) return json(env, { error:"not linked" }, 401);
+        const id = sess.id, stub = await athleteStub(env, id);
+        // Sync is what every player does on opening the app, which makes it
+        // the place an old account becomes reachable again. Guarded: a
+        // directory write is bookkeeping and must never cost somebody
+        // their runs.
+        try { await ensureHandle(env, id); } catch (e){ /* not worth a failed sync */ }
+        const out = await (await stub.fetch("https://do/sync", { method:"POST" })).json();
+        // A session with fewer than 100 days left is quietly renewed. For a
+        // Strava athlete an expired one costs a reconnect; a Health-only player
+        // has nothing to reconnect to, and losing it would orphan their pet.
+        if (sess.exp - Date.now() < 100 * 86400e3) out.session = await mintSession(env, id);
+        return json(env, out);
+      }
+
+      /* --- Apple Health ---------------------------------------------------- */
+      if (path === "/health/link" && request.method === "POST"){
+        const given = bearer(request);
+        let id = await readSession(env, given), session = null;
+        if (given && !id) return json(env, { error:"not linked" }, 401);
+        if (!id){
+          // nobody to attach to: a Health-only player, who gets a session of
+          // their own so the save, Friends, Rankings and Explore work for them
+          id = "p" + randomId(16);
+          session = await mintSession(env, id);
+          try { await rosterPut(env, id, null); } catch (e){ /* bookkeeping only */ }
+        }
+        const r = await (await athleteStub(env, id)).fetch("https://do/health-link", { method:"POST" });
+        const out = await r.json();
+        if (!out.ok) return json(env, out, 409);
+        await setHealthOwner(env, out.key, id);
+        return json(env, { key: out.key, since: out.since, session, url: url.origin + "/health/import/" + out.key });
+      }
+
+      if (path.startsWith("/health/import") && request.method === "POST"){
+        const key = path.split("/")[3] || bearer(request);
+        const owner = await healthOwner(env, key);
+        // a plain sentence as well as the counts: the Shortcut can show it as is
+        if (!owner) return json(env, { error:"unknown link",
+          message:"Runmon does not recognise this sync link. Set Apple Health up again in Runmon's Settings and paste the new link into the Shortcut." }, 404);
+        const r = await (await athleteStub(env, owner)).fetch("https://do/health-put",
+          { method:"POST", body: JSON.stringify({ items: parseHealthBody(await request.text()) }) });
+        return json(env, await r.json());
+      }
+
+      if (path === "/health/unlink" && request.method === "POST")
+        return await withAthlete(request, env, async stub => {
+          const { key } = await (await stub.fetch("https://do/health-unlink", { method:"POST" })).json();
+          await clearHealthOwner(env, key);
+          return json(env, { unlinked: true });
+        });
+
+      /* Somebody who set up Health first and connected Strava afterwards has two
+         objects: the "p" one holding their pet's Health link, and the athlete
+         one the Strava callback just made. The app sends both sessions and the
+         Health side moves across - key, queue, the times already taken, the
+         swings not yet spent, the friend code - so the Shortcut on their phone
+         keeps working and nothing is counted twice or lost. The save itself
+         follows by the ordinary route: the phone pushes it. */
+      if (path === "/health/adopt" && request.method === "POST")
         return await withAthlete(request, env, async (stub, id) => {
-          // Sync is what every player does on opening the app, which makes it
-          // the place an old account becomes reachable again. Guarded: a
-          // directory write is bookkeeping and must never cost somebody
-          // their runs.
-          try { await ensureHandle(env, id); } catch (e){ /* not worth a failed sync */ }
-          return stub.fetch("https://do/sync", { method:"POST" });
+          const body = await request.json().catch(() => ({}));
+          const from = await readSession(env, body.from || "");
+          if (!from || !isPlayerId(from) || from === id || isPlayerId(id)) return json(env, { adopted: false });
+          const old = await athleteStub(env, from);
+          const state = await (await old.fetch("https://do/health-export", { method:"POST" })).json();
+          const { keptKey, keptCode } = await (await stub.fetch("https://do/health-absorb",
+            { method:"POST", body: JSON.stringify(state) })).json();
+          // The player object is done with, and erased the way any player is -
+          // roster row, handle, backups - since the athlete now holds all of
+          // it. That clears the directory entries it owned, so the ones that
+          // moved are pointed at the athlete afterwards, not before.
+          await purgeAthlete(env, from);
+          if (state.healthKey && keptKey) await setHealthOwner(env, state.healthKey, id);
+          if (state.friendCode && keptCode) await claimCode(env, state.friendCode, id);
+          return json(env, { adopted: true });
         });
 
       if (path === "/save" && request.method === "PUT")
@@ -1400,7 +1603,7 @@ function summaryTable(rows){
   const out = [
     `Runmon \u00b7 ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC`,
     "",
-    `Connected to Strava   ${linked}`,
+    `Connected             ${linked}`,
     `Disconnected          ${rows.length - linked}`,
     `Hatched               ${hatched}`,
     "",
@@ -1421,6 +1624,11 @@ export class Athlete {
     const path = new URL(request.url).pathname;
     if (path === "/open")  return this.open(await request.json());
     if (path === "/sync")  return this.sync();
+    if (path === "/health-link")   return this.healthLink();
+    if (path === "/health-put")    return this.healthPut(await request.json());
+    if (path === "/health-unlink") return this.healthUnlink();
+    if (path === "/health-export") return this.healthExport();
+    if (path === "/health-absorb") return this.healthAbsorb(await request.json());
     if (path === "/save")  return this.commit(await request.json());
     if (path === "/park")  return this.park();
     if (path === "/pet-intent") return this.petIntent();
@@ -1991,11 +2199,26 @@ export class Athlete {
     return tok.access_token;
   }
 
+  /** Strava's part of a sync and Health's part, side by side. Health rides on
+      every reply, including one where Strava failed: a refused Strava token
+      is no reason to sit on a run the phone sent. */
   async sync(){
+    const s = this.state.storage;
+    const [refresh, healthOnly] = await Promise.all([s.get("refresh"), s.get("healthOnly")]);
+    // A Health-only player never had a Strava token, and must not be told to
+    // reconnect to a Strava they never connected - that reply is what parks
+    // a Strava athlete's phone.
+    const strava = !refresh && healthOnly
+      ? { save: await s.get("save") || null, activities: [], strava: false, adjust: await s.get("adjust") || [] }
+      : await this.stravaSync();
+    return this.ok({ ...strava, ...(await this.healthOut()) });
+  }
+
+  async stravaSync(){
     const s = this.state.storage;
     const save = await s.get("save") || null;
     const token = await this.accessToken();
-    if (!token) return this.ok({ save, activities: [], error:"reauth" });
+    if (!token) return ({ save, activities: [], error:"reauth" });
 
     const connectedAt = await s.get("connectedAt") || Date.now();
     const { map: imported, floor } = await this.pruneImported(Date.now());
@@ -2012,7 +2235,7 @@ export class Athlete {
     // 200 is the endpoint's maximum, and costs the same one request as 100.
     url.searchParams.set("per_page", "200");
     const r = await fetch(url, { headers:{ Authorization:`Bearer ${token}` } });
-    if (!r.ok) return this.ok({ save, activities: [], error:`strava ${r.status}` });
+    if (!r.ok) return ({ save, activities: [], error:`strava ${r.status}` });
 
     // Counts, not activities: enough for the athlete to see why a sync came back
     // empty - nothing recorded since connecting, nothing of a type that counts,
@@ -2029,6 +2252,9 @@ export class Athlete {
         t: Date.parse(a.start_date),
         km: a.distance / 1000,
         sec: a.moving_time,
+        // the wall-clock length, stops included: what the app needs to tell
+        // whether a run from Apple Health is this same run again
+        elapsed: a.elapsed_time || a.moving_time,
         elev: a.total_elevation_gain || 0,
         type: a.type,
         manual: !!a.manual,                // typed in by hand on Strava, not recorded
@@ -2111,7 +2337,7 @@ export class Athlete {
        yet and pushes the result. Sent every time rather than once, because a
        sync whose reply is lost would otherwise lose the adjustment with it. */
     const adjust = await s.get("adjust") || [];
-    return this.ok({ save, activities, seen, adjust });
+    return ({ save, activities, seen, adjust });
   }
 
   /* A race is held by a pet's name, so a renamed pet keeps its races under
@@ -2218,9 +2444,21 @@ export class Athlete {
       an activity cannot be marked imported by a save that never landed. Its
       public card rides along: the app knows the XP curve and the form names, and
       working them out again here would be the same rules written twice. */
-  async commit({ save, imported, card }){
+  async commit({ save, imported, card, healthDone }){
     const s = this.state.storage;
     if (await s.get("parkedAt")) return this.ok({ saved: false, error: "disconnected" });
+    /* Health workouts the app has settled - counted, or recognised as a run
+       it already had - leave the queue. Kept apart from `imported` on
+       purpose: those are Strava ids, and letting one go moves Strava's floor
+       up to its start time, so a Health time in there would stop Strava runs
+       being fetched. */
+    if (Array.isArray(healthDone) && healthDone.length){
+      const pending = await s.get("healthPending");
+      if (pending){
+        for (const k of healthDone) delete pending[String(k)];
+        await s.put("healthPending", pending);
+      }
+    }
     const now = Date.now();
     const { map } = await this.pruneImported(now);
     const offered = await s.get("offered") || {};
@@ -2259,19 +2497,153 @@ export class Athlete {
     return this.ok({ saved: true, ...(named && save ? { pet: named.name } : {}) });
   }
 
+  /* --- Apple Health ---------------------------------------------------- */
+  /** What every /sync reply carries for Health: the queue, and the link's
+      state, null when there is none - which is how a link turned off on
+      another phone reaches this one. */
+  async healthOut(){
+    const s = this.state.storage;
+    const [pending, key, since, last] = await Promise.all(
+      [s.get("healthPending"), s.get("healthKey"), s.get("healthSince"), s.get("healthLast")]);
+    return {
+      health: Object.values(pending || {}).sort((a, b) => a.start - b.start),
+      healthInfo: key ? { since: since || null, last: last || null } : null
+    };
+  }
+
+  /** The player's sync key, minted once. `healthSince` is the same rule as
+      Strava's connectedAt: workouts from before the link are somebody's
+      history, not this pet's food. */
+  async healthLink(){
+    const s = this.state.storage;
+    if (await s.get("parkedAt")) return this.ok({ ok:false, error:"disconnected" });
+    let key = await s.get("healthKey");
+    if (!key){
+      key = randomId(24);
+      const put = { healthKey: key, healthSince: Date.now() };
+      // nobody's Strava behind this object: see sync()
+      if (!(await s.get("athleteId")) && !(await s.get("refresh"))) put.healthOnly = true;
+      await s.put(put);
+    }
+    return this.ok({ ok:true, key, since: await s.get("healthSince") });
+  }
+
+  /** What the Shortcut sent, queued for the app. A workout overlapping one
+      already taken is that run again - sent twice, or a second app's copy of
+      it in Health - and is not taken. */
+  async healthPut({ items }){
+    const s = this.state.storage;
+    const [since, pending0, spans0, refresh, kmAfter0] = await Promise.all(
+      ["healthSince", "healthPending", "healthSpans", "refresh", "healthKmAfter"].map(k => s.get(k)));
+    if (!since) return this.ok({ error:"unlinked", message:"Apple Health is switched off in Runmon. Set it up again in Settings." });
+    const now = Date.now();
+    const pending = pending0 || {};
+    const spans = (spans0 || []).filter(x => x.end > now - HEALTH_SPANS_MS);
+    const counts = { sent: (items || []).length, queued: 0, already: 0, beforeLink: 0, tooOld: 0, skipped: {} };
+    const taken = [];
+    // oldest first, so of two copies of one run the earlier-starting is kept
+    const clean = (items || []).map(cleanWorkout);
+    for (const c of clean) if (!c.ok) counts.skipped[c.why] = (counts.skipped[c.why] || 0) + 1;
+    for (const w of clean.filter(c => c.ok).map(c => c.ok).sort((a, b) => a.start - b.start)){
+      if (w.start < since){ counts.beforeLink++; continue; }
+      if (w.start < now - HEALTH_HORIZON_MS){ counts.tooOld++; continue; }
+      if (w.start > now + 10 * 60e3){ counts.skipped.badDate = (counts.skipped.badDate || 0) + 1; continue; }
+      if (pending[w.key] || spans.some(x => w.start < x.end && x.start < w.end)){ counts.already++; continue; }
+      pending[w.key] = w;
+      spans.push({ start: w.start, end: w.end });
+      taken.push(w);
+      counts.queued++;
+    }
+    const put = { healthPending: pending, healthSpans: spans, healthLast: now };
+    /* Swings, for a player whose runs only come from Health. One with Strava
+       is paid by Strava's runs alone (see stravaSync()): the same run arriving
+       both ways would otherwise buy its swings twice, and this side cannot see
+       Strava's copy to tell. A high-water mark on start time, as Strava's
+       counter has, so a workout can only ever be counted once. */
+    const kmAfter = Number(kmAfter0) || 0;
+    const counting = refresh ? [] : taken.filter(w => w.start > kmAfter);
+    if (counting.length){
+      const bank = await this.raidBank();
+      bank.part += counting.reduce((t, w) => t + w.km, 0);
+      const whole = Math.floor(bank.part / RAID_KM_PER_SWING);
+      bank.earned += whole;
+      bank.part = Math.round((bank.part - whole * RAID_KM_PER_SWING) * 1000) / 1000;
+      put.raidBank = bank;
+      put.healthKmAfter = Math.max(kmAfter, ...counting.map(w => w.start));
+    }
+    await s.put(put);
+    const n = counts.queued;
+    counts.message = n ? `${n} new run${n === 1 ? "" : "s"} sent to Runmon.`
+      : counts.sent ? "Nothing new for Runmon." : "No runs found in Health.";
+    return this.ok(counts);
+  }
+
+  async healthUnlink(){
+    const s = this.state.storage;
+    const key = await s.get("healthKey");
+    // healthKmAfter stays: a link set up again must not pay for old runs twice
+    await s.delete(HEALTH_KEYS.filter(k => k !== "healthKmAfter"));
+    return this.ok({ key: key || null });
+  }
+
+  /** Everything the Health side owns, for moving onto a Strava athlete: the
+      link, the queue, the times already taken (or a copy could be taken
+      again there), and the swings not yet spent. */
+  async healthExport(){
+    const s = this.state.storage;
+    const got = {};
+    for (const k of [...HEALTH_KEYS, "friendCode"]) got[k] = await s.get(k);
+    const bank = await this.raidBank();
+    const spent = Number(await s.get("raidSpent")) || 0;
+    return this.ok({ ...got, unspent: Math.max(0, bank.earned - spent), part: bank.part || 0 });
+  }
+
+  async healthAbsorb(st){
+    const s = this.state.storage;
+    const [mine, myCode, pending0, spans0] = await Promise.all(
+      ["healthKey", "friendCode", "healthPending", "healthSpans"].map(k => s.get(k)));
+    const write = {};
+    // this object's own link wins if it somehow has one; the other is retired
+    const keptKey = !mine && !!st.healthKey;
+    if (keptKey){
+      write.healthKey = st.healthKey;
+      write.healthSince = st.healthSince || Date.now();
+      if (st.healthLast) write.healthLast = st.healthLast;
+    }
+    const spans = (spans0 || []).concat(st.healthSpans || []);
+    const pending = { ...(pending0 || {}) };
+    for (const [k, w] of Object.entries(st.healthPending || {})) if (!pending[k]) pending[k] = w;
+    if (keptKey || mine){ write.healthSpans = spans; write.healthPending = pending; }
+    // the swings they ran for come with them
+    if (st.unspent > 0 || st.part > 0){
+      const bank = await this.raidBank();
+      bank.earned += Math.max(0, Number(st.unspent) || 0);
+      bank.part += Math.max(0, Number(st.part) || 0);
+      const whole = Math.floor(bank.part / RAID_KM_PER_SWING);
+      bank.earned += whole;
+      bank.part = Math.round((bank.part - whole * RAID_KM_PER_SWING) * 1000) / 1000;
+      write.raidBank = bank;
+    }
+    const keptCode = !myCode && !!st.friendCode;
+    if (keptCode) write.friendCode = st.friendCode;
+    await s.put(write);
+    return this.ok({ keptKey, keptCode });
+  }
+
   /** A disconnect - see parkAthlete(). */
   async park(){
     const s = this.state.storage;
     await this.revoke();
-    const [save, card] = await Promise.all([s.get("save"), s.get("card")]);
+    const [save, card, healthKey] = await Promise.all([s.get("save"), s.get("card"), s.get("healthKey")]);
     await s.delete(["refresh", "access", "expires", "connectedAt", "lastSync", "imported",
                     "importedAt", "floor", "offered", "gone",
-                    "kmSeen", "kmAfter", "raidBank", "raidSpent", "raidPending", "deleteIntent"]);
+                    "kmSeen", "kmAfter", "raidBank", "raidSpent", "raidPending", "deleteIntent",
+                    ...HEALTH_KEYS]);
     const put = { parkedAt: Date.now() };
     if (save) put.save = gameOnly(save);
     if (card) put.card = gameCard(card);
     await s.put(put);
-    return this.ok({ parked: true, code: await s.get("friendCode") || null });
+    return this.ok({ parked: true, code: await s.get("friendCode") || null, healthKey: healthKey || null });
   }
 
   /* Tell Strava to forget us. oauth/revoke is the endpoint Strava now asks
@@ -2313,9 +2685,9 @@ export class Athlete {
   async purge(){
     const s = this.state.storage;
     await this.revoke();
-    const code = await s.get("friendCode");
+    const [code, healthKey] = await Promise.all([s.get("friendCode"), s.get("healthKey")]);
     await s.deleteAll();
-    return this.ok({ ok:true, code: code || null });
+    return this.ok({ ok:true, code: code || null, healthKey: healthKey || null });
   }
 
   /* The Strava ids of what the app has imported, each kept a week and then
@@ -2380,6 +2752,14 @@ export class Athlete {
     }
     await this.pruneImported(now);
     await this.raidBank();
+    // Health workouts the app never came back for, and the times kept to
+    // recognise repeats, go once nothing could still arrive to need them
+    const [pending, spans] = await Promise.all([s.get("healthPending"), s.get("healthSpans")]);
+    if (pending){
+      for (const k of Object.keys(pending)) if (pending[k].start < now - RETAIN_MS) delete pending[k];
+      await s.put("healthPending", pending);
+    }
+    if (spans) await s.put("healthSpans", spans.filter(x => x.end > now - HEALTH_SPANS_MS));
     const gone = await s.get("gone");
     if (gone){
       for (const k of Object.keys(gone)) if (now - gone[k] >= RETAIN_MS) delete gone[k];
