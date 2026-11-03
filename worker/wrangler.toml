@@ -17,6 +17,11 @@ class_name = "Athlete"
 tag = "v1"
 new_sqlite_classes = ["Athlete"]
 
+# The nightly backup of every pet (no runs in it; see autoBackup() in src).
+# 03:17 UTC, off the hour so it does not queue behind everybody else's crons.
+[triggers]
+crons = ["17 3 * * *"]
+
 [vars]
 # Public, and fine to commit. The secret half never appears in this repo:
 #   npx wrangler secret put STRAVA_CLIENT_SECRET

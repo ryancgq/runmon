@@ -18,10 +18,11 @@
 #   STRAVA_CLIENT_SECRET   from strava.com/settings/api
 #   SESSION_SECRET         any long random string you invent; it signs login
 #                          sessions and is not from Strava
-#   ADMIN_TOKEN            another long random string you invent, optional. It
-#                          is what opens /admin/summary, the private roster of
-#                          who is playing. Leave it unset and that route 404s
-#                          like any other address that does not exist.
+#   ADMIN_TOKEN            the admin dashboard's password (admin.html), and
+#                          what opens /admin/summary. Any value you choose;
+#                          change it here and re-run this to change it. Leave
+#                          it unset and the admin routes 404 like any address
+#                          that does not exist.
 #
 # None of them are ever visible to anyone, including in this file, the logs, or
 # to me. Changing SESSION_SECRET later signs everybody out, which is the point.

@@ -1,0 +1,71 @@
+import assert from "node:assert/strict";
+import http from "node:http"; import fs from "node:fs"; import path from "node:path";
+import { createRequire } from "node:module"; import { makeHarness, REPO, OUT } from "./lib.mjs";
+const { chromium } = createRequire(import.meta.url)("playwright");
+const { worker, env, call, storageOf } = await makeHarness(null, { APP_ORIGIN: "http://localhost:8791", APP_PATH: "/index.html" });
+const W = "https://runmon-strava.runmon-gq.workers.dev";
+const server = http.createServer((q, r) => { const f = path.join(REPO, new URL(q.url,"http://x").pathname);
+  if (!fs.existsSync(f) || fs.statSync(f).isDirectory()){ r.writeHead(404); return r.end(); }
+  r.writeHead(200, {"Content-Type": f.endsWith(".html") ? "text/html" : "image/png"}); fs.createReadStream(f).pipe(r); }).listen(8791);
+const b = await chromium.launch(); const ctx = await b.newContext({ viewport:{ width:390, height:844 }, deviceScaleFactor: 2 });
+await ctx.grantPermissions(["clipboard-read", "clipboard-write"], { origin: "http://localhost:8791" });
+const p = await ctx.newPage();
+const errs = []; p.on("pageerror", e => errs.push(String(e)));
+await p.route(W + "/**", async route => { const req = route.request(); const u = new URL(req.url());
+  const r = await worker.fetch(new Request("https://broker" + u.pathname + u.search, { method: req.method(), headers: req.headers(), body: ["GET","HEAD"].includes(req.method()) ? undefined : req.postData() }), env, { waitUntil(){} });
+  const h = {}; r.headers.forEach((v,k)=>h[k]=v); await route.fulfill({ status:r.status, headers:h, body: await r.text() }); });
+await p.route(/unpkg|cdnjs|jsdelivr|tile|fonts\.g|runmon-explore/, r => r.abort());
+const now = Date.now(), APP = "http://localhost:8791/index.html";
+await p.goto(APP);
+await p.evaluate(s => { localStorage.clear(); localStorage.setItem("runmon.save.v1", JSON.stringify(s)); },
+  { v:1, species:"ember", petName:"Ash", createdAt: now - 20*864e5, runs:[], badges:{}, seenStage:1, settings:{ units:"km", weightKg:70, xpAnim:false }, friends:[] });
+await p.goto("about:blank"); await p.goto(APP + "?health=1"); await p.waitForTimeout(1200);
+await p.evaluate(() => go("settings")); await p.waitForTimeout(400);
+await p.click("#health-on"); await p.waitForTimeout(900);
+const title = () => p.evaluate(() => document.querySelector("#sheet-wrap.show #sheet h3")?.textContent || null);
+const shot = n => p.screenshot({ path: `${OUT}/guide-${n}.png` });
+assert.equal(await title(), "One more thing: the Shortcut", "guide opens straight after Set up");
+await shot(0);
+await p.click('[data-sheet-act="1"]'); await p.waitForTimeout(250);
+assert.equal(await title(), "Copy your sync link"); await p.click('[data-health="copy"]'); await p.waitForTimeout(250);
+assert.equal(await p.evaluate(() => document.querySelector('[data-health="copy"]').textContent), "Copied ✓");
+assert.match(await p.evaluate(() => navigator.clipboard.readText()), /\/health\/import\/[a-z0-9]{24}$/);
+await shot(1);
+await p.click('[data-sheet-act="1"]'); await p.waitForTimeout(250); assert.equal(await title(), "Add the Runmon Shortcut"); await shot(2);
+await p.click('[data-sheet-act="1"]'); await p.waitForTimeout(250); assert.equal(await title(), "Run it once now"); await shot(3);
+// a Health-only player's guide goes on to the recovery code, then Done
+await p.click('[data-sheet-act="1"]'); await p.waitForTimeout(500);
+assert.equal(await title(), "Save your recovery code");
+// leave without running it
+await p.click('[data-sheet-act="1"]'); await p.waitForTimeout(300);
+const panel = await p.evaluate(() => document.querySelector("#health-panel").innerText);
+assert.match(panel, /Not syncing yet/); assert.match(panel, /Finish setup/);
+await p.locator("#health-title").scrollIntoViewIfNeeded(); await shot("panel-waiting");
+await p.evaluate(() => go("home")); await p.waitForTimeout(400);
+assert.match(await p.evaluate(() => document.querySelector("#notices").innerText), /Apple Health isn't syncing yet/);
+await shot("home-notice");
+// Finish setup reopens it
+await p.evaluate(() => go("settings")); await p.waitForTimeout(300);
+await p.click('#health-panel [data-health="guide"]'); await p.waitForTimeout(250);
+assert.equal(await title(), "One more thing: the Shortcut");
+await p.evaluate(() => closeSheet());
+// the Shortcut runs (one workout) and opens the app at #health
+const link = await p.evaluate(() => Runmon.state.save.healthLink.url); const key = link.split("/").pop();
+const pid = (await p.evaluate(() => localStorage.getItem("runmon.strava.session"))).split(".")[0];
+storageOf(pid).set("healthSince", now - 3*864e5);
+const t = now - 5*3600e3;
+const put = await call("POST", "/health/import/" + key, { body: { text: `${new Date(t).toISOString()} | ${new Date(t + 1800e3).toISOString()} | 5.2 km | Running` } });
+assert.equal(put.queued, 1);
+await p.evaluate(() => go("home"));
+await p.goto(APP + "#health"); await p.waitForTimeout(2500);
+assert.equal(await title(), "Apple Health is syncing ✓", "success pop-up after the first run");
+await shot("success");
+await p.click('[data-sheet-act="0"]'); await p.waitForTimeout(300);
+assert.doesNotMatch(await p.evaluate(() => document.querySelector("#notices").innerText), /isn't syncing/, "reminder cleared");
+assert.equal(await p.evaluate(() => Runmon.state.save.runs.length), 1);
+await p.evaluate(() => go("settings")); await p.waitForTimeout(400);
+assert.match(await p.evaluate(() => document.querySelector("#health-panel").innerText), /Syncing/);
+await p.locator("#health-title").scrollIntoViewIfNeeded(); await shot("panel-syncing");
+assert.deepEqual(errs, []);
+console.log("guide checks passed");
+await b.close(); server.close();

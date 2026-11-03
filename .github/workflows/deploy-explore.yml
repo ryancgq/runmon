@@ -1,0 +1,57 @@
+# Deploys Runmon Explore's world server (explore-worker/) - the prototype's
+# shared world when it is played outside Claude. A separate worker from the
+# Strava broker: its own name (runmon-explore), its own storage, no secrets
+# of its own. It only uses the two Cloudflare credentials the broker's
+# workflow already set up, and touches nothing the game uses.
+#
+# Runs by itself on a push that changes explore-worker/ (or this file), and
+# by hand from the Actions tab once this file is on the default branch.
+
+name: Deploy the Explore world
+
+on:
+  push:
+    branches: [claude/runpet-tracker-app-x6ospu, main]
+    paths:
+      - "explore-worker/**"
+      - ".github/workflows/deploy-explore.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-explore
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Cloudflare
+        id: deploy
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: explore-worker
+
+      - name: Tell me the URL
+        if: always()
+        run: |
+          {
+            if [ "${{ steps.deploy.outcome }}" = "success" ]; then
+              echo "## Explore world deployed"
+              echo ""
+              echo "**Worker URL:** \`${{ steps.deploy.outputs.deployment-url }}\`"
+              echo ""
+              echo "The page connects to \`wss://<that host>/world\`. If the host is not"
+              echo "\`runmon-explore.runmon-gq.workers.dev\`, change EXPLORE_SERVER in"
+              echo "explore/index.html to match."
+            else
+              echo "## The deploy failed"
+              echo ""
+              echo "The deploy step's log above says why. This workflow needs only"
+              echo "CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID, the same two the"
+              echo "Strava broker's workflow uses."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
