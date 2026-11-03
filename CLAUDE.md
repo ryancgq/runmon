@@ -131,7 +131,7 @@ code, not an iPhone: the Shortcut and Health's real data are checked by hand.
 
 ## The app is one file with nine separate `<script>` blocks
 
-`index.html` is ~10,600 lines. The blocks are **not** one scope at parse time: a
+`index.html` is ~10,400 lines. The blocks are **not** one scope at parse time: a
 `const` declared in a later block is invisible to an earlier one during
 top-level execution, and cannot be reassigned or stubbed from outside. This has
 bitten twice while testing (`stravaLinked`, `stravaCall`). Use Playwright
