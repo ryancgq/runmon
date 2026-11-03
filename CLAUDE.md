@@ -22,7 +22,19 @@ that advice about release timing was confidently wrong.
 
 `main` is a lagging snapshot that only ever receives this branch's work back
 through PR merges. It has never carried independent development. Git may report
-`main` as "N commits ahead" — that is merge commits, not content.
+`main` as "N commits ahead" — that is merge commits, not content. Since November
+2026 the repo's **default branch is the live branch**, so a fresh clone or
+session starts on live code; one session before that built a whole feature on
+a `main` 156 commits stale before anyone noticed.
+
+### Releasing a change that touches the broker
+
+Deploy the broker from the work branch **first** (Actions → Deploy the Strava
+broker → that branch), check the run succeeded, **then** fast-forward the live
+branch to it. The broker must keep serving the live app in the gap — test that
+with `tests/strava-unchanged.mjs`, which runs the old app against the new
+broker. An app-only change needs only the push; check with
+`git diff --stat <last deployed commit> HEAD -- worker/`.
 
 ### Consequences that follow from this
 
@@ -71,9 +83,55 @@ has the full list; the ones easiest to break by accident:
 - No lifetime distance anywhere. No Strava data, or anything derived from it,
   into any AI — including this chat.
 
+## Apple Health — and keeping Strava players exactly as they were
+
+Runs also come from Apple Health, through an iPhone Shortcut (README → "Apple
+Health"). With Strava's athlete cap reached it is the way in for new players.
+What to hold to:
+
+- **A player connected to Strava must not notice any of it.** `healthOn()` is
+  false for them unless they set Health up themselves, and anything Health adds
+  hangs on that or on `save.healthLink` — not on "has a broker session", which
+  Health-only players have too (`stravaLinked()` means the latter;
+  `stravaAthlete()` means Strava). Every change near this gets
+  `node tests/strava-unchanged.mjs <live commit>`: identical, or it does not ship.
+- **`STRAVA_FULL`** closes Strava to *new* players only. Anyone who has played
+  with Strava before (`stravaReturning()`) can always connect — a new phone,
+  a disconnect inside the four weeks, Strava asking again. Set it to `false`
+  when the athlete-capacity review comes through.
+- **A run is counted once whatever it came through**: any run whose span
+  crosses one already held is the same run (`runOverlapping`). That only works
+  while the other copy's times still exist — Strava runs lose theirs when they
+  fold at six days — so Health only takes outings **under five days old**, in
+  the broker (`HEALTH_HORIZON_MS`) and the app alike. Don't widen one without
+  the other, and don't widen past the fold.
+- **Health keys never go into `importedAt`.** Pruning it moves Strava's fetch
+  floor up to each id's start time, so a Health time in there stops real
+  Strava runs being fetched. They travel as `healthDone`.
+- **Swings from Health are paid only to Health-only players**, per outing
+  taken — the broker cannot see a Strava copy to tell one run from two.
+- **Shortcuts cannot read workouts** on current iOS, so runs and walks are
+  rebuilt from Walking + Running Distance slices, checked against Step Count
+  for vehicles (`sessionsFromSamples`). The thresholds were set on simulated
+  data; real outings are the test that matters.
+- **Health-only players have no Strava to sign back in with.** Their session is
+  the only key to their pet; the recovery code is the second. Never make the
+  Shortcut's sync link able to read a save — it is in a file people share.
+- The shared Shortcut's link is `HEALTH_SHORTCUT_URL`. A new share must carry
+  an **import question with an empty default** on Get Contents of URL; the
+  first one did not, and would have sent every new player's runs to the
+  owner's pet. Check by opening the link and seeing it ask.
+
+## Tests
+
+`node tests/run-all.mjs` before every push to the live branch — see
+`tests/README.md`. The real broker runs in-process with a fake Strava, and the
+browser tests drive this checkout's `index.html` against it. They cover the
+code, not an iPhone: the Shortcut and Health's real data are checked by hand.
+
 ## The app is one file with nine separate `<script>` blocks
 
-`index.html` is ~6,400 lines. The blocks are **not** one scope at parse time: a
+`index.html` is ~10,600 lines. The blocks are **not** one scope at parse time: a
 `const` declared in a later block is invisible to an earlier one during
 top-level execution, and cannot be reassigned or stubbed from outside. This has
 bitten twice while testing (`stravaLinked`, `stravaCall`). Use Playwright
