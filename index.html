@@ -884,11 +884,6 @@ body::before{
    pet or a sprite sheet. */
 .evo-node.locked .pet-holder svg,
 .evo-node.locked .pet-holder .sprite-view{filter:brightness(0) invert(1) opacity(.8)}
-/* Somebody else's pet at a stage you have not reached is drawn the same way:
-   the evolution tab keeps your next forms a surprise, and Rankings showing them
-   in full colour two rows up gave the surprise away. */
-.pet-holder.unseen svg,
-.pet-holder.unseen .sprite-view{filter:brightness(0) invert(1) opacity(.8)}
 .evo-node.current{
   border-color:rgba(var(--glow),.55);
   background:linear-gradient(100deg, rgba(var(--glow),.13), var(--card) 60%);
@@ -5029,7 +5024,7 @@ function spriteConfig(species, stage, level){
 /* Stamped into Settings so a device can say which build it is running. GitHub
    Pages caches index.html and offers no way to set headers on it, so a missing
    feature and a stale page look the same without this. */
-const BUILD_ID = "2026-11-06 c2eb6e8";
+const BUILD_ID = "2026-11-06 f9f82af";
 const ART_VERSION = "27";
 function assetURL(src){
   return /^art\//.test(src) ? src + "?v=" + ART_VERSION : src;
@@ -6353,8 +6348,8 @@ function renderExplore(){
     <div class="card" style="padding:4px 14px">${rows.map(r => `
       <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--line);${r.rank === 1 ? "border-top:0;" : ""}${r.you ? "color:var(--accent);" : ""}">
         <b style="width:20px;text-align:right;font-size:12px;color:var(--muted)">${r.rank}</b>
-        <div class="pet-holder mood-okay${!r.you && unseenCard(cardOf(r)) ? " unseen" : ""}" data-board-art="${r.rank}" style="flex:0 0 38px;width:38px;height:38px"></div>
-        <span style="flex:1;font-weight:800">${esc(r.pet || "A pet")}<span class="muted" style="font-size:11px;font-weight:700"> \u00B7 ${(c => c ? (!r.you && unseenCard(c) ? UNSEEN_FORM : esc(c.form)) + (c.level ? ` \u00B7 Lv ${c.level}` : "") : esc((SPECIES[r.species] || {}).name || ""))(cardOf(r))}</span></span>
+        <div class="pet-holder mood-okay" data-board-art="${r.rank}" style="flex:0 0 38px;width:38px;height:38px"></div>
+        <span style="flex:1;font-weight:800">${esc(r.pet || "A pet")}<span class="muted" style="font-size:11px;font-weight:700"> \u00B7 ${(c => c ? esc(c.form) + (c.level ? ` \u00B7 Lv ${c.level}` : "") : esc((SPECIES[r.species] || {}).name || ""))(cardOf(r))}</span></span>
         <b style="font-size:13px">${(r.dm / max * 100).toFixed(1)}%</b>
       </div>`).join("")}</div>` : B ? `<div class="muted" style="font-size:12px;font-weight:700;margin-top:18px;text-align:center">Nobody has landed a blow yet.</div>` : ""}`;
   for (const r of rows){
@@ -7522,22 +7517,6 @@ function rankBadge(rank){
     : `<span class="rank${metal}">${rank}</span>`;
 }
 
-/* Whether a pet is further along than yours. Ahead of you it is a shape and a
-   "???" - wherever another player's pet is listed - so the forms you are
-   running towards are still a reveal when you get there. Your own stage, and
-   anything below it, you have seen and so see in full. No pet yet counts as
-   the egg: the first form is the one everybody starts from.
-
-   By stage, not species: a second-form pet of any species is something a
-   second-form player has already got the measure of. The stage number itself
-   stays on the row, because "they are ahead of you" is the ranking's point;
-   only the look and the name of what is ahead are held back. */
-function myStage(){
-  return save.species && derived && derived.species ? derived.stage : 0;
-}
-function unseenCard(c){ return !!c && c.stage > myStage(); }
-const UNSEEN_FORM = "???";
-
 /** One place in the table. The pet is drawn with the same art the pet screen
     uses, so a friend's Panda is the Panda. */
 function friendRowHTML(r, rank){
@@ -7557,15 +7536,14 @@ function friendRowHTML(r, rank){
     ? `<div class="hit">You attacked them \u00b7 again ${lock.until ? untilShort(lock.until) : "tomorrow"}</div>` : "";
   const art  = r.me ? "me" : r.id;
   const open = r.me ? "" : ` data-friend="${r.id}"`;
-  const hid  = !r.me && unseenCard(c);
   return `<${r.me ? "div" : "button"} class="friend${r.me ? " me" : ""}"${open}>
       <div class="mug">
-        <div class="pet-holder mood-okay${hid ? " unseen" : ""}" data-friend-art="${art}"></div>
+        <div class="pet-holder mood-okay" data-friend-art="${art}"></div>
         ${rankBadge(rank)}
       </div>
       <div class="who">
         <div class="n">${esc(c.pet)} <span class="chip">LV ${c.level}</span>${tag}</div>
-        <div class="h">${hid ? UNSEEN_FORM : esc(c.form)} \u00b7 Stage ${c.stage + 1} of 5</div>
+        <div class="h">${esc(c.form)} \u00b7 Stage ${c.stage + 1} of 5</div>
         <div class="s">${c.streak >= 2 ? c.streak + "-day streak" : "no streak"} \u00b7 ${c.badges} badge${c.badges === 1 ? "" : "s"}</div>
         ${pen}${hit}
       </div>
@@ -7762,15 +7740,13 @@ function openFriend(id){
   if (!f) return;
   const c = safeCard(f.card);
   const lock = attackLock(id);
-  const hid = unseenCard(c);
-  const form = c ? (hid ? UNSEEN_FORM : esc(c.form)) : "";
   openSheet({
     title: c ? esc(c.pet) : "Their pet",
-    desc: c ? `${form} \u00b7 Level ${c.level}` : "",
+    desc: c ? `${esc(c.form)} \u00b7 Level ${c.level}` : "",
     body: c ? `
       <div class="pet-stage" style="min-height:170px;margin:4px 0 14px">
         <div class="pet-halo"></div>
-        <div class="pet-holder mood-okay${hid ? " unseen" : ""}" id="friend-big"></div>
+        <div class="pet-holder mood-okay" id="friend-big"></div>
       </div>
       <div class="stat-grid">
         <div class="stat"><div class="v">${c.streak}</div><div class="k">Day streak</div></div>
@@ -7780,7 +7756,7 @@ function openFriend(id){
       <div class="stat-grid" style="margin-top:9px">
         <div class="stat"><div class="v">${c.level}</div><div class="k">Level</div></div>
         <div class="stat"><div class="v">${c.badges}</div><div class="k">Badges</div></div>
-        <div class="stat"><div class="v" style="font-size:15px">${form}</div><div class="k">Form</div></div>
+        <div class="stat"><div class="v" style="font-size:15px">${esc(c.form)}</div><div class="k">Form</div></div>
       </div>
       ${lock.locked ? lockNote(c, lock) : attackNote(c)}`
       : `<p class="desc">No pet on this code yet.</p>`,
