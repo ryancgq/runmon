@@ -48,14 +48,20 @@ export async function makeHarness(workerFile, envExtra = {}){
   });
   env.ATHLETE = ns("A");
   const strava = { acts: [], athlete: 777 };
+  /* Strava's ids go 64-bit in June 2027. A BigInt anywhere in what the fake
+     returns is written as the bare digits a real reply would carry, so a test
+     can hand the broker an id no JavaScript number holds exactly. */
+  const reply = v => new Response(JSON.stringify(v, (k, x) => typeof x === "bigint" ? "__big" + x + "__" : x)
+    .replace(/"__big(\d+)__"/g, "$1"), { headers:{ "Content-Type":"application/json" } });
   const realFetch = globalThis.fetch;
   globalThis.fetch = async (u, init) => {
     const url = new URL(u instanceof Request ? u.url : String(u));
     if (url.host !== "strava.test") return realFetch(u, init);
-    if (url.pathname === "/oauth/token") return Response.json({ access_token:"A", refresh_token:"R", expires_at: Date.now()/1000 + 3600, athlete:{ id: strava.athlete } });
-    if (url.pathname === "/api/athlete/activities") return Response.json(strava.acts);
+    if (url.pathname === "/oauth/token") return reply({ access_token:"A", refresh_token:"R", expires_at: Date.now()/1000 + 3600,
+      athlete: typeof strava.athlete === "object" ? strava.athlete : { id: strava.athlete } });
+    if (url.pathname === "/api/athlete/activities") return reply(strava.acts);
     if (url.pathname === "/oauth/revoke" || url.pathname === "/oauth/deauthorize") return Response.json({});
-    if (url.pathname === "/api/athlete") return Response.json({ id: strava.athlete });
+    if (url.pathname === "/api/athlete") return reply(typeof strava.athlete === "object" ? strava.athlete : { id: strava.athlete });
     return new Response("not found", { status: 404 });
   };
   const W = "https://broker";

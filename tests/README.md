@@ -16,6 +16,7 @@ JSON land in `$RUNMON_TEST_OUT`, or `<tmp>/runmon-tests`.
 | File | What it holds to |
 | --- | --- |
 | `broker.test.mjs` | The broker's Health routes: linking, the five-day window, overlapping copies taken once, swings for Health-only players only, Health keys kept out of Strava's `importedAt`, adopting onto a Strava athlete, unlink and disconnect retiring the link |
+| `strava-ids.test.mjs` | Strava's 64-bit ids (June 2027): two athletes whose ids round to the same number get two pets, two such runs stay two, `id_str` is read first, and a webhook's bare-number ids reach the right athlete and run |
 | `health-sessions.test.mjs` | Runs and walks rebuilt from distance slices; a phone and watch copy counted once; pottering ignored; cars, buses and trains dropped on speed and stride; no steps, no outing; a half-finished walk replaced by the whole one |
 | `health-app.test.mjs` | The app end to end: setup, three copies of one run counted once, re-sends ignored, moving to Strava, a Strava and Health copy counted once, a failed upload retried without double counting, the horizon held in the app too |
 | `health-guide.test.mjs` | The setup guide: opens on Set up, each page, leaving early (red panel, reminder), Finish setup, and the success message on the first word from the Shortcut |

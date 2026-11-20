@@ -101,6 +101,35 @@ const json = (env, obj, status = 200) =>
 
 const appURL = env => (env.APP_ORIGIN || "") + (env.APP_PATH || "/");
 
+/* Strava's ids for athletes and activities become 64-bit from June 2027.
+   A JavaScript number holds integers exactly only up to 2^53, so `r.json()`
+   rounds a big id before any code sees it and String() then spells the
+   rounded value: two athletes could share one pet, two runs one id. Strava
+   returns `id_str` alongside `id` for exactly this, so it is read first; the
+   number is the fallback for any reply that does not carry it yet, and is
+   exact for every id issued so far. */
+const stravaId = o => {
+  if (!o) return null;
+  const v = o.id_str != null ? String(o.id_str) : (o.id != null ? String(o.id) : "");
+  return /^\d+$/.test(v) ? v : null;
+};
+/* Webhook events carry their ids as bare numbers and Strava has promised no
+   string copy of them, so they are read out of the body's text before it is
+   parsed: the digits as sent, not what a double rounds them to. A field that
+   is not a plain integer is left as JSON.parse saw it. */
+function parseWebhookBody(text){
+  let ev;
+  try { ev = JSON.parse(text); } catch (e){ return null; }
+  if (!ev || typeof ev !== "object") return null;
+  for (const k of ["object_id", "owner_id", "subscription_id"]){
+    const m = text.match(new RegExp('"' + k + '"\\s*:\\s*"?(\\d+)"?\\s*[,}]'));
+    // the same number JSON.parse found, so a key of that name nested in
+    // `updates` can never stand in for the event's own
+    if (m && Number(m[1]) === Number(ev[k])) ev[k] = m[1];
+  }
+  return ev;
+}
+
 async function athleteStub(env, id){
   return env.ATHLETE.get(env.ATHLETE.idFromName(String(id)));
 }
@@ -316,7 +345,7 @@ const webhookToken = async env => (await hmac(env.SESSION_SECRET, "strava-webhoo
 async function handleWebhook(env, ev){
   if (!ev || typeof ev !== "object") return { ignored: "body" };
   const conf = await (await webhookStub(env).fetch("https://do/wh-get")).json();
-  if (conf.id && Number(ev.subscription_id) !== Number(conf.id)) return { ignored: "subscription" };
+  if (conf.id && String(ev.subscription_id) !== String(conf.id)) return { ignored: "subscription" };
   const key = [ev.object_type, ev.aspect_type, ev.object_id, ev.owner_id, ev.event_time,
                JSON.stringify(ev.updates || {})].join("|");
   const { dup } = await (await webhookStub(env).fetch("https://do/wh-seen",
@@ -861,7 +890,7 @@ export default {
           return json(env, { error:"no such endpoint" }, 404);
         }
         if (request.method === "POST"){
-          const ev = await request.json().catch(() => null);
+          const ev = parseWebhookBody(await request.text().catch(() => ""));
           const job = handleWebhook(env, ev).catch(() => null);
           if (ctx && ctx.waitUntil) ctx.waitUntil(job); else await job;
           return new Response("ok");
@@ -900,7 +929,7 @@ export default {
         });
         if (!r.ok) return Response.redirect(appURL(env) + "#strava=failed", 302);
         const tok = await r.json();
-        const athleteId = tok.athlete && tok.athlete.id;
+        const athleteId = stravaId(tok.athlete);
         if (!athleteId) return Response.redirect(appURL(env) + "#strava=failed", 302);
 
         const stub = await athleteStub(env, athleteId);
@@ -2415,14 +2444,14 @@ export class Athlete {
     // empty - nothing recorded since connecting, nothing of a type that counts,
     // or everything already taken - without anyone having to read a log.
     const raw = await r.json();
-    const fresh = raw.filter(a => !imported[String(a.id)] && !(Date.parse(a.start_date) <= floor));
+    const fresh = raw.filter(a => stravaId(a) && !imported[stravaId(a)] && !(Date.parse(a.start_date) <= floor));
     const kinds = {};
     for (const a of fresh) kinds[a.type] = (kinds[a.type] || 0) + 1;
 
     const activities = fresh
       .filter(a => want.has(a.type) && a.distance > 0)
       .map(a => ({
-        id: String(a.id),
+        id: stravaId(a),
         t: Date.parse(a.start_date),
         km: a.distance / 1000,
         sec: a.moving_time,

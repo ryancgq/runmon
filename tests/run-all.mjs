@@ -6,6 +6,7 @@ import { REPO, OUT } from "./lib.mjs";
 
 const tests = [
   "broker.test.mjs",          // the broker's Health routes, adopt, swings, unlink
+  "strava-ids.test.mjs",      // 64-bit Strava ids stay exact: athletes, runs, webhooks
   "health-sessions.test.mjs", // runs and walks rebuilt from distance; vehicles
   "health-app.test.mjs",      // the app end to end against the real broker
   "health-guide.test.mjs",    // the setup guide, its reminders and success
